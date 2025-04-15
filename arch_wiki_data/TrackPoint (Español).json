@@ -1,0 +1,81 @@
+{
+  "title": "TrackPoint (Español)",
+  "url": "https://wiki.archlinux.org/title/TrackPoint_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-19** \n\nTrackPoint es la marca registrada de Lenovo para el puntero en el medio del teclado. Es soportado por xf86-input-evdev y xf86-input-libinput.\n\nEl comportamiento por defecto en Xorg (Español) soporta cliquear y apuntar. Para cliquear con el botón del medio y desplazarse con el controlador evdev se requiere configuración adicional.\n\n"
+    },
+    {
+      "title": "Configuración en Interfaz grafica",
+      "level": 2,
+      "content": "Instale el paquete gpointing-device-settingsAUR.\n\n"
+    },
+    {
+      "title": "Desplazamiento con el botón del medio",
+      "level": 2,
+      "content": "Al usar xf86-input-libinput, el desplazamiento con el botón del medio esta activado por defecto.\n\nAl usar xf86-input-evdev, el desplazamiento con el botón del medio es soportado a través de xinput de el paquete xorg-xinput. Por ejemplo:\n\n```\n~/.xinitrc\n```\n\n```\nxinput set-prop \"TPPS/2 IBM TrackPoint\" \"Evdev Wheel Emulation\" 1\nxinput set-prop \"TPPS/2 IBM TrackPoint\" \"Evdev Wheel Emulation Button\" 2\nxinput set-prop \"TPPS/2 IBM TrackPoint\" \"Evdev Wheel Emulation Timeout\" 200\nxinput set-prop \"TPPS/2 IBM TrackPoint\" \"Evdev Wheel Emulation Axes\" 6 7 4 5\n```\n\n- Los dispositivos pueden ser listados con xinput --list o hwinfo.\n- La linea \"Device Accel Constant Deceleration\" configura la sensibilidad del puntero.\n\n"
+    },
+    {
+      "title": "Configuración de Xorg",
+      "level": 3,
+      "content": "Como alternativa a configurarlo en ~/.xinitrc, también puede hacer una configuración en Xorg para el controlador evdev(4). Por ejemplo, como en /etc/X11/xorg.conf.d/20-thinkpad.conf, reemplazando TPPS/2 IBM TrackPoint con el nombre del dispositivo en xinput:\n\n```\nSection \"InputClass\"\n    Identifier\t\"Trackpoint Wheel Emulation\"\n    Driver \"evdev\"\n    MatchProduct\t\"TPPS/2 IBM TrackPoint\"\n    MatchDevicePath\t\"/dev/input/event*\"\n    Option\t\t\"EmulateWheel\"\t\t\"true\"\n    Option\t\t\"EmulateWheelButton\"\t\"2\"\n    Option\t\t\"Emulate3Buttons\"\t\"false\"\n    Option\t\t\"XAxisMapping\"\t\t\"6 7\"\n    Option\t\t\"YAxisMapping\"\t\t\"4 5\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Punteros con dos botones",
+      "level": 3,
+      "content": "Al usar xf86-input-libinput en los punteros de dos botones, el botón de desplazamiento se puede establecer al botón derecho sin perder funcionalidad.\n\nReemplazando dispositivo con el nombre en xinput:\n\n```\n$ xinput set-prop \"dispositivo\" \"libinput Button Scrolling Button\" 3\n```\n\n"
+    },
+    {
+      "title": "Atributos en Sysfs",
+      "level": 2,
+      "content": "Los punteros exponen sus atributos con archivos en /sys/devices/platform/i8042/serio1/. Por ejemplo, para habilitar manualmente la funcionalidad tocar-para-presionar:\n\n```\n# echo -n 1 > /sys/devices/platform/i8042/serio1/press_to_select\n```\n\n"
+    },
+    {
+      "title": "Regla udev",
+      "level": 4,
+      "content": "Esta regla aumenta la velocidad del puntero y habilita la característica tocar-para-seleccionar (vea mas arriba) al iniciar.\n\n```\n/etc/udev/rules.d/10-trackpoint.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"input\", ATTR{name}==\"TPPS/2 IBM TrackPoint\", ATTR{device/sensitivity}=\"240\", ATTR{device/press_to_select}=\"1\"\n```\n\n"
+    },
+    {
+      "title": "Unidad systemd.path",
+      "level": 4,
+      "content": "Han habido reportes en los foros de que los archivos de atributos en /sys/devices/platform/i8042/serio1/serio2/ aparecen demasiado tarde en el proceso de inicio como para que la(s) regla(s) udev anterior (o similares) tengan efecto en ellos. En vez de eso, se puede usar una unidad systemd.path para configurar los atributos del puntero.\n\nPrimero, cree un script ejecutable llamado p.ej /usr/local/bin/configuracion_puntero.sh que establezca los atributos del puntero como se indica en la sección #Atributos en Sysfs.\n\nEl siguiente ejemplo deshabilita el puntero en algunos portátiles, dejando que los botones derecho e izquierdo (los de arriba del puntero) funcionen bien (aunque, si se deshabilita el puntero directamente desde la configuración UEFI/BIOS, los botones también se deshabilitan).\n\n```\n/usr/local/bin/configuracion_puntero.sh\n```\n\n```\n#!/bin/bash\necho -n 0 > /sys/devices/platform/i8042/serio1/serio2/sensitivity\necho -n 0 > /sys/devices/platform/i8042/serio1/serio2/speed\n```\n\nDespués, cree las siguientes unidades de systemd. Asegúrese que todos los atributos modificados por el scripts sean listados con PathExist.\n\n```\n/etc/systemd/system/parametros_puntero.path\n```\n\n```\n[Unit]\nDescription=Vigilar y modificar los atributos del puntero\n\n[Path]\nPathExists=/sys/devices/platform/i8042/serio1/press_to_select\n\n[Install]\nWantedBy=default.target\n```\n\n```\n/etc/systemd/system/parametros_puntero.service\n```\n\n```\n[Unit]\nDescription=Establecer los atributos del puntero\n\n[Service]\nExecStart=/usr/local/bin/configuracion_puntero.sh\n```\n\nFinalmente habilite e inicie la unidad de systemd parametros_puntero.path.\n\n"
+    },
+    {
+      "title": "Entrada hwdb de udev",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nLibinput aplica sus propios parámetros a sysfs basado en las entradas de [la base de datos de hardware de udev. Este es el comportamiento en los sistemas ejecutando un compositor de Wayland, ya que libinput es la única interfaz de entrada soportada en ese entorno. Los cambios que se hagan antes del inicio de un compositor de Wayland o una sesión de X serán sobrescritos.\n\nPara cambiar la configuración por defecto de libinput, añada una entrada local a hwdb:\n\n```\n/etc/udev/hwdb.d/99-trackpoint.hwdb\n```\n\n```\nevdev:name:TPPS/2 IBM TrackPoint:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPad??60?:*\n  POINTINGSTICK_SENSITIVITY=250\n```\n\nPuede encontrar las claves de varios modelos en la base de datos de hardware de udev. Tome en cuenta que desde este commit libinput ignora el parametro POINTINGSTICK_CONST_ACCEL y ocupa POINTINGSTICK_SENSITIVITY. El rango es de 0-255.\n\nReinicie hwdb para aplicar los cambios:\n\n```\n# udevadm hwdb --update\n```\n\nPara probar los cambios antes de reiniciar so compositor de Wayland o sesión de X, primero busque su nodo de entrada (/dev/input/eventX) usando:\n\n```\n# libinput list-devices\n```\n\nEjecute lo siguiente para obtener la salida de depuración:\n\n```\n# udevadm trigger /sys/class/input/eventX\n# udevadm test /sys/class/input/eventX\n```\n\nFinalmente, reinicie su compositor de Wayland o su sesión de X para aplicar los cambios.\n\n"
+    },
+    {
+      "title": "Configuración para dispositivos específicos",
+      "level": 4,
+      "content": "Con el cambio de libinput a los archivos de configuración de estilo .ini para las configuraciones especificas para ciertos dispositivos (quirks), puede ajustar los parámetros del puntero al sobrescribirlos localmente en /etc/libinput.\n\nPor ejemplo, para sobrescribir la velocidad del puntero, cree /etc/libinput/local-overrides.quirks:\n\n```\n[Trackpoint Override]\nMatchUdevType=pointingstick\nAttrTrackpointMultiplier=0.75\n```\n\nPara mas información, vea libinput: Instalando configuraciones especificas temporales (en ingles).\n\n"
+    },
+    {
+      "title": "El puntero no es detectado o se detecta después de X minutos",
+      "level": 3,
+      "content": "Esto parece ser un error (bug) del kernel. Vea: [1].\n\nUna solución temporal es pasar proto=bare al modulo psmouse. Aunque esto puede deshabilitar el desplazamiento con el clickpad y el clickeo de dos dedos en el botón del medio:\n\n```\n# modprobe psmouse proto=bare\n```\n\n"
+    },
+    {
+      "title": "Los botones del puntero no siempre funcionan",
+      "level": 3,
+      "content": "Si descubre que deshabilitando el puntero en la configuración del BIOS deshabilita los botones incorrectos y/o los botones del puntero no siempre funcionan, una solución puede ser pasar proto=imps al modulo psmouse.\n\n```\n# rmmod psmouse; modprobe psmouse proto=imps\n```\n\n"
+    },
+    {
+      "title": "El desplazamiento con dos dedos deja de funcionar después de suspender",
+      "level": 3,
+      "content": "En algunos portátiles, pareciera que psmouse falla al iniciar o después de la suspensión:\n\n```\npsmouse serio1: synaptics: Unable to initialize device\n```\n\nUna solución es añadir psmouse.synaptics_intertouch=0 a la consola de inicio del kernel.\n\n"
+    },
+    {
+      "title": "El puntero se mueve por si solo",
+      "level": 3,
+      "content": "En algunos ThinkPads el puntero se mueve espontáneamente después de soltarlo y no se detiene. Esto sucede por el bajo valor en el parámetro drift_time (p.j.5), debe cambiarlo a 25 o 30 para arreglar el problema. Esto se puede hacer con una regla udev:\n\n```\n/etc/udev/rules.d/10-trackpoint.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"input\", ATTR{name}==\"TPPS/2 IBM TrackPoint\", ATTR{device/drift_time}=\"25\"\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Como configurar el TrackPoint - ThinkWiki\n- Velocidad del TrackPoint\n- ¿Cual es la mejor manera para configurar el TrackPoint de un ThinkPad?\n\n"
+    }
+  ]
+}

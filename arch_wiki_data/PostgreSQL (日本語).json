@@ -1,0 +1,101 @@
+{
+  "title": "PostgreSQL (日本語)",
+  "url": "https://wiki.archlinux.org/title/PostgreSQL_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- PhpPgAdmin\n\nPostgreSQL はオープンソースの、コミュニティドリブンな、標準準拠のオブジェクト関係データベースシステムです。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 はじめに\n- 2 PostgreSQL のインストール\n- 3 最初のデータベース/ユーザーの作成\n- 4 PostgreSQL の習熟 4.1 データベースシェルにアクセス\n- 5 任意の設定 5.1 リモートホストから PostgreSQL にアクセスできるように設定 5.2 PAM で PostgreSQL を認証する設定 5.3 デフォルトのデータディレクトリを変更 5.4 新しいデータベースのデフォルトエンコーディングを UTF-8 に変更\n- 6 管理ツール\n- 7 PostgreSQL のアップグレード 7.1 pg_upgrade 7.2 手動ダンプとリロード\n- 8 トラブルシューティング 8.1 小規模なトランザクションのパフォーマンスを向上させる 8.2 アイドル状態の際にディスクの書き込みを止めさせる 8.3 pg_connect() でデータベースに接続できない 8.4 PostgreSQL database unable to start after package update when using extensions 8.5 Failing to start a PostgreSQL server with the older version of the database while upgrading to the newer version with extensions\n\n- 4.1 データベースシェルにアクセス\n\n- 5.1 リモートホストから PostgreSQL にアクセスできるように設定\n- 5.2 PAM で PostgreSQL を認証する設定\n- 5.3 デフォルトのデータディレクトリを変更\n- 5.4 新しいデータベースのデフォルトエンコーディングを UTF-8 に変更\n\n- 7.1 pg_upgrade\n- 7.2 手動ダンプとリロード\n\n- 8.1 小規模なトランザクションのパフォーマンスを向上させる\n- 8.2 アイドル状態の際にディスクの書き込みを止めさせる\n- 8.3 pg_connect() でデータベースに接続できない\n- 8.4 PostgreSQL database unable to start after package update when using extensions\n- 8.5 Failing to start a PostgreSQL server with the older version of the database while upgrading to the newer version with extensions\n\n"
+    },
+    {
+      "title": "はじめに",
+      "level": 2,
+      "content": "\"postgres ユーザーになってください\" という記述がセクションのところどころで出てくることがあります。この記事では postgres ユーザーで実行するべきコマンドには [postgres]$ と記しています。\n\npostgres ユーザーのシェルになるには root で次のコマンドを実行します:\n\n```\n# su -l postgres\n```\n\nsudo を使う場合、以下のコマンドを使用します:\n\n```\n$ sudo -u postgres -i\n```\n\npostgres ユーザーは PostgreSQL をインストールしたときに自動で作成されます。ユーザーが作成されたら postgres ユーザーのパスワードを設定してください。\n\n"
+    },
+    {
+      "title": "PostgreSQL のインストール",
+      "level": 2,
+      "content": "postgresql パッケージをインストールしてください。\n\nPostgreSQL を正しく機能させるには、postgres ユーザーでデータベースクラスタを初期化する必要があります。postgres ユーザーになって次のコマンドを実行してください:\n\n```\n[postgres]$ initdb --locale $LANG -E UTF8 -D '/var/lib/postgres/data'\n```\n\n上記コマンドの説明:\n\n- --locale は /etc/locale.conf ファイルに定義されているロケールを指定します。\n- -E はデータベースのデフォルトエンコーディングです。\n- -D はデータベースクラスタが保存されるデフォルトのディレクトリです。\n\n画面に大量の文字が表示され、最後に ... ok が表示されます:\n\n```\nThe files belonging to this database system will be owned by user \"postgres\".\nThis user must also own the server process.\n\nThe database cluster will be initialized with locale \"en_GB.UTF-8\".\nThe default text search configuration will be set to \"english\".\n\nData page checksums are disabled.\n\nfixing permissions on existing directory /var/lib/postgres/data ... ok\ncreating subdirectories ... ok\nselecting default max_connections ... 100\nselecting default shared_buffers ... 128MB\nselecting dynamic shared memory implementation ... posix\ncreating configuration files ... ok\ncreating template1 database in /var/lib/postgres/data/base/1 ... ok\ninitializing pg_authid ... ok\n[...]\n```\n\n上記のように表示されれば、初期化が成功しています。exit で通常ユーザーに戻ってください。\n\npostgresql.service を root で起動・有効化してください。新しいバージョンの PostgreSQL パッケージをインストールする前に必要な手順については #PostgreSQL のアップグレードを参照してください。\n\n"
+    },
+    {
+      "title": "最初のデータベース/ユーザーの作成",
+      "level": 2,
+      "content": "postgres ユーザーになってください。createuser コマンドを使って新しいデータベースユーザーを追加します:\n\n```\n[postgres]$ createuser --interactive\n```\n\ncreatedb コマンドを使って読み書き権限がある前記のユーザーに新しいデータベースを作成します (データベースユーザーの名前が Linux ユーザーと同じ場合はログインシェルからコマンドを実行してください、もしくはコマンドに -U database-username を加えて下さい):\n\n```\n$ createdb myDatabaseName\n```\n\n"
+    },
+    {
+      "title": "データベースシェルにアクセス",
+      "level": 3,
+      "content": "postgres ユーザーになってください。基本のデータベースシェル psql を起動します。psql ではデータベースやテーブルの作成・削除・パーミッションの設定・生の SQL コマンドの実行など全てが行えます。-d オプションを使って作成済みのデータベースに接続します (データベースを指定しなかった場合、psql はユーザー名と同じ名前のデータベースにアクセスします)\n\n```\n[postgres]$ psql -d myDatabaseName\n```\n\n便利なコマンド:\n\nヘルプを表示:\n\n```\n=> \\help\n```\n\n特定のデータベースに接続:\n\n```\n=> \\c <database>\n```\n\n全てのユーザーとパーミッションレベルを表示:\n\n```\n=> \\du\n```\n\n現在のデータベースにある全てのテーブルのサマリー情報を表示:\n\n```\n=> \\dt\n```\n\npsql シェルを終了:\n\n```\n=> \\q or CTRL+d\n```\n\n多数のメタコマンドが存在しますが、最初は以上のコマンドで十分でしょう。全てのメタコマンドを確認するには、次を実行:\n\n```\n=> \\?\n```\n\n"
+    },
+    {
+      "title": "リモートホストから PostgreSQL にアクセスできるように設定",
+      "level": 3,
+      "content": "PostgreSQL データベースサーバーの設定ファイルは postgresql.conf です。このファイルはサーバーのデータディレクトリ (通常は /var/lib/postgres/data) に配置されています。このフォルダには pg_hba.conf など、その他のメインの設定ファイルも保存されます。\n\n/var/lib/postgres/data/postgresql.conf ファイルを編集します。接続と認証のセクションに listen_addresses という行を追加してください:\n\n```\nlisten_addresses = 'localhost,my_local_ip_address'\n```\n\n'*' に設定することで全てのローカルアドレスから使えるようにすることもできます。他の行を注意して見て下さい。\n\nホストによる認証は /var/lib/postgres/data/pg_hba.conf で設定します。このファイルでは接続を許可するホストをコントロールします。デフォルトでは、データベースのスーパーユーザーを含め、あらゆるデータベースユーザーとして全てのローカルユーザーが接続できるようになっているので注意してください。以下のように行を追加します:\n\n```\n# IPv4 local connections:\nhost  all  all  my_remote_client_ip_address/32  md5\n```\n\nmy_remote_client_ip_address はクライアントの IP アドレスに置き換えて下さい。\n\npg_hba.conf のドキュメントも参照。\n\n設定をした後は、postgresql デーモンを再起動して変更を適用してください。\n\nトラブルシューティングの際はサーバーのログファイルを見て下さい:\n\n```\n$ journalctl -u postgresql\n```\n\n"
+    },
+    {
+      "title": "PAM で PostgreSQL を認証する設定",
+      "level": 3,
+      "content": "PostgreSQL には様々な認証方法があります。システムパスワードでユーザーの認証を行いたい場合、設定が必要です。まずは PAM を有効にしてください。\n\n例えば、上と同じように設定する場合:\n\n```\n# IPv4 local connections:\nhost   all   all   my_remote_client_ip_address/32   pam\n```\n\nただし PostgreSQL サーバーは root 権限を使わずに動作するため /etc/shadow を読み込むことができません。postgres グループからファイルにアクセスできるように許可することで問題を解決できます:\n\n```\n# setfacl -m g:postgres:r /etc/shadow\n```\n\n"
+    },
+    {
+      "title": "デフォルトのデータディレクトリを変更",
+      "level": 3,
+      "content": "新しく作成したデータベースが保存されるデフォルトのディレクトリは /var/lib/postgres/data です。これを変更するには、以下の手順を踏んで下さい:\n\n新しいディレクトリを作成して postgres ユーザーをディレクトリの所有者にする:\n\n```\n# mkdir -p /pathto/pgroot/data\n# chown -R postgres:postgres /pathto/pgroot\n```\n\npostgres ユーザーになって、新しいクラスタを初期化:\n\n```\n[postgres]$ initdb -D /pathto/pgroot/data\n```\n\nsystemd#ユニットファイルの編集に書いてあるようにして設定で変数を上書きする必要があります。まず、以下のコマンドを実行:\n\n```\n# systemctl edit postgresql.service\n```\n\nSystemctl はドロップインの設定ファイルをエディタで開きます。以下のように書き込んでください:\n\n```\n[Service]\nEnvironment=PGROOT=/pathto/pgroot/\nPIDFile=/pathto/pgroot/data/postmaster.pid\n```\n\n/home ディレクトリをテーブル領域のデフォルトディレクトリとして使いたい場合、以下の行も追加してください:\n\n```\nProtectHome=false\n```\n\n"
+    },
+    {
+      "title": "新しいデータベースのデフォルトエンコーディングを UTF-8 に変更",
+      "level": 3,
+      "content": "(createdb blog などで) 新しいデータベースを作成するとき、PostgreSQL は実際にはテンプレートデータベースをコピーしています。2つの定義済みテンプレートが存在します: template0 が標準のテンプレートである一方、オンサイトの template1 は管理者によって変更を加えることができるテンプレートでデフォルトで使用されます。新しいデータベースのエンコーディングを変更するには、オンサイトの template1 を変更します。PostgresSQL シェル (psql) にログインして以下を実行してください:\n\nまず、template1 を削除する必要があります。テンプレートは削除できないので、最初に template1 を通常のデータベースにします:\n\n```\nUPDATE pg_database SET datistemplate = FALSE WHERE datname = 'template1';\n```\n\nそして template1 を削除:\n\n```\nDROP DATABASE template1;\n```\n\n次に、新しいデフォルトエンコーディングを使って、template0 から新しいデータベースを作成します:\n\n```\nCREATE DATABASE template1 WITH TEMPLATE = template0 ENCODING = 'UNICODE';\n```\n\nそして template1 をテンプレートに戻します:\n\n```\nUPDATE pg_database SET datistemplate = TRUE WHERE datname = 'template1';\n```\n\n(任意) このテンプレートに接続できないようにしたい場合、datallowconn を FALSE に設定してください:\n\n```\nUPDATE pg_database SET datallowconn = FALSE WHERE datname = 'template1';\n```\n\nこれで新しいデータベースを作成することができるようになりました:\n\n```\n[postgres]$ createdb blog\n```\n\npsql にまたログインしてデータベースを確認すれば、新しいデータベースに適切なエンコーディングがあるのを見れるはずです:\n\n```\n\\l\n```\n\n```\nList of databases\n  Name    |  Owner   | Encoding  | Collation | Ctype |   Access privileges\n-----------+----------+-----------+-----------+-------+----------------------\nblog      | postgres | UTF8      | C         | C     |\npostgres  | postgres | SQL_ASCII | C         | C     |\ntemplate0 | postgres | SQL_ASCII | C         | C     | =c/postgres\n                                                     : postgres=CTc/postgres\ntemplate1 | postgres | UTF8      | C         | C     |\n```\n\n"
+    },
+    {
+      "title": "管理ツール",
+      "level": 2,
+      "content": "- phpPgAdmin — PostgreSQL のウェブベースの管理ツール。\n\n- pgAdmin — PostgreSQL の GUI ベースの管理ツール。\n\n"
+    },
+    {
+      "title": "PostgreSQL のアップグレード",
+      "level": 2,
+      "content": "PosgreSQL のメジャーバージョンのアップグレードにはメンテナンスが必要です。\n\n- PostgreSQL の公式の アップグレードドキュメント に従ってください。\n- バージョン 10.0 から PostgreSQL のバージョンの命名規則は変更されています [1]。前は 9.x から 9.y への変更がメジャーアップグレードとされていましたが、現在はバージョン 10.x から 10.y へのアップグレードはマイナーアップグレードで、バージョン 10.x から 11.y のアップグレードがメジャーアップグレードになります。\n\n現在使用されているデータベースバージョンの取得\n\n```\n# cat /var/lib/postgres/data/PG_VERSION\n```\n\nデータベースを誤って互換性のないバージョンにアップグレードしないようにするために、PostgreSQL パッケージの 更新をスキップすることをお勧めします。\n\nマイナーバージョンのアップグレードは実行しても問題ありません。しかしながら、メジャーバージョンのアップグレードをした場合、データにアクセスできなくなる可能性があります。毎回 PostgreSQL のホームページ を確認してアップグレード時に必要な手順を確認してください。詳しくは バージョン管理ポリシー を参照。\n\nPostgreSQL データベースをアップグレードする方法は大きく2つあります。詳しくは公式のドキュメントを読んで下さい。\n\n"
+    },
+    {
+      "title": "pg_upgrade",
+      "level": 3,
+      "content": "pg_upgrade を使いたい場合、postgresql-old-upgrade パッケージが存在します。常に最新の PostgreSQL パッケージの1つ前のメジャーバージョンを実行します。新しいバージョンの PostgreSQL と一緒にインストールすることが可能です。\n\n準備ができたら、次のパッケージをアップグレードしてください: postgresql, postgresql-libs, postgresql-old-upgrade。データディレクトリはバージョンによって変わることがないため、pg_upgrade を実行する前に、既存のデータディレクトリの名前を変更して、新しいディレクトリに移動する必要があります。新しいデータベースは、このページの一番上で書いているように初期化する必要があります:\n\n```\n# systemctl stop postgresql.service\n# mv /var/lib/postgres/data /var/lib/postgres/olddata\n# mkdir /var/lib/postgres/data /var/lib/postgres/tmp\n# chown postgres:postgres /var/lib/postgres/data /var/lib/postgres/tmp\n[postgres]$ initdb --locale $LANG -E UTF8 -D '/var/lib/postgres/data'\n```\n\nアップグレードは以下のコマンドのように実行します。何も準備をしないままコマンドを実行するのは止めてください。詳しくは 上流の pg_upgrade のドキュメント を参照。\n\n```\n[postgres]$ cd /var/lib/postgres/tmp\n[postgres]$ pg_upgrade -b /opt/pgsql-9.6/bin -B /usr/bin -d /var/lib/postgres/olddata -D /var/lib/postgres/data\n```\n\npg_upgrade はアップグレードを実行すると /var/lib/postgres/tmp にスクリプトを作成します。画面上の指示に従ってください。アップグレードが完了したら /var/lib/postgres/tmp ディレクトリは削除してもかまいません。\n\n"
+    },
+    {
+      "title": "手動ダンプとリロード",
+      "level": 3,
+      "content": "以下のように行います (postgresql-old-upgrade のアップグレードとインストール後に実行):\n\n- 以下は PostgreSQL 9.6 でのコマンドです。PostgreSQL 9.2 の場合、/opt/ に同じようなコマンドがあるはずです。\n- pg_hba.conf ファイルをカスタマイズしている場合、ローカル環境から古いデータベースクラスタへの完全なアクセスを許可するように一時的に修正が必要です。アップグレードが完了したら新しいデータベースクラスタを同じようにカスタマイズして postgresql.service を再起動してください。\n\n```\n# systemctl stop postgresql.service\n# mv /var/lib/postgres/data /var/lib/postgres/olddata\n# mkdir /var/lib/postgres/data\n# chown postgres:postgres /var/lib/postgres/data\n[postgres]$ initdb --locale $LANG -E UTF8 -D '/var/lib/postgres/data'\n[postgres]$ /opt/pgsql-9.6/bin/pg_ctl -D /var/lib/postgres/olddata/ start\n[postgres]$ pg_dumpall -f /tmp/old_backup.sql\n[postgres]$ /opt/pgsql-9.6/bin/pg_ctl -D /var/lib/postgres/olddata/ stop\n# systemctl start postgresql.service\n[postgres]$ psql -f /tmp/old_backup.sql postgres\n```\n\n"
+    },
+    {
+      "title": "小規模なトランザクションのパフォーマンスを向上させる",
+      "level": 3,
+      "content": "開発用のローカルマシンで PostgresSQL を使っていて動作が遅い場合、設定で synchronous_commit をオフ にしてみてください。ただし、注意事項 があります。\n\n```\n/var/lib/postgres/data/postgresql.conf\n```\n\n```\nsynchronous_commit = off\n```\n\n"
+    },
+    {
+      "title": "アイドル状態の際にディスクの書き込みを止めさせる",
+      "level": 3,
+      "content": "PostgreSQL は定期的に内部の \"statistics\" ファイルを更新しています。デフォルトでは、このファイルはディスク上に保存されるため、ノートパソコンのディスクのスピンダウンの妨げになったり、ハードドライブのシーク音が発生したりします。以下の設定オプションを使うことでこのファイルをメモリ上のファイルシステムに再配置することができます:\n\n```\n/var/lib/postgres/data/postgresql.conf\n```\n\n```\nstats_temp_directory = '/run/postgresql'\n```\n\n"
+    },
+    {
+      "title": "pg_connect() でデータベースに接続できない",
+      "level": 3,
+      "content": "php-pgsql をインストールして php.ini ファイルを編集して extension=pdo_pgsql.so や extension=pgsql.so という行をアンコメントして httpd を再起動してください。\n\n"
+    },
+    {
+      "title": "PostgreSQL database unable to start after package update when using extensions",
+      "level": 3,
+      "content": "The cause in this case is mostly the existing package is not compiled for the newer version (and it may be up-to-date), the solution is rebuilding the package either manually or waiting for an update to the extension package.\n\n"
+    },
+    {
+      "title": "Failing to start a PostgreSQL server with the older version of the database while upgrading to the newer version with extensions",
+      "level": 3,
+      "content": "This is caused because the old version of postgres from the package postgresql-old-upgrade does not have the required extensions (.so files) in it's lib directory, the current solution is dirty, and might cause a lot of problems so keep a backup of the database just in case, basically copy the required extension .so files from /usr/lib/postgresql/ to /opt/pgsql-XX/lib/ (remember to replace XX with the major version of postgresql-old-upgrade).\n\nFor example, for timescaledb\n\n```\n# cp /usr/lib/postgresql/timescaledb*.so /opt/pgsql-13/lib/\n```\n\nto know the exact files to copy, check the contant of the package of the extension using :\n\n```\n$ pacman -Ql package_name\n```\n\n"
+    }
+  ]
+}

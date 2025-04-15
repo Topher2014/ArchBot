@@ -1,0 +1,76 @@
+{
+  "title": "Lighttpd (日本語)",
+  "url": "https://wiki.archlinux.org/title/Lighttpd_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "lighttpd は高速性の重視される環境に最適化された、安全・高速で標準に準拠し、とても柔軟なウェブサーバーです。他のウェブサーバーと比べてメモリ使用量や CPU 負担が少ないのが特徴です。高度な機能セット (FastCGI, CGI, 認証, 圧縮出力, URL の書き換えなど) により、lighttpd は負担が気になるサーバーにうってつけのウェブサーバーソフトウェアとして君臨します。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 基本設定 2.1.1 ログ出力 2.1.2 SSL による HTTPS の有効化 2.1.2.1 自己署名証明書 2.1.2.2 Let's Encrypt 2.1.3 ディレクトリのパスワード保護 2.2 CGI 2.3 FastCGI 2.3.1 PHP 2.3.1.1 php-cgi を使う 2.3.1.2 php-fpm を使う 2.3.2 Python FastCGI 2.3.2.1 Server Name Indication 2.3.3 HTTP のリクエストを HTTPS にリダイレクト 2.4 圧縮出力\n- 3 参照\n\n- 2.1 基本設定 2.1.1 ログ出力 2.1.2 SSL による HTTPS の有効化 2.1.2.1 自己署名証明書 2.1.2.2 Let's Encrypt 2.1.3 ディレクトリのパスワード保護\n- 2.2 CGI\n- 2.3 FastCGI 2.3.1 PHP 2.3.1.1 php-cgi を使う 2.3.1.2 php-fpm を使う 2.3.2 Python FastCGI 2.3.2.1 Server Name Indication 2.3.3 HTTP のリクエストを HTTPS にリダイレクト\n- 2.4 圧縮出力\n\n- 2.1.1 ログ出力\n- 2.1.2 SSL による HTTPS の有効化 2.1.2.1 自己署名証明書 2.1.2.2 Let's Encrypt\n- 2.1.3 ディレクトリのパスワード保護\n\n- 2.1.2.1 自己署名証明書\n- 2.1.2.2 Let's Encrypt\n\n- 2.3.1 PHP 2.3.1.1 php-cgi を使う 2.3.1.2 php-fpm を使う\n- 2.3.2 Python FastCGI 2.3.2.1 Server Name Indication\n- 2.3.3 HTTP のリクエストを HTTPS にリダイレクト\n\n- 2.3.1.1 php-cgi を使う\n- 2.3.1.2 php-fpm を使う\n\n- 2.3.2.1 Server Name Indication\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "lighttpd パッケージをインストールしてください。\n\n"
+    },
+    {
+      "title": "基本設定",
+      "level": 3,
+      "content": "lighttpd の設定ファイルは /etc/lighttpd/lighttpd.conf です。デフォルトではテストページが表示されるようになっています。\n\nlighttpd.conf に問題が存在しないか次のコマンドを使うことで確認できます、これによって設定の誤りを早期発見することが可能です:\n\n```\n$ lighttpd -t -f /etc/lighttpd/lighttpd.conf\n```\n\nデフォルトの設定ファイルでは /srv/http/ をウェブ上に公開するドキュメントのディレクトリとして指定しています。\n\nインストールが正しく行われたかテストするには:\n\n```\n# echo 'TestMe!' >> /srv/http/index.html\n# chmod 755 /srv/http/index.html\n```\n\nlighttpd.service を起動・有効化してサーバーを起動してください。\n\nブラウザで localhost を開いて見てください、テストページが表示されるはずです。\n\n設定ファイルのサンプルは /usr/share/doc/lighttpd/ にあります。\n\n"
+    },
+    {
+      "title": "ログ出力",
+      "level": 4,
+      "content": "lighttpd はエラー・アクセスログをファイルに書き出すことができます。ログオプションを有効にするには /etc/lighttpd/lighttpd.conf を以下のように編集:\n\n```\nserver.modules += (\n   \"mod_access\",\n   \"mod_accesslog\",\n)\n\nserver.errorlog   = \"/var/log/lighttpd/error.log\"\naccesslog.filename = \"/var/log/lighttpd/access.log\"\n```\n\n"
+    },
+    {
+      "title": "SSL による HTTPS の有効化",
+      "level": 4,
+      "content": "- Mozilla は lighttpd で使える SSL 設定ジェネレータ を提供しています。\n- SSL の設定後、Qualys SSL Labs の SSL Server Check を使うことで設定をチェックできます。\n\n自己署名 SSL 証明書は以下のように作成できます (openssl のインストールが必要です):\n\n```\n# mkdir /etc/lighttpd/certs\n# openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -sha256 -keyout /etc/lighttpd/certs/server.pem -out /etc/lighttpd/certs/server.pem\n# chmod 600 /etc/lighttpd/certs/server.pem\n```\n\n/etc/lighttpd/lighttpd.conf を編集して以下の行を追加すれば https が有効になります:\n\n```\n$SERVER[\"socket\"] == \":443\" {\n    ssl.engine                  = \"enable\" \n    ssl.pemfile                 = \"/etc/lighttpd/certs/server.pem\" \n }\n```\n\nLet's Encrypt によって署名された証明書を使うこともできます。手動で証明書を作成した後、生成された privkey.pem と fullchain.pem をひとつのファイルに結合してください:\n\n```\n# cat /etc/letsencrypt/live/domain/{privkey.pem,fullchain.pem} > /etc/letsencrypt/live/domain/combined.pem\n```\n\n/etc/lighttpd/lighttpd.conf を編集して以下の行を追加します:\n\n```\n$SERVER[\"socket\"] == \":443\" {\n    ssl.engine                  = \"enable\" \n    ssl.pemfile                 = \"/etc/letsencrypt/live/domain/combined.pem\"\n    ssl.ca-file                 = \"/etc/letsencrypt/live/domain/fullchain.pem\"\n}\n```\n\ncurl で接続したときに \"empty reply from server\" と返される場合、上記の設定に以下を追加してください:\n\n```\nssl.openssl.ssl-conf-cmd = (\"Protocol\" => \"-ALL, TLSv1.2\")\n```\n\nまた、上記の設定で Firefox を使って HTTPS でサイトをロードできない場合も解決することがあります。\n\n"
+    },
+    {
+      "title": "ディレクトリのパスワード保護",
+      "level": 4,
+      "content": "libmariadbclient[リンク切れ: 置換パッケージ: mariadb-libs] をインストールする必要があります。lighttpd の passwd ファイルはシステムがユーザー認証に使用する /etc/passwd と同じです。以下のように簡単にエントリを作成することができます:\n\n```\n$ user=foo\n$ password=b@R102\n$ realm='Password Required'\n$ hash=`echo -n \"$user:$realm:$password\" | md5sum | cut -b -32`\n\n# echo \"$user:$realm:$hash\" >> /etc/lighttpd/lighttpd.user\n```\n\n/etc/lighttpd/lighttpd.conf を編集して以下の行を追加することでディレクトリの保護が有効になります:\n\n```\nserver.modules = (\n   \"mod_auth\",\n )\n\nauth.debug = 2\nauth.backend                = \"htdigest\"\nauth.backend.htdigest.userfile = \"/etc/lighttpd/lighttpd.user\"\n\n# note this entry is relative to the server.document-root\nauth.require = ( \"/secret\" =>\n   (\n    \"method\" => \"basic\",\n    \"realm\" => \"Password Required\",\n    \"require\" => \"user=foo\"\n   )\n)\n```\n\n"
+    },
+    {
+      "title": "CGI",
+      "level": 3,
+      "content": "Lighttpd では、特に設定をしなくても、CGI モジュールを有効にするだけで CGI スクリプトが動作します。使用するプログラミング言語のインタプリタがインストールされているか確認してください (例えば python なら python をインストールします)。\n\n/etc/lighttpd/conf.d/cgi.conf ファイルを作成して以下の内容を追加します:\n\n```\nserver.modules += ( \"mod_cgi\" )\n\ncgi.assign                 = ( \".pl\"  => \"/usr/bin/perl\",\n                               \".cgi\" => \"/usr/bin/perl\",\n                               \".rb\"  => \"/usr/bin/ruby\",\n                               \".erb\" => \"/usr/bin/eruby\",\n                               \".py\"  => \"/usr/bin/python\",\n                               \".php\" => \"/usr/bin/php-cgi\" )\n\nindex-file.names           += ( \"index.pl\",   \"default.pl\",\n                               \"index.rb\",   \"default.rb\",\n                               \"index.erb\",  \"default.erb\",\n                               \"index.py\",   \"default.py\",\n                               \"index.php\",  \"default.php\" )\n```\n\nPHP スクリプトの場合、以下を /etc/php/php.ini に設定する必要があります:\n\n```\ncgi.fix_pathinfo = 1\n```\n\nLighttpd の設定ファイルを /etc/lighttpd/lighttpd.conf に以下を追加してください:\n\n```\ninclude \"conf.d/cgi.conf\"\n```\n\n"
+    },
+    {
+      "title": "FastCGI",
+      "level": 3,
+      "content": "fcgi をインストールしてください。それで lighttpd に fcgi サポートが追加されます。fcgi サポートを追加するだけなら設定はそれだけです。Ruby on Rails, PHP, Python などを使いたい場合は以下を読んで下さい。\n\nまず /usr/share/doc/lighttpd/config/conf.d/fastcgi.conf から /etc/lighttpd/conf.d にサンプル設定ファイルをコピーします。\n\n以下を設定ファイル /etc/lighttpd/conf.d/fastcgi.conf に追加する必要があります:\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\n#server.indexfiles += ( \"dispatch.fcgi\" ) #this is deprecated\nindex-file.names += ( \"dispatch.fcgi\" ) #dispatch.fcgi if rails specified\n\nserver.error-handler-404   = \"/dispatch.fcgi\" #too\nfastcgi.server = (\n    \".fcgi\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/lighttpd/rails-fastcgi.sock\",\n        \"bin-path\" => \"/path/to/rails/application/public/dispatch.fcgi\"\n      )\n    )\n)\n```\n\nそして /etc/lighttpd/lighttpd.conf に以下を記述してください:\n\n```\ninclude \"conf.d/fastcgi.conf\"\n```\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 4,
+      "content": "php と php-cgi をインストールします (PHP や LAMP を参照)。\n\nphp-cgi が動作するかは php-cgi --version で確認:\n\n```\nPHP 5.4.3 (cgi-fcgi) (built: May  8 2012 17:10:17)\nCopyright (c) 1997-2012 The PHP Group\nZend Engine v2.4.0, Copyright (c) 1998-2012 Zend Technologies\n```\n\n以上のように出力されたら php は正しくインストールされています。\n\n新しい設定ファイルを作成:\n\n```\n/etc/lighttpd/conf.d/fastcgi.conf\n```\n\n```\n# Make sure to install php and php-cgi. See:                                                             \n# https://wiki.archlinux.org/index.php/Fastcgi_and_lighttpd#PHP\n\nserver.modules += (\"mod_fastcgi\")\n\n# FCGI server\n# ===========\n#\n# Configure a FastCGI server which handles PHP requests.\n#\nindex-file.names += (\"index.php\")\nfastcgi.server = ( \n    # Load-balance requests for this path...\n    \".php\" => (\n        # ... among the following FastCGI servers. The string naming each\n        # server is just a label used in the logs to identify the server.\n        \"localhost\" => ( \n            \"bin-path\" => \"/usr/bin/php-cgi\",\n            \"socket\" => \"/tmp/php-fastcgi.sock\",\n            # breaks SCRIPT_FILENAME in a way that PHP can extract PATH_INFO\n            # from it \n            \"broken-scriptfilename\" => \"enable\",\n            # Launch (max-procs + (max-procs * PHP_FCGI_CHILDREN)) procs, where\n            # max-procs are \"watchers\" and the rest are \"workers\". See:\n            # https://redmine.lighttpd.net/projects/1/wiki/frequentlyaskedquestions#How-many-php-CGI-processes-will-lighttpd-spawn \n            \"max-procs\" => 4, # default value\n            \"bin-environment\" => (\n                \"PHP_FCGI_CHILDREN\" => \"1\" # default value\n            )\n        )\n    )   \n)\n```\n\nlighttpd が新しい設定ファイルを使うように設定:\n\n```\n/etc/lighttpd/lighttpd.conf\n```\n\n```\ninclude \"conf.d/fastcgi.conf\"\n```\n\nlighttpd をリロード:\n\n```\n# systemctl reload lighttpd\n```\n\n- php ファイルにアクセスしたときに No input file found などのエラーが表示される場合、複数の原因が考えられます。詳しくは この FAQ を見て下さい。\n- 他のモジュール (例: mod_cgi) が .php 拡張子を処理するようになっていないか確認してください。\n\n最近の lighttpd のリリースでは適応型のプロセス生成はなくなっています。PHP プロセスの動的な管理がしたい場合は、php-fpm をインストールしてください。そして php-fpm.service を起動・有効化してください。\n\n/etc/lighttpd/conf.d/fastcgi.conf に以下を追加:\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\nindex-file.names += ( \"index.php\" ) \n\nfastcgi.server = (\n    \".php\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/php-fpm/php-fpm.sock\",\n        \"broken-scriptfilename\" => \"enable\"\n      ))\n)\n```\n\n"
+    },
+    {
+      "title": "Python FastCGI",
+      "level": 4,
+      "content": "FastCGI をインストール・設定してください (上の #FastCGI を参照)。\n\npython2-flup[リンク切れ: パッケージが存在しません] をインストールして以下のように設定:\n\n```\nfastcgi.server = (\n    \".py\" =>\n    (\n        \"python-fcgi\" =>\n        (\n        \"socket\" => \"/run/lighttpd/fastcgi.python.socket\",\n         \"bin-path\" => \"test.py\",\n         \"check-local\" => \"disable\",\n         \"max-procs\" => 1,\n        )\n    )\n)\n```\n\ntest.py をサーバーのルートに置いて下さい (忘れずに chmod +x で実行権限を与えます)。\n\n```\n#!/usr/bin/env python2\n\ndef myapp(environ, start_response):\n    print 'got request: %s' % environ\n    start_response('200 OK', [('Content-Type', 'text/plain')])\n    return ['Hello World!']\n\nif __name__ == '__main__':\n    from flup.server.fcgi import WSGIServer\n    WSGIServer(myapp).run()\n```\n\n詳しくは こちらの投稿 を参照。\n\nlighttpd で SNI を使用するには、ssl.pemfile 設定ディレクティブを host 条件文の中に追加してください。デフォルトの ssl.pemfile が必要です。\n\n```\n$HTTP[\"host\"] == \"www.example.org\" {\n    ssl.pemfile = \"/etc/lighttpd/certs/www.example.org.pem\" \n}\n\n$HTTP[\"host\"] == \"mail.example.org\" {\n    ssl.pemfile = \"/etc/lighttpd/certs/mail.example.org.pem\" \n}\n```\n\n"
+    },
+    {
+      "title": "HTTP のリクエストを HTTPS にリダイレクト",
+      "level": 4,
+      "content": "/etc/lighttpd/lighttpd.conf の server.modules 行に \"mod_redirect\" を追加してください:\n\n```\nserver.modules += ( \"mod_redirect\" )\n\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"host\"] =~ \"example.org\" {\n    url.redirect = ( \"^/(.*)\" => \"https://example.org/$1\" )\n    server.name                 = \"example.org\" \n  }\n}\n\n$SERVER[\"socket\"] == \":443\" {\n  ssl.engine = \"enable\" \n  ssl.pemfile = \"/etc/lighttpd/certs/server.pem\"  \n  server.document-root = \"...\" \n}\n```\n\n全てのホストをセキュアな URL にリダイレクトするには上の socket 80 の設定のところに以下を記述します:\n\n```\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"host\"] =~ \".*\" {\n    url.redirect = (\".*\" => \"https://%0$0\")\n  }\n}\n```\n\nサイトの一部だけリダイレクトするには (例: secure または phpmyadmin):\n\n```\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"url\"] =~ \"^/secure\" {\n    url.redirect = ( \"^/(.*)\" => \"https://example.com/$1\" )\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "圧縮出力",
+      "level": 3,
+      "content": "/etc/lighttpd/lighttpd.conf に以下を追加:\n\n```\nvar.cache_dir           = \"/var/cache/lighttpd\"\n```\n\n圧縮ファイル用にディレクトリを作成:\n\n```\n# mkdir /var/cache/lighttpd/compress\n# chown http:http /var/cache/lighttpd/compress\n```\n\nサンプル設定ファイルをコピー:\n\n```\n# mkdir /etc/lighttpd/conf.d\n# cp /usr/share/doc/lighttpd/config/conf.d/compress.conf /etc/lighttpd/conf.d/\n```\n\n以下を /etc/lighttpd/lighttpd.conf に追加:\n\n```\ninclude \"conf.d/compress.conf\"\n```\n\n圧縮したいコンテンツのタイプを選択することもできます。/etc/lighttpd/conf.d/compress.conf の compress.filetype パラメータを編集してください:\n\n```\ncompress.filetype           = (\"text/plain\", \"text/html\", \"text/javascript\", \"text/css\", \"text/xml\")\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Lighttpd wiki\n\n"
+    }
+  ]
+}

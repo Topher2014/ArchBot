@@ -1,0 +1,96 @@
+{
+  "title": "CMake package guidelines (Português)",
+  "url": "https://wiki.archlinux.org/title/CMake_package_guidelines_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nEste documento abrange padrões e diretrizes sobre como escrever PKGBUILDs para software que usa CMake.\n\n"
+    },
+    {
+      "title": "Introdução",
+      "level": 2,
+      "content": "Do site do CMake:\n\n"
+    },
+    {
+      "title": "Uso típico",
+      "level": 3,
+      "content": "O uso típico consiste em executar o comando cmake e depois executar o comando de construção. O comando cmake geralmente define alguns parâmetros, verifica as dependências necessárias e cria os arquivos de compilação, deixando o software pronto para ser compilado por outras ferramentas como make e ninja.\n\n"
+    },
+    {
+      "title": "Comportamentos indesejados do CMake",
+      "level": 2,
+      "content": "Devido às suas próprias características internas para gerar os arquivos de compilação, às vezes o CMake pode se comportar de maneiras indesejadas. Sendo assim, algumas etapas devem ser observadas ao escrever PKGBUILDs para software baseado no CMake.\n\n"
+    },
+    {
+      "title": "Carência de suporte à variável de ambiente CPPFLAGS",
+      "level": 3,
+      "content": "O CMake não possui suporte à variável de ambiente CPPFLAGS. Essa variável contém sinalizadores (opções) de preprocessador C/C++ que são passados para o compilador no momento da compilação e são definidos no arquivo de configuração do makepkg. Como o CMake não possui suporte a ela, todos os sinalizadores definidos nesta variável não serão passados para o compilador.\n\nAtualmente, CPPFLAGS contém apenas o sinalizador -D_FORTIFY_SOURCE=2. Este é um sinalizador de proteção e é importante por motivos de segurança, pois pode evitar tipos específicos de ataques que podem ocorrer em estouros de buffer exploráveis. Para mais detalhes sobre este sinalizador, consulte feature_test_macros(7).\n\nOs desenvolvedores do CMake estão cientes dessa situação, pois há um antigo relatório de erro[1][2] foi aberto (em 2012) no rastreador de erros do CMake e ainda não foi resolvido. Enquanto isso não for resolvido, os empacotadores devem manipular manualmente a passagem do CPPFLAGS para o CMake a nível de empacotamento.\n\n"
+    },
+    {
+      "title": "Corrigindo o problema de CPPFLAGS",
+      "level": 4,
+      "content": "Isso pode ser corrigido anexando CPPFLAGS a CFLAGS e/ou CXXFLAGS, pois eles são analisados pelo CMake. Você pode usar export para anexar CPPFLAGS diretamente em CFLAGS/CXXFLAGS antes de executar o CMake. Por exemplo:\n\n```\nPKGBUILD\n```\n\n```\nbuild() {\n    export CFLAGS+=\" ${CPPFLAGS}\"\n    export CXXFLAGS+=\" ${CPPFLAGS}\"\n    cmake <opções>\n    <outros comandos>\n}\n```\n\nIsso afetará todos os comandos que usam CFLAGS/CXXFLAGS posteriormente. Existem outras possibilidades que preservam o CFLAGS/CXXFLAGS, como usar as opções do CMake -DCMAKE_C_FLAGS=\"${CFLAGS} ${CPPFLAGS}\" e/ou -DCMAKE_CXX_FLAGS=\"${CXXFLAGS} ${CPPFLAGS}\".\n\nAlguns poucos projetos de software codificam -D_FORTIFY_SOURCE=2 em seus arquivos CMake. Se esse for o caso e se você tiver certeza de que -D_FORTIFY_SOURCE=2 está sendo usado, anexando CPPFLAGS a CFLAGS/CXXFLAGS não é necessário, mas geralmente não há problema em fazer isso como regra geral. Isso evitará que o pacote perca o suporte para -D_FORTIFY_SOURCE=2 se o upstream o remover do código-fonte em versões futuras e você não perceber, reduzindo o trabalho de atualização do pacote.\n\n- Não é ideal misturar CPPFLAGS em CFLAGS/CXXFLAGS, mas é melhor do que permitir que o pacote seja compilado sem o importante sinalizador de proteção.\n- Ao usar o export, não esqueça o espaço após o operador do shell +=. Caso contrário, o comando do compilador falhará na execução porque produzirá uma opção inválida.\n- Nem todo software exigirá o acréscimo de CPPFLAGS a CFLAGS e CXXFLAGS. Programas diferentes exigirão apenas CFLAGS, apenas CXXFLAGS ou ambos, e isso dependerá do software upstream em questão. Em caso de dúvida, o uso de ambos geralmente não dói. Você pode usar apenas o necessário, se tiver certeza.\n\n"
+    },
+    {
+      "title": "CMake pode substituir automaticamente o sinalizador padrão de otimização do compilador",
+      "level": 3,
+      "content": "É muito comum ver pessoas executando o CMake com a opção -DCMAKE_BUILD_TYPE=Release. Alguns projetos upstream, mesmo inadvertidamente, incluem essa opção em suas instruções de compilação, mas isso produz um comportamento indesejado.\n\nCada tipo de compilação faz com que o CMake anexe automaticamente um conjunto de sinalizadores a CFLAGS e CXXFLAGS. Ao usar o tipo de compilação comum Release, ele anexa automaticamente o sinalizador de otimização -O3[3] do compilador, e isso substitui o sinalizador padrão do Arch Linux que atualmente é -O2 (definido no arquivo de configuração do makepkg). Isso é indesejável, pois se desvia do nível de otimização direcionada do Arch Linux.\n\n"
+    },
+    {
+      "title": "Notas sobre -O3",
+      "level": 4,
+      "content": "O uso de -O3 não garante que o software tenha um desempenho melhor e, às vezes, pode até atrasar o programa. Também pode quebrar o software em algumas situações. Há uma boa razão pela qual os desenvolvedores do Arch Linux escolhem -O2 como o nível de otimização de destino e devemos continuar com ele. A menos que você saiba exatamente o que está fazendo, ou se o upstream explicitamente disser ou implicar que -O3 é necessário, devemos evitar usá-lo em nossos pacotes.\n\n"
+    },
+    {
+      "title": "Corrigindo a substituição automática do sinalizador de otimização",
+      "level": 4,
+      "content": "Corrigir isso de uma maneira 100% garantida não é uma questão simples devido à flexibilidade do CMake. Observe que não há solução padrão que possa ser aplicada a todos os casos. Nesta seção serão objeto de discussão as possíveis soluções e alguns pontos que devem ser observados.\n\nO tipo de compilação padrão do CMake é None e não anexa nenhum sinalizador a CFLAGS e CXXFLAGS por padrão, então simplesmente omitir a opção CMAKE_BUILD_TYPE pode funcionar, pois será padronizada como None. Mas observe que a omissão desta opção não garante a correção do problema, pois muitos projetos de software configuram automaticamente o tipo de construção como Release (ou outro tipo) nos arquivos CMake, se CMAKE_BUILD_TYPE não estiver definido na linha de comando.\n\nComo o tipo de compilação padrão None não anexa nenhum sinalizador a CFLAGS e CXXFLAGS por padrão, usando a opção -DCMAKE_BUILD_TYPE=None também pode funcionar. De um modo geral, usar a opção -DCMAKE_BUILD_TYPE=None é melhor do que omitir o uso de CMAKE_BUILD_TYPE. Ele abordará o caso quando o upstream definir automaticamente o tipo de compilação como Release quando CMAKE_BUILD_TYPE for omitido, ele não anexará nenhum sinalizador por padrão e é incomum ver o software configurando sinalizadores indesejados para o tipo de compilação None.\n\nMas, infelizmente, as coisas não são tão simples como usar apenas -DCMAKE_BUILD_TYPE=None para corrigir isso. Ao usar o tipo de compilação None para corrigir o problema de -O3, pode-se cair em outro problema. É uma prática comum para muitos projetos de software definir alguns sinalizadores de compilador necessários para o tipo de compilação Release nos arquivos CMake (por exemplo, como definir as variáveis do CMake CMAKE_C_FLAGS_RELEASE e CMAKE_CXX_FLAGS_RELEASE). Esse software pode quebrar ou se comportar mal quando compilado sem esses sinalizadores definidos pelo upstream, se você usar o tipo de compilação None. Para determinar se estão faltando alguns sinalizadores, é necessário examinar os arquivos do CMake ou comparar a saída de make VERBOSE=1 para os tipos de compilação None e Release. O que fazer se o tipo de compilação None fizer com que alguns sinalizadores definidos pelo upstream sejam perdidos? Nesse caso, você pode estar no meio de duas situações problemáticas, porque se você usar o tipo de compilação Release, poderá usar o sinalizador indesejado -O3 e se usar o tipo de compilação None, você perderá alguns sinalizadores definidos a montante necessários. Não existe uma maneira padrão de resolver essa situação e ela deve ser analisada caso a caso. Se o upstream definir -O2 para o tipo de compilação Release, você poderá usar -DCMAKE_BUILD_TYPE=Release (veja abaixo). Caso contrário, o patch dos arquivos do CMake pode ser uma solução.\n\nAlguns poucos projetos de software codificam -O2 para o tipo de compilação Release em seus arquivos CMake e, portanto, -DCMAKE_BUILD_TYPE=Release pode ser configurado com segurança nesse caso se você tiver certeza de que -O2 é o nível de otimização que está sendo usado.\n\n- Alguns softwares podem falhar ao usar o tipo de compilação None. Teste o software ao usar o tipo de compilação None para verificar se ele irá quebrar ou perder funcionalidades.\n- Alguns softwares podem funcionar apenas com o tipo de compilação Release. Você precisará experimentar e testar o software.\n\n"
+    },
+    {
+      "title": "Verificando as correções",
+      "level": 3,
+      "content": "Você pode verificar se as correções estão sendo usadas corretamente pelo CMake, ativando o modo detalhado da ferramenta de compilação. Por exemplo, ao usar make (que é o padrão do CMake), isso pode ser feito adicionando VERBOSE=1 a ele (como make VERBOSE=1). Isso permitirá que make produza os comandos do compilador que estão sendo executados. Você pode então executar makepkg e examinar a saída para ver se o compilador está usando os sinalizadores -D_FORTIFY_SOURCE=2 e -O2. Se vários sinalizadores de otimização estiverem sendo exibidos em cada linha de comando, o último sinalizador na linha será o usado pelo compilador (significa que -O2 precisa ser o último sinalizador de otimização para ser eficaz).\n\n"
+    },
+    {
+      "title": "Diretórios de prefixo e instalação de biblioteca",
+      "level": 2,
+      "content": "O prefixo padrão do Arch Linux /usr pode ser especificado pela opção do CMake -DCMAKE_INSTALL_PREFIX=/usr. Isso geralmente é necessário porque muitos softwares padrão instalam arquivos no prefixo /usr/local.\n\nAlguns projetos upstream configuram seus arquivos CMake para instalar bibliotecas no diretório /usr/lib64. Se esse for o caso, você poderá configurar corretamente o diretório de instalação da biblioteca como /usr/lib usando a opção CMake -DCMAKE_INSTALL_LIBDIR=lib.\n\n"
+    },
+    {
+      "title": "Especificando diretórios",
+      "level": 3,
+      "content": "Desde a versão 3.13 do CMake, existe uma opção -B que cria automaticamente o diretório de compilação. Isso evita a criação do diretório de compilação por um comando mkdir (ou install) separado. A opção -S especifica o diretório fonte (onde procurar por um arquivo CMakeLists.txt) e evita a necessidade de usar cd na árvore de fontes antes executando cmake. Combinadas, essas duas opções são uma maneira conveniente de especificar os diretórios de compilação e de fontes. Por exemplo, para criar um programa chamado foo:\n\n```\nPKGBUILD\n```\n\n```\nbuild() {\n    <comando(s) de exportação>\n    cmake -B build -S \"foo-${pkgver}\" [outras_opções_cmake]\n    make -C build\n}\n```\n\n"
+    },
+    {
+      "title": "Reduzindo possíveis saídas indesejadas",
+      "level": 3,
+      "content": "A opção -Wno-dev do CMake suprimirá a saída de alguns avisos destinados apenas aos desenvolvedores do projeto upstream que gravam os arquivos CMakeLists.txt. A remoção desses avisos torna a saída do CMake mais suave e reduz a carga de examiná-la. Como regra geral, esses avisos geralmente podem ser ignorados com segurança pelos empacotadores.\n\n"
+    },
+    {
+      "title": "Removendo referências a RPATH inseguro de binários",
+      "level": 3,
+      "content": "Às vezes, os binários resultantes podem conter referências não seguras em RPATH. Isso pode ser verificado executando Namcap no pacote compilado e consiste em um problema de segurança que deve ser corrigido. Há uma boa chance de corrigir isso usando as opções do CMake CMAKE_SKIP_INSTALL_RPATH=YES ou CMAKE_SKIP_RPATH=YES. Você precisa experimentar os dois e ver o que funcionará no software em questão (não é necessário usar as duas opções).\n\n"
+    },
+    {
+      "title": "Obtendo todas as opções disponíveis do CMake",
+      "level": 3,
+      "content": "Para obter todas as opções \"visíveis\" do CMake disponíveis para um projeto de software, execute cmake -LAH na árvore de origem (onde está localizado o arquivo principal CMakeLists.txt).\n\nSe você deseja salvar a saída para referência posterior, você pode redirecioná-la para um arquivo:\n\n```\n$ cmake -LAH >options.txt 2>&1\n```\n\n"
+    },
+    {
+      "title": "Modelo",
+      "level": 2,
+      "content": "Aqui está um modelo geral para a função build() que serve como ponto de partida para pacotes baseados no CMake. Supondo que o pacote seja nomeado foo, ele é baseado em C e C++ e que não define nenhum sinalizador de compilador necessário para o tipo de compilação Release nos arquivos CMake:\n\n```\nPKGBUILD\n```\n\n```\nbuild() {\n    export CFLAGS+=\" ${CPPFLAGS}\"\n    export CXXFLAGS+=\" ${CPPFLAGS}\"\n    cmake -B build -S \"foo-${pkgver}\" \\\n        -DCMAKE_BUILD_TYPE='None' \\\n        -DCMAKE_INSTALL_PREFIX='/usr' \\\n        -Wno-dev\n    make -C build\n}\n```\n\nNão se esqueça de colocar o cmake em makedepends.\n\n"
+    },
+    {
+      "title": "Pacotes exemplos",
+      "level": 2,
+      "content": "- i2pd\n- libmysofa\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Documentação do CMake\n- Documentação de referência para a versão mais recente\n- Artigo do Wikipédia\n- cmake(1)\n\n"
+    }
+  ]
+}

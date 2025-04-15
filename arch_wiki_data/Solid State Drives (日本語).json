@@ -1,0 +1,146 @@
+{
+  "title": "Solid State Drives (日本語)",
+  "url": "https://wiki.archlinux.org/title/Solid_State_Drives_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- ソリッドステートドライブ/NVMe\n- ソリッドステートドライブ/メモリセルの消去\n- ベンチマーク/データストレージデバイス\n- パフォーマンスの向上#ストレージデバイス\n\nこの記事では、ソリッドステートドライブ (SSD) や他のフラッシュメモリベースのストレージデバイスの取り扱いに関するトピックをカバーしています。\n\n特定の目的のために SSD をパーティショニングしたい場合、フラッシュメモリ向けに最適化されたファイルシステムのリストで検討すると良いかもしれません。\n\n一般的な利用では、自由にファイルシステムを選び、#TRIM を有効化すると良いでしょう。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 使用法 1.1 TRIM 1.1.1 定期的な TRIM 1.1.2 連続的な TRIM 1.1.3 デバイス全体を trim する 1.1.4 LVM 1.1.5 dm-crypt 1.1.6 スワップ 1.2 パフォーマンスを最大化する 1.2.1 SSD のメモリセルのクリア 1.3 セキュリティ 1.3.1 Frozen モード 1.3.1.1 スリープから復帰したあとに SATA SSD の状態を frozen モードにする 1.3.2 ハードウェア暗号化\n- 2 トラブルシューティング 2.1 NCQ エラーを解消する 2.2 SATA の電源管理関連のエラーを解消する 2.3 外部 SSD での TRIM サポート\n- 3 ファームウェア 3.1 ADATA 3.2 Crucial 3.3 Intel 3.4 Kingston 3.5 Mushkin 3.6 OCZ 3.7 Samsung 3.7.1 Linux でのアップデート 3.7.1.1 古い SSD 3.8 SanDisk\n- 4 参照\n\n- 1.1 TRIM 1.1.1 定期的な TRIM 1.1.2 連続的な TRIM 1.1.3 デバイス全体を trim する 1.1.4 LVM 1.1.5 dm-crypt 1.1.6 スワップ\n- 1.2 パフォーマンスを最大化する 1.2.1 SSD のメモリセルのクリア\n- 1.3 セキュリティ 1.3.1 Frozen モード 1.3.1.1 スリープから復帰したあとに SATA SSD の状態を frozen モードにする 1.3.2 ハードウェア暗号化\n\n- 1.1.1 定期的な TRIM\n- 1.1.2 連続的な TRIM\n- 1.1.3 デバイス全体を trim する\n- 1.1.4 LVM\n- 1.1.5 dm-crypt\n- 1.1.6 スワップ\n\n- 1.2.1 SSD のメモリセルのクリア\n\n- 1.3.1 Frozen モード 1.3.1.1 スリープから復帰したあとに SATA SSD の状態を frozen モードにする\n- 1.3.2 ハードウェア暗号化\n\n- 1.3.1.1 スリープから復帰したあとに SATA SSD の状態を frozen モードにする\n\n- 2.1 NCQ エラーを解消する\n- 2.2 SATA の電源管理関連のエラーを解消する\n- 2.3 外部 SSD での TRIM サポート\n\n- 3.1 ADATA\n- 3.2 Crucial\n- 3.3 Intel\n- 3.4 Kingston\n- 3.5 Mushkin\n- 3.6 OCZ\n- 3.7 Samsung 3.7.1 Linux でのアップデート 3.7.1.1 古い SSD\n- 3.8 SanDisk\n\n- 3.7.1 Linux でのアップデート 3.7.1.1 古い SSD\n\n- 3.7.1.1 古い SSD\n\n"
+    },
+    {
+      "title": "TRIM",
+      "level": 3,
+      "content": "ファイルの削除がファイルシステムレベルのみで処理される[1]ハードドライブと比較して、SSD は、メモリブロックが解放されて再利用可能になったときにディスクコントローラに通知することで利益を得ます。SSD を構成するフラッシュセルは書き込み操作の度に少しづつ摩耗するため、ディスクコントローラは全てのセルに書き込み操作を分散させるアルゴリズムを使用します: この処理はウェアレベリングと呼ばれます。NVMe の DEALLOCATE や、SAS の UNMAP、ATA_TRIM コマンドが無ければ、空きメモリブロックがなくなると、1つセルに書き込む前にそのセルを削除するためにデータを移動しなければならないため、ディスクコントローラは書き込み操作により多くの時間を消費するようになってしまいます (Wikipedia:ja:ライトアンプリフィケーション を参照): TechSpot のベンチマークでは、SSD をデータで埋める前と後でのパフォーマンスへの影響を表しています。\n\nLinux カーネルバージョン 3.8 以降、異なるファイルシステムに対する TRIM のサポートが継続的に追加されました。概要は以下の表を見てください:\n\nTable content:\nファイルシステム | 連続的な TRIM (discard オプション) | 定期的な TRIM (fstrim) | 参照 と備考\nBcachefs | Yes | No | \nBtrfs | Yes | Yes | カーネル 6.2 から非同期 discard がデフォルトで有効化されています。\nexFAT | Yes | Yes | fstrim はカーネル 5.13 以降、サポートされています。[4]\next3 | Yes | Yes | \next4 | Yes | Yes | [5] の \"discard, nodiscard(*)\"\nF2FS | Yes | Yes | \nJFS | Yes | Yes | [6]\nNILFS2 | Yes | Yes | \nNTFS | Yes | No | ntfs3 カーネルドライバは連続的な TRIM のみをサポートしています。\nNo | Yes | NTFS-3G ドライバは定期的な TRIM のみをサポートしています。\nVFAT | Yes | Yes | fstrim はカーネル 4.19 以降、サポートされています。[7]\nXFS | Yes | Yes | [8]\nスワップ | Yes | No | 技術的には「ファイルシステム」ではありませんが、TRIM とは関係があります。\"once\" オプションで、スタートアップ時にトリムをスケジュールできます。swapon(8) を参照。\n\nTRIM のサポートを確認するには、以下を実行してください:\n\n```\n$ lsblk --discard\n```\n\nそして、DISC-GRAN (discard granularity) と DISC-MAX (discard max bytes) 列の値を確認してください。値が 0 でなければ、TRIM をサポートしていることを意味します。\n\nSATA SSD の場合にのみ、hdparm パッケージは、hdparm -I /dev/sda | grep TRIM を root ユーザとして実行することにより、TRIM サポートを検出することができます。hdparm は、NVMe SSD をサポートしていません。\n\n"
+    },
+    {
+      "title": "定期的な TRIM",
+      "level": 4,
+      "content": "util-linux パッケージは fstrim.service と fstrim.timer systemd ユニットファイルを提供しています。タイマーを有効化すれば毎週サービスが実行されます。このサービスは、discard 操作をサポートしているデバイス上のマウント済みのファイルシステムすべてに対して fstrim(8) を実行します。\n\nタイマーは最後に実行してから一週間経過したことを知るために (最初に実行したときに作成される) /var/lib/systemd/timers/stamp-fstrim.timer のタイムスタンプを使います。そのため、anacron のように、何度も頻繁に実行される恐れはありません。\n\nユニットの活動と状態を取得するには、journalctl を見てください。タイマーの周期や実行されるコマンドを変更するには、提供されているユニットファイルを編集してください。\n\n"
+    },
+    {
+      "title": "連続的な TRIM",
+      "level": 4,
+      "content": "TRIM コマンドを定期的に (fstrim.timer を使用する場合はデフォルトで1週間に1度) 発行するのではなく、ファイルが削除されるたびに TRIM コマンドを発行することも可能です。後者は、連続的な TRIM (continuous TRIM) として知られています。\n\n/etc/fstab 内で discard オプションを使うことにより、デバイスオペレーションでの連続的な TRIM を有効化します:\n\n```\n/dev/sda1  /           ext4  defaults,discard   0  1\n```\n\next4 ファイルシステムでは、tune2fs を使って discard フラグをデフォルトマウントオプションとして設定することもできます:\n\n```\n# tune2fs -o discard /dev/sdXY\n```\n\n外部ドライブの場合は、/etc/fstab 内のエントリではなくデフォルトマウントオプションを使うと便利です。そのようなパーティションは、他のマシンでもデフォルトのオプションを使ってマウントされるからです。この方法では、すべてのマシンで /etc/fstab を編集する必要はありません。\n\n"
+    },
+    {
+      "title": "デバイス全体を trim する",
+      "level": 4,
+      "content": "一度に SSD 全体を trim したい場合 (例えば、新しいインストールのためや、そのドライブを売りたい場合など)、blkdiscard コマンドが使えます。\n\n"
+    },
+    {
+      "title": "LVM",
+      "level": 4,
+      "content": "ファイルシステムから論理ボリュームへ渡された TRIM 要求は、自動的に物理ボリュームへ渡されます。追加の設定は必要ありません。\n\nデフォルトでは、LVM のオペレーション (lvremove、lvreduce、そしてその他すべて) は物理ボリュームに TRIM 要求を発行しません。これは、vgcfgrestore(8) を使って以前のボリュームグループ設定を復元できるようにするためです。/etc/lvm/lvm.conf 内の issue_discards は、論理ボリュームがその基底となる物理ボリュームの領域をもはや使用しなくなった時に、その物理ボリュームに discard 要求を送信するかどうかを制御します。\n\n"
+    },
+    {
+      "title": "dm-crypt",
+      "level": 4,
+      "content": "LUKS 及びプレーンな dm-crypt デバイスで discard サポートを有効化するには、dm-crypt/特記事項#ソリッドステートドライブ (SSD) の Discard/TRIM のサポート の手順に従ってください。\n\n"
+    },
+    {
+      "title": "スワップ",
+      "level": 4,
+      "content": "スワップ領域で discard を有効化するには、fstab 内のスワップデバイスのエントリに discard オプションを追加するか、swapon 呼び出し時に --discard を渡してください。\n\nSystemd#GPT パーティションの自動マウント の使用時、discard はスワップパーティションに対しては自動的には有効化されません。\n\nスワップが discard されるタイミング (discard=once か discard=pages) に関する議論は swapon(8) を見てください。モードの指定無しに discard が指定された場合、デフォルトで両方が有効化されます。\n\n"
+    },
+    {
+      "title": "パフォーマンスを最大化する",
+      "level": 3,
+      "content": "パフォーマンスの向上#ストレージデバイス のヒントに従ってドライブのパフォーマンスを最大化しましょう。\n\n"
+    },
+    {
+      "title": "SSD のメモリセルのクリア",
+      "level": 4,
+      "content": "時々、SSD のセルを完全にリセットしてデバイスにインストールした時と同じ初めの状態にすることで製造時の書き込みパフォーマンスを取り戻したいと思うことがあるかもしれません。SSD の書き込みパフォーマンスはネイティブの TRIM サポートを使っていても時間経過で落ちていきます。TRIM はファイル削除に対するセーフガードとして働くだけで、増加保存などの代わりにはなりません。\n\n#SATA や #NVMe の場合、ソリッドステートドライブ/メモリセルの消去 に書かれている適切な手順に従うことでリセットすることができます。\n\n"
+    },
+    {
+      "title": "Frozen モード",
+      "level": 4,
+      "content": "一部のマザーボードファームウェアは初期化時に ATA SECURITY FREEZE LOCK コマンドを SATA デバイスに発行します。これによりドライブは frozen モードになり、SEC2 状態 (セキュリティ無効、未ロック、frozen 状態) に遷移します。同様に、一部の SSD (と HDD) も工場出荷時にこの状態にすでに設定されています。このことは hdparm と smartctl の出力から確認できます:\n\n```\n# hdparm -I /dev/sda\n```\n\n```\nSecurity: \n \tMaster password revision code = 65534\n \t\tsupported\n \tnot\tenabled\n \tnot\tlocked\n \t\tfrozen\n \tnot\texpired: security count\n \t\tsupported: enhanced erase\n \t4min for SECURITY ERASE UNIT. 2min for ENHANCED SECURITY ERASE UNIT.\n```\n\n```\n# smartctl -g security /dev/sda\n```\n\n```\nATA Security is:  Disabled, frozen [SEC2]\n```\n\nデバイスのフォーマットやオペレーティングシステムのインストールといった操作は、frozen モードの影響を受けません。\n\n上記の hdparm の出力は、デバイスが起動時に HDD パスワードによってロックされていないこと、そして frozen 状態によってデバイスを (実行時にパスワードを設定してデバイスをロックさせてしまうような) マルウェアから保護していることを示しています。\n\n\"frozen\" 状態のデバイスにパスワードを設定したい場合、それに対応しているマザーボード BIOS が必要です。ハードウェア暗号化に必要なので、多くのノートパソコンでサポートされていますが、デスクトップやサーバーのボードではサポートがあるかどうかはっきりしないことがあります。\n\n例えば、Intel DH67CL/BL マザーボードの場合、設定にアクセスするには物理的なジャンパによってマザーボードを \"maintenance mode\" に設定する必要があります。[10]\n\nSSD を消去するときは、ディスクの完全消去#hdparm や ソリッドステートドライブ/メモリセルの消去 を見て下さい。\n\nSATA SSD は S3 スリープから復帰すると SEC1 状態 (セキュリティ無効、未ロック、非 frozen) に戻っていることが多く、ソリッドステートドライブ/メモリセルの消去 で説明されているように ATA SECURITY ERASE UNIT コマンドに対して脆弱になっています。\n\nこの問題を回避するために、スリープからの復帰後にスクリプトを実行することができます:\n\n```\n/usr/lib/systemd/system-sleep/ssd-freeze.sh\n```\n\n```\n#!/bin/sh\nif [ \"$1\" = 'post' ]; then\n\tsleep 1\n\tif hdparm --security-freeze /dev/disk/by-id/ata-name-of-disk; then\n\t\tlogger \"$0: SSD freeze command executed successfully\"\n\telse\n\t\tlogger \"$0: SSD freeze command failed\"\n\tfi\t\nfi\n```\n\nシステムに複数のストレージデバイスやポータブル USB ドライブが存在している場合、Hdparm#udev ルールによる永続的な設定 に書かれてあるテクニックを利用して、--security-freeze を全ドライブ (HDD も含む) に発行することもできます。\n\n"
+    },
+    {
+      "title": "ハードウェア暗号化",
+      "level": 4,
+      "content": "#Frozen モード で説明されているように、BIOS でストレージデバイス (SSD/HDD) のパスワードを設定すると、それをサポートしているデバイスのハードウェア暗号化も初期化される場合があります。デバイスが OPAL 規格にも準拠している場合、パスフレーズを設定する機能が BIOS に無くとも、これを行える場合があります。自己暗号化ドライブ を見てください。\n\n"
+    },
+    {
+      "title": "トラブルシューティング",
+      "level": 2,
+      "content": "あなたが今遭遇している問題は、Linux 固有でないファームウェアのバグである可能性があります。ゆえに、SSD に影響を与える問題のトラブルシューティングに挑戦する前に、以下のアップデートが利用可能であるかをチェックするべきです:\n\n- SSD のファームウェア\n- マザーボードの BIOS/UEFI ファームウェア\n\nファームウェアのバグであったとしても、解決できることがあります。ファームウェアにアップデートが存在しなかったり、ファームウェアのアップデートをしたくない場合、以下のセクションが役に立つかもしれません。\n\n"
+    },
+    {
+      "title": "NCQ エラーを解消する",
+      "level": 3,
+      "content": "SSD や SATA チップセットによっては Linux Native Command Queueing (NCQ) が正しく動作しないことがあります。journal に以下のようなエラーが表示されます:\n\n```\nata9: exception Emask 0x0 SAct 0xf SErr 0x0 action 0x10 frozen\nata9.00: failed command: READ FPDMA QUEUED\nata9.00: cmd 60/04:00:d4:82:85/00:00:1f:00:00/40 tag 0 ncq 2048 in\nres 40/00:18:d3:82:85/00:00:1f:00:00/40 Emask 0x4 (timeout)\n```\n\n起動時に NCQ を無効にするには、ブートローダーの設定におけるカーネルコマンドラインに libata.force=noncq を追加してください。ポート 9 のディスク 0 の NCQ だけを無効化するには次を使用: libata.force=9.00:noncq。\n\nまた、sysfs を使うことで再起動せずに特定のドライブの NCQ を無効化することもできます:\n\n```\n# echo 1 > /sys/block/sdX/device/queue_depth\n```\n\n問題が解決しなかったり他の問題が発生する場合は、バグレポートを作成してください。\n\n"
+    },
+    {
+      "title": "SATA の電源管理関連のエラーを解消する",
+      "level": 3,
+      "content": "SATA Active Link Power Management (ALPM) が有効化されていると、一部の SSD (例: Transcend MTS400 や Crucial M550) は特定の SATA コントローラで問題が発生します。\n\nLinux 4.16 から ALPM はデフォルトで有効化されています。また、省電力デーモン (例: TLP、Laptop Mode Tools) によって実行中に有効化される場合もあります。これに関しては 電源管理#SATA Active Link Power Management を参照してください。\n\n"
+    },
+    {
+      "title": "外部 SSD での TRIM サポート",
+      "level": 3,
+      "content": "いくつかの USB から SATA へのブリッジチップ (VL715、VL716 など) や USB から PCIe へのブリッジチップ (IB-1817M-C31 のような外部 NVMe エンクロージャで使用されている JMicron JMS583 など) は、USB Attached SCSI ドライバ (Linux では \"uas\" と呼ばれています) を通して送信できる TRIM ライクなコマンドをサポートしています。\n\nしかし、カーネルはこの機能を自動的に検出しない場合があり、この機能を使用しないかもしれません。 問題のブロックデバイスが /dev/sdX であると仮定すると、sg3_utils パッケージのコマンドを使えばそのケースに当てはまっているかどうかを確認できます:\n\n```\n# sg_readcap -l /dev/sdX\n```\n\nこのコマンドの出力に \"Logical block provisioning: lbpme=0\" と始まる行がある場合、(LBPME) ビットがセットされていないためカーネルはそのデバイスが \"Logical Block Provisioning Management\" をサポートしていないと推定していることを示しています。\n\nこの場合、デバイスの \"Logical Block Provisioning\" の \"Vital Product Data\" (VPD) ページでデータのアンマッピングのためのサポートされている機能を確認する必要があります。以下のコマンドでこれを行うことができます:\n\n```\n# sg_vpd -a /dev/sdX\n```\n\n出力から以下のような行を探してください:\n\n```\nUnmap command supported (LBPU): 1\nWrite same (16) with unmap bit supported (LBPWS): 0\nWrite same (10) with unmap bit supported (LBPWS10): 0\n```\n\nこの例では、デバイスが \"UNMAP\" コマンドをサポートしていることを示しています。\n\n以下のコマンドの出力を見てください:\n\n```\n$ cat /sys/block/sdX/device/scsi_disk/*/provisioning_mode\n```\n\nカーネルがデバイスのデータアンマッピング機能を検出していない場合、このコマンドはおそらく \"full\" を返します。 \"full\" の他に、カーネルの SCSI ストレージドライバは現在以下の provisioning_mode 値が登録されています:\n\n```\nunmap\nwritesame_16\nwritesame_10\nwritesame_zero\ndisabled\n```\n\n上記の例の場合、\"provisioning_mode\" を \"unmap\" に設定することで、カーネルにそれを使用するように要求することができます:\n\n```\n# echo \"unmap\" >/sys/block/sdX/device/scsi_disk/*/provisioning_mode\n```\n\nこのコマンドを実行すると即座に、/dev/sdX 上で \"blkdiscard\" のようなツールを使ったり、/dev/sdX 上にマウントされているファイルシステム上で \"fstrim\" を実行したりできるようになるはずです。\n\n特定のベンダ/製品の外部デバイスが接続されたときに \"provisioning_mode\" を自動的に有効化したいならば、\"udev\" の機構を使うことで可能です。まず、USB Vendor と Product ID を調べてください:\n\n```\n$ cat /sys/block/sdX/../../../../../../idVendor\n$ cat /sys/block/sdX/../../../../../../idProduct\n```\n\nそして、udev ルールのファイルに以下の内容を記述してください (この例では、idVendor 152d と idProduct 0583 を使っています):\n\n```\n# echo 'ACTION==\"add|change\", ATTRS{idVendor}==\"152d\", ATTRS{idProduct}==\"0583\", SUBSYSTEM==\"scsi_disk\", ATTR{provisioning_mode}=\"unmap\"' >>/etc/udev/rules.d/10-uas-discard.rules\n```\n\n(関連する idVendor/idProduct は lsusb を使うことでも取得できます。)\n\n"
+    },
+    {
+      "title": "ファームウェア",
+      "level": 2,
+      "content": "デバイスのベンダーによってサポートされていれば、fwupd ユーティリティを使ってファームウェアをアップデートすることが推奨されます。\n\n現在のファームウェアバージョンを確認するには:\n\n```\n# smartctl -i /dev/ssd_device\n```\n\n"
+    },
+    {
+      "title": "ADATA",
+      "level": 3,
+      "content": "Linux での SSD ファームウェアのアップデートは ADATA によってサポートされていません。Windows でのみ利用できるユーティリティ SSD ToolBox が ADATA によって ADATAのサポートページと ADATA XPG のサポートページで提供されています。このツールにより、監視、TRIM、ベンチマーク、ADATA SSD ファームウェアのアップデートができます。\n\n"
+    },
+    {
+      "title": "Crucial",
+      "level": 3,
+      "content": "Crucial は ISO イメージを使ってファームウェアをアップデートする方法を提供しています。SSD サポートページから製品を選んで \"Manual Boot File\" をダウンロードすることでイメージを入手できます。\n\nM4 Crucial モデルを使っている場合、smartctl でファームウェアのアップグレードが必要かどうかチェックすることが可能です。\n\n```\n$ smartctl --all /dev/sdX\n```\n\n```\n==> WARNING: This drive may hang after 5184 hours of power-on time:\nhttps://www.tomshardware.com/news/Crucial-m4-Firmware-BSOD,14544.html\nSee the following web page for firmware updates:\nhttps://www.crucial.com/usa/en/support-ssd\n```\n\n上記の警告が表示された場合は、重要なデータをバックアップしてから直ちにアップグレードを行うことが推奨されます。ISO イメージと Grub を使用して Crucial MX100 のファームウェアをアップデートする手順は こちら を参照してください。\n\n"
+    },
+    {
+      "title": "Intel",
+      "level": 3,
+      "content": "Intel は、Windows の Intel® Memory and Storage Tool (GUI) ソフトウェアに対応していないオペレーティングシステム向けに、Linux ライブシステムをベースとする Firmware Update Tool を配布しています。\n\nまた、ファームウェアをリフラッシュできる、Intel Memory and Storage (MAS) Tool という新しい Linux コマンドラインユーティリティもあります。intel-mas-cli-toolAUR パッケージで利用できます。PDF のユーザガイドがあります。\n\nファームウェアの状態をチェックすると例えば以下のように表示されます:\n\n```\n# intelmas show -intelssd 0\n```\n\n```\nDevicePath : /dev/nvme0n1\nDeviceStatus : Healthy\nFirmware : 002C\nFirmwareUpdateAvailable : The selected Intel SSD contains current firmware as of this tool release.\n```\n\nシステム上に1つしか SSD が存在しない場合、-intelssd 0 は省略できます。2番目の SSD は -intelssd 1 となります。\n\nアップデートが利用できる場合は、intelmas load -intelssd 0 を実行することでアップデートできます。上記の PDF ユーザガイドでは、この手順は Linux で2回 (間に電源の切断と再投入を挟んで) 行う必要があると書かれています。すべてのデバイス用の最新のファームウェアは、MAS Tool 自体の一部として配布されており、別途ダウンロードする必要はありません。\n\n"
+    },
+    {
+      "title": "Kingston",
+      "level": 3,
+      "content": "Sandforce ベースのドライバ向けに KFU ツールが利用できます (kingston_fw_updaterAUR)。\n\n"
+    },
+    {
+      "title": "Mushkin",
+      "level": 3,
+      "content": "マイナーな Mushkin ブランドのソリッドステートドライブも Sandforce コントローラーを使っており、ファームウェアをアップデートする Linux ユーティリティ (Kingston のものとほとんど同じ) が存在します。\n\n"
+    },
+    {
+      "title": "OCZ",
+      "level": 3,
+      "content": "OCZ は Linux 用の Command Line Online Update Tool (CLOUT) を用意しています。ocz-ssd-utilityAUR, ocztoolboxAUR, oczcloutAUR パッケージでインストールすることができます。\n\n"
+    },
+    {
+      "title": "Samsung",
+      "level": 3,
+      "content": "Samsung は Magician ソフトウェア以外の方法によるアップデートを\"サポートしない\"としていますが、不可能ではありません。Magician ソフトウェアは、ファームウェアのアップデートを含むブータブルな USB ドライブを作成することはできますが、Samsung はもはやコンシューマ SSD 向けのソフトウェアを提供していません。また、Samsung は 、ファームウェアをアップデートできる作成済みのブータブルな ISO イメージも提供しています。他のオプションは、samsung_magician-consumer-ssdAUR によって提供されている、Samsung の magician ユーティリティを使うことです。Magician は Samsung ブランドの SSD のみをサポートしています。OEM (Lenovo など) 向けに Samsung によって製造された SSD はサポートされていません。\n\n(Microsoft Windows で Samsung の \"Magician\" ソフトウェアを使わずに) Linux で作成したライブ USB スティックからファームウェアアップデートを実行したい場合は、[11] を参照してください。注意点として、このブログ記事では Master Boot Record (MBR) を使ってブート可能な USB ドライブを作成する方法が説明されており、最近のマザーボートでは MBR がサポートされていないことがあります (例えば、Intel NUC はもはや MBR をサポートしていません)。\n\n"
+    },
+    {
+      "title": "Linux でのアップデート",
+      "level": 4,
+      "content": "SSD のファームウェアは以下に示すように (ブータブルな USB スティックを作らなくても) ネイティブにアップデートできます。まず、Samsung downloads ページを開き、\"Samsung SSD Firmware\" セクションへ行き、あなたの SSD 用の最新のファームウェア (ISO イメージであるはずです) をダウンロードしてください。\n\nISO イメージから initrd Linux イメージを抽出してください:\n\n```\n$ bsdtar xf samsung_ssd_firmware.iso initrd\n```\n\nroot/fumagician/ を抽出してください。このディレクトリには、ファームウェアのアップデートファイルが含まれています:\n\n```\n$ bsdtar xf initrd root/fumagician\n```\n\n最後に、root/fumagician/fumagician を root 権限で実行し、(ファームウェアが正常にアップデートされたのであれば) システムを再起動してください。\n\n再起動後にファームウェアのバージョンが変わっていない場合は、root/fumagician/fumagician 2> log を実行して、出力されたログファイルからエラーを探してください。例えば、ログに 'unzip is not available' という記述がある場合は、unzip をインストールするか、initrd から抽出してください。\n\nSSD ファームウェアの ISO イメージのいくつかには、initrd Linux イメージではなく FreeDOS イメージが含まれています。ゆえに、SSD ファームウェアのアップデートに必要なステップは上記とは異なります。以下の表は、そのような SSD (とそれに関連するパス) のリストです:\n\nTable content:\nSSD モデル | FreeDOS イメージパス | ファームウェアパッケージパス\n470, 830 | BTDSK.IMG | SSR/\n840 | isolinux/btdsk.img | samsung/DSRD/\n840 EVO (mSATA), Pro | ISOLINUX/BTDSK.IMG\n\nまず、ISO イメージから FreeDOS イメージを抽出してください:\n\n```\n$ bsdtar xf samsung_ssd_firmware.iso freedos_image_path\n```\n\nFreeDOS イメージを /mnt/ にマウントしてください:\n\n```\n# mount freedos_image_path /mnt\n```\n\nMagician SSD 管理ユーティリティから Disk Number にある SSD のディスク番号を入手してください:\n\n```\n# magician --list\n```\n\nファームウェアパッケージのパスを指定し、指定したディスクに対して SSD ファームウェアをアップデートしてください:\n\n```\n# magician --disk disk_num --firmware-update --fwpackage-path /mnt/firmware_package_path\n```\n\n最後に、(root 権限で実行した) magician --list の出力から Firmware にあるバージョンを確認し、ファームウェアが正常にアップデートできたか検証してください。ファームウェアが正常にアップデートされたのであれば、システムを再起動してください。\n\n"
+    },
+    {
+      "title": "SanDisk",
+      "level": 3,
+      "content": "SanDisk は、SanDisk SSD Toolkit でサポートされていないオペレーティングシステムにおいて SSD のファームウェアアップデートをするための ISO ファームウェアイメージを作成しています。\n\n適切な SSD モデル だけでなく、適切な SSD 容量 (例: 60 GB または 256GB) も合わせて、ファームウェアを選択しなければなりません。ISO ファームウェアイメージを焼いたあと、PC を再起動し、新しく作成した CD/DVD ブートディスクを起動してください (USB スティックでも動作するかもしれません)。\n\nISO イメージには、Linux カーネルと initrd が含まれています。それらを /boot パーティションに抽出し、GRUB や Syslinux でそれらを起動して、ファームウェアをアップデートしてください。\n\n参照:\n\n- SanDisk Extreme SSD 手動ファームウェアアップデート バージョン R211\n- SanDisk Ultra SSD 手動ファームウェアアップデート バージョン 365A13F0\n- SanDisk Ultra+ SSD 手動ファームウェアアップデート バージョン X2316RL - \"H2\" モデルと \"HP\" モデルのうちどちらが使用されているかを確認するには、smartctl -i dev/disk/by-id/*SanDisk!(*part*) を root として実行してください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- SSD に Arch をインストールすることについての Reddit における討論\n- Re: Varying Leafsize and Nodesize in Btrfs\n- Re: SSD alignment and Btrfs sector size\n- Erase Block (Alignment) Misinformation?\n- Is alignment to erase block size needed for modern SSD's?\n- Btrfs support for efficient SSD operation (data blocks alignment)\n\n"
+    }
+  ]
+}

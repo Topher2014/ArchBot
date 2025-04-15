@@ -1,0 +1,51 @@
+{
+  "title": "Reflector (Español)",
+  "url": "https://wiki.archlinux.org/title/Reflector_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-10-18** \n\nArtículos relacionados\n\n- Mirrors (Español)\n- Pacman (Español)\n\nReflector es un script que puede recuperar la última lista de servidores de réplicas desde la página MirrorStatus, filtrar la mayoría de los servidores de réplicas actualizados, ordénarlos por velocidad y sobrescribir el archivo /etc/pacman.d/mirrorlist.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete reflector.\n\n"
+    },
+    {
+      "title": "Utilización",
+      "level": 2,
+      "content": "- En los siguientes ejemplos, se sobrescribirá el archivo /etc/pacman.d/mirrorlist. Haga una copia de seguridad antes de continuar.\n- Asegúrese de que el archivo /etc/pacman.d/mirrorlist resultante no contenga entradas que considere poco fiables antes de sincronizar o actualizar con Pacman (Español).\n\nPara ver todos las órdenes disponibles, ejecute la siguiente orden:\n\n```\n# reflector --help\n```\n\n"
+    },
+    {
+      "title": "Ejemplos",
+      "level": 3,
+      "content": "Para clasificar y ordenar detalladamente los cinco servidores de réplicas sincronizados más recientes por velocidad de descarga y sobrescribir el archivo /etc/pacman.d/mirrorlist:\n\n```\n# reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist\n```\n\nPara seleccionar los 200 servidores de réplicas HTTP o HTTPS más recientemente sincronizados, ordenarlos por velocidad de descarga y sobrescribir el archivo /etc/pacman.d/mirrorlist:\n\n```\n# reflector --latest 200 --protocol http --protocol https --sort rate --save /etc/pacman.d/mirrorlist\n```\n\nPara seleccionar los 200 servidores de réplicas HTTPS sincronizados en las últimas 12 horas y ubicados en Francia o Alemania, ordenarlos por velocidad de descarga y sobrescribir el archivo /etc/pacman.d/mirrorlist:\n\n```\n# reflector --country France --country Germany --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist\n```\n\n"
+    },
+    {
+      "title": "Hook de pacman",
+      "level": 3,
+      "content": "Puede crear un hook de pacman que ejecute reflector y elimine el archivo .pacnew creado cada vez que pacman-mirrorlist obtenga una actualización:\n\n```\n/etc/pacman.d/hooks/mirrorupgrade.hook\n```\n\n```\n[Trigger]\nOperation = Upgrade\nType = Package\nTarget = pacman-mirrorlist\n\n[Action]\nDescription = Actualizar pacman-mirrorlist con reflector y eliminar pacnew...\nWhen = PostTransaction\nDepends = reflector\nExec = /bin/sh -c \"reflector --country 'United States' --latest 200 --age 24 --sort rate --save /etc/pacman.d/mirrorlist; rm -f /etc/pacman.d/mirrorlist.pacnew\"\n```\n\nAsegúrese de sustituir los argumentos de reflector con los que desee.\n\n"
+    },
+    {
+      "title": "Servicio systemd",
+      "level": 3,
+      "content": "Este es un ejemplo de unidad de servicio (de systemd) que espera a que la red esté activa y conectada antes de ejecutar reflector:\n\n```\n/etc/systemd/system/reflector.service\n```\n\n```\n[Unit]\nDescription=Actualizar la lista de servidores de réplica de pacman\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/reflector --protocol https --latest 30 --number 20 --sort rate --save /etc/pacman.d/mirrorlist\n\n[Install]\nRequiredBy=multi-user.target\n```\n\nInicie reflector.service para actualizar la lista de servidores de réplica. Para actualizar la lista de servidores de réplica cada vez que arranque el equipo, active el servicio.\n\n"
+    },
+    {
+      "title": "Temporizador de systemd",
+      "level": 3,
+      "content": "Si desea ejecutar reflector.service semanalmente, cree un archivo .timer asociado. Por ejemplo::\n\n```\n/etc/systemd/system/reflector.timer\n```\n\n```\n[Unit]\nDescription=Ejecutar reflector semanalmente\n\n[Timer]\nOnCalendar=Mon *-*-* 7:00:00\nRandomizedDelaySec=15h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n```\n\nY luego solo tiene que iniciar reflector.timer.\n\n"
+    },
+    {
+      "title": "Paquete reflector-timer",
+      "level": 3,
+      "content": "Instale reflector-timerAUR[enlace roto: package not found] to run reflector weekly.\n\nLa configuración predeterminada, que se puede editar para adaptarse a sus necesidades, es:\n\n```\n/usr/share/reflector-timer/reflector.conf\n```\n\n```\nAGE=6\nCOUNTRY=Germany\nLATEST=30\nNUMBER=20\nSORT=rate\n### eliminar una entrada si no la quiere como protocolo disponible\nPROTOCOL1='-p http'\nPROTOCOL2='-p https'\nPROTOCOL3='-p ftp'\n```\n\nAsegúrese de activar reflector.timer.\n\n"
+    },
+    {
+      "title": "Tarea de cron",
+      "level": 3,
+      "content": "Para actualizar la lista servidores de réplica diariamente, considere lo siguiente:\n\n```\n/etc/cron.daily/mirrorlist\n```\n\n```\n#!/bin/bash\n\n# Obtener los del país\n/usr/bin/reflector -c \"India\" -p http --sort rate > /etc/pacman.d/mirrorlist\n\n# Trabajar con otras alternativas\n/usr/bin/reflector -p http  --latest 20 -p https -p ftp --sort rate >> /etc/pacman.d/mirrorlist\n```\n\n"
+    }
+  ]
+}

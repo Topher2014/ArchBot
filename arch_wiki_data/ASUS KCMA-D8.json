@@ -1,0 +1,36 @@
+{
+  "title": "ASUS KCMA-D8",
+  "url": "https://wiki.archlinux.org/title/ASUS_KCMA-D8",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This page describes the steps necessary to get most of the features of the ASUS KCMA-D8 working correctly. It assumes that you have already successfully installed Arch Linux and use the GRUB boot loader.\n\n"
+    },
+    {
+      "title": "BIOS",
+      "level": 2,
+      "content": "The manufacturers BIOS is outdated and unsafe, it has no NVMe drivers, fails to resume from suspend, and it's closed source. To remedy this, we can install a precompiled open source bios known as libreboot instead.\n\nThe stock BIOS prevents you from flashing it with a non-stock BIOS, so the first flash must be done via hardware. The easiest way to install libreboot for the first time is with a raspberry pi, connecting the bios chip to the GPIO as seen here. Install flashprog on the pi with apt install flashprog, and then download, verify, and extract the latest bios images from the libreboot downloads page (recommended to be testing release 20231021 or later, earlier versions do not support NVMe). Make sure to pick the bios image with the correct RAM type, ROM size, payloads, and keyboard type, and then follow the how to use flashprog instructions to flash the bios, replacing ./flashprog with flashprog since we have installed it. Make sure to clear the CMOS before booting with the new BIOS.\n\nOnce libreboot has been installed, it can be updated from within the operating system by following these instructions.\n\nThe stock BIOS chip is 2MiB, and can be upgraded to a 16MiB one such as the 25Q128FVIQ, or the W25Q128FVSG with a SOP8 to DIP8 adapter PCB. This will allow more space for larger payloads in the future, but isn't strictly necessary.\n\nTo boot your operating system from NVMe, it's recommended to install your operating system entirely to NVMe, and install GRUB to a SATA drive (which must have at least one partition on it). This simply prevents you from having to reconfigure GRUB's boot order from within the libreboot bios.\n\n"
+    },
+    {
+      "title": "Sensors",
+      "level": 2,
+      "content": "After running sensors detect, it loads the incorrect kernel driver w83627ehf. This can be remediated by replacing w83627ehf with w83795 in lm_sensors configuration file:\n\n```\n/etc/conf.d/lm_sensors\n```\n\n```\nHWMON_MODULES=\"w83795\"\n```\n\nThe enumerated hwmon symlinks located in /sys/class/hwmon/ may vary in order after a power cycle, because the kernel modules do not load in a consistent order every boot. Something as simple as plugging in a game controller could cause the order to change. Creating/editing /etc/modules-load.d/modules.conf in such a manner should create a defined order for the modules to load in, which should make the hwmon paths stay where they are and not change order upon reboot:\n\n```\n/etc/modules-load.d/modules.conf\n```\n\n```\n# Load w83795 at boot\nw83795\n```\n\nThis method may not always work consistently, and a more reliable method should be documented and implemented.\n\n"
+    },
+    {
+      "title": "Fan control",
+      "level": 2,
+      "content": "Fan control in this motherboard is quite unusual. There is 8 PWM fan control channels, however only 2 channels are used for controlling the fan speed of all 8 fan headers. One must use a combination of 4 pin fans (recommended for CPU), and 3 pin fans (recommended for case). One speed can be set for all of the 4 pin fans, and another speed can be set for all of the 3 pin fans. After running pwmconfig, fancontrol.service refuses to start. This is because fancontrol cannot associate more than 2 fans with PWM speed. Manually configure /etc/fancontrol so that FCFANS only has two inputs per device, and restart fancontrol.service. Here is an example configuration:\n\n```\n/etc/fancontrol\n```\n\n```\nINTERVAL=10\nDEVPATH=hwmon6=devices/pci0000:00/0000:00:14.0/i2c-8/8-002f\nDEVNAME=hwmon6=w83795g\nFCTEMPS=hwmon6/device/pwm2=hwmon6/device/temp1_input hwmon6/device/pwm1=hwmon6/device/temp8_input\nFCFANS=hwmon6/device/pwm2=hwmon6/device/fan8_input+hwmon6/device/fan6_input hwmon6/device/pwm1=hwmon6/device/fan2_input+hwmon6/device/fan1_input\nMINTEMP=hwmon6/device/pwm2=60 hwmon6/device/pwm1=40\nMAXTEMP=hwmon6/device/pwm2=80 hwmon6/device/pwm1=65\nMINSTART=hwmon6/device/pwm2=60 hwmon6/device/pwm1=60\nMINSTOP=hwmon6/device/pwm2=0 hwmon6/device/pwm1=0\n```\n\n"
+    },
+    {
+      "title": "Gaming Boost Clocks",
+      "level": 2,
+      "content": "Gaming on the KCMA-D8 is quite attainable with a pair of 4332 HE / 4386 CPU's and some 1333-1600MHz RAM. However, there is a few things you can do to make it better. For example, the 4386's all core max turbo is 3.1GHz, however it can boost to 3.8GHz on 2 cores 4 threads when the other 2 cores 4 threads are not as busy. Since these CPU's have plenty of threads and can pull quite a bit of power, we can simply disable half the cores on boot and get a massive single threaded boost while saving on electricity. The recommended way to do this is with cpupower-gui-gitAUR. Execute cpupower-gui as root to modify the default profile applied at boot by cpupower-gui.service. See cpupower-gui systemd units to learn more about global and user configurations.\n\nKeep in mind that inter-CPU communication introduces latency that isn't usually desirable for games, so restricting all of the game threads to run on CPU 0 is often desirable. See taskset(1) for setting cpu affinity.\n\n"
+    },
+    {
+      "title": "IPMI Module",
+      "level": 2,
+      "content": "This motherboard supports an ASMB4 IPMI Module. The manufacturers ROM for the IPMI module has slight incompatibilities with coreboot as is, preventing restarts from working correctly. There exists an open source replacement for the IPMI module ROM called OpenBMC, however compilation is extremely difficult as the codebase has not been updated in a long time and it requires an antiquated version of debian to compile. The developers of dasharo seem to have interest in supporting the KCMA-D8, because they already maintain and update their implementation of coreboot and OpenBMC for the very similar KGPE-D16, they just need a little bit more of a push from the community. If Dasharo decides to support the KCMA-D8, this would be massive, because the IPMI module has the ability to control fan speeds properly regardless of the state of the operating system, which could save the hardware from overheating in the unlikely event of a freeze, making the KCMA-D8 an even more legendary FOSS motherboard. However, they have declined to reply to any emails regarding this topic so it seems unlikely.\n\nLeah Rowe, founder of libreboot, is displaying curiosity in porting dasharo to the KCMA-D8. This would let an even more modern version of coreboot run on the KCMA-D8, which would also presumably support the OpenBMC from dasharo too. Please show Leah your support :)\n\n"
+    }
+  ]
+}

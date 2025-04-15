@@ -1,0 +1,96 @@
+{
+  "title": "Streaming With Icecast and MPD",
+  "url": "https://wiki.archlinux.org/title/Streaming_With_Icecast_and_MPD",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Mpd\n- Mplayer\n\nNote: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nIcecast is a program for streaming media such as audio and video across a network. Different types of clients connect to the IceCast server, either to provide a \"mount point\", control the server, or listen to the audio being cast.\n\nIcecast has support for streaming many audio streams simultaneously - each stream has a \"mount point\" which a client can access, with a network URI such as http://localhost:8000/example.ogg.m3u (this refers to a mount point called \"example\").\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install icecastAUR.\n\nAlternatively, you can build and install the icecast-khAUR package. Icecast-kh (Karl Heyes) extends on the official release with features that may be (if found to be working out well) merged into next official releases.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "All configuration is done in /etc/icecast.xml.\n\nBy default icecast listens on port 8000. It can listen on more than one port - this behavior can be changed by modifying one or more <listen-socket> sections.\n\nIcecast binds to all interfaces (i.e. 0.0.0.0) by default. To change this behavior, modify a <bind-address> section below a respective <listen-socket> section.\n\nTo set defaults for all mounts that do not specify their type (e.g. <mount type=\"normal\">) the <mount type=\"default\"> section can be modified:\n\n```\n/etc/icecast.xml\n```\n\n```\n<mount type=\"default\">\n  <public>0</public>\n  <intro>/stream.m3u</intro>\n  <max-listener-duration>3600</max-listener-duration>\n  <authentication type=\"url\">\n    <option name=\"mount_add\" value=\"http://auth.example.org/stream_start.php\"/>\n  </authentication>\n  <http-headers>\n    <header name=\"foo\" value=\"bar\" />\n  </http-headers>\n</mount>\n```\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "Enable and start icecast.service.\n\nTo verify that icecast is running go to http://localhost:8000/ or check the status of icecast.service.\n\n"
+    },
+    {
+      "title": "Streaming",
+      "level": 2,
+      "content": "Several programs are able to stream to icecast based on a <source-password> set in the <authentication> section of the configuration.\n\nNote: **before** \n\n"
+    },
+    {
+      "title": "MPD",
+      "level": 3,
+      "content": "Make sure to setup MPD and a client to control it.\n\nConfigure MPD (as system or user service) to be an icecast source:\n\n```\nmpd.conf\n```\n\n```\naudio_output {\n    type        \"shout\"\n    encoding    \"ogg\"\n    name        \"my cool stream\"\n    host        \"localhost\"\n    port        \"8000\"\n    mount       \"/example.ogg\"\n    user        \"source\"\n    password    \"<source-password>\"\n\n# Set either quality or bit rate\n#   quality     \"5.0\"\n    bitrate     \"64\"\n    format      \"44100:16:1\"\n# Optional Parameters\n#   description \"here is my long description\"\n#   genre       \"jazz\"\n}\n\n# Need this so that mpd still works if icecast is not running\naudio_output {\n    type \"null\"\n    name \"fake out\"\n}\n```\n\nStart mpd.service.\n\nThe icecast web interface should now list this new stream and the playlist should be available as http://localhost:8000/example.ogg.m3u\n\n"
+    },
+    {
+      "title": "ezstream",
+      "level": 3,
+      "content": "ezstreamAUR is a native source client for icecast. It uses XML files for configurations, like icecast\n\nSeveral examples can be found in /usr/share/examples/ezstream/. It supports mp3, Ogg Vorbis, Ogg Theora, for streaming video ffmpeg2theora can be used to reencode into Ogg Theora.\n\nAfter configuring, stream can be started by\n\n```\n$ ezstream -c /path/to/file.xml\n```\n\nMultiple media can streamed by creating a m3u playlist and defining it under <intakes> in configuration file\n\n```\n<intakes>\n   <intake>\n\t<type>playlist</type>\n\t<filename>playlist.m3u</filename>\n   </intake>\n</intakes>\n```\n\n"
+    },
+    {
+      "title": "XMMS2",
+      "level": 3,
+      "content": "xmms2 is a minimal music player which can be controled with several clients, setting this up is fairly simple compared to MPD and media can be added to stream on fly unlike ezstream.\n\nIcecast configuration can be displayed with:\n\n```\n$ xmms2 server config | grep ices\n```\n\n```\nices.encodingmaxbr = -1\nices.encodingminbr = -1\nices.encodingnombr = 96000\nices.host = localhost\nices.mount = /stream.ogg\nices.password = hackme\nices.port = 8000\nices.public = \nices.streamdescription = \nices.streamgenre = \nices.streamname = \nices.streamurl = \nices.user = source\n```\n\nThese can be changed as follows,\n\n```\n$ xmms2 server config ices.password my_password\n$ xmms2 server config ices.port 5080\n$ xmms2 server config ices.public 1\n```\n\nChange the output as ices so XMMS2 can mount the stream on icecast server.\n\n```\n$ xmms2 server config output.plugin ices\n```\n\nUpon starting, the stream should be working and files can be added with the command \"add\".\n\nAlternatively, XMMS2 can be controlled with lxmusic which provides a simple GUI.\n\n"
+    },
+    {
+      "title": "VLC",
+      "level": 3,
+      "content": "vlc is a full-featured media player and transcoder with built-in support for Icecast streaming. It can be controlled via GUI or command line, and can act as an Icecast source for media files or real-time audio captured from JACK output ports and other sources. For example, this command connects VLC to the first JACK audio output ports it finds, encodes the audio as Ogg Vorbis, and streams it to an Icecast mount point at http://localhost:8000/stream.ogg:\n\n```\n$ cvlc 'jack://channels=2:ports=.*' ':sout=#transcode{vcodec=none,acodec=vorb,ab=192,channels=2,samplerate=44100,scodec=none}:std{access=shout,mux=ogg,dst=//source:hackme@localhost:8000/stream.ogg}' :no-sout-all :sout-keep\n```\n\nAlternatively, VLC offers a guided GUI to stream to an Icecast server. When opening any media source, choose Stream and then add Icecast as a destination. You will be prompted for the network Address, Port, Mount Point, and Login:pass. Use source:<password> as the format for the latter. Select the desired transcoding options on the next screen and you are ready to go.\n\n"
+    },
+    {
+      "title": "Playback",
+      "level": 2,
+      "content": "Streams can be listened to via a web browser when visiting http://localhost:8000.\n\nAdditionally, there are several clients that can make direct use of a provided playlist file (e.g. http://localhost:8000/example.ogg.m3u)\n\n"
+    },
+    {
+      "title": "MPD",
+      "level": 3,
+      "content": "Icecast streams can be played back using MPD.\n\nUse an MPD client such as mpc to add the URL of an icecast playlist file to the playlist of a (local) MPD instance:\n\n```\n$ mpc add http://localhost:8000/example.ogg.m3u\n```\n\nThe added item behaves like any other track in the MPD playlist.\n\n"
+    },
+    {
+      "title": "MPlayer",
+      "level": 3,
+      "content": "Install the mplayer package.\n\nStart the program and provide it with the icecast playlist:\n\n```\n$ mplayer -playlist http://localhost:8000/example.ogg.m3u\n```\n\n"
+    },
+    {
+      "title": "Mpv",
+      "level": 3,
+      "content": "Install the mpv package.\n\nStart the program and point it at the icecast playlist:\n\n```\n$ mpv http://localhost:8000/example.ogg.m3u\n```\n\n"
+    },
+    {
+      "title": "Sonata",
+      "level": 3,
+      "content": "- Install the sonata-gitAUR package.\n- Start it up and you should be greeted by Sonata's preferences.\n- Set 'Name' to the name of your server.\n- Set 'Host' to the IP address of your server.\n- Set 'Port' to '6600'.\n- Click the '+' and repeat the previous steps but instead about your local computer (i.e. its name and IP).\n- Right-click->'Connections' and select your server. Then click on the 'Library' tab, if all is well, you should see your entire music selection that is on your server. Find a folder, right-click and click 'Add'. Clicking on the 'Current' tab will show you your current playlist, which should have the contents of whatever folder you just chose from the library. Double-click on a song. You should see the text get bold and the progress bar show up, just like it is playing, but you will not hear anything. Fear not.\n- Right-click->'Connections' and select your local computer. Then click the 'Streams' tab. Right-click and click 'New'. Make 'Stream Name' the name from your servers /etc/mpd.conf file's audio_output { } section and make the URL IP.of.server:8000/example.ogg.m3u. Double-click on this stream.\n- Click on the 'Current' tab and you will see the URL of the stream as your only item. Double-click on it and after a delay you should hear whatever song you had chosen on the server.\n\n"
+    },
+    {
+      "title": "VLC",
+      "level": 3,
+      "content": "In addition to acting as an Icecast source, vlc can play back streams from Icecast and other network audio sources. Choose Open Network Stream... and provide the URL when prompted.\n\n"
+    },
+    {
+      "title": "Running Icecast in a chroot environment",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nChange following settings in /etc/icecast.xml:\n\n```\n<chroot>1</chroot>\n```\n\nEdit the [Service] section of icecast.service:\n\n```\nWorkingDirectory=/usr/share/icecast\n```\n\nNow change this entries in /etc/icecast.xml:\n\n```\n<logdir>./log</logdir>\n<webroot>./web</webroot>\n<adminroot>./admin</adminroot>\n<pidfile>./icecast.pid</pidfile>\n```\n\nCreate a log directory under /usr/share/icecast and set the permissions:\n\n```\n# cd /usr/share/icecast\n# mkdir log\n# cd log\n# touch access.log playlist.log error.log\n# cd ..\n# chown -R icecast:icecast log/\n```\n\n"
+    },
+    {
+      "title": "Local user",
+      "level": 3,
+      "content": "Note that if you are running icecast under a local user (i.e. one that does not use /etc/icecast.xml) then you will need to copy the icecast web xml files from /usr/share otherwise you will get errors about XSLT and the web interface will not work.\n\n```\n$ cp -R /usr/share/icecast/web ~/icecast/\n```\n\nAlso, make sure that the <changeowner> section in the icecast configuration file is commented out, as changing the owner of a process requires root privileges.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official Website - The official Icecast website\n- List of clients - The upstream list of clients that work with Icecast\n- MPD Wiki: Configuration - Configuration page in the MPD wiki\n- ffmpeg2theora live streaming howto[dead link 2025-04-05 ⓘ] - Howto on live streaming with icecast, oggfwd and ffmpeg2theora\n- Ezstream - The ezstream website\n\n"
+    }
+  ]
+}

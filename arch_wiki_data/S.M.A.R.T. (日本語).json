@@ -1,0 +1,101 @@
+{
+  "title": "S.M.A.R.T. (日本語)",
+  "url": "https://wiki.archlinux.org/title/S.M.A.R.T._(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) は、最近のストレージデバイスの多くに内蔵されている補助コンポーネントであり、これによってデバイスは動作の健康状態を監視、保存、そして分析します。ソフトウェアは、収集された統計 (温度、代替処理されたセクタ数、シークエラーなど) を用いてデバイスの健康状態の計測、デバイスの障害の予測、危険な値に達した際の通知を行うことができます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 Smartmontools 1.1 smartctl 1.1.1 テストを実行する 1.1.2 テスト結果を表示する 1.1.3 全ディスクの属性表を生成する 1.2 smartd 1.2.1 デーモン管理 1.2.2 管理すべきデバイスを定義する 1.2.3 潜在的な問題を通知する 1.2.4 電源管理 1.2.5 自己テストをスケジュールする 1.2.6 温度の変化を警告する 1.2.7 完全な smartd.conf の例 1.3 update-smart-drivedb\n- 2 コンソールアプリケーション\n- 3 GUI アプリケーション\n- 4 参照\n\n- 1.1 smartctl 1.1.1 テストを実行する 1.1.2 テスト結果を表示する 1.1.3 全ディスクの属性表を生成する\n- 1.2 smartd 1.2.1 デーモン管理 1.2.2 管理すべきデバイスを定義する 1.2.3 潜在的な問題を通知する 1.2.4 電源管理 1.2.5 自己テストをスケジュールする 1.2.6 温度の変化を警告する 1.2.7 完全な smartd.conf の例\n- 1.3 update-smart-drivedb\n\n- 1.1.1 テストを実行する\n- 1.1.2 テスト結果を表示する\n- 1.1.3 全ディスクの属性表を生成する\n\n- 1.2.1 デーモン管理\n- 1.2.2 管理すべきデバイスを定義する\n- 1.2.3 潜在的な問題を通知する\n- 1.2.4 電源管理\n- 1.2.5 自己テストをスケジュールする\n- 1.2.6 温度の変化を警告する\n- 1.2.7 完全な smartd.conf の例\n\n"
+    },
+    {
+      "title": "Smartmontools",
+      "level": 2,
+      "content": "smartmontools パッケージには、ストレージデバイスの分析と監視のためのユーティリティプログラム smartctl と smartd、サードパーティのデータベース更新ユーティリティ update-smart-drivedb が含まれています。\n\nこれらのツールを使用するには smartmontools パッケージをインストールしてください。\n\nこれらのツールを効果的に使用するには、各ストレージデバイスで SMART サポートが利用可能であり、かつ有効化されていなければなりません。#smartctl を使うことで SMART サポートを確認したり有効化したりすることができます。それが済んだら、手動で #テストを実行する ことも #テスト結果を表示する こともできますし、#smartd を使って自動的にテストを実行してメールで通知することもできます。\n\n"
+    },
+    {
+      "title": "smartctl",
+      "level": 3,
+      "content": "smartctl は、「ほとんどの ATA/SATA 及び SCSI/SAS ハードドライブやソリッドステートドライブに組み込まれている Self-Monitoring, Analysis and Reporting Technology (SMART) システムを制御する」コマンドラインツールです。\n\n-i/--info オプションは、デバイスに関する様々な情報を出力します (SMART が利用可能で有効であるかどうかに関する情報を含む):\n\n```\n# smartctl --info /dev/sda | grep 'SMART support is:'\n```\n\n```\nSMART support is: Available - device has SMART capability.\nSMART support is: Enabled\n```\n\nSMART が利用可能であるが、有効でない場合、有効化することができます:\n\n```\n# smartctl --smart=on /dev/device\n```\n\n場合によっては、デバイスのタイプを指定する必要があります。例えば、--device=ata は、デバイスのタイプが ATA であることを smartctl に伝え、smartctl がそのデバイスに SCSI コマンドを発行してしまうことを防ぎます。\n\n"
+    },
+    {
+      "title": "テストを実行する",
+      "level": 4,
+      "content": "デバイスが実行できる自己テストには3種類あります (どのテストもユーザデータに対して安全です):\n\n- Short: デバイスの問題を検出する可能性の高いテストを実行します。\n- Extended 或いは Long: このテストは short チェックと同じですが、時間制限が無く、完全なディスクサーフェス検査を行います。\n- Conveyance: デバイスの輸送中にダメージが発生したかどうかを調べます。\n- Selective: LBA の範囲をテストします (詳細は smartctl(8) § t を参照)。\n\n-c/--capabilities フラグは、デバイスがサポートしているテストと各テストの推定実行時間を出力します。例えば:\n\n```\n# smartctl -c /dev/sda\n```\n\n```\n...\nShort self-test routine\nrecommended polling time:        (   1) minutes.\nExtended self-test routine\nrecommended polling time:        (  74) minutes.\nConveyance self-test routine\nrecommended polling time:        (   2) minutes.\n...\n```\n\nテストを実行するには -t/--test=test_name フラグを使用してください:\n\n```\n# smartctl -t short /dev/device\n# smartctl -t long /dev/device\n# smartctl -t conveyance /dev/device\n# smartctl -t select,123+345 /dev/device\n```\n\n"
+    },
+    {
+      "title": "テスト結果を表示する",
+      "level": 4,
+      "content": "-H フラグでデバイスの全体的な健康状態を表示できます。「デバイスが健康状態に問題があると報告した場合、デバイスがすでに故障しているか、24時間以内にデバイス自体が故障することが予測されていることを意味します。この場合 […] 可能な限り早くディスクからデータを取り出し、別の安全な場所に移してください。」\n\n```\n# smartctl -H /dev/device\n```\n\n最近のテスト結果の一覧やデバイスの詳細な情報を表示することもできます:\n\n```\n# smartctl -l selftest /dev/device\n# smartctl -x /dev/device\n```\n\n"
+    },
+    {
+      "title": "全ディスクの属性表を生成する",
+      "level": 4,
+      "content": "```\n#!/bin/bash\nfunction drives_csv {\n\tdeclare -A drive_values\n\tfor d in `smartctl --scan -d scsi | cut -d' ' -f1`; do\n\t\tdrive_values[\"-Drive-----------------\"]=\"${drive_values[-Drive-----------------]},$d\"\n\t\tfor l in `smartctl -A $d | grep ATTRIBUTE_NAME -A30 | grep -v ATTRIBUTE_NAME | column -H1,3,4,5,6,7,8,9,11,12,13,14,15 -t -o, | sed 's/ //g'`; do\n\t\t\tkey=`echo $l | cut -d',' -f1`\n\t\t\tvalue=`echo $l | cut -d',' -f2`\n\t\t\texisting=${drive_values[\"$key\"]}\n\t\t\tdrive_values[\"${key}\"]=\"${existing},${value}\"\n\t\t\t#~ echo \"${key},${drive_values[$key]}\"\n\t\tdone\n\tdone\n\tfor key in \"${!drive_values[@]}\"; do\n\t\techo \"${key}${drive_values[$key]}\"\n\tdone | sort\n}\ndrives_csv | column -s, -t\n```\n\n"
+    },
+    {
+      "title": "smartd",
+      "level": 3,
+      "content": "smartd デーモンは SMART の状態を監視して、何か問題が発生したら通知します。このデーモンは systemd で管理でき、設定ファイル /etc/smartd.conf で設定できます。設定ファイルの構文は難解であり、この wiki ページではクイックリファレンスしか提供しません。より完全な情報は設定ファイル内の例やコメントを読んだり、smartd.conf(5) を読んだりしてください。\n\n"
+    },
+    {
+      "title": "デーモン管理",
+      "level": 4,
+      "content": "デーモンの起動、ステータスの確認、システムブート時の自動起動、最近のログファイルエントリの確認を行うには、smartd.service systemd ユニットを起動/有効化してください。\n\n"
+    },
+    {
+      "title": "管理すべきデバイスを定義する",
+      "level": 4,
+      "content": "全ディスク上のすべての SMART エラーを監視するには、以下の設定を設定ファイルに追加しなければなりません:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -a\n```\n\n注意点として、これはデフォルトの smartd 設定であり、-a パラメータ (デフォルトのパラメータ) は省略できます。\n\n/dev/sda と /dev/sdb のすべての SMART エラーを監視し、他のデバイスすべてを無視するには:\n\n```\n/etc/smartd.conf\n```\n\n```\n/dev/sda -a\n/dev/sdb -a\n```\n\n外部接続のディスクのすべての SMART エラーを監視する場合、ドライブの /dev/sdX は再起動後に変化するかもしれないので、ドライブの UUID を smartd に渡すのが賢明です。\n\nまず、監視すべきディスクの UUID を手に入れなければなりません。ls -lah /dev/disk/by-uuid/ を実行して、監視したいディスクを見つけてください:\n\n```\n$ ls -lah /dev/disk/by-uuid/\n```\n\n```\nlrwxrwxrwx 1 root root   9 Nov  5 22:41 820cdd8a-866a-444d-833c-1edb0f4becac -> ../../sde\nlrwxrwxrwx 1 root root  10 Nov  5 22:41 b51b87f3-425e-4fe7-883f-f4ff1689189e -> ../../sdf2\nlrwxrwxrwx 1 root root   9 Nov  5 22:42 ea2199dd-8f9f-4065-a7ba-71bde11a462c -> ../../sda\nlrwxrwxrwx 1 root root  10 Nov  5 22:41 fe9e886a-8031-439f-a909-ad06c494fadb -> ../../sdf1\n```\n\nこの例では、対象のデバイスは sde です。/dev/disk/by-uuid/ のパスを使って smartd にこのディスクを監視するように指示します:\n\n```\n/etc/smartd.conf\n```\n\n```\n/dev/disk/by-uuid/820cdd8a-866a-444d-833c-1edb0f4becac -a\n```\n\n注意点として、smartd を機能させるために -d removable も必要である場合があります。\n\nこれで、/dev/sdX のパスが再起動によって変化しても、USB ディスクが監視されるようになりました。\n\n"
+    },
+    {
+      "title": "潜在的な問題を通知する",
+      "level": 4,
+      "content": "障害や新しいエラーが発生した場合にメールを送信させるには、-m オプションを使用してください:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com\n```\n\n(root メールアカウントではなく) 外部にメールを送信するには、MTA (Mail Transport Agent) か MUA (Mail User Agent) のインストール・設定が必要です。一般的な MUA は msmtp と Postfix ですが、おそらく最も簡単な dma で十分でしょう。一般的な MTA は sendmail と Postfix です。メールだけであれば S-nail を設定するだけで十分ですが、これらの手順に従う必要があります。\n\n-M test オプションで、smartd デーモンが起動する度にテストメールを送信します:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com -M test\n```\n\nメールが届くまでに時間がかかることもあります。ハードドライブの障害が発生したときにすぐに対応が必要な場合、メールの送信に加えて実行されるスクリプトを定義することもできます:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com -M exec /usr/local/bin/smartdnotify\n```\n\nメールとシステム通知を送信するには、/usr/local/bin/smartdnotify に以下のようなコードを記述してください:\n\n```\n#!/bin/sh\n# Send email\necho \"$SMARTD_MESSAGE\" | mail -s \"$SMARTD_FAILTYPE\" \"$SMARTD_ADDRESS\"\n# Notify user\nwall \"$SMARTD_MESSAGE\"\n```\n\nデスクトップ環境を使っている場合、デスクトップ上にポップアップを表示させたい場合があります。そのようなときは、以下のスクリプトを使用することができます (X_user と X_userid は X を実行しているユーザとユーザ ID にそれぞれ置き換えてください):\n\n```\n/usr/local/bin/smartdnotify\n```\n\n```\n#!/bin/sh\n\nsudo -u X_user DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/X_userid/bus notify-send \"S.M.A.R.T Error ($SMARTD_FAILTYPE)\" \"$SMARTD_MESSAGE\" --icon=dialog-warning -u critical\n```\n\nこのスクリプトは libnotify と完全なデスクトップ環境を必要とします。詳細は デスクトップ通知 を見てください。\n\nまた、カスタムのスクリプトを /usr/share/smartmontools/smartd_warning.d/ に置くこともできます:\n\nこのスクリプトは、システム上のログイン中の全ユーザに libnotify を介して通知を送ります。\n\n```\n/usr/share/smartmontools/smartd_warning.d/smartdnotify\n```\n\n```\n#!/bin/sh\n\nIFS=$'\\n'\nfor LINE in `w -hs`\ndo\n    USER=`echo $LINE | awk '{print $1}'`\n    USER_ID=`id -u $USER`\n    DISP_ID=`echo $LINE | awk '{print $8}'`\n    sudo -u $USER DISPLAY=$DISP_ID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus notify-send \"S.M.A.R.T Error ($SMARTD_FAILTYPE)\" \"$SMARTD_MESSAGE\" --icon=dialog-warning -u critical\ndone\n```\n\nこのスクリプトは libnotify、procps-ng そして完全なデスクトップ環境を必要とします。\n\n以下でカスタムのスクリプトを実行することができます:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m @smartdnotify\n```\n\n"
+    },
+    {
+      "title": "電源管理",
+      "level": 4,
+      "content": "電源管理の制御下にあるコンピュータを使用している場合、低消費電力モードでディスクを扱う方法を smartd に指示する必要があります。通常、ディスクプラッタは、smartd によって発行された SMART コマンドに応答してスピンアップします。なので、以下のオプションを使用しなかった場合、smartd によって定期的にポーリングされたときに、低消費電力モードにあるディスクがスピンアップして高電力モードになる場合があります。\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -n standby,15,q\n```\n\n詳細は smartmontools wiki を参照してください。\n\n一部のデバイスでは -n が機能しません。syslog に以下のエラーメッセージが出力されます:\n\n```\n# journalctl -u smartd\n```\n\n```\nCHECK POWER MODE: incomplete response, ATA output registers missing\nDevice: /dev/sdb [SAT], no ATA CHECK POWER STATUS support, ignoring -n Directive\n```\n\n別の方法として smartd の -i オプションを使用することができます。このオプションは、ドライブの状態を確認するためにディスクをスピンアップする頻度を制御します。デフォルトは30分です。頻度を変更するには /etc/conf.d/smartd を編集してください。\n\n```\n/etc/conf.d/smartd\n```\n\n```\nSMARTD_ARGS=\"-i 10800\"  Check status every 10800 seconds (3 hours)\n```\n\n詳細は smartd(8) を参照してください。\n\n"
+    },
+    {
+      "title": "自己テストをスケジュールする",
+      "level": 4,
+      "content": "smartd は、スケジュールに従って自己診断の実行をするようディスクに指示を出すことができます。以下の /etc/smartd.conf の設定では毎日午前2-3時の間に短い自己診断、土曜日の午前3-4時の間に長い自己診断が行われるようにします:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -s (S/../.././02|L/../../6/03)\n```\n\n"
+    },
+    {
+      "title": "温度の変化を警告する",
+      "level": 4,
+      "content": "smartd はディスクの温度を記録して、急激な温度上昇が起こった時や温度の上限に達した時に警告をすることができます。以下の例では、温度が4度以上変化したときにログを取り、温度が35度に達したときにログを取り、40度に達したときに警告をログに記録しメールを送信します:\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -W 4,35,40\n```\n\n- コマンド smartctl -A /dev/device | grep Temperature_Celsius を実行することで、現在のディスクの温度を知ることができます｡\n- 一部のディスクが専ら他のディスクより熱い/冷たい場合、DEVICESCAN を削除して個々のデバイスを定義し、適切な温度設定をしてください｡\n\n"
+    },
+    {
+      "title": "完全な smartd.conf の例",
+      "level": 4,
+      "content": "上記の例を全てまとめると以下のような設定になります:\n\n- DEVICESCAN: smartd ディスクをスキャンし、検出されたディスクすべてを監視する\n- -a: 全ての属性を監視する\n- -o on: オンラインデータの自動収集を有効化する\n- -S on: 属性の自動保存を有効化する\n- -n standby,q: ディスクが待機中の時チェックを実行せず、ディスクアクセスが発生しないようにログに書き込まない\n- -s ...: 短いテストと長いテストの予定を立てる\n- -W ...: 温度を監視する\n- -m ...: メールアラート\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -a -o on -S on -n standby,q -s (S/../.././02|L/../../6/03) -W 4,35,40 -m username-or-email\n```\n\n"
+    },
+    {
+      "title": "update-smart-drivedb",
+      "level": 3,
+      "content": "このユーティリティは smartmontools のソースリポジトリから drivedb.h の最新バージョンをダウンロードし、新しいデバイスとそのパラメータを認識できるようにします。\n\nダウンロードされたファイルは /usr/share/smartmontools/drivedb.h にあるデフォルトのものを置き換えることができます。このファイルは、各ドライブに対してコンマで区切られた値を含む平文ファイルです。\n\nあなたのドライブがまだ認識されない場合は、上流に投稿することができます。\n\nコマンドラインオプションの完全なリストは update-smart-drivedb(8) を見てください。\n\n"
+    },
+    {
+      "title": "コンソールアプリケーション",
+      "level": 2,
+      "content": "- skdump — SMART デバイスの監視と管理、及びハードディスクドライブの健康状態の監視と報告を行うユーティリティ。\n\n- iostat -x (sysstat に含まれる) もいくつかのディスクの健康指標を提供します。特に、f_await 列の値が大きい場合は、ディスクがリクエストに素早く応答していないことを意味しており、障害が発生しているのかもしれません。\n\n"
+    },
+    {
+      "title": "GUI アプリケーション",
+      "level": 2,
+      "content": "- DisKMonitor — SMART デバイスと MDRaid 健康状態を監視する KDE 向けツール集。\n\n- GNOME Disks — libatasmart を使用する GNOME フロントエンドで、ハードディスクドライブの健康状態を監視し、報告します。gnome に含まれています。\n\n- GSmartControl — smartctl の GUI です。ドライブの SMART データを調査して健康状態を判定することができ、ドライブに様々なテストを実行することもできます。\n\n- Plasma Disks — KDE Plasma のためのハードディスクの健康状態の監視。plasma に含まれています。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Smartmontools ホームページ\n- Ubuntu Wiki の Smartmontools\n- Gentoo: smartmontools\n\n"
+    }
+  ]
+}

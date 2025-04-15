@@ -1,0 +1,111 @@
+{
+  "title": "Nouveau (Русский)",
+  "url": "https://wiki.archlinux.org/title/Nouveau_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- NVIDIA\n- Xorg\n- Bumblebee\n\nThis article covers the reverse-engineered open-source Nouveau[dead link 2025-04-06 ⓘ] driver for NVIDIA graphics cards. For information about the upstream proprietary nvidia and open-source nvidia-open drivers, see NVIDIA.\n\nFind your card's code name[dead link 2025-04-06 ⓘ] (a more detailed list is available on Wikipedia), and compare it with the feature matrix for supported features.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mesa package, which provides the DRI driver for 3D acceleration.\n\n- For 32-bit application support, also install the lib32-mesa package from the multilib repository.\n- For the DDX driver (which provides 2D acceleration in Xorg), install the xf86-video-nouveau package.\n\nSee also Hardware video acceleration.\n\n"
+    },
+    {
+      "title": "Using the Mesa NVK Vulkan Driver",
+      "level": 3,
+      "content": "NVK is an open-source Vulkan driver based on Nouveau for Turing and newer NVIDIA cards.\n\nUsing NVK requires Kernel version 6.7 or newer and mesa version 24.1 or newer.\n\nBefore enabling NVK you must uninstall any of the following packages (and/or their lib32 and DKMS variants):\n\n- nvidia, nvidia-open, nvidia-lts, nvidia-betaAUR\n- nvidia-settings, nvidia-utils\n- egl-wayland\n\nIf you are using a hybrid laptop or a dual GPU system ensure you do not have Nouveau blacklisted by a GPU manager in /etc/modprobe.d.\n\nThen install vulkan-nouveau (and if it is required, lib32-vulkan-nouveau).\n\nAdd nouveau.config=NvGspRm=1 as a kernel parameter if required. It is enabled by default on Ada Lovelace and newer cards. See note at FreeDeskTop.org.\n\nFinally reboot your system.\n\nTo verify everything is working vulkaninfo from vulkan-tools can be used. It should report the NVIDIA GPU in your system as using the NVK driver.\n\n```\n$ vulkaninfo\n```\n\n```\n...\nGPU id : 0 (NVIDIA GeForce RTX 3050 Ti Laptop GPU (NVK GA107)):\n       Surface type = VK_KHR_wayland_surface\n       Formats: count = 8\n...\n```\n\n"
+    },
+    {
+      "title": "Loading",
+      "level": 2,
+      "content": "The Nouveau kernel module should load automatically on system boot. If it does not happen, then:\n\n- Make sure you do not have nomodeset or vga= as a kernel parameter, since Nouveau requires kernel mode-setting.\n- Also, check that you do not have Nouveau disabled using any modprobe blacklisting technique within /etc/modprobe.d/ or /usr/lib/modprobe.d/.\n- If everything above still fails to load nouveau, check dmesg for an opcode error. Add nouveau.config=NvBios=PRAMIN to your Kernel parameters to prevent module unloading.[1]\n- Check if /etc/X11/xorg.conf or any file in /etc/X11/xorg.conf.d/ exists and is referencing the nvidia driver. It is probably a good idea to rename the file.\n\n"
+    },
+    {
+      "title": "Early KMS",
+      "level": 3,
+      "content": "Kernel mode setting (KMS) is supported by the nouveau driver and is enabled early since mkinitcpio v32, as the kms hook is included by default. For other setups, see Kernel mode setting#Early KMS start for instructions on how to enable KMS as soon as possible at the boot process.\n\n"
+    },
+    {
+      "title": "Keep NVIDIA driver installed",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nIf you want to keep the proprietary NVIDIA driver installed (and are not using OpenGL), but want to use the Nouveau driver, follow the steps below:\n\nComment out nouveau blacklisting in /etc/modprobe.d/nouveau_blacklist.conf or /usr/lib/modprobe.d/nvidia-utils.conf, modifying it as follows:\n\n```\n#blacklist nouveau\n```\n\nYou may also need to comment out other configuration files that prioritize the proprietary driver, e.g. systemd-modules-load's /usr/lib/modules-load.d/nvidia-utils.conf and Udev's /usr/lib/udev/rules.d/60-nvidia.rules. Check what files the driver has installed with the following command:\n\n```\n# pacman -Ql nvidia-utils | grep conf\n```\n\nThen, ensure that you have disabled nvidia--prefixed services that might call nvidia-modprobe to load the module on boot. For example:\n\n```\n$ systemctl status nvidia-persistenced.service\n```\n\nAnd if you are using Xorg, tell Xorg to load nouveau instead of NVIDIA by creating the file /etc/X11/xorg.conf.d/20-nouveau.conf with the following content:\n\n```\nSection \"Device\"\n    Identifier \"Nvidia card\"\n    Driver \"nouveau\"\nEndSection\n```\n\nReboot to make effects. And check that it loaded fine by looking at kernel messages:\n\n```\n# dmesg\n```\n\n"
+    },
+    {
+      "title": "Installing the latest development packages",
+      "level": 3,
+      "content": "To get the latest Nouveau improvements\n\n- linux-gitAUR\n- libdrm-gitAUR\n- lib32-libdrm-gitAUR\n- lib32-mesa-gitAUR\n- mesa-gitAUR\n- xf86-video-nouveau-gitAUR\n\n"
+    },
+    {
+      "title": "Dual head",
+      "level": 3,
+      "content": "Multiple monitors can be setup with RandR, see Multihead#RandR.\n\n"
+    },
+    {
+      "title": "Setting console resolution",
+      "level": 3,
+      "content": "You can pass the resolution to nouveau with the video= kernel line option (see KMS).\n\n"
+    },
+    {
+      "title": "Power management",
+      "level": 3,
+      "content": "The lack of proper power management in the nouveau driver is one of the most important causes of performance issues, since most cards will remain in their lower power state with lower clocks during their use. Experimental support for GPU reclocking is available for some cards (see the Nouveau PowerManagement page) and since kernel 4.5 can be controlled through a debugfs interface located at /sys/kernel/debug/dri/*/pstate.\n\nFor example, to check the available power states and the current setting for the first card in your system, run:\n\n```\n# cat /sys/kernel/debug/dri/0/pstate\n```\n\nIt is also possible to manually set/force a certain power state by writing to said interface:\n\n```\n# echo pstate > /sys/kernel/debug/dri/0/pstate\n```\n\n"
+    },
+    {
+      "title": "Fan control",
+      "level": 4,
+      "content": "If it is implemented for your card, you can configure fan control via /sys.\n\n```\n$ find /sys -name pwm1_enable\n/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/hwmon/hwmon1/pwm1_enable\n$ readlink /sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/driver\n../../../../bus/pci/drivers/nouveau\n```\n\npwm1_enable can be set to 0, 1 or 2 meaning NONE, MANUAL and AUTO fan control. If set to manual fan control, you can set pwm1 manually, for example to 40 for 40%.\n\nYou can also set it by udev rule:\n\n```\n$ cat /etc/udev/rules.d/50-nouveau-hwmon.rules\nACTION==\"add\", SUBSYSTEM==\"hwmon\", DRIVERS==\"nouveau\", ATTR{pwm1_enable}=\"2\"\n```\n\nSources:\n\n- https://floppym.blogspot.de/2013/07/fan-control-with-nouveau.html\n- https://web.archive.org/web/20141031191559/https://kalgan.cc/blog/posts/Controlling_nVidia_cards_fans_with_nouveau_in_Debian/\n\n"
+    },
+    {
+      "title": "Optimus",
+      "level": 3,
+      "content": "You have two solutions to use Optimus on a laptop (aka hybrid graphics, when you have two GPUs on your laptop): bumblebee and PRIME\n\n"
+    },
+    {
+      "title": "Vertical Sync",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nXorg compositors are prone to show issues with Nouveau. Unlike most of them, Picom offers lots of options to tweak for a smoother and tearing free result. A configuration which is expected to deliver a good result would be the following:\n\n```\n$ picom -b --unredir-if-possible --backend xr_glx_hybrid --vsync --use-damage --glx-no-stencil\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Add drm.debug=14 and log_buf_len=16M to your kernel parameters to turn on video debugging:\n\nCreate verbose Xorg log:\n\n```\n$ startx -- -logverbose 9 -verbose 9\n```\n\nView loaded video module parameters and values:\n\n```\n$ modinfo -p video\n```\n\n"
+    },
+    {
+      "title": "Disable MSI",
+      "level": 3,
+      "content": "If you are still having problems loading the module or starting the X server, append nouveau.config=NvMSI=0 to your Kernel parameters.\n\nSource: https://bugs.freedesktop.org/show_bug.cgi?id=78441\n\n"
+    },
+    {
+      "title": "Phantom output issue",
+      "level": 3,
+      "content": "It is possible for the nouveau driver to detect \"phantom\" outputs. For example, both VGA-1 and LVDS-1 are shown as connected but only LVDS-1 is present.\n\nThis causes display problems and/or prevent suspending on lid closure.\n\n"
+    },
+    {
+      "title": "Kernel parameters",
+      "level": 4,
+      "content": "The problem can be overcome by disabling the phantom output (VGA-1 in the examples given) with Kernel parameters:\n\n```\nvideo=VGA-1:d\n```\n\nWhere d = disable.\n\nThe nouveau kernel module also has an option to disable TV-out detection [2]:\n\n```\ntv_disable=1\n```\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 4,
+      "content": "The phantom output can be disabled in Xorg by adding the following to /etc/X11/xorg.conf.d/20-nouveau.conf:\n\n```\nSection \"Monitor\"\nIdentifier \"VGA-1\"\nOption \"Ignore\" \"1\"\nEndSection\n```\n\nSource: https://web.archive.org/web/20170118202740/http://gentoo-en.vfose.ru/wiki/Nouveau#Phantom_and_unpopulated_output_connector_issues\n\n"
+    },
+    {
+      "title": "Xrandr",
+      "level": 4,
+      "content": "Xrandr can disable the output:\n\n```\n$ xrandr --output VGA-1 --off\n```\n\nThis can be added to the xinit configuration.\n\n"
+    },
+    {
+      "title": "Random lockups with kernel error messages",
+      "level": 3,
+      "content": "Specific Nvidia chips with Nouveau may give random system lockups and more commonly throw many kernel messages, seen with dmesg. Try adding the nouveau.noaccel=1 kernel parameter. See Fedora:Common kernel problems#Systems with nVidia adapters using the nouveau driver lock up randomly for more information.\n\nNote that using nouveau.noaccel=1 kernel parameter might cause ~%100 CPU usage on Wayland when there is no iGPU or disabled iGPU by factory. You can switch to X11 session or prefer adding LIBGL_ALWAYS_SOFTWARE=1 environment variable for wayland to disable OpenGL hardware acceleration completely.\n\nAs an alternative, you can also use the QT_XCB_FORCE_SOFTWARE_OPENGL=1 environment variable to disable OpenGL acceleration in Qt applications.\n\n"
+    },
+    {
+      "title": "Flat Panel Table Invalid",
+      "level": 3,
+      "content": "NVIDIA graphics cards with recent chipsets can cause startup issues - this includes X11 being unable to start and lspci freezing indefinitely[3][4][5][6][7].\n\nThis can break live distributions/installation media. This can be detected either by running lspci, or checking the systemd journal for the error:\n\n```\nnouveau E[     DRM]Pointer to flat panel table invalid\n```\n\nThe system may start if the Nouveau driver is disabled by passing the following kernel parameters:\n\n```\nmodprobe.blacklist=nouveau\n```\n\nThe Nouveau driver can then be loaded using\n\n```\n# modprobe nouveau\n```\n\nThe system should then function correctly. If you have another Nvidia graphics card, or just want to be safe, you can disable the offending card using:\n\n```\n$ echo 1 > /sys/bus/pci/devices/[card device id]/remove\n```\n\n"
+    }
+  ]
+}

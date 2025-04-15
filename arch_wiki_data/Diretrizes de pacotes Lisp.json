@@ -1,0 +1,31 @@
+{
+  "title": "Diretrizes de pacotes Lisp",
+  "url": "https://wiki.archlinux.org/title/Diretrizes_de_pacotes_Lisp",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nNo momento, há relativamente poucos pacotes Lisp disponíveis nos repositórios do Arch. Isso significa que, em algum momento ou outro, mais provavelmente aparecerá. É útil, portanto, descobrir agora, enquanto há poucos pacotes, como eles devem ser empacotados.\n\n"
+    },
+    {
+      "title": "Nomenclatura e estrutura de diretórios",
+      "level": 2,
+      "content": "Há pelo menos um pacote no repositório base (libgpg-error) que inclui arquivos lisp, que são colocados em /usr/share/common-lisp/source/gpg-error. De acordo com isso, outros pacotes lisp também devem colocar seus arquivos em /usr/share/common-lisp/source/pkgname.\n\nO diretório do pacote deve ser o nome do pacote lisp, não o que é chamado nos repositórios oficiais do Arch (ou no AUR). Isso se aplica até mesmo a pacotes de arquivo único.\n\nPor exemplo, um pacote Lisp chamado \"cl-ppcre\" deve ser chamado cl-ppcre no AUR e residir em /usr/share/common-lisp/source/cl-ppcre. Um pacote Lisp chamado \"alexandria\" deve ser chamado cl-alexandria no AUR e residir em /usr/share/common-lisp/source/alexandria.\n\n"
+    },
+    {
+      "title": "ASDF",
+      "level": 2,
+      "content": "Tente evitar o uso do ASDF-Install como um meio de instalar esses pacotes em todo o sistema.\n\nO próprio ASDF pode ser necessário ou útil como meio de compilar e/ou carregar pacotes. Nesse caso, sugere-se que o diretório usado para o registro central (a localização de todos os links simbólicos para *.asd) seja /usr/share/common-lisp/systems/.\n\nNo entanto, tenho observado problemas em fazer a compilação com asdf como parte do processo de compilação de pacotes. No entanto, ele funciona durante uma instalação, através do uso de um arquivo pacote.install. Esse arquivo pode ser assim:\n\n```\ncl-ppcre.install\n```\n\n```\n# arg 1:  the new package version\npost_install() {\n    echo \"---> Compiling lisp files <---\"\n\n    clisp --silent -norc -x \\\n        \"(load #p\\\"/usr/share/common-lisp/source/asdf/asdf\\\") \\\n        (pushnew #p\\\"/usr/share/common-lisp/systems/\\\" asdf:*central-registry* :test #'equal) \\\n        (asdf:operate 'asdf:compile-op 'cl-ppcre)\"\n\n    echo \"---> Done compiling lisp files <---\"\n\n    cat << EOM\n\n    To load this library, load asdf and then place the following lines\n    in your ~/.clisprc.lisp file:\n\n    (push #p\"/usr/share/common-lisp/systems/\" asdf:*central-registry*)\n    (asdf:operate 'asdf:load-op 'cl-ppcre)\nEOM\n}\n\npost_upgrade() {\n    post_install $1\n}\n\npre_remove() {\n    rm /usr/share/common-lisp/source/cl-ppcre/{*.fas,*.lib}\n}\n\nop=$1\nshift\n\n$op $*\n```\n\nObviamente, para este exemplo funcionar, é necessário que haja um link simbólico para pacote.asd no diretório do sistema asdf. Durante a compilação do pacote, um bloco como essa fará o truque...\n\n```\npushd ${_lispdir}/systems\nln -s ../source/cl-ppcre/cl-ppcre.asd .\nln -s ../source/cl-ppcre/cl-ppcre-test.asd .\npopd\n```\n\n...sendo que $_lispdir é $pkgdir/usr/share/common-lisp. Ao vincular a um caminho relativo, em vez de absoluto, é possível garantir que o link não interromperá a pós-instalação.\n\n"
+    },
+    {
+      "title": "Empacotamento específico do Lisp",
+      "level": 2,
+      "content": "Quando possível, não crie pacotes específicos para uma única implementação de lisp; tente ser tão multiplataforma quanto o próprio pacote permitir. Se, no entanto, o pacote for projetado especificamente para uma implementação única de lisp (ou seja, os desenvolvedores ainda não conseguiram adicionar suporte para outros, ou o propósito do pacote é especificamente fornecer um recurso integrado a outra implementação de lisp), é apropriado tornar o seu pacote Arch específico de lisp.\n\nSe o pacote é independente da implementação, deve depender de common-lisp. Se o pacote possui suporte a várias implementações, mas não todas, você poderia (a) não fazer com que seu pacote dependa de *qualquer* lisp e incluir uma declaração no arquivo package.install informando às pessoas para ter certeza de que possuem um lisp compatível instalado (não ideal) ou (b) se baseie no PKGBUILD do sbcl e inclua uma declaração condicional para descobrir qual lisp é necessário (que envolve muito hacking e, novamente, longe do ideal). Outras ideias são bem-vindas.\n\nObserve também que se o ASDF for necessário para instalar/compilar/carregar o pacote, as coisas podem ficar estranhas no que diz respeito às dependências. SBCL e CMUCL vêm com asdf instalado, mas o clisp não (mas há um pacote AUR).\n\nAs pessoas que atualmente mantêm pacotes específicos de lisp que não precisam ser específicos de lisp devem considerar fazer pelo menos um dos seguintes procedimentos:\n\n- Editar seus PKGBUILDs para serem multiplataformas, desde que outra pessoa não esteja mantendo o mesmo pacote para um lisp diferente.\n- Se oferecer para assumir a manutenção ou ajudar na manutenção do mesmo pacote para um lisp diferente e, em seguida, combiná-los em um único pacote.\n- Oferecer seu pacote ao mantenedor de uma versão diferente do mesmo pacote, para permitir que essa pessoa os combine em um único pacote.\n\n"
+    },
+    {
+      "title": "Coisas que você, o leitor, pode fazer",
+      "level": 2,
+      "content": "- Manter pacotes lisp seguindo essas diretrizes\n- Atualizar e corrigir problemas com essas diretrizes\n- Se manter atualizado com o que foi alterado aqui\n- Fornecer ideias, feedback e sugestões (educados) tanto para esse documento quanto para o trabalho das pessoas.\n- Traduzir essa página e atualizações futuras a esta página.\n\n"
+    }
+  ]
+}

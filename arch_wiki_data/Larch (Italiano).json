@@ -1,0 +1,156 @@
+{
+  "title": "Larch (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Larch_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Archiso as pxe server\n- Offline installation\n- USB flash installation medium\n\nArchiso is a highly-customizable tool for building Arch Linux live CD/USB ISO images. The official images are built with archiso and include the following packages. It can be used as the basis for rescue systems, linux installers or other systems. This wiki article explains how to install archiso, and how to configure it to control aspects of the resulting ISO image such as included packages and files. Technical requirements and build steps can be found in the official project documentation. Archiso is implemented with a number of bash scripts. The core component of archiso is the mkarchiso command. Its options are documented in mkarchiso -h and not covered here.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the archiso or archiso-gitAUR package.\n\n"
+    },
+    {
+      "title": "Prepare a custom profile",
+      "level": 2,
+      "content": "Archiso comes with two profiles, releng and baseline.\n\n- releng is used to create the official monthly installation ISO. It can be used as a starting point for creating a customized ISO image.\n- baseline is a minimal configuration, that includes only the bare minimum packages required to boot the live environment from the medium.\n\nTo build an unmodified version of the profiles, skip to #Build the ISO. Otherwise, if you wish to adapt or customize one of archiso's shipped profiles, copy it from /usr/share/archiso/configs/profile-name/ to a writable directory with a name of your choice. For example:\n\n```\n$ cp -r /usr/share/archiso/configs/releng/ archlive\n```\n\nProceed to the following sections to customize and build the custom profile.\n\n"
+    },
+    {
+      "title": "Profile structure",
+      "level": 3,
+      "content": "An archiso profile contains configuration that defines the resulting ISO image. The profile structure is documented in /usr/share/doc/archiso/README.profile.rst[1].\n\n"
+    },
+    {
+      "title": "Selecting packages",
+      "level": 3,
+      "content": "Edit packages.x86_64 to select which packages are to be installed on the live system image, listing packages line by line.\n\n"
+    },
+    {
+      "title": "Custom local repository",
+      "level": 4,
+      "content": "To add packages not located in standard Arch repositories (e.g. packages from the AUR or customized with the ABS), set up a custom local repository and add your custom packages to it. Then add your repository to pacman.conf as follows:\n\n```\narchlive/pacman.conf\n```\n\n```\n...\n[customrepo]\nSigLevel = Optional TrustAll\nServer = file:///path/to/customrepo\n...\n```\n\n- The ordering within pacman.conf matters. To give top priority to your custom repository, place it above the other repository entries.\n- This pacman.conf is only used for building the image. It will not be used in the live environment. To do this, see #Adding repositories to the image.\n- Ensure that the repository is located in a directory accessible by the chrooted mkarchiso process, such as /tmp, to ensure the repository is read correctly during the image building process.\n- mkarchiso will look for a repo called custom, so when you create it run:\n\n```\n$ repo-add /path/to/custom.db.tar.zst /path/to/package-1.0-1-x86_64.pkg.tar.zst\n```\n\n"
+    },
+    {
+      "title": "Packages from multilib",
+      "level": 4,
+      "content": "To install packages from the multilib repository, simply uncomment that repository in pacman.conf.\n\n"
+    },
+    {
+      "title": "Adding files to image",
+      "level": 3,
+      "content": "The airootfs directory is used as the starting point for the root directory (/) of the live system on the image. All its contents will be copied over to the working directory before packages are installed.\n\nPlace any custom files and/or directories in the desired location under airootfs/. For example, if you have a set of iptables scripts on your current system you want to be used on your live image, copy them over as such:\n\n```\n$ cp -r /etc/iptables archlive/airootfs/etc\n```\n\nSimilarly, some care is required for special configuration files that reside somewhere down the hierarchy. Missing parts of the directory structure can be simply created with mkdir(1).\n\nBy default, permissions will be 644 for files and 755 for directories. All of them will be owned by the root user. To set different permissions or ownership for specific files and/or folders, use the file_permissions associative array in profiledef.sh. See README.profile.rst for details.\n\n"
+    },
+    {
+      "title": "Adding repositories to the image",
+      "level": 3,
+      "content": "To add a repository that can be used in the live environment, create a suitably modified pacman.conf and place it in archlive/airootfs/etc/.\n\nIf the repository also uses a key, place the key in archlive/airootfs/usr/share/pacman/keyrings/. The key file name must end with .gpg. Additionally, the key must be trusted. This can be accomplished by creating a GnuPG exported trust file in the same directory. The file name must end with -trusted. The first field is the key fingerprint, and the second is the trust. You can reference /usr/share/pacman/keyrings/archlinux-trusted for an example.\n\n"
+    },
+    {
+      "title": "archzfs example",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nThe files in this example are:\n\n```\nairootfs\n├── etc\n│   ├── pacman.conf\n│   └── pacman.d\n│       └── archzfs_mirrorlist\n└── usr\n    └── share\n        └── pacman\n            └── keyrings\n                ├── archzfs.gpg\n                └── archzfs-trusted\n```\n\n```\nairootfs/etc/pacman.conf\n```\n\n```\n...\n[archzfs]\nInclude = /etc/pacman.d/archzfs_mirrorlist\n...\n```\n\n```\nairootfs/etc/pacman.d/archzfs_mirrorlist\n```\n\n```\nServer = https://archzfs.com/$repo/$arch\nServer = https://mirror.sum7.eu/archlinux/archzfs/$repo/$arch\nServer = https://mirror.biocrafting.net/archlinux/archzfs/$repo/$arch\nServer = https://mirror.in.themindsmaze.com/archzfs/$repo/$arch\nServer = https://zxcvfdsa.com/archzfs/$repo/$arch\n```\n\n```\nairootfs/usr/share/pacman/keyrings/archzfs-trusted\n```\n\n```\nDDF7DB817396A49B2A2723F7403BD972F75D9D76:4:\n```\n\narchzfs.gpg itself can be obtained directly from the repository site at https://archzfs.com/archzfs.gpg.\n\n"
+    },
+    {
+      "title": "Kernel",
+      "level": 3,
+      "content": "Although both archiso's included profiles only have linux, ISOs can be made to include other or even multiple kernels.\n\nFirst, edit packages.x86_64 to include kernel package names that you want. When mkarchiso runs, it will include all work_dir/airootfs/boot/vmlinuz-* and work_dir/boot/initramfs-*.img files in the ISO (and additionally in the FAT image used for UEFI booting).\n\nmkinitcpio presets by default will build fallback initramfs images. For an ISO, the main initramfs image would not typically include the autodetect hook, thus making an additional fallback image unnecessary. To prevent the creation of an fallback initramfs image, so that it does not take up space or slow down the build process, place a custom preset in archlive/airootfs/etc/mkinitcpio.d/pkgbase.preset. For example, for linux-lts:\n\n```\narchlive/airootfs/etc/mkinitcpio.d/linux-lts.preset\n```\n\n```\nPRESETS=('archiso')\n\nALL_kver='/boot/vmlinuz-linux-lts'\nALL_config='/etc/mkinitcpio.conf'\n\narchiso_image=\"/boot/initramfs-linux-lts.img\"\n```\n\nFinally create boot loader configuration to allow booting the kernel(s).\n\n"
+    },
+    {
+      "title": "Boot loader",
+      "level": 3,
+      "content": "Archiso supports syslinux for BIOS booting and GRUB or systemd-boot for UEFI booting. Refer to the articles of the boot loaders for information on their configuration syntax.\n\nNote: **releng** \n\n- The releng profile by default builds into an ISO that supports both BIOS and UEFI booting when burned to an optical disc using El Torito, or when written to a hard disk (or USB flash drive, or similar) using Isohybrid.\n- Due to the modular nature of isolinux, you are able to use lots of addons since all .c32 files are copied and available to you. Take a look at the official syslinux site and the archiso git repo. Using said addons, it is possible to make visually attractive and complex menus. See [2].\n\nmkarchiso expects that GRUB configuration is in the grub directory, systemd-boot configuration is in the efiboot directory and syslinux configuration in the syslinux directory.\n\n"
+    },
+    {
+      "title": "UEFI Secure Boot",
+      "level": 4,
+      "content": "If you want to make your archiso bootable on a UEFI Secure Boot enabled environment, you must use a signed boot loader. You can follow the instructions on Secure Boot#Booting an installation medium.\n\n"
+    },
+    {
+      "title": "systemd units",
+      "level": 3,
+      "content": "To enable systemd services/sockets/timers for the live environment, you need to manually create the symbolic links just as systemctl enable does it.\n\nFor example, to enable gpm.service, which contains WantedBy=multi-user.target, run:\n\n```\n$ mkdir -p archlive/airootfs/etc/systemd/system/multi-user.target.wants\n$ ln -s /usr/lib/systemd/system/gpm.service archlive/airootfs/etc/systemd/system/multi-user.target.wants/\n```\n\nThe required symlinks can be found out by reading the systemd unit, or if you have the service installed, by enabling it and observing the systemctl output.\n\n"
+    },
+    {
+      "title": "Login manager",
+      "level": 4,
+      "content": "Starting X at boot is done by enabling your login manager's systemd service. If you do not know which .service to enable, you can easily find out in case you are using the same program on the system you build your ISO on. Just use:\n\n```\n$ ls -l /etc/systemd/system/display-manager.service\n```\n\nNow create the same symlink in archlive/airootfs/etc/systemd/system/. For LXDM:\n\n```\n$ ln -s /usr/lib/systemd/system/lxdm.service archlive/airootfs/etc/systemd/system/display-manager.service\n```\n\nThis will enable LXDM at system start on your live system.\n\n"
+    },
+    {
+      "title": "Changing automatic login",
+      "level": 4,
+      "content": "The configuration for getty's automatic login is located under airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf.\n\nYou can modify this file to change the auto login user:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin username --noclear %I 38400 linux\n```\n\nOr remove autologin.conf altogether to disable auto login.\n\nIf you are using the serial console, create airootfs/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf with the following content instead:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -- \\\\u' --noclear --autologin root --keep-baud 115200,57600,38400,9600 - $TERM\n```\n\n"
+    },
+    {
+      "title": "Users and passwords",
+      "level": 3,
+      "content": "To create a user which will be available in the live environment, you must manually edit archlive/airootfs/etc/passwd, archlive/airootfs/etc/shadow, archlive/airootfs/etc/group and archlive/airootfs/etc/gshadow.\n\nFor example, to add a user archie. Add them to archlive/airootfs/etc/passwd following the passwd(5) syntax:\n\n```\narchlive/airootfs/etc/passwd\n```\n\n```\nroot:x:0:0:root:/root:/usr/bin/zsh\narchie:x:1000:1000::/home/archie:/usr/bin/zsh\n```\n\nAdd the user to archlive/airootfs/etc/shadow following the syntax of shadow(5). If you want to define a password for the user, generate a password hash with openssl passwd -6 and add it to the file. For example:\n\n```\narchlive/airootfs/etc/shadow\n```\n\n```\nroot::14871::::::\narchie:$6$randomsalt$cij4/pJREFQV/NgAgh9YyBIoCRRNq2jp5l8lbnE5aLggJnzIRmNVlogAg8N6hEEecLwXHtMQIl2NX2HlDqhCU1:14871::::::\n```\n\nOtherwise, you may keep the password field empty, meaning that the user can log in with no password.\n\nAdd the user's group and the groups which they will part of to archlive/airootfs/etc/group according to group(5). For example:\n\n```\narchlive/airootfs/etc/group\n```\n\n```\nroot:x:0:root\nadm:x:4:archie\nwheel:x:10:archie\nuucp:x:14:archie\narchie:x:1000:\n```\n\nCreate the appropriate archlive/airootfs/etc/gshadow according to gshadow(5):\n\n```\narchlive/airootfs/etc/gshadow\n```\n\n```\nroot:!*::root\narchie:!*::\n```\n\nMake sure /etc/shadow and /etc/gshadow have the correct permissions:\n\n```\narchlive/profiledef.sh\n```\n\n```\n...\nfile_permissions=(\n  ...\n  [\"/etc/shadow\"]=\"0:0:0400\"\n  [\"/etc/gshadow\"]=\"0:0:0400\"\n)\n```\n\nAfter package installation, mkarchiso will create all specified home directories for users listed in archlive/airootfs/etc/passwd and copy work_directory/x86_64/airootfs/etc/skel/* to them. The copied files will have proper user and group ownership.\n\n"
+    },
+    {
+      "title": "Keymaps",
+      "level": 3,
+      "content": "To change the live system's default keymap on the console, add a vconsole.conf with the desired keymap. Check Linux console/Keyboard configuration and vconsole.conf(5) for details and more options.\n\nFor example, to change the console's and X11's default keymap to German (de-latin1), create archlive/airootfs/etc/vconsole.conf with the following contents:\n\n```\narchlive/airootfs/etc/vconsole.conf\n```\n\n```\nKEYMAP=de-latin1\nXKBLAYOUT=de\n```\n\n"
+    },
+    {
+      "title": "Locales",
+      "level": 3,
+      "content": "To change the live system's locale, you must first enable and generate the localization files. For this to work you must add a custom locale.gen with the required locales and run locale-gen within the live system. This then enables you to also change the system's default locale.\n\nFor example, to enable de_DE.UTF-8 UTF-8 and en_US.UTF-8 UTF-8, create archlive/airootfs/etc/locale.gen with the following contents (check Locale#Generating locales for details):\n\n```\narchlive/airootfs/etc/locale.gen\n```\n\n```\nde_DE.UTF-8 UTF-8\nen_US.UTF-8 UTF-8\n```\n\nYou then need to run locale-gen within the live system. This can be achieved with a Pacman hook that is later automatically removed from the image by another hook. Create archlive/airootfs/etc/pacman.d/hooks/locale-gen.hook with the following contents (check Pacman#Hooks and alpm-hooks(5) for details):\n\n```\narchlive/airootfs/etc/pacman.d/hooks/locale-gen.hook\n```\n\n```\n# remove from airootfs!\n[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = glibc\n\n[Action]\nDescription = Generating localisation files...\nWhen = PostTransaction\nDepends = glibc\nExec = /usr/bin/locale-gen\n```\n\nOptionally, you can then change the live system's default locale by adding a custom locale.conf. For example, to change the default locale to de_DE.UTF-8, create archlive/airootfs/etc/locale.conf with the following contents (check Locale#Variables and locale.conf(5) for details):\n\n```\narchlive/airootfs/etc/locale.conf\n```\n\n```\nLANG=de_DE.UTF-8\n```\n\n"
+    },
+    {
+      "title": "Changing the distribution name used in the ISO",
+      "level": 3,
+      "content": "Start by copying the file /etc/os-release into the etc/ folder in the rootfs. Then, edit the file accordingly. You can also change the name inside of GRUB and syslinux.\n\n"
+    },
+    {
+      "title": "Build the ISO",
+      "level": 2,
+      "content": "Build an ISO which you can then burn to CD or USB by running:\n\n```\n# mkarchiso -v -w /path/to/work_dir -o /path/to/out_dir /path/to/profile/\n```\n\n- -w specifies the working directory. If the option is not specified, it will default to work in the current directory.\n- -o specifies the directory where the built ISO image will be placed. If the option is not specified, it will default to out in the current directory.\n- It should be noted the profile file profiledef.sh cannot be specified when running mkarchiso, only the path to the file.\n\nReplace /path/to/profile/ with the path to your custom profile, or with /usr/share/archiso/configs/releng/ if you are building an unmodified profile.\n\n```\n# mkarchiso -v -w /tmp/archiso-tmp /path/to/profile/\n```\n\nWhen run, the script will download and install the packages you specified to work_directory/x86_64/airootfs, create the kernel and init images, apply your customizations and finally build the ISO into the output directory.\n\n"
+    },
+    {
+      "title": "Removal of work directory",
+      "level": 3,
+      "content": "Note: **you may lose data** \n\nThe temporary files are copied into work directory. After successfully building the ISO , the work directory and its contents can be deleted. E.g.:\n\n```\n# rm -rf /path/to/work_dir\n```\n\n"
+    },
+    {
+      "title": "Using the ISO",
+      "level": 2,
+      "content": "See Installation guide#Prepare an installation medium for various options.\n\n"
+    },
+    {
+      "title": "Test the ISO in QEMU",
+      "level": 2,
+      "content": "Install the optional dependencies qemu-desktop and edk2-ovmf.\n\nUse the convenience script run_archiso to run a built image using QEMU.\n\n```\n$ run_archiso -i /path/to/archlinux-yyyy.mm.dd-x86_64.iso\n```\n\nThe virtual machine can also be run using UEFI emulation:\n\n```\n$ run_archiso -u -i /path/to/archlinux-yyyy.mm.dd-x86_64.iso\n```\n\n"
+    },
+    {
+      "title": "Run setup commands as part of the ISO build process",
+      "level": 3,
+      "content": "When creating a custom profile, some modifications will require you to run setup commands within the live system's environment before creating the ISO. For example, if you want to enable additional locales, you must run locale-gen within the live system to generate the necessary localization files.\n\nTo run setup commands before creating the ISO, add a Pacman hook below archlive/airootfs/etc/pacman.d/hooks/. Check Pacman#Hooks and alpm-hooks(5) for details on how to create custom Pacman hooks. Also check #Locales for an example.\n\nSince these setup hooks are often required to run just once as part of the ISO build process, the releng profile includes a Pacman hook that removes any Pacman hook that is marked with the string \"remove from airootfs\". So, if you don't want your Pacman hook to also apply on the running live system, add the following comment to your Pacman hook:\n\n```\n# remove from airootfs!\n```\n\n"
+    },
+    {
+      "title": "Prepare an ISO for an installation via SSH",
+      "level": 3,
+      "content": "To install Arch Linux via SSH without any interaction with the system, an SSH public key must be placed in authorized_keys.\n\nAdding the SSH key can either be done manually (explained here), or by cloud-init.\n\nTo add the key manually, first copy archiso's releng profile to a writable directory. The following example uses archlive.\n\n```\n$ cp -r /usr/share/archiso/configs/profile/ archlive\n```\n\nCreate a .ssh directory in the home directory of the user which will be used to log in. The following example will be using the root user.\n\n```\n$ mkdir archlive/airootfs/root/.ssh\n```\n\nAdd the SSH public key(s), which will be used to log in, to authorized_keys:\n\n```\n$ cat ~/.ssh/key1.pub >> archlive/airootfs/root/.ssh/authorized_keys\n$ cat ~/.ssh/key2.pub >> archlive/airootfs/root/.ssh/authorized_keys\n```\n\nSet correct permissions and ownership for the .ssh directory and the authorized_keys file:\n\n```\narchlive/profiledef.sh\n```\n\n```\n...\nfile_permissions=(\n  ...\n  [\"/root\"]=\"0:0:0750\"\n  [\"/root/.ssh\"]=\"0:0:0700\"\n  [\"/root/.ssh/authorized_keys\"]=\"0:0:0600\"\n)\n```\n\nFinally build the ISO. Upon booting the ISO, OpenSSH will start and it will be possible to log in using the corresponding SSH private key(s).\n\n"
+    },
+    {
+      "title": "Automatically connect to a Wi-Fi network using iwd",
+      "level": 3,
+      "content": "Create /var/lib/iwd/ inside the profile's airootfs directory and set the correct permissions:\n\n```\n$ mkdir -p archlive/airootfs/var/lib/iwd\n```\n\n```\narchlive/profiledef.sh\n```\n\n```\n...\nfile_permissions=(\n  ...\n  [\"/var/lib/iwd\"]=\"0:0:0700\"\n)\n```\n\nFollow the instructions in iwd#Network configuration and iwd.network(5) to create a network configuration file for your Wi-Fi network.\n\nSave the configuration file inside archlive/airootfs/var/lib/iwd/.\n\n"
+    },
+    {
+      "title": "Adjusting the size of the root file system",
+      "level": 3,
+      "content": "When installing packages in the live environment, for example on hardware requiring DKMS modules, the default size of the root file system might not allow the download and installation of such packages due to its size.\n\nIt will manifest as the following error message when downloading files or installing packages in the live environment:\n\n```\nerror: partition / too full: 63256 blocks needed, 61450 blocks free\nerror: not enough free disk space\nerror: failed to commit transaction (not enough free disk space)\nErrors occurred: no packages were upgraded.\n```\n\nTo adjust the size on the fly:\n\n```\n# mount -o remount,size=SIZE /run/archiso/cowspace\n```\n\nSee tmpfs(5) § size for the possible parameters of SIZE.\n\nTo adjust the size at the boot loader stage (by pressing e or Tab) use the boot option:\n\n```\ncow_spacesize=SIZE\n```\n\nTo adjust the size while building an image add the boot option to:\n\n- efiboot/loader/entries/*.cfg\n- grub/*.cfg\n- syslinux/*.cfg\n\nThe result can be checked with:\n\n```\n$ df -h\n```\n\nSee mkinitcpio-archiso boot parameters.\n\n"
+    },
+    {
+      "title": "Window manager freezes",
+      "level": 3,
+      "content": "If you want to use a window manager in the Live CD, you must add the necessary and correct video drivers, or the WM may freeze on loading.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Archiso project page\n- Official documentation\n- Arch Linux Release Engineering mailing list\n- #archlinux-releng — Arch Linux Release Engineering IRC channel\n- archiso-manager — the tool used for building the official monthly ISOs\n\n"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "title": "Munin (日本語)",
+  "url": "https://wiki.archlinux.org/title/Munin_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "プロジェクトウェブページ より:\n\nと、いうわけで、 Munin はシステムの統計を採りグラフに図示してくれるものです。詳しくはオスロ大学の Munin install など見ると良いでしょう。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール作業 1.1 munin と munin-node について 1.1.1 パッケージの確認 1.1.2 インストール 1.2 ウェブサーバーの必要性について 1.3 IPv6\n- 2 設定 2.1 デーモン 2.2 プラグイン 2.2.1 SNMP について設定したい場合 2.3 ディレクトリ 2.4 ホスト名 2.5 Cron 2.6 systemd タイマー 2.7 ユーザー munin へのアクセス権の設定\n- 3 テスト\n- 4 プラグイン 4.1 追加 4.2 削除 4.3 デバッグ作業\n- 5 ヒントとテクニック‎ 5.1 MySQL 5.2 S.M.A.R.T. 5.3 lm_sensors\n\n- 1.1 munin と munin-node について 1.1.1 パッケージの確認 1.1.2 インストール\n- 1.2 ウェブサーバーの必要性について\n- 1.3 IPv6\n\n- 1.1.1 パッケージの確認\n- 1.1.2 インストール\n\n- 2.1 デーモン\n- 2.2 プラグイン 2.2.1 SNMP について設定したい場合\n- 2.3 ディレクトリ\n- 2.4 ホスト名\n- 2.5 Cron\n- 2.6 systemd タイマー\n- 2.7 ユーザー munin へのアクセス権の設定\n\n- 2.2.1 SNMP について設定したい場合\n\n- 4.1 追加\n- 4.2 削除\n- 4.3 デバッグ作業\n\n- 5.1 MySQL\n- 5.2 S.M.A.R.T.\n- 5.3 lm_sensors\n\n"
+    },
+    {
+      "title": "インストール作業",
+      "level": 2,
+      "content": "Munin はクライアント−サーバーモデルです。クライアントを munin-node 、サーバーを munin と称します(ドキュメントでは \"munin-master\"となっていたりもするけど)。\n\nmunin-master は1台のマシンにインストールし、 munin-node は監視したい全てのマシンにインストールします。ここでは、とりあえず1台のマシンについてのみインストールする事を考えてみるとしましょう。より詳しく知りたいのならば Munin documentation wiki を見ましょうね。\n\n"
+    },
+    {
+      "title": "munin と munin-node について",
+      "level": 3,
+      "content": "執筆現在に於いて munin (munin-master) と munin-node は extra リポジトリにパッケージがあります。\n\n"
+    },
+    {
+      "title": "パッケージの確認",
+      "level": 4,
+      "content": "```\n# pacman -Ss munin\n```\n\n```\nextra/munin 1.4.6-2\n    A distributed monitoring/graphing tool\nextra/munin-node 1.4.6-2\n    A distributed monitoring/graphing tool\n```\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 4,
+      "content": "```\n# pacman -S munin munin-node\n```\n\n"
+    },
+    {
+      "title": "ウェブサーバーの必要性について",
+      "level": 3,
+      "content": "このガイドでは Munin で静的な HTML とグラフ画像を設定されたディレクトリへ出力する様にセットアップを行います。生成されたファイルはローカルのブラウザからならそのまま見ることもできるでしょう。しかし、もしリモートのマシンから見たいのならば適当なウェブサーバーを予めセットアップしておく必要があります。例えば、\n\n- Apache\n- Lighttpd\n- Nginx\n\nなどなど。他にサーバーについては詳しく知りたければウェブサーバーカテゴリも参考になるかもしれません。\n\n"
+    },
+    {
+      "title": "IPv6",
+      "level": 3,
+      "content": "munin-node で IPv6 をサポートするには (/etc/munin/munin-node.conf で host :::1 を使う) 以下のパッケージをインストールする必要があります:\n\n- perl-socket6\n- perl-io-socket-inet6\n\n"
+    },
+    {
+      "title": "デーモン",
+      "level": 3,
+      "content": "デーモンを追加して\n\n```\n# systemctl enable munin-node\n```\n\n起動して置きましょう\n\n```\n# systemctl start munin-node\n```\n\n詳しくはデーモンを見て下さい。\n\n"
+    },
+    {
+      "title": "プラグイン",
+      "level": 3,
+      "content": "munin-node-configure を実行しましょう。--suggest オプションを付けると、インストールしたマシンで使えそうなプラグインのお勧めリストが表示されます:\n\n```\n# munin-node-configure --suggest\n```\n\n使用したいプラグインがあれば、もう一度コマンドを実行します。--shell オプションを付けると munin-node-configure によってお勧めされたプラグインが設定されるでしょう:\n\n```\n# munin-node-configure --shell | sh\n```\n\n"
+    },
+    {
+      "title": "SNMP について設定したい場合",
+      "level": 4,
+      "content": "例えば SNMP サーバーが SERVER というホスト名で、 バージョン v2c 、 コミュニティ名 COMMUNITY で稼働している際は次の様にお勧めリストの確認を行います:\n\n```\n# munin-node-configure --suggest --snmp SERVER --snmpversion snmpv2c --snmpcommunity COMMUNITY\n```\n\nこの結果をシェル用に出力し、その出力をシェルに渡すには次の様にします:\n\n```\n# munin-node-configure --shell --snmp SERVER --snmpversion snmpv2c --snmpcommunity COMMUNITY | sh\n```\n\n"
+    },
+    {
+      "title": "ディレクトリ",
+      "level": 3,
+      "content": "munin-master がHTMLやグラフ画像を生成する為のディレクトリを設定し、作成して於きましょう。\n\n/etc/munin/munin.conf の以下の htmldir のコメントを外します:\n\n```\nhtmldir /srv/http/munin\n```\n\nこれで /srv/http/munin へ出力が設定されます。\n\nディレクトリについては作成するだけでなく、ユーザー munin がこのディレクトリへの書き込み権限を満たす様にするのも忘れないようにしましょう。\n\n```\n# mkdir /srv/http/munin\n# chown munin:munin /srv/http/munin\n```\n\n適当なウェブサーバーが標準設定のまま (ドキュメントルートが /srv/http)で稼働していれば、このディレクトリを http://localhost/munin/ で表示する事ができるでしょう。\n\nnginx-1.18.0-1 の場合は、ドキュメントルートの初期値が /usr/share/nginx/html となっているので以下のように変更します。\n\nlocation / {\n\n```\nroot /srv/http;\n    index  index.html  index.htm;\n```\n\n}\n\n"
+    },
+    {
+      "title": "ホスト名",
+      "level": 3,
+      "content": "munin を実行する前に、システムのホスト名を設定しておくと良いでしょう。/etc/munin/munin.conf で標準では myhostname となっている筈です。お好みの名前を付けてあげて下さいね。ホスト名は /var/lib/munin の .rrdファイル、HTML やグラフ画像のグループ化に適用されます。\n\n"
+    },
+    {
+      "title": "Cron",
+      "level": 3,
+      "content": "次の設定で5分措きに munin がデータを更新し、HTMLとグラフ画像を生成します:\n\n```\n# crontab /etc/munin/munin-cron-entry -u munin\n```\n\nユーザー munin へのメール配送のエイリアスも設定して措くと良いでしょう。もしも postfix を使っているのならば /etc/postfix/aliases に次のように設定し、\n\n```\nmunin:    root\n```\n\nそれから\n\n```\n# newaliases\n```\n\nとかコマンドを実行すると良いでしょう。\n\n"
+    },
+    {
+      "title": "systemd タイマー",
+      "level": 3,
+      "content": "cron ジョブではなく systemd のタイマーを使うこともできます。\n\nタイマーにはサービスユニットの設定が必要です:\n\n```\n/etc/systemd/system/munin-cron.service\n```\n\n```\n[Unit]\nDescription=Survey monitored computers\nAfter=network.target\n\n[Service]\nUser=munin\nExecStart=/usr/bin/munin-cron\n```\n\nタイマーユニットの設定:\n\n```\n/etc/systemd/system/munin-cron.timer\n```\n\n```\n[Unit]\nDescription=Survey monitored computers every five minutes\n\n[Timer]\nOnCalendar=*-*-* *:00/5:00\n\n[Install]\nWantedBy=multi-user.target\n```\n\nsystemd の設定をリロードして、munin-cron.timer を起動し、問題が発生しないことを確認してください:\n\n```\n$ journalctl --unit munin-cron.service\n$ less /var/log/munin/munin-update.log\n```\n\n最後に、munin-cron.timer を有効化してください。\n\n"
+    },
+    {
+      "title": "ユーザー munin へのアクセス権の設定",
+      "level": 3,
+      "content": "多くのプラグインがログファイルを読もうとします。そう云う訳でユーザー munin を log グループに追加して措きましょう:\n\n```\n# usermod -aG log munin\n```\n\n"
+    },
+    {
+      "title": "テスト",
+      "level": 2,
+      "content": "Munin は既に使える状態になっています。さあ、munin-node を稼働させましょう:\n\n```\n# systemctl start munin-node\n```\n\nもしも手作業で HTML とグラフ画像を生成したいのならば、\n\n```\n# munin --shell=/bin/bash\n$ munin-cron\n```\n\nとかすると良いでしょう。後はブラウザで出力ディレクトリ或いは http://localhost/munin/ を表示する等してインターフェースをテストしましょう。\n\n"
+    },
+    {
+      "title": "プラグイン",
+      "level": 2,
+      "content": "Munin には沢山のプラグインがあってキミにインストールされるのを待っているよ！手始めに MuninExchange を見るといいよ、素敵だろ？まあ、時にはお目当てのプラグインを見付けられない事もあるだろうけど…そんな時は自分で書けばいいよ！簡単だから HowToWritePlugins を見ながらやってみるといいよ。\n\n"
+    },
+    {
+      "title": "追加",
+      "level": 3,
+      "content": "基本的には全てのプラグインはマナーに則って追加されるよ(いやまあ勿論、例外はあるからプラグイン毎によく確認してね！):\n\n先ずはプラグインをダウンロードするなどして、それを /usr/lib/munin/plugins に複製なり移動なりしよう。\n\n```\n# cp <plugin> /usr/lib/munin/plugins/\n```\n\nそして /etc/munin/plugins にシンボリックリンクを張るんだ:\n\n```\n# ln -s /usr/lib/munin/plugins/<plugin> /etc/munin/plugins/<plugin>\n```\n\nさあ、プラグインをテストしよう。プラグインのフルパスを入れる必要は無いよ、次にように munin-run を実行しよう:\n\n```\n# munin-run <plugin>\n```\n\nそれから munin-node を 再起動するんだ:\n\n```\n# systemctl restart munin-node\n```\n\n後はウェブページが更新されれば完了さ。\n\n"
+    },
+    {
+      "title": "削除",
+      "level": 3,
+      "content": "プラグインを削除したいのなら、/etc/munin/plugins のシンボリックリンクを削除すればいい。/usr/lib/munin/plugins から削除する必要は無いよ。\n\n```\n# rm /etc/munin/plugins/<plugin>\n```\n\n"
+    },
+    {
+      "title": "デバッグ作業",
+      "level": 3,
+      "content": "思惑通りに動いてくれないプラグイン(何も出力されてないっぽいとか)に出会してしまったなら、そのプラグインを直接実行して見るというのも良いかもしれません。例えば、apache_accesses プラグインを直接実行するには、\n\n```\n# munin-run apache_accesses\n```\n\nとかします。\n\nエラーがあれば、例えば \"LWP::UserAgent not found at /etc/munin/plugins/apache_accesses line 86.\" だとか出力されるかもしれません。ちなみにこの場合は、Perlの関数が見つからないという問題で、不足しているライブラリ perl-libwww をインストールしてあげると良いかもしれません。\n\n"
+    },
+    {
+      "title": "MySQL",
+      "level": 3,
+      "content": "MySQL プラグインは AUR のパッケージに依存しています: perl-dbi, perl-cache-cacheAUR, perl-ipc-shareliteAUR\n\nまた、データベースにアクセスするときは専用の MySQL ユーザーを使うことが推奨されています。ユーザーを作成するには以下の MySQL コマンドを実行:\n\n```\nMariaDB> CREATE USER 'muninuser'@'localhost' IDENTIFIED BY 'muninpassword';\nMariaDB> GRANT SUPER,PROCESS ON *.* TO 'muninuser'@'localhost';\nMariaDB> GRANT SELECT ON mysql.* TO 'muninuser'@'localhost';\nMariaDB> FLUSH PRIVILEGES;\n```\n\nこの新しいユーザーを使うように Munin を設定するには、以下を作成:\n\n```\n/etc/munin/plugin-conf.d/mysql_\n```\n\n```\n[mysql_*]\n     env.mysqlconnection DBI:mysql:mysql;host=127.0.0.1;port=3306\n     env.mysqluser muninuser\n     env.mysqlpassword muninpassword\n```\n\n"
+    },
+    {
+      "title": "S.M.A.R.T.",
+      "level": 3,
+      "content": "S.M.A.R.T. データの監視を有効にするには smartmontools パッケージをインストールして、以下を使用:\n\n```\n/etc/munin/plugin-conf.d/munin-node\n```\n\n```\n[smart_*]\n    user root\n    group disk\n```\n\nそして監視するディスクのシンボリックリンクを適切に作成してください。sda の場合:\n\n```\n# ln -s /usr/lib/munin/plugins/smart_ /etc/munin/plugins/smart_sda\n```\n\n"
+    },
+    {
+      "title": "lm_sensors",
+      "level": 3,
+      "content": "lm_sensors をインストールして Lm sensors#lm_sensors の設定 に従って設定を行って下さい。それが全て終わったら、シンボリックリンクを作成:\n\n```\n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_fan \n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_temp\n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_volt\n```\n\n"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "title": "Odoo",
+  "url": "https://wiki.archlinux.org/title/Odoo",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Odoo (formerly known as OpenERP and before that, TinyERP) is a suite of open-source enterprise management applications. Targeting companies of all sizes, the application suite includes billing, accounting, manufacturing, purchasing, warehouse management, and project management.\n\nOdoo features an application server which uses PostgreSQL as database back-end, with a web-based client. Odoo is written in Python, with a highly modular design which allows rapid development of new modules through Open Object RAD. Odoo developers have a strong commitment to free software.\n\nA thriving support and development community has grown up around Odoo, providing free technical support, bug-fixing, new development, and support services. Odoo provides extensive documentation in various electronic formats, as well as hardcopy. The company responsible for development of Odoo earns profits through partnership services with Odoo consultants, and by providing support, training, hosting services, software development, and software quality testing and verification.\n\n"
+    },
+    {
+      "title": "Installing Odoo",
+      "level": 3,
+      "content": "Install the odoo-venvAUR package. These dependencies and the size of Odoo require much disk space to be used (multiple GBs). If you are building manually in the current directory, please make sure your current directory is on a device with enough free space.\n\n"
+    },
+    {
+      "title": "Configuring PostgreSQL to run with Odoo",
+      "level": 3,
+      "content": "Odoo uses PostgreSQL as the database backend. The latter should have been installed with the odoo package as postgresql comes as a dependency.\n\nIt is necessary to create a new PostgreSQL user for Odoo. If the PostgreSQL instance has not been initialized yet, please follow first the PostgreSQL install process.\n\nlog in as the default PostgreSQL superuser, 'postgres' and create the database user (called role in the PostgreSQL ) odoo with the command that follows,\n\n- where --interactive is used to prompt for missing role name and attributes rather than using defaults\n- and --pwprompt is used to assign a password to the new role\n\nTo ensure proper installation, you should have created a database named odoo or anything other before you modify odoo user. Then you will first be asked for a password with createuser command. For highly secure yet easy to remember passwords, consider using a Diceware Passphrase. Re-enter the password as requested. The next three questions should be answered in sequence with n, y, and n.\n\n```\n[postgres]$ createdb odoo\n[postgres]$ createuser odoo --interactive --pwprompt\nEnter password for new role: \nEnter it again: \nShall the new role be a superuser? (y/n) n\nShall the new role be allowed to create databases? (y/n) y\nShall the new role be allowed to create more new roles? (y/n) n\n```\n\nYou can also use the following command line to specify the options to skip the interactive questions:\n\n```\n[postgres]$ createuser odoo --createdb --login --no-superuser --no-createrole --pwprompt\n```\n\nOnce you are finished answering these questions, type exit to return to your regular user.\n\nThis completes the required installation and setup of PostgreSQL for use with Odoo under Arch Linux. Additional detailed information about PostgreSQL configuration can be found in the PostgreSQL article. By default, PostgreSQL only accepts connections from the local machine. If you plan to run PostgreSQL and Odoo on two different machines, you will need to follow PostgreSQL#Configure PostgreSQL to be accessible from remote hosts.\n\n"
+    },
+    {
+      "title": "Configuring Odoo to run with PostgreSQL",
+      "level": 3,
+      "content": "The configuration file of Odoo is located at /etc/odoo/odoo.conf. Specify the db_user and db_password according to the username and password you specified at previous step. If the PostgreSQL server is on a different machine, also edit db_host.\n\n```\n[options]\n; This is the password that allows database operations:\n; admin_passwd = admin\ndb_host = False\ndb_port = False\ndb_user = odoo\ndb_password = False\n```\n\n"
+    },
+    {
+      "title": "Starting the server",
+      "level": 3,
+      "content": "Ensure PostgreSQL is running and enabled first before proceeding with the following lines.\n\nTo start Odoo automatically at boot, enable odoo.service. Start the unit to start Odoo immediately.\n\n"
+    },
+    {
+      "title": "Logging in",
+      "level": 3,
+      "content": "Go to http://localhost:8069 in your web browser to access the Odoo login page.\n\n"
+    },
+    {
+      "title": "Running Odoo behind a reverse proxy",
+      "level": 2,
+      "content": "You can run odoo behind a web server such as Apache HTTP Server or Nginx in reverse proxy mode. This is useful for making odoo available in a local network, under a domaine name such as odoo.mydomain.local. It is also useful to enable caching for static resources, and reduce the load on your odoo application.\n\nFor this to work, you need to make sure that your local DNS-server (such as BIND or dnsmasq) resolves the domain name you choose to the web servers IP address. If running on your local machine, you could simply add an entry to /etc/hosts like this:\n\n```\n127.0.0.1 odoo.mydomain.local\n```\n\n"
+    },
+    {
+      "title": "Using Nginx",
+      "level": 3,
+      "content": "Refer to this guide for how to create virtual hosts in Nginx.\n\nAssuming your local domain is called mydomain.local, and odoo is hosted on the same machine as your Nginx server, create a file inside the servers-available directory that contains this server block:\n\n```\n/etc/nginx/servers-available/odoo\n```\n\n```\nupstream odoo {\n    server 127.0.0.1:8069;\n}\n\nserver {\n    listen 80;\n    server_name odoo.mydomain.local;\n    root        /usr/share/nginx/html;\n    index       index.html index.htm;\n    access_log  /var/log/nginx/odoo-mydomain-local.access.log;\n    error_log   /var/log/nginx/odoo-mydomain-local.error.log;\n\n    location / {\n        proxy_pass  http://odoo;\n        # force timeouts if the backend dies\n        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;\n        proxy_redirect off;\n\n        # set headers\n        proxy_set_header    Host            $host;\n        proxy_set_header    X-Real-IP       $remote_addr;\n        proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header    X-Forwarded-Proto https;\n    }\n\n    # cache some static data in memory for 60mins\n    location ~* /web/static/ {\n        proxy_cache_valid 200 60m;\n        proxy_buffering on;\n        expires 864000;\n        proxy_pass http://odoo;\n    }\n}\n```\n\nTo enable, simple create a symlink:\n\n```\n# ln -s /etc/nginx/servers-available/odoo /etc/nginx/servers-enabled/odoo\n```\n\nReload or restart the nginx service to enable the new configuration.\n\n"
+    },
+    {
+      "title": "Additional documentation",
+      "level": 2,
+      "content": "As Odoo is a complete enterprise solution, it might be rather complex to use for newcomers. Therefore, reading the Odoo User Documentation and Odoo technical documentation is highly advised.\n\n"
+    }
+  ]
+}

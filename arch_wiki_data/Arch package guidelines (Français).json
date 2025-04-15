@@ -1,0 +1,81 @@
+{
+  "title": "Arch package guidelines (Français)",
+  "url": "https://wiki.archlinux.org/title/Arch_package_guidelines_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Creating packages\n- PKGBUILD (Français)\n- makepkg (Français)\n- Arch Build System (Français)\n- Arch User Repository (Français)\n- Arch package guidelines/Security\n\nLorsque vous construisez des paquets pour Arch Linux, adhérez aux directives pour les paquets ci-dessous, surtout si votre intention est de contribuer à un nouveau paquet pour Arch Linux. Vous devriez également consulter les pages de manuel PKGBUILD(5) et makepkg(8).\n\n"
+    },
+    {
+      "title": "Prototype de PKGBUILD",
+      "level": 2,
+      "content": "```\n# Mainteneur : Votre nom <votremail@domaine.com>\npkgname=NAME\npkgver=VERSION\npkgrel=1\npkgdesc=\"\"\narch=()\nurl=\"\"\nlicense=('GPL')\ngroups=()\ndepends=()\nmakedepends=()\noptdepends=()\nprovides=()\nconflicts=()\nreplaces=()\nbackup=()\noptions=()\ninstall=\nchangelog=\nsource=($pkgname-$pkgver.tar.gz)\nnoextract=()\nmd5sums=() #auto-compléter en utilisant updpkgsums\n\nbuild() {\n  cd \"$pkgname-$pkgver\n\n  ./configure --prefix=/usr\n  make\n}\n\npackage() {\n  cd \"$pkgname-$pkgver\n\n  make DESTDIR=\"$pkgdir/\" install\n}\n```\n\nD'autres prototypes se trouvent dans /usr/share/pacman/ fourni par le paquet pacman.\n\n"
+    },
+    {
+      "title": "Étiquette des paquets",
+      "level": 2,
+      "content": "- Les paquets ne doivent jamais être installés sur /usr/local/.\n- N'introduisez pas de nouvelles variables ou fonctions dans les scripts de construction PKGBUILD, à moins que le paquet ne puisse être construit sans cela, car elles pourraient entrer en conflit avec des variables et des fonctions utilisées dans makepkg lui-même.\n- Si une nouvelle variable ou une nouvelle fonction est absolument nécessaire, préfixez son nom avec un trait de soulignement (_), par exemple _customvariable=\n- Evitez d'utiliser /usr/libexec/ pour quoi que ce soit. Utilisez plutôt /usr/lib/$pkgname/.\n- Le champ packager du fichier meta du paquet peut être personnalisé par le constructeur du paquet en modifiant l'option appropriée dans le fichier /etc/makepkg.conf, ou alternativement en créant ~/.makepkg.conf.\n- N'utilisez pas les sous-routines de makepkg (par exemple error, msg, msg2, plain, warning) car elles peuvent changer à tout moment. Pour imprimer des données, utilisez printf ou echo.\n- Tous les messages importants doivent être répercutés pendant l'installation à l'aide d'un fichier .install. Par exemple, si un paquet a besoin d'une configuration supplémentaire pour fonctionner, des instructions doivent être incluses.\n- Les dépendances sont l'erreur d'empaquetage la plus courante. Veuillez prendre le temps de les vérifier soigneusement, par exemple en exécutant ldd sur les exécutables dynamiques, en vérifiant les outils requis par les scripts ou en regardant la documentation du logiciel. L'utilitaire namcap peut vous aider à cet égard. Cet outil peut analyser à la fois PKGBUILD et le paquet résultant et vous avertira des mauvaises permissions, des dépendances manquantes, des dépendances redondantes et d'autres erreurs courantes.\n- Toute dépendance optionnelle qui n'est pas nécessaire à l'exécution du paquet ou à son fonctionnement général ne doit pas être incluse dans le tableau depends ; l'information doit plutôt être ajoutée au tableau optdepends :\n\n```\n_customvariable=\n```\n\n```\noptdepends=('cups: printing support'\n            'sane: scanners support'\n            'libgphoto2: digital cameras support'\n            'alsa-lib: sound support'\n            'giflib: GIF images support'\n            'libjpeg: JPEG images support'\n            'libpng: PNG images support')\n```\n\n- Lors de la création d'une description de paquet pour un paquet, n'incluez pas le nom du paquet de manière auto-référentielle. Par exemple, \"Nedit est un éditeur de texte pour X11\" pourrait être simplifié en \"Un éditeur de texte pour X11\". Essayez également de garder les descriptions à environ 80 caractères ou moins.\n- Essayez de maintenir la longueur de ligne dans le PKGBUILD en dessous de environ 100 caractères.\n- Si possible, supprimez les lignes vides du PKGBUILD. (provides, replaces, etc.)\n- Il est courant de conserver l'ordre des champs PKGBUILD comme indiqué ci-dessus. Cependant, ce n'est pas obligatoire, car la seule exigence dans ce contexte est une syntaxe bash correcte.\n- Utilisez des guillemets pour les variables qui peuvent contenir des espaces, comme \"$pkgdir\" et \"$srcdir\".\n- Pour garantir l'intégrité des paquets, assurez-vous que les variables integrity| contiennent des valeurs correctes. Celles-ci peuvent être mises à jour en utilisant l'outil updpkgsums(8).\n\n"
+    },
+    {
+      "title": "Nommage des paquets",
+      "level": 2,
+      "content": "- Les noms de paquets ne peuvent contenir que des caractères alphanumériques et l'un des éléments suivants : @, ., _, +, -. Les noms ne peuvent pas commencer par des traits d'union ou des points. Toutes les lettres doivent être en minuscules.\n- Les noms de paquets ne doivent pas être suffixés par le numéro de version de la version majeure amont (par exemple, nous ne voulons pas de libfoo2 si les développeurs en amont l'appelle libfoo v2.3.4) dans le cas où la bibliothèque et ses dépendances sont censées pouvoir continuer à utiliser la version la plus récente de la bibliothèque avec chaque version amont respective. Cependant, pour certains logiciels ou dépendances, cela ne peut être supposé. Dans le passé, cela a été particulièrement vrai pour les boîtes à outils de widgets telles que GTK et Qt. Les logiciels qui dépendent de ces boîtes à outils ne peuvent généralement pas être portés de manière triviale vers une nouvelle version majeure. Ainsi, dans les cas où le logiciel ne peut pas continuer à évoluer de manière triviale avec ses dépendances, les noms de paquets doivent porter le suffixe de la version majeure (par exemple gtk2, gtk3, qt4, qt5). Pour les cas où la plupart des dépendances peuvent continuer à rouler avec la dernière version, mais pas certaines (par exemple, une source fermée qui a besoin de libpng12 ou similaire), une version dépréciée de ce paquet peut être appelée libfoo1 alors que la version actuelle est juste libfoo.\n\n"
+    },
+    {
+      "title": "Version des paquets",
+      "level": 2,
+      "content": "- Les versions des paquets (c'est-à-dire PKGBUILD (Français)#pkgver) doivent être identiques à la version publiée par l'auteur. Les versions peuvent inclure des lettres si nécessaire (par exemple, la version de nmap est 2.54BETA32). Les balises de version ne peuvent pas inclure de traits d'union ! Seulement des lettres, des chiffres et des points.\n- Les versions de paquet (i.e. PKGBUILD (Français)#pkgrel) sont spécifiques aux paquets Arch Linux. Elles permettent aux utilisateurs de différencier les paquets les plus récents des plus anciens. Lorsqu'une nouvelle version d'un paquet est publiée pour la première fois, le nombre de versions commence à 1. Puis, au fur et à mesure que des corrections et des optimisations sont apportées, le paquet sera re-livré au public d'Arch Linux et le numéro de version sera incrémenté. Quand une nouvelle version sort, le nombre de versions est remis à 1. Les étiquettes de version de paquet suivent les mêmes restrictions de nommage que les étiquettes de version.\n\n"
+    },
+    {
+      "title": "Dépendances des paquets",
+      "level": 2,
+      "content": "- Ne comptez pas sur les dépendances transitives dans aucun des PKGBUILD (Français)#Dépendances, car elles pourraient se casser, si une des dépendances est mise à jour.\n- Lister toutes les dépendances directes de la bibliothèque. Pour les identifier, find-libdeps(1) (partie de devtools) peut être utilisé.\n\n"
+    },
+    {
+      "title": "Relations avec les paquets",
+      "level": 2,
+      "content": "- N'ajoutez pas $pkgname à PKGBUILD (Français)#provides, car il est toujours implicitement fourni par le paquet.\n- Listez toutes les bibliothèques partagées externes d'un paquet dans PKGBUILD (Français)#provides (par exemple, 'libsomething.so'). Pour les identifier, find-libprovides(1) (qui fait partie de devtools) peut être utilisée.\n\n"
+    },
+    {
+      "title": "Sources des paquets",
+      "level": 2,
+      "content": "- Les sources HTTPS (https:// pour les archives, git+https:// pour les sources git) doivent être utilisées autant que possible.\n- Les sources doivent être vérifiées à l'aide de signatures PGP dans la mesure du possible (ce qui peut impliquer de construire à partir d'une balise git plutôt que d'une archive source, si l'amont signe les commits et les balises mais pas les archives).\n- Lors de la construction à partir d'une étiquette «tag» git, utilisez son hachage d'objet obtenu par git rev-parse au lieu du nom de l'étiquette :\n\n```\n_tag=1234567890123456789012345678901234567890 # git rev-parse \"v$pkgver\"\nsource=(git+https://$url.git?signed#tag=$_tag)\n\npkgver() {\n    cd \"$pkgname\"\n    git describe\n}\n```\n\n- Ne pas diminuer la sécurité ou la validité d'un paquet (par exemple, en supprimant la vérification de la somme de contrôle ou la vérification de la signature PGP), parce qu'une version amont est cassée ou manque soudainement d'une certaine fonctionnalité (par exemple, la signature PGP manque pour une nouvelle version).\n- Les sources doivent être uniques dans srcdir. (cela peut nécessiter de les renommer lors du téléchargement, par exemple \"${pkgname}-${pkgver}.tar.gz::https://${pkgname}.tld/download/${pkgver}.tar.gz\"\n- Éviter d'utiliser des miroirs spécifiques (par exemple sur sourceforge) pour télécharger, car ils pourraient devenir indisponibles.\n\n"
+    },
+    {
+      "title": "Travailler avec les développeurs en amont",
+      "level": 2,
+      "content": "Il est considéré comme une bonne pratique de travailler en étroite collaboration avec les développeurs en amont dans la mesure du possible. Cela implique de signaler les problèmes de construction et de test d'un paquet.\n\n- Signalez immédiatement les problèmes aux développeurs en amont.\n- Remontez les patches lorsque c'est possible.\n- Ajoutez des commentaires avec des liens vers les tickets de suivi de bogues (en amont) pertinents dans le PKGBUILD (ceci est particulièrement important, car cela garantit que les autres empaqueteurs peuvent comprendre les changements et travailler avec un paquet également).\n\nIl est recommandé de suivre le flux amont avec des outils tels que nvchecker ou urlwatch pour être informé des nouvelles versions stables.\n\n"
+    },
+    {
+      "title": "Répertoires",
+      "level": 2,
+      "content": "- Les fichiers de configuration doivent être placés dans le répertoire /etc. S'il y a plus d'un fichier de configuration, il est d'usage d'utiliser un sous-répertoire afin de garder la zone /etc aussi propre que possible. Utilisez /etc/{pkgname}/ où {pkgname} est le nom du paquet (ou une alternative appropriée, par exemple, apache utilise /etc/httpd/).\n- Les fichiers de paquets doivent suivre ces directives générales de répertoire :\n\nTable content:\n/etc | Fichiers de configuration essentiels au système\n/usr/bin | Binaires\n/usr/lib | Bibliothèques\n/usr/include | Fichiers d'en-tête\n/usr/lib/{pkg} | Modules, plugins, etc.\n/usr/share/doc/{pkg} | Documentation de l'application\n/usr/share/info | Fichiers système GNU Info\n/usr/share/man | Pages de manuel\n/usr/share/{pkg} | Données de l'application\n/var/lib/{pkg} | Stockage persistant des applications\n/etc/{pkg} | Fichiers de configuration pour {pkg}\n/opt/{pkg} | Gros paquets autonomes\n\n- Les paquets ne doivent contenir aucun des répertoires suivants :\n\n"
+    },
+    {
+      "title": "Fonctions de makepkg",
+      "level": 2,
+      "content": "Lorsque makepkg est utilisé pour construire un paquet, il effectue automatiquement les tâches suivantes :\n\n1. Vérifie si les dependencies et makedepends du paquet sont installés\n1. Télécharge les fichiers sources depuis les serveurs\n1. Vérifie l'intégrité des fichiers sources\n1. Désarchive les fichiers sources\n1. Applique tout patch nécessaire\n1. Compile le logiciel et l'installe dans une fausse racine\n1. Dépouille les symboles des binaires\n1. Dépouille les symboles de débogage des bibliothèques\n1. Compresse les pages de manuel et/ou d'information\n1. Génère le fichier meta du paquet qui est inclus dans chaque paquet\n1. Compresse la fausse racine dans le fichier paquet\n1. Enregistre le fichier du paquet dans le répertoire de destination configuré (c'est à dire le répertoire courant «cwd» par défaut)\n\n"
+    },
+    {
+      "title": "Architectures",
+      "level": 2,
+      "content": "Le tableau arch doit contenir 'x86_64' si le paquet compilé est spécifique à une architecture. Sinon, utilisez 'any' pour les paquets indépendants de l'architecture.\n\n"
+    },
+    {
+      "title": "Licences",
+      "level": 2,
+      "content": "Consultez PKGBUILD (Français)#license.\n\n"
+    },
+    {
+      "title": "Constructions reproductibles",
+      "level": 2,
+      "content": "Arch travaille à rendre tous les paquets reproductibles. Un empaqueteur peut vérifier si un paquet est reproductible avec makerepropkg de devtools ou repro de archlinux-repro.\n\n```\n$ makerepropkg $pkgname-1-1-any.pkg.tar.zst\n```\n\nOu\n\n```\n$ repro -f $pkgname-1-1-any.pkg.tar.zst\n```\n\n"
+    },
+    {
+      "title": "Directives supplémentaires",
+      "level": 2,
+      "content": "Assurez-vous de lire d'abord les directives ci-dessus - les points importants sont listés sur cette page et ne seront pas répétés dans les pages de directives suivantes. Ces directives spécifiques sont destinées à compléter les normes énumérées sur cette page.\n\n32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nLes paquets soumis à l'AUR doivent en outre respecter les AUR submission guidelines.\n\n"
+    }
+  ]
+}

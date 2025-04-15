@@ -1,0 +1,171 @@
+{
+  "title": "Mkinitcpio (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Mkinitcpio_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Booster\n- Boot debugging\n- dracut\n- Kernel modules\n- mkinitcpio/Minimal initramfs\n- systemd\n- Unified kernel image\n\nmkinitcpio is a Bash script used to create an initial ramdisk environment. From the mkinitcpio(8) man page:\n\nNote: **This article or section is a candidate for merging with Arch boot process#initramfs.** This article or section is a candidate for merging with Arch boot process#initramfs.\n\nThis article or section is a candidate for merging with Arch boot process#initramfs.\n\nTraditionally, the kernel was responsible for all hardware detection and initialization tasks early in the boot process before mounting the root file system and passing control to init. However, as technology advances, these tasks have become increasingly complex.\n\nNowadays, the root file system may be on a wide range of hardware, from SCSI to SATA to USB drives, controlled by a variety of drive controllers from different manufacturers. Additionally, the root file system may be encrypted or compressed; within a software RAID array or a logical volume group. The simple way to handle that complexity is to pass management into userspace: an initial ramdisk. See also: /dev/brain0 » Blog Archive » Early Userspace in Arch Linux.\n\nmkinitcpio has been developed by the Arch Linux developers and from community contributions. See the public Git repository.\n\nIt is important to note that there are two distinct approaches how the various tasks during initial ramdisk phase are performed:\n\nThe concrete variant is determined by the absence or presence of the systemd hook in the HOOKS array of /etc/mkinitcpio.conf. See #Common hooks for more details.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mkinitcpio package, which is a dependency of the linux package, so most users will already have it installed.\n\nAdvanced users may wish to install the latest development version of mkinitcpio from Git with the mkinitcpio-gitAUR package.\n\n"
+    },
+    {
+      "title": "Automated generation",
+      "level": 3,
+      "content": "Every time a kernel is installed or upgraded, a pacman hook automatically generates a .preset file saved in /etc/mkinitcpio.d/. For example linux.preset for the official stable linux kernel package. A preset is simply a list of information required to create initial ramdisk images, instead of manually specifying the various parameters and the location of the output files. By default, it contains the instructions to create two images:\n\n1. the default ramdisk image created following the directives specified in the mkinitcpio #Configuration, and\n1. the fallback ramdisk image, same as above except that the autodetect hook is skipped during creation, thus including a full range of modules which supports most systems.\n\nAfter creating the preset, the pacman hook calls the mkinitcpio script which generates the two images, using the information provided in the preset.\n\n"
+    },
+    {
+      "title": "Manual generation",
+      "level": 3,
+      "content": "To run the script manually, refer to the mkinitcpio(8) manual page for instructions. In particular, to (re-)generate an initramfs image based on the preset provided by a kernel package, use the -p/--preset option followed by the preset to utilize. For example, for the linux package, use the command:\n\n```\n# mkinitcpio -p linux\n```\n\nTo (re-)generate initramfs images based on all existing presets, use the -P/--allpresets switch. This is typically used to regenerate all the initramfs images after a change of the global #Configuration:\n\n```\n# mkinitcpio -P\n```\n\nUsers may create any number of initramfs images with a variety of different configurations. The desired image must be specified in the respective boot loader configuration file.\n\n"
+    },
+    {
+      "title": "Customized generation",
+      "level": 3,
+      "content": "Users can generate an image using an alternative configuration file. For example, the following will generate an initial ramdisk image according to the directions in /etc/mkinitcpio-custom.conf and save it as /boot/initramfs-custom.img.\n\n```\n# mkinitcpio --config /etc/mkinitcpio-custom.conf --generate /boot/initramfs-custom.img\n```\n\nIf generating an image for a kernel other than the one currently running, add the kernel release version to the command line. The installed kernel releases can be found in /usr/lib/modules/, the syntax is consistent with the output of the command uname -r for each kernel.\n\n```\n# mkinitcpio --generate /boot/initramfs-custom2.img --kernel 5.7.12-arch1-1\n```\n\n"
+    },
+    {
+      "title": "Unified kernel images",
+      "level": 3,
+      "content": "mkinitcpio can create unified kernel images (UKIs) either by itself or via systemd-ukify. If systemd-ukify is absent or explicitly disabled using --no-ukify, the UKI will be assembled by mkinitcpio itself. Advanced features of ukify will not be available then.\n\nSee unified kernel image for details about UKI generation.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The primary configuration file for mkinitcpio is /etc/mkinitcpio.conf. Drop-in configuration files are also supported, e.g. /etc/mkinitcpio.conf.d/myhooks.conf (they aren't taken into account if mkinitcpio is called with -c option and/or use a preset containing ALL_config). Additionally, preset definitions are provided by kernel packages in the /etc/mkinitcpio.d directory (e.g. /etc/mkinitcpio.d/linux.preset).\n\nUsers can modify seven variables within the configuration file, see mkinitcpio.conf(5) § VARIABLES for more details:\n\nNote: **lvm2** \n\n- Some hooks that may be required for your system like lvm2, mdadm_udev, and encrypt are NOT enabled by default. Read the #HOOKS section carefully for instructions.\n- Preset files created by mkinitcpio before Version 36 set the variable ALL_config, which prevents drop-in configuration files from being loaded. To enable drop-in files, comment out the line ALL_config=\"/etc/mkinitcpio.conf\" in older preset files.\n\n"
+    },
+    {
+      "title": "MODULES",
+      "level": 3,
+      "content": "The MODULES array is used to specify modules to load before anything else is done.\n\nModules suffixed with a ? will not throw errors if they are not found. This might be useful for custom kernels that compile in modules which are listed explicitly in a hook or configuration file.\n\nNote: **must** \n\n- If using out-of-tree file systems that will be mounted in early userspace (e.g. when using such a file system as the root file system), their modules (e.g. reiser4) must be added to the MODULES array.\n- When using the encrypt or sd-encrypt hook, the keyboard modules and/or filesystems needed to unlock the LUKS device during system boot need to be added to the MODULES array when the target system differs from the one used to run mkinitcpio. For example, if you use a keyfile on an ext2 file system but no ext2 file system is mounted at the time mkinitcpio runs, add ext2. See dm-crypt/System configuration#cryptkey for more details.\n- If using a keyboard through a USB 3 hub and wish to use it to unlock a LUKS device, add usbhid xhci_hcd.\n- If using displays connected to a docking station, you might need to add a module for your graphics card to make initrd output visible (e.g. i915 for most Intel cards).\n\n"
+    },
+    {
+      "title": "BINARIES and FILES",
+      "level": 3,
+      "content": "These options allow users to add files to the image. Both BINARIES and FILES are added before hooks are run, and may be used to override files used or provided by a hook. BINARIES are auto-located within a standard PATH and are dependency-parsed, meaning any required libraries will also be added. FILES are added as-is. For example:\n\n```\nFILES=(/etc/modprobe.d/modprobe.conf)\n```\n\n```\nBINARIES=(kexec)\n```\n\nNote that as both BINARIES and FILES are Bash arrays, multiple entries can be added delimited with spaces.\n\n"
+    },
+    {
+      "title": "HOOKS",
+      "level": 3,
+      "content": "The HOOKS array is the most important setting in the file. Hooks are small scripts which describe what will be added to the image. For some hooks, they will also contain a runtime component which provides additional behavior, such as starting a daemon, or assembling a stacked block device. Hooks are referred to by their name, and executed in the order they exist in the HOOKS array of the configuration file.\n\nThe default HOOKS setting should be sufficient for most simple, single disk setups. For root devices which are stacked or multi-block devices such as LVM, RAID, or dm-crypt, see the respective wiki pages for further necessary configuration.\n\n"
+    },
+    {
+      "title": "Build hooks",
+      "level": 4,
+      "content": "Build hooks are found in /usr/lib/initcpio/install/, custom build hooks can be placed in /etc/initcpio/install/. These files are sourced by the bash shell during runtime of mkinitcpio and should contain two functions: build and help. The build function describes the modules, files, and binaries which will be added to the image. An API, documented by mkinitcpio(8), serves to facilitate the addition of these items. The help function outputs a description of what the hook accomplishes.\n\nFor a list of all available hooks:\n\n```\n$ mkinitcpio -L\n```\n\nUse mkinitcpio's -H/--hookhelp option to output help for a specific hook, for example:\n\n```\n$ mkinitcpio -H udev\n```\n\n"
+    },
+    {
+      "title": "Runtime hooks",
+      "level": 4,
+      "content": "Runtime hooks are found in /usr/lib/initcpio/hooks/, custom runtime hooks can be placed in /etc/initcpio/hooks/. For any runtime hook, there should always be a build hook of the same name, which calls add_runscript to add the runtime hook to the image. These files are sourced by the busybox ash shell during early userspace. With the exception of cleanup hooks, they will always be run in the order listed in the HOOKS setting. Runtime hooks may contain several functions:\n\nrun_earlyhook: Functions of this name will be run once the API file systems have been mounted and the kernel command line has been parsed. This is generally where additional daemons, such as udev, which are needed for the early boot process are started from.\n\nrun_hook: Functions of this name are run shortly after the early hooks. This is the most common hook point, and operations such as assembly of stacked block devices should take place here.\n\nrun_latehook: Functions of this name are run after the root device has been mounted. This should be used, sparingly, for further setup of the root device, or for mounting other file systems, such as /usr.\n\nrun_cleanuphook: Functions of this name are run as late as possible, and in the reverse order of how they are listed in the HOOKS array in the configuration file. These hooks should be used for any last minute cleanup, such as shutting down any daemons started by an early hook.\n\nNote: **systemd** \n\n"
+    },
+    {
+      "title": "Common hooks",
+      "level": 4,
+      "content": "A table of common hooks and how they affect image creation and runtime follows. Note that this table is not complete, as packages can provide custom hooks.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nTable content:\nbusybox init | systemd init | Build hook | Runtime hook (busybox init only)\nbase | optional | Sets up all initial directories and installs base utilities and libraries. Always keep this hook as the first hook unless you know what you are doing, as it provides critical busybox init when not using systemd hook. Optional when using the systemd hook as it only provides a busybox recovery shell. Note: The recovery shell is not usable since the root account in the initramfs is locked. See archlinux/mkinitcpio/mkinitcpio#205. | –\nudev | systemd | Adds udevd, udevadm, and a small subset of udev rules to your image. | Starts the udev daemon and processes uevents from the kernel; creating device nodes. As it simplifies the boot process by not requiring the user to explicitly specify necessary modules, using it is recommended.\nusr | Adds support for /usr on a separate partition. See #/usr as a separate partition for details. | Mounts the /usr partition after the real root has been mounted.\nresume | Adds lzo and lz4 kernel modules to allow resuming when using a hibernation image compression algorithm other than the compile-time default. Adds the systemd-hibernate-resume(8) binary to support resuming from a hibernation image specified via the HibernateLocation UEFI variable. | Tries to resume from the \"suspend to disk\" state. See Hibernation for further configuration.\nbtrfs | – | Sets the required modules to enable Btrfs for using multiple devices with Btrfs. You need to have btrfs-progs installed to use this. This hook is not required for using Btrfs on a single device where the filesystems hook suffices. | Runs btrfs device scan to assemble a multi-device Btrfs root file system when udev hook or systemd hook is not present. The btrfs-progs package is required for this hook.\nautodetect | Shrinks your initramfs to a smaller size by creating a whitelist of modules from a scan of sysfs. Be sure to verify included modules are correct and none are missing. This hook must be run before other subsystem hooks in order to take advantage of auto-detection. Any hooks placed before 'autodetect' will be installed in full. | –\nmicrocode | Prepends an uncompressed initramfs image with early microcode update files for Intel and AMD processors. Uses microcode files from /usr/lib/firmware/amd-ucode/ and /usr/lib/firmware/intel-ucode/ if they are available or extracts /boot/amd-ucode.img and /boot/intel-ucode.img otherwise. If the autodetect hook runs before this hook, it will only add early microcode update files for the processor of the system the image is built on. The use of this hook replaces the now deprecated --microcode flag, and the microcode option in the preset files. This also allows you to drop the microcode initrd lines from your boot configuration as they are now packed together with the main initramfs image. | –\nmodconf | Includes modprobe configuration files from /etc/modprobe.d/ and /usr/lib/modprobe.d/. | –\nkms | Adds GPU modules to provide early KMS start. Additionally adds modules that are required by privacy screens built into the LCD panel of some laptops. | –\nkeyboard | Adds the necessary modules for keyboard devices. Use this if you have a USB or serial keyboard and need it in early userspace (either for entering encryption passphrases or for use in an interactive shell). As a side effect, modules for some non-keyboard input devices might be added too, but this should not be relied on. Note: For systems that are booted with different hardware configurations (e.g. laptops with external keyboard vs. internal keyboard or headless systems), this hook needs to be placed before autodetect in order to be able to use the keyboard at boot time, for example to unlock an encrypted device when using the encrypt hook. | –\nkeymap | sd-vconsole | Adds the specified console keymap(s) from /etc/vconsole.conf to the initramfs. If you use system encryption, especially full-disk encryption, make sure you add it before the encrypt hook. | Loads the specified console keymap(s) from /etc/vconsole.conf during early userspace.\nconsolefont | Adds the specified console font from /etc/vconsole.conf to the initramfs. | Loads the specified console font from /etc/vconsole.conf during early userspace.\nblock | Adds block device modules. If the autodetect hook runs before this hook, it will only add modules for block devices used on the system. Exceptions are the ahci, sd_mod, usb_storage, uas, mmc_block, nvme, virtio_scsi and virtio_blk modules which will always be added unconditionally. | –\nnet | not implemented | Adds the necessary modules for a network device. You must have mkinitcpio-nfs-utils installed to use this, see #Using net for details. | Provides handling for an NFS-based root file system.\ndmraid | ? | Provides support for fakeRAID root devices. You must have dmraid installed to use this. Note that it is preferred to use mdadm with the mdadm_udev hook with fakeRAID if your controller supports it. See #Using RAID for details. | Locates and assembles fakeRAID block devices using dmraid.\nmdadm_udev | Provides support for assembling RAID arrays via udev. You must have mdadm installed to use this. See RAID#Configure mkinitcpio for details. | –\nencrypt | sd-encrypt | Adds the dm_crypt kernel module and the cryptsetup tool to the image. You must have cryptsetup installed to use this. Note: Take notice of the remarks for the keyboard hook above to unlock an encrypted device during boot, and/or the filesystem remarks in #MODULES when you use a file to unlock. | Detects and unlocks an encrypted root partition. See #Runtime customization for further configuration. For sd-encrypt see dm-crypt/System configuration#Using systemd-cryptsetup-generator.\nlvm2 | Adds the device mapper kernel module and the lvm tool to the image. You must have lvm2 installed to use this. This is necessary if you have your root file system on LVM. | –\nfilesystems | This includes necessary file system modules into your image. This hook is required unless you specify your file system modules in MODULES. | –\nfsck | Adds the fsck binary and file system-specific helpers to allow running fsck against your root device (and /usr if separate) prior to mounting. If added after the autodetect hook, only the helper specific to your root file system will be added. Usage of this hook is strongly recommended, and it is required with a separate /usr partition. It is highly recommended that if you include this hook that you also include any necessary modules to ensure your keyboard will work in early userspace. The use of this hook requires the rw parameter to be set on the kernel command line (discussion). See fsck#Boot time checking for more details. | –\nacpi_override | Adds ACPI Machine Language (.aml) files found in /usr/initcpio/acpi_override/ and /etc/initcpio/acpi_override/ to the early uncompressed initramfs image so that the kernel can override ACPI tables (e.g. DSDT) very early during boot.[1] | –\n\nNote: **autodetect** \n\nFor sd-encrypt see dm-crypt/System configuration#Using systemd-cryptsetup-generator.\n\n"
+    },
+    {
+      "title": "Post hooks",
+      "level": 4,
+      "content": "Post hooks are executables or shell scripts located in /usr/lib/initcpio/post/ (hooks provided by packages) and /etc/initcpio/post/ (custom hooks). These files are executed after an image is (re)generated in order to perform additional tasks like signing.\n\nTo each executable the following arguments are passed in this order:\n\n1. the kernel used (may be empty in some circumstances);\n1. the generated initramfs image;\n1. (optional) the generated unified kernel image.\n\nAdditionally, the following environment variables are set—KERNELVERSION the full kernel version, KERNELDESTINATION the default location where the kernel should be located on order to be booted.\n\n"
+    },
+    {
+      "title": "COMPRESSION",
+      "level": 3,
+      "content": "The kernel supports several formats for compression of the initramfs: gzip, bzip2, lzma (xz), xz, lzo (lzop), lz4 and zstd. By default mkinitcpio uses zstd compression for kernel version 5.9 and newer and gzip for kernel versions older than 5.9.\n\nThe provided mkinitcpio.conf has the various COMPRESSION options commented out. Uncomment one if you wish to switch to another compression method and make sure you have the corresponding compression utility installed. If none is specified, the default method is used. If you wish to create an uncompressed image, specify COMPRESSION=cat in the configuration file or use -z cat on the command line.\n\n- lz4 and xz compression utilities are multithreaded by default and zstd is run in multithreaded mode (with the -T0 option which tries to spawn as many threads as detected cores).\n- With a compression ratio typically around 2.5 on the image in its high compression mode (-9), lz4 achieves the fastest decompression speed. For a slightly better compression, lzo is still fast to decompress. zstd offers a versatile solution, with multi-threaded compression and a wide range of compression levels through its options — see zstd(1) § Operation Modifiers. xz achieves the smallest size with a reduction factor around 5 in its high compression preset (-9), at the cost of a much slower decompression speed.\n\n"
+    },
+    {
+      "title": "COMPRESSION_OPTIONS",
+      "level": 3,
+      "content": "These are additional flags passed to the program specified by COMPRESSION, such as:\n\n```\nCOMPRESSION_OPTIONS=(-9)\n```\n\nThis option can be left empty; mkinitcpio will ensure that any supported compression method has the necessary flags to produce a working image.\n\nNote: **unbootable system** \n\nWith the default zstd compression, to save space for custom kernels (especially with a dual boot setup when using the EFI system partition as /boot), the --long option is very effective. However, systems with limited RAM may not be able to decompress initramfs using this option. The -v option may also be desired to see details during the initramfs generation. For example:\n\n```\nCOMPRESSION=\"zstd\"\nCOMPRESSION_OPTIONS=(-v -5 --long)\n```\n\nHighest, but slowest, compression can be achieved by using xz with the -9e compression level and also decompressing the loadable kernel modules and firmware:\n\n```\nCOMPRESSION=\"xz\"\nCOMPRESSION_OPTIONS=(-9e)\nMODULES_DECOMPRESS=\"yes\"\n```\n\n"
+    },
+    {
+      "title": "MODULES_DECOMPRESS",
+      "level": 3,
+      "content": "MODULES_DECOMPRESS controls whether the kernel module and firmware files are decompressed during initramfs creation. The default value is no.\n\nArch compresses its kernel modules and linux-firmware with zstd at level 19. When using a higher compression than that for the initramfs, setting MODULES_DECOMPRESS=\"yes\" will allow to reduce the initramfs size even further. This comes at the expense of increased RAM and CPU usage at early boot which negatively affects systems with limited RAM or weak CPUs since the kernel will spend more time to decompress the whole initramfs image than it would take to decompress the individual modules and firmware upon loading them.\n\n"
+    },
+    {
+      "title": "Runtime customization",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nRuntime configuration options can be passed to init and certain hooks via the kernel command line. Kernel command-line parameters are often supplied by the boot loader. The options discussed below can be appended to the kernel command line to alter default behavior. See Kernel parameters and Arch boot process for more information.\n\n"
+    },
+    {
+      "title": "init from base hook",
+      "level": 3,
+      "content": "```\ndisablehooks=resume\n```\n\nSee Boot debugging and mkinitcpio(8) for other parameters.\n\n"
+    },
+    {
+      "title": "Using RAID",
+      "level": 3,
+      "content": "See RAID#Configure mkinitcpio.\n\n"
+    },
+    {
+      "title": "Using net",
+      "level": 3,
+      "content": "Required packages\n\nnet requires the mkinitcpio-nfs-utils package.\n\nKernel parameters\n\nComprehensive and up-to-date information can be found in the official kernel documentation.\n\nip=\n\nThis parameter tells the kernel how to configure IP addresses of devices and also how to set up the IP routing table. It can take up to nine arguments separated by colons: ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>.\n\nIf this parameter is missing from the kernel command line, all fields are assumed to be empty, and the defaults mentioned in the kernel documentation apply. In general this means that the kernel tries to configure everything using autoconfiguration.\n\nThe <autoconf> parameter can appear alone as the value to the ip parameter (without all the : characters before). If the value is ip=off or ip=none, no autoconfiguration will take place, otherwise autoconfiguration will take place. The most common way to use this is ip=dhcp.\n\nFor parameters explanation, see the kernel documentation.\n\nExamples:\n\n```\nip=127.0.0.1:::::lo:none  --> Enable the loopback interface.\nip=192.168.1.1:::::eth2:none --> Enable static eth2 interface.\nip=:::::eth0:dhcp --> Enable dhcp protocol for eth0 configuration.\n```\n\nBOOTIF=\n\nIf you have multiple network cards, this parameter can include the MAC address of the interface you are booting from. This is often useful as interface numbering may change, or in conjunction with pxelinux IPAPPEND 2 or IPAPPEND 3 option. If not given, eth0 will be used.\n\nExample:\n\n```\nBOOTIF=01-A1-B2-C3-D4-E5-F6  # Note the prepended \"01-\" and capital letters.\n```\n\nnfsroot=\n\nIf the nfsroot parameter is NOT given on the command line, the default /tftpboot/%s will be used.\n\n```\nnfsroot=[<server-ip>:]<root-dir>[,<nfs-options>]\n```\n\nRun mkinitcpio -H net for parameter explanation.\n\n"
+    },
+    {
+      "title": "Using LVM",
+      "level": 3,
+      "content": "If your root device is on LVM, see Install Arch Linux on LVM#Adding mkinitcpio hooks.\n\n"
+    },
+    {
+      "title": "Using encrypted root",
+      "level": 3,
+      "content": "If using an encrypted root see dm-crypt/System configuration#mkinitcpio for detailed information on which hooks to include.\n\n"
+    },
+    {
+      "title": "/usr as a separate partition",
+      "level": 3,
+      "content": "If you keep /usr as a separate partition, you must adhere to the following requirements:\n\n- Add the fsck hook, mark /usr with a passno of 2 in /etc/fstab to run the check on the partition at startup. While recommended for everyone, it is mandatory if you want your /usr partition to be fsck'ed at boot-up. Without this hook, /usr will never be fsck'd.\n- If not using the systemd hook, add the usr hook. This will mount the /usr partition after root is mounted.\n\n"
+    },
+    {
+      "title": "Disabling fallback initramfs generation",
+      "level": 3,
+      "content": "The generation of fallback images can be disabled:\n\n- Change PRESETS=('default' 'fallback') line to PRESETS=('default') in the respective .preset files in /etc/mkinitcpio.d/.\n- Remove the fallback initramfs images in /boot/.\n- Update your boot loader configuration.\n\n"
+    },
+    {
+      "title": "Extracting the image",
+      "level": 3,
+      "content": "If you are curious about what is inside the initramfs image, you can extract it and poke at the files inside of it.\n\nThe initramfs image is an SVR4 CPIO archive, generated via the find and bsdcpio commands, optionally compressed with a compression scheme understood by the kernel. For more information on the compression schemes, see #COMPRESSION.\n\nmkinitcpio includes a utility called lsinitcpio(1) which will list and/or extract the contents of initramfs images.\n\nYou can list the files in the image with:\n\n```\n# lsinitcpio /boot/initramfs-linux.img\n```\n\nAnd to extract them all in the current directory:\n\n```\n# lsinitcpio -x /boot/initramfs-linux.img\n```\n\nYou can also get a more human-friendly listing of the important parts in the image:\n\n```\n# lsinitcpio -a /boot/initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "Recompressing a modified extracted image",
+      "level": 3,
+      "content": "Invoke the build_image function of the /usr/bin/mkinitcpio script with parameters\n\n```\nbuild_image outfile compression\n```\n\nIt can be done by creating a new script with the contents of the build_image function and running it with the above parameters. This will compress the contents present in the current directory in a file named outfile.\n\n"
+    },
+    {
+      "title": "\"/dev must be mounted\" when it already is",
+      "level": 3,
+      "content": "The test used by mkinitcpio to determine if /dev is mounted is to see if /dev/fd/ is there. If everything else looks fine, it can be \"created\" manually by:\n\n```\n# ln -s /proc/self/fd /dev/\n```\n\n(Obviously, /proc must be mounted as well. mkinitcpio requires that anyway, and that is the next thing it will check.)\n\n"
+    },
+    {
+      "title": "Possibly missing firmware for module XXXX",
+      "level": 3,
+      "content": "When initramfs are being rebuilt after a kernel update, you might get warnings:\n\n```\n==> WARNING: Possibly missing firmware for module: 'module_name'\n```\n\nIf these messages appear when generating a default initramfs image, then, as the warning says, installing additional firmware may be required. Most common firmware files can be acquired by installing the linux-firmware package. For other packages providing firmware see the table below or try searching for the module name in the official repositories or AUR.\n\nOtherwise, if the messages only appear when generating the fallback initramfs image you have the following options:\n\n- You can safely ignore the warnings, if you know that you do not use the affected hardware.\n- If you want to suppress the warnings, you can install the missing firmware. The meta-package mkinitcpio-firmwareAUR contains most optional firmwares. Alternatively, manually install the needed packages:\n\nTable content:\nModule | Package\naic94xx | aic94xx-firmwareAUR\nast | ast-firmwareAUR\nbfa | linux-firmware-qlogic\nbnx2x | linux-firmware-bnx2x\nliquidio | linux-firmware-liquidio\nmlxsw_spectrum | linux-firmware-mellanox\nnfp | linux-firmware-nfp\nqat_420xx | Firmware is not yet available. See [2]\nqed | linux-firmware-qlogic\nqla1280 | linux-firmware-qlogic\nqla2xxx | linux-firmware-qlogic\nwd719x | wd719x-firmwareAUR\nxhci_pci | upd72020x-fwAUR\n\n- If you want to get rid of the warnings, but do not want to waste your system space on unneeded firmware packages, you can disable fallback initramfs generation altogether.\n\nFor unavailable firmware, you can suppress the warnings by creating dummy files, e.g.:\n\n```\n# echo \"Device not available\" > /usr/lib/firmware/qat_420xx.bin\n# echo \"Device not available\" > /usr/lib/firmware/qat_420xx_mmp.bin\n```\n\n"
+    },
+    {
+      "title": "No PS/2 controller found",
+      "level": 3,
+      "content": "On some motherboards (mostly ancient ones, but also a few new ones), the i8042 controller cannot be automatically detected. It is rare, but some people will surely be without keyboard. You can detect this situation in advance. If you have a PS/2 port and get i8042: PNP: No PS/2 controller found. Probing ports directly message, add atkbd to the MODULES array.[3]\n\n"
+    },
+    {
+      "title": "Standard rescue procedures",
+      "level": 3,
+      "content": "With an improper initial ram-disk a system often is unbootable. So follow a system rescue procedure like below:\n\n"
+    },
+    {
+      "title": "Boot succeeds on one machine and fails on another",
+      "level": 4,
+      "content": "mkinitcpio's autodetect hook filters unneeded kernel modules in the primary initramfs scanning /sys and the modules loaded at the time it is run. If you transfer your /boot directory to another machine and the boot sequence fails during early userspace, it may be because the new hardware is not detected due to missing kernel modules. Note that USB 2.0 and 3.0 need different kernel modules.\n\nTo fix, first try choosing the fallback image from your boot loader, as it is not filtered by autodetect. Once booted, run mkinitcpio on the new machine to rebuild the primary image with the correct modules. If the fallback image fails, try booting into an Arch Linux live CD/USB, chroot into the installation, and run mkinitcpio on the new machine. As a last resort, try manually adding modules to the initramfs.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Linux Kernel documentation on initramfs, \"What is rootfs?\"\n- Linux Kernel documentation on initrd\n- Wikipedia article on initrd\n\n"
+    }
+  ]
+}

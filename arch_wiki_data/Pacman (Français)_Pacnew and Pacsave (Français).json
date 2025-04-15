@@ -1,0 +1,51 @@
+{
+  "title": "Pacman (Français)/Pacnew and Pacsave (Français)",
+  "url": "https://wiki.archlinux.org/title/Pacman_(Fran%C3%A7ais)/Pacnew_and_Pacsave_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Quand pacman supprime un paquet qui a un fichier de configuration, il crée normalement une copie de sauvegarde de ce fichier de configuration et ajoute .pacsave au nom du fichier. De même, lorsque pacman met à jour un paquet qui inclut un nouveau fichier de configuration créé par le mainteneur, différent du fichier actuellement installé, il enregistre un fichier .pacnew avec la nouvelle configuration. pacman fournit une notification lorsque ces fichiers sont écrits.\n\n"
+    },
+    {
+      "title": "Pourquoi ces fichiers sont créés",
+      "level": 2,
+      "content": "Un fichier .pacnew peut être créé lors d'une mise à jour de paquet (pacman -Syu, pacman -Su ou pacman -U) pour éviter d'écraser un fichier qui existe déjà et qui a été précédemment modifié par l'utilisateur. Lorsque cela se produit, un message comme le suivant apparaîtra dans la sortie de pacman :\n\n```\nwarning: /etc/pam.d/usermod installed as /etc/pam.d/usermod.pacnew\n```\n\nUn fichier .pacsave peut être créé lors de la suppression d'un paquet (pacman -R), ou par une mise à jour d'un paquet (le paquet doit d'abord être supprimé). Lorsque la base de données de pacman a un enregistrement indiquant qu'un certain fichier appartenant au paquet doit être sauvegardé, elle crée un fichier .pacsave. Lorsque cela se produit, pacman affiche un message comme le suivant :\n\n```\nwarning: /etc/pam.d/usermod saved as /etc/pam.d/usermod.pacsave\n```\n\nCes fichiers nécessitent une intervention manuelle de l'utilisateur et il est bon de les traiter juste après chaque mise à jour ou suppression de paquet. Si elles ne sont pas gérées, les configurations incorrectes peuvent entraîner un mauvais fonctionnement du logiciel ou l'impossibilité totale de le faire fonctionner.\n\n"
+    },
+    {
+      "title": "Fichiers de sauvegarde des paquets",
+      "level": 2,
+      "content": "Le fichier PKGBUILD d'un paquet spécifie quels fichiers doivent être préservés ou sauvegardés lorsque le paquet est mis à jour ou supprimé. Par exemple, le PKGBUILD de pulseaudio contient la ligne suivante :\n\n```\nbackup=(etc/pulse/{daemon.conf,default.pa,system.pa})\n```\n\nAprès l'installation, cette liste peut être interrogée à partir de la base de données pacman en utilisant pacman -Qii package_name.\n\nPour empêcher un paquet d'écraser un certain fichier, consultez Pacman (Français)#Ignorer la mise à jour d'un fichier.\n\n"
+    },
+    {
+      "title": ".pacnew",
+      "level": 3,
+      "content": "Pour chacun des #Fichiers de sauvegarde des paquets mis à jour, pacman effectue une comparaison croisée de trois md5sums générés à partir du contenu du fichier : une somme pour la version installée à l'origine par le paquet, une pour la version actuellement dans le système de fichiers, et une pour la version dans le nouveau paquet. Si la version du fichier actuellement dans le système de fichiers a été modifiée par rapport à la version initialement installée par le paquet, pacman ne peut pas savoir comment fusionner ces changements avec la nouvelle version du fichier. Par conséquent, au lieu d'écraser le fichier modifié lors de la mise à jour, pacman enregistre la nouvelle version avec une extension .pacnew et laisse la version modifiée intacte.\n\nPour aller plus loin dans le détail, la comparaison de la somme MD5 à 3 voies aboutit à l'un des résultats suivants :\n\nRarement, lorsqu'un paquet mis à jour inclut un fichier de sauvegarde que la version précédente n'avait pas, la situation est correctement gérée comme X/Y/Y ou X/Y/Z, X étant une valeur inexistante.\n\n"
+    },
+    {
+      "title": ".pacsave",
+      "level": 3,
+      "content": "Si l'utilisateur a modifié l'un des fichiers spécifiés dans backup, ce fichier sera renommé avec une extension .pacsave et restera dans le système de fichiers après la suppression du reste du paquet.\n\n"
+    },
+    {
+      "title": "Localiser les fichiers .pac*",
+      "level": 2,
+      "content": "Pacman ne gère pas les fichiers .pacnew automatiquement : vous devez les maintenir vous-même. Quelques outils sont présentés dans la section suivante. Pour faire cela manuellement, vous aurez d'abord besoin de les localiser. Lors de la mise à jour ou de la suppression d'un grand nombre de paquets, les fichiers .pac* mis à jour peuvent être manqués. Pour découvrir si des fichiers .pac* ont été installés, utilisez l'une des méthodes suivantes :\n\n- Pour rechercher dans /etc où sont stockées la plupart des configurations globales : $ find /etc -regextype posix-extended -regex \".+\\.pac(new|save)\" 2> /dev/null ou pour effectuer une recherche sur l'ensemble du disque en remplaçant /etc par / dans la commande ci-dessus (auquel cas vous pouvez vouloir sauter sélectivement certains répertoires pour accélérer la recherche).\n- Si elle est installée, locate peut également être utilisée. Réindexez d'abord la base de données : # updatedb Puis exécutez : $ locate --existing --regex \"\\.pac(new|save)$\"\n- Utilisez le journal de pacman pour les trouver : $ grep --extended-regexp \"\\.pac(new|save)\" /var/log/pacman.log Notez que le journal ne garde pas trace des fichiers actuellement dans le système de fichiers ni de ceux qui ont déjà été supprimés ; la commande ci-dessus listera tous les fichiers .pac* qui ont déjà existé sur votre système. Pour obtenir uniquement les 10 fichiers .pac* les plus récents, envoyez le résultat à tail.\n\n```\n$ find /etc -regextype posix-extended -regex \".+\\.pac(new|save)\" 2> /dev/null\n```\n\n```\n# updatedb\n```\n\n```\n$ locate --existing --regex \"\\.pac(new|save)$\"\n```\n\n```\n$ grep --extended-regexp \"\\.pac(new|save)\" /var/log/pacman.log\n```\n\n"
+    },
+    {
+      "title": "pacdiff",
+      "level": 3,
+      "content": "pacman-contrib fournit l'outil simple pacdiff(8) pour gérer les fichiers pac*. Il recherchera tous les fichiers .pacnew et .pacsave et demandera des actions sur eux. Il utilise vimdiff par défaut, mais vous pouvez spécifier un outil différent avec DIFFPROG=your_editor pacdiff. Consultez List of applications/Utilities#Comparison, diff, merge pour d'autres outils de comparaison courants.\n\n"
+    },
+    {
+      "title": "Utilitaires tiers",
+      "level": 3,
+      "content": "Quelques utilitaires tiers offrant différents niveaux d'automatisation de ces tâches sont disponibles :\n\n- dotpac — Script interactif de base avec une interface texte basée sur ncurses et un guide pratique. Pas de fonctionnalités de fusion ou de fusion automatique.\n\n- etc-update — Utilitaire de Gentoo, compatible avec d'autres distributions dont Arch. Il fournit une CLI simple pour visualiser, fusionner et modifier interactivement les modifications. Les modifications triviales, comme les commentaires, peuvent être fusionnées automatiquement.\n\n- p3wm — Fusion à trois voies des fichiers .pacnew. Elle peut fusionner automatiquement les changements triviaux. Si des conflits surviennent, il lancera vimdiff, meld ou kdiff3 pour les résoudre.\n\n- pacnews-git — Un script simple visant à trouver tous les fichiers .pacnew, puis à les éditer avec vimdiff.\n\n- pacfiles-mode — Un paquet pour Emacs pour gérer et fusionner les fichiers .pacnew.\n\n- pacdiff-pacman-hook-git — Un hook Pacman pour lancer pacdiff automatiquement.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Fil de discussion du forum : Traiter les fichiers .pacnew\n\n"
+    }
+  ]
+}

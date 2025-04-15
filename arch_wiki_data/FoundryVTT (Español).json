@@ -1,0 +1,51 @@
+{
+  "title": "FoundryVTT (Español)",
+  "url": "https://wiki.archlinux.org/title/FoundryVTT_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Foundry VTT es un software independiente creada para jugar a juegos de rol de mesa, que usa una aplicación con multitud de funciones, moderna e instalable en un servidor propio, a la que los jugadores se conectan mediante un navegador.\n\nFoundry VTT es software privativo. Se debe adquirir una licencia de pago antes de usar el software.\n\nEstas instrucciones explican una de las formas posibles de instalar Foundry VTT en un sistema Arch Linux. Al final del proceso, el servicio debería ser accesible desde un navegador usando una conexión segura.\n\n"
+    },
+    {
+      "title": "Requisitos",
+      "level": 2,
+      "content": "Antes de instalar Foundry VTT, deberías tener una instalación que funcione de nginx and Node.js.\n\n"
+    },
+    {
+      "title": "Crear directorios para Foundry VTT",
+      "level": 2,
+      "content": "En primer lugar, crea estos directorios para instalar el software y sus datos. Puedes crear estos directorios en /home, por ejemplo:\n\n```\n# mkdir -p /home/foundry/{foundryvtt,foundrydata}\n```\n\n"
+    },
+    {
+      "title": "Crear un usuario de sistema",
+      "level": 2,
+      "content": "Foundry VTT será ejecutado por un usuario de sistema. Primero, crea un usuario de sistema con el nombre foundry o cualquier otro nombre.\n\n```\n# useradd -r -s /usr/bin/nologin foundry\n```\n\n"
+    },
+    {
+      "title": "Descargar Foundry VTT",
+      "level": 2,
+      "content": "Una vez estés registrado en foundryvtt.com y hayas comprado una licencia, necesitas ir a la sección \"Purchased Software Licenses\" de tu perfil de foundryvtt.com. Allí verás diferentes paquetes para el software. Necesitas descargar la versión para Node.js.\n\nPuedes ver un pequeño icono de 'cadena' junto a los enlaces de descarga de la página de descarga. Pulsar en este icono de cadena genera un enlace temporal que se puede usar para descargar Foundry VTT desde un terminal usango wget.\n\nCuando descargues el enlace usando una utilidad de línea de comandos como wget es importante poner el enlace entre comillas dobles. Esto asegura que el enlace sea leído correctamente por el comando. Por ejemplo:\n\n```\n# wget -O foundryvtt.zip \"https://tu-enlace-de-descarga-de-foundry-vtt.com-aqui/\"\n```\n\nEl fichero descargado debe ser descomprimido al directorio foundryvtt que has creado antes. Una vez este directorio tenga su contenido, necesitas establecer los permisos apropiados:\n\n```\n# unzip foundryvtt.zip -d /home/foundry/foundryvtt\n# chown -R foundry:foundry /home/foundry/foundryvtt\n```\n\n"
+    },
+    {
+      "title": "Ejecutar el software sin un proxy",
+      "level": 2,
+      "content": "Ahora puedes comprobar si el software funciona. Ejecuta el servidor con el usuario foundry:\n\n```\n# su - foundry -s /bin/bash -c \"node foundryvtt/resources/app/main.js --dataPath=/home/foundry/foundrydata\"\n```\n\nMientras esté en ejecución, deberías poder conectarte al servidor desde un navegador, usando el puerto 30000. Si lo deseas, puedes aprovechar para establecer tu contraseña de admin y tu clave de licencia.\n\nDespués, detén el servidor usando Ctrl-c.\n\n"
+    },
+    {
+      "title": "Crear un servicio para systemd",
+      "level": 2,
+      "content": "Una de las formas de ejecutar el software como demonio es usar Systemd. Puedes crear un servicio sencillo para Foundry VTT:\n\n```\n# nano /etc/systemd/system/foundryvtt.service\n```\n\nEste es un ejemplo de esta unidad de systemd:\n\n```\n[Unit]\nDescription=Foundry VTT\n\n[Service]\nType=simple\nExecStart=node /home/foundry/foundryvtt/resources/app/main.js --dataPath=/home/foundry/foundrydata\nRestart=on-failure\nUser=foundry\n\n[Install]\nWantedBy=multi-user.target\n```\n\nComo se sugiere en las instrucciones de instalación, edita las opciones del software para prepararlo para que acepte conexiones de un servidor proxy:\n\n```\n# nano /home/foundry/foundrydata/Config/options.json\n```\n\nConfigura las siguientes opciones, dejando las demás como están:\n\n```\n\"hostname\": \"your.hostname.com\",\n\"routePrefix\": null,\n\"sslCert\": null,\n\"sslKey\": null,\n\"port\": 30000,\n\"proxyPort\": 443,\n\"proxySSL\": true\n```\n\n"
+    },
+    {
+      "title": "Configurar nginx",
+      "level": 2,
+      "content": "Para configurar un servidor proxy con nginx para Foundry VTT puedes usar este ejemplo de la documentación oficial:\n\n```\n# This goes in a file within /etc/nginx/sites-available/. By convention,\n# the filename would be either \"your.domain.com\" or \"foundryvtt\", but it\n# really does not matter as long as it's unique and descriptive for you.\n\n# Define Server\nserver {\n\n    # Enter your fully qualified domain name or leave blank\n    server_name             your.hostname.com;\n\n    # Listen on port 443 using SSL certificates\n    listen                  443 ssl;\n    ssl_certificate         \"/etc/letsencrypt/live/your.hostname.com/fullchain.pem\";\n    ssl_certificate_key     \"/etc/letsencrypt/live/your.hostname.com/privkey.pem\";\n\n    # Sets the Max Upload size to 300 MB\n    client_max_body_size 300M;\n\n    # Proxy Requests to Foundry VTT\n    location / {\n\n        # Set proxy headers\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n\n        # These are important to support WebSockets\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"Upgrade\";\n\n        # Make sure to set your Foundry VTT port number\n        proxy_pass http://localhost:30000;\n    }\n}\n\n# Optional, but recommend. Redirects all HTTP requests to HTTPS for you\nserver {\n    if ($host = your.hostname.com) {\n        return 301 https://$host$request_uri;\n    }\n\n    listen 80;\n    listen [::]:80;\n\n    server_name your.hostname.com;\n    return 404;\n}\n```\n\nPuedes conseguir tus certificados usando cerbot.\n\n"
+    },
+    {
+      "title": "Ejecutar el servicio",
+      "level": 2,
+      "content": "Ahora puedes iniciar y habilitar tanto Foundry VTT como nginx:\n\n```\n# systemctl start foundryvtt\n# systemctl enable foundryvtt\n# systemctl start nginx\n# systemctl enable nginx\n```\n\nEn este punto deberías poder acceder a tu servidor desde un navegador usando https, con el puerto 443 por defecto (ejemplo:https://your.hostname.com).\n\n"
+    }
+  ]
+}

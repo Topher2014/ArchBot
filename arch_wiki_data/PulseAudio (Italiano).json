@@ -1,0 +1,311 @@
+{
+  "title": "PulseAudio (Italiano)",
+  "url": "https://wiki.archlinux.org/title/PulseAudio_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- /Examples\n- /Troubleshooting\n- PipeWire\n\nPulseAudio is a general purpose sound server intended to run as a middleware between your applications and your hardware devices, either using Advanced Linux Sound Architecture (ALSA) or Open Sound System (OSS). It also offers easy network streaming across local devices using Avahi if enabled. While its main purpose is to ease audio configuration, its modular design allows more advanced users to configure the daemon precisely to best suit their needs.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the pulseaudio package.\n\nSome PulseAudio modules are not included in the main package and must be installed separately if needed:\n\n- pulseaudio-alsa for PulseAudio to manage ALSA as well, see #ALSA\n- pulseaudio-bluetooth for Bluetooth support (BlueZ), see the Bluetooth headset page\n- pulseaudio-equalizer for equalizer sink (qpaeq)\n- pulseaudio-jack for JACK sink, source and jackdbus detection\n- pulseaudio-lirc for infrared volume control with LIRC\n- pulseaudio-zeroconf for Zeroconf (Avahi/DNS-SD) support\n\n"
+    },
+    {
+      "title": "Front-ends",
+      "level": 3,
+      "content": "There are a number of front-ends available for controlling the PulseAudio daemon:\n\n"
+    },
+    {
+      "title": "Console",
+      "level": 4,
+      "content": "- ncpamixer — Ncurses mixer for PulseAudio inspired by pavucontrol.\n\n- pacmixer — alsamixer(1) alike for PulseAudio.\n\n- PAmix — Ncurses PulseAudio mixer similar to pavucontrol.\n\n- pamixer — PulseAudio command line mixer.\n\n- pavolume — Simple command-line volume control for PulseAudio with libnotify messages.\n\n- Ponymix — Command line mixer for PulseAudio.\n\n- pulseaudio-ctl — Control PulseAudio volume from the shell or mapped to keyboard shortcuts.\n\n- pulsemixer — CLI and curses mixer for PulseAudio. Discontinued development.\n\n"
+    },
+    {
+      "title": "Graphical",
+      "level": 4,
+      "content": "- KMix — KDE volume control application supporting several platforms including PulseAudio, system tray applet configurable.\n\n- MicTray — Lightweight system tray application which lets you control the microphone state and volume using PulseAudio.\n\n- pa-applet — System tray applet for PulseAudio with volume bar.\n\n- pa-notify — PulseAudio or PipeWire volume notification daemon.\n\n- pasystray — System tray applet for PulseAudio.\n\n- plasma-pa — KDE Plasma applet for audio volume management using PulseAudio.\n\n- PulseAudio Equalizer — LADSPA based multiband equalizer for PulseAudio.\n\n- PulseAudio Graph Control — Electron-based volume and graph control for PulseAudio.\n\n- PulseAudio Preferences — Simple GTK configuration dialog for PulseAudio.\n\n- PulseAudio Volume Control — Simple GTK volume control tool (\"mixer\") for PulseAudio.\n\n- PulseAudio Volume Control (Qt) — Mixer for PulseAudio (Qt port of pavucontrol).\n\n- PulseAudio Volume Meter — Simple GTK volume meter for PulseAudio. Discontinued development.\n\n- PulseEffects — Audio effects for PulseAudio applications.\n\n- Volctl — Per-application system tray applet volume control and OSD for PulseAudio.\n\n- Xfce PulseAudio Panel Plugin — PulseAudio plugin for Xfce4 panel.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "By default, PulseAudio is configured to automatically detect all sound cards and manage them. It takes control of all detected ALSA devices and redirects all audio streams to itself, making the PulseAudio daemon the central configuration point. The daemon should work mostly out of the box, only requiring a few minor tweaks.\n\nWhile PulseAudio usually runs fine out of the box and requires only minimal configuration, advanced users can change almost every aspect of the daemon by either altering the default configuration file to disable modules or writing your own from scratch.\n\nPulseAudio runs as a server daemon that can run either system-wide or on per-user basis using a client/server architecture. The daemon by itself does nothing without its modules except to provide an API and host dynamically loaded modules. The audio routing and processing tasks are all handled by various modules, including PulseAudio's native protocol itself (provided by module-native-protocol-unix). Clients reach the server through one of many protocol modules that will accept audio from external sources, route it through PulseAudio and eventually have it go out through a final other module. The output module does not have to be an actual sound output: it can dump the stream into a file, stream it to a broadcasting server such as Icecast, or even just discard it.\n\nYou can find a detailed list of all available modules at PulseAudio Loadable Modules. To enable them you can just add a line load-module module-name-from-list to ~/.config/pulse/default.pa.\n\n"
+    },
+    {
+      "title": "Configuration files",
+      "level": 3,
+      "content": "PulseAudio will first look for configuration files in the home directory ~/.config/pulse/, and if they are not found, the system-wide configuration from /etc/pulse/ will be applied.\n\n- It is strongly suggested not to edit system-wide configuration files, but rather edit user ones. Create the ~/.config/pulse directory, then copy the system configuration files into it and edit according to your need.\n- Make sure you keep user configuration in sync with changes to the packaged files in /etc/pulse/. Otherwise, PulseAudio may refuse to start due to configuration errors.\n- There is usually no need to add your user to the audio group, as PulseAudio uses udev and logind to give access dynamically to the currently \"active\" user. Exceptions would include running the machine headless so that there is no currently \"active\" user.\n\n"
+    },
+    {
+      "title": "daemon.conf",
+      "level": 4,
+      "content": "This is the main configuration file to configure the daemon itself. It defines base settings like the default sample rates used by modules, resampling methods, realtime scheduling and various other settings related to the server process. These can not be changed at runtime without restarting the PulseAudio daemon. The defaults are sensible for most users, see the pulse-daemon.conf(5) man page for additional information. Boolean options accepts any of these: true, yes, on and 1 as well as false, no, off and 0.\n\nTable content:\nOption | Description\ndaemonize | Controls whether the server will daemonize itself and return. Set to no when debugging so you can see the debugging information on the terminal.\nresample-method | Which resampler to use when audio with incompatible sample rates needs to be passed between modules (e.g. playback of 96kHz audio on hardware which only supports 48kHz). The available resamplers can be listed with pulseaudio --dump-resample-methods. Choose the best tradeoff between CPU usage and audio quality for the present use-case. Tip: In some cases PulseAudio will generate a high CPU load. This can happen when multiple streams are resampled (individually). If this is a common use-case in a workflow, it should be considered to create an additional sink at a matching sample rate which can then be fed into the main sink, resampling only once.\navoid-resampling | With avoid-resampling = yes, PulseAudio automatically configures the hardware to the sample rate which the application uses, if the hardware supports this sample rate (needs PA 11 or higher) Warning: Enabling this feature might cause audio distortion, therefore it is disabled by default, see the release notes for more information.\nenable-remixing | When the input and output have a different channel count (for example, outputting a 6 channel movie into a stereo sink), PulseAudio can either remix all the channels (default, yes) or just trivially map the channels by their name (left goes to left, right to right, all others ignored) when no.\nsystem-instance | If set to yes, run the daemon as a system-wide instance. Highly discouraged as it can introduce security issues. Useful on Multiseat systems, or headless systems that have no real local users. Defaults to no.\nflat-volumes | If set to yes, scales the device-volume with the volume of the \"loudest\" application. For example, raising the VoIP call volume will raise the hardware volume and adjust the music-player volume so it stays where it was, without having to lower the volume of the music-player manually. Defaults to no. Note: When enabled, this can sometimes be confusing and some applications, unaware of this feature, can set their volume to 100% at startup, potentially blowing your speakers or your ears.\nrealtime-scheduling | If your kernel supports realtime scheduling (for instance, Realtime kernel or Linux-ck), set this to yes to ensure PulseAudio can deliver low-latency glitch-free playback. You can adjust realtime-priority as well to have it use the correct priority, especially when JACK is also running on the system.\nnice-level | Since PulseAudio runs in userspace and involves inter-process communication, audio can be subject to dropouts if the daemon does not have enough CPU time to process the audio. The default usually is enough, but can be tweaked to give PulseAudio the wanted priority over (or below) other applications.\nexit-idle-time | If you want to run PulseAudio only when needed and use ALSA otherwise, you can set a delay in seconds after which the daemon will automatically shutdown after all clients are disconnected. Set it to -1 to disable this feature.\nlog-level | When debugging, you may want to increase the logging level of the daemon to see exactly why a specific module fails to load. High logging levels will sometimes print useful information such as detected minimum latency for the system, which can then be used to tweak default-fragments and default-fragment-size-msec.\ndefault-sample-format | This usually does not need to be changed, but if your sound card's native format is different, performance and quality can be improved by setting the right format here.\ndefault-sample-rate | The default sample rate used by PulseAudio unless overriden at module level. Change this if your sound card does not support 44100Hz or if you wish to upsample all audio. See previous note about CPU usage.\nalternate-sample-rate | To fix a common limitation where movies at 48000Hz were needlessly downsampled to 44100Hz, some modules support changing their sample rate dynamically to avoid resampling when possible. See manual for more in-depth information. This usually does not need to be changed.\ndefault-sample-channels | The default number of channels when not specified. Usually do not need any change as you can configure more channels on per-module basis.\ndefault-fragments | Audio samples are split into multiple fragments of default-fragment-size-msec each. The larger the buffer is, the less likely audio will skip when the system is overloaded. On the downside this will increase the overall latency. Increase this value if you have issues.\ndefault-fragment-size-msec | The size in milliseconds of each fragment. This is the amount of data that will be processed at once by the daemon.\n\n"
+    },
+    {
+      "title": "default.pa",
+      "level": 4,
+      "content": "This file is a startup script and is used to configure modules. It is actually parsed and read after the daemon has finished initializing and additional commands can be sent at runtime using pactl(1) or pacmd(1). The startup script can also be provided on the command line by starting PulseAudio in a terminal using pulseaudio -nC. This will make the daemon load the CLI module and will accept the configuration directly from the command line, and output resulting information or error messages on the same terminal. This can be useful when debugging the daemon or just to test various modules before setting them permanently on disk. The manual page is quite self-explanatory, consult pulse-cli-syntax(5) for the details of the syntax.\n\nThe default configuration also loads module-gsettings to apply settings specified by paprefs.\n\n- Rather than being a complete copy, ~/.config/pulse/default.pa can start with the line .include /etc/pulse/default.pa and then just override the defaults.\n- Run pacmd list-sinks | grep -Ei 'index:|name:' to list available sinks. The present default sink is marked with an asterisk.\n- Edit ~/.config/pulse/default.pa to insert/alter the set-default-sink command using the sink's name as the numbering cannot be guaranteed repeatable.\n\n"
+    },
+    {
+      "title": "system.pa",
+      "level": 4,
+      "content": "This file is a startup script used in place of default.pa when PulseAudio is running in system-wide mode.\n\n"
+    },
+    {
+      "title": "client.conf",
+      "level": 4,
+      "content": "This is the configuration file read by every PulseAudio client application. It is used to configure runtime options for individual clients. It can be used to set and configure the default sink and source statically as well as allowing (or disallowing) clients to automatically start the server if not currently running. If autospawn is enabled, clients will automatically start PulseAudio if it is not already running when a client attempts to connect to it. This can be useful if you do not want PulseAudio to always be running to conserve system resources. Otherwise, you really should have it start with your X11 session.\n\n"
+    },
+    {
+      "title": "Configuration command",
+      "level": 3,
+      "content": "The main command to configure a server during runtime is pacmd. Run pacmd --help for a list options, or just run pacmd to enter the shell interactive mode and Ctrl+d to exit. All modifications will immediately be applied.\n\nOnce your new settings have been tested and meet your needs, edit the default.pa accordingly to make the change persistent. See PulseAudio/Examples for some basic settings.\n\nIt is important to understand that the \"sources\" (processes, capture devices) and \"sinks\" (sound cards, servers, other processes) accessible and selectable through PulseAudio depend upon the current hardware \"Profile\" selected. These \"Profiles\" are those ALSA \"pcms\" listed by the command aplay -L, and more specifically by the command pacmd list-cards, which will include a line \"index:\", a list beginning \"profiles:\", and a line \"active profile: <...>\" in the output, among other things. \"Profiles\" correspond to different card input/output configurations, notably the number of available input/output channels.\n\nThe \"active profile\" can be set with the command pacmd set-card-profile INDEX PROFILE, with no comma separating INDEX and PROFILE, where INDEX is just the number on the line \"index:\" and a PROFILE name is everything shown from the beginning of any line under \"profiles:\" to just before the colon and first space, as shown by the command pacmd list-cards. For instance, pacmd set-card-profile 0 output:analog-stereo+input:analog-stereo.\n\nIt may be easier to select a \"profile\" with a graphical tool like pavucontrol, under the Configuration tab, or KDE System Settings, under the Sound tab. Each audio \"card\", which are those devices listed by the command aplay -l, or again by the command pacmd list-cards, will have its own selectable \"profile\". When a \"profile\" has been selected, the then available \"sources\" and \"sinks\" can be seen by using the commands pacmd list-sources and pacmd list-sinks. Note that the \"index\" of the available sources and sinks will change each time a card profile is changed.\n\nThe selected \"Profile\" can be an issue for some applications, especially the Adobe Flash players, typically /usr/lib/mozilla/plugins/libflashplayer.so and /usr/lib/PepperFlash/libpepflashplayer.so. Often, these Flash players will only work when one of the Stereo profiles is selected, and otherwise, will play video with no sound, or will simply \"crash\". When all else fails, you might try selecting a different profile.\n\nOf course, when configuring some variation of Surround Sound in PulseAudio, the appropriate Surround profile will have to be selected, before Surround Sound will work, or in order to do things like remap the speaker channels.\n\nIf the only profile you seem to have is \"HiFi\", this means that you are using ALSA Use Case Manager profiles instead of PulseAudio profiles. See PulseAudio/Examples#Disabling UCM/\"HiFi\" for information on how to get back to using PulseAudio profiles.\n\n"
+    },
+    {
+      "title": "Connection and authentication",
+      "level": 3,
+      "content": "Since PulseAudio runs as a daemon as the current user, clients needs to know where to find the daemon socket to connect to it as well as a shared random cookie file clients use to authenticate with it. By default, clients should be able to locate the daemon without problem using environment variables, X11 root window properties, the default-server option in client.conf and finally by trying the default location $XDG_RUNTIME_DIR/pulse/native (typically unix:/run/user/user-id/pulse/native). However, if you have clients that needs to access PulseAudio outside of your X11 session like mpd running as a different user, you will need to tell it how to connect to your PulseAudio instance. See PulseAudio/Examples#Allowing multiple users to share a PulseAudio daemon for a complete example. An authentication cookie containing random bytes is enabled by default to ensure audio does not leak from one user to another on a multi-user system. If you already control who can access the server using user/group permissions, you can disable the cookie by passing auth-cookie-enabled=0 to module-native-protocol-unix.\n\n"
+    },
+    {
+      "title": "Environment variables",
+      "level": 4,
+      "content": "These two variables are the important ones in order for libpulse clients to locate PulseAudio if you moved its socket to somewhere else. See pulseaudio(1) for more details and other useful environment variables clients will read.\n\nTable content:\nVariable | Definition\nPULSE_SERVER | Defines where the server is. It takes a protocol prefix like unix: or tcp followed by the path or IP of the server. Example: unix:/home/pulse/native-sock.\nPULSE_COOKIE | Point this to the location of a file that contains the random cookie generated by PulseAudio. This file will be read by clients and its content sent to the server, thus the file has to be readable by all audio clients. It does not need to be the same file, as long as its content matches the one the daemon uses.\n\n"
+    },
+    {
+      "title": "X11 properties",
+      "level": 4,
+      "content": "When using SSH X11 forwarding (i.e. when the DISPLAY and SSH_CONNECTION environment variables are present), libpulse clients also use window properties on the root window of the X11 server to help find the daemon.\n\nX11 properties can be queried using xprop -root, or with pax11publish -d to read pulse-specific properties. pax11publish can also be used to update the properties from environment variables (pax11publish -e, or pax11publish -r to remove them entirely). If possible, it is recommended to let PulseAudio do it by itself using the module-x11-publish module or the start-pulseaudio-x11 command.\n\nTable content:\nVariable | Definition\nPULSE_SERVER | String value (xprop -root -f PULSE_SERVER 8s -set PULSE_SERVER 127.0.0.1:4713 or pax11publish -e -S 127.0.0.1:4713), works the same as the environment variable of the same name.\nPULSE_COOKIE | String value that contains the hexadecimal representation of the authentication cookie.\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "PulseAudio on Arch has pulseaudio.socket enabled by default for the systemd/User instance. This means that PulseAudio will automatically start when needed.\n\n- To disable pulseaudio.socket, mask the pulseaudio.socket user unit. This will allow you to have pulseaudio installed without applications using it, e.g. you do not need sound or you are using an alternate sound server. This systemd-based approach takes precedence over the autospawn option described in pulse-client.conf(5). pulseaudio comes with option disabled by default, so you need not worry about setting it yourself. [3]\n- Many desktop environments support XDG Autostart. In those desktop environments, PulseAudio will be launched automatically regardless of the socket activation status.\n\n- This systemd-based approach takes precedence over the autospawn option described in pulse-client.conf(5). pulseaudio comes with option disabled by default, so you need not worry about setting it yourself. [3]\n\nFor more information, see PulseAudio: Running.\n\n"
+    },
+    {
+      "title": "Stopping",
+      "level": 2,
+      "content": "Stop the pulseaudio.socket and pulseaudio.service user units.\n\n"
+    },
+    {
+      "title": "ALSA",
+      "level": 3,
+      "content": "Note: **not** \n\nIf you have applications that do not support PulseAudio explicitly but rely on ALSA, these applications will try to access the sound card directly via ALSA and will therefore bypass PulseAudio. PulseAudio will thus not have access to the sound card any more. As a result, all applications relying on PulseAudio will not be working any more, leading to this issue. To prevent this, you will need to install the pulseaudio-alsa package. It contains the necessary /etc/alsa/conf.d/99-pulseaudio-default.conf for configuring ALSA to use PulseAudio. Also make sure that ~/.asoundrc does not exist, as it would override the /etc/asound.conf file.\n\nAlso install lib32-libpulse and lib32-alsa-plugins if you run a x86_64 system and want to have sound for 32-bit multilib programs like Wine and Steam.\n\nTo prevent applications from using ALSA's OSS emulation and bypassing PulseAudio (thereby preventing other applications from playing sound), make sure the module snd_pcm_oss is not being loaded at boot. If it is currently loaded (lsmod | grep oss), disable it by executing:\n\n```\n# rmmod snd_pcm_oss\n```\n\n"
+    },
+    {
+      "title": "Enable DTS via ALSA",
+      "level": 4,
+      "content": "To enable PulseAudio DTS (Digital Theater System) via ALSA install dcaencAUR package and enable it:\n\n```\n/etc/asound.conf\n```\n\n```\n<confdir:pcm/dca.conf>\n```\n\nFinally restart PulseAudio. If experience volume issues with your DTS device and/or PulseAudio, you may fix it by looking for more setting option at dcaenc's GitLab.\n\n"
+    },
+    {
+      "title": "Expose PulseAudio sources, sinks and mixers to ALSA",
+      "level": 4,
+      "content": "Although pulseaudio-alsa contains the necessary configuration file to allow ALSA applications to use PulseAudio's default device, ALSA's pulse plugin is more versatile than that:\n\n```\n~/.asoundrc (or /etc/asound.conf)\n```\n\n```\n# Create an alsa input/output using specific PulseAudio sources/sinks\npcm.pulse-example1 {\n    type pulse\n    device \"my-combined-sink\" # name of a source or sink\n    fallback \"pulse-example2\" # if combined not available\n}\n\npcm.pulse-example2 {\n    type pulse\n    device \"other-sound-card\" # name of a source or sink\n    # example: device \"alsa_output.pci-0000_00_1b.0.analog-stereo\"\n}\n\n# Create an ALSA mixer using specific PulseAudio sources/sinks\n# these can be tested with \"alsamixer -D pulse-example3\"\nctl.pulse-example3 {\n    type pulse\n    device \"my-output\" # name of source or sink to control\n\n    # example: always control the laptop speakers:\n    # device \"alsa_output.pci-0000_00_1b.0.analog-stereo\"\n    fallback \"pulse-example4\" # supports fallback too\n}\n\n# Mixers also can control a specific source and sink, separately:\nctl.pulse-example4 {\n    type pulse\n    sink \"my-usb-headphones\"\n    source \"my-internal-mic\"\n\n    # example: output to HDMI, record using internal\n    sink \"alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1\"\n    source \"alsa_input.pci-0000_00_1b.0.analog-stereo\"\n}\n\n# These can override the default mixer (example: for pnmixer integration)\nctl.!default {\n    type pulse\n    sink \"alsa_output.pci-0000_01_00.1.hdmi-stereo-extra1\"\n    source \"alsa_input.pci-0000_00_1b.0.analog-stereo\"\n}\n```\n\nThe source code can be read to know all available options.\n\n"
+    },
+    {
+      "title": "ALSA/dmix without grabbing hardware device",
+      "level": 4,
+      "content": "Note: **not** \n\nYou may want to use ALSA directly in most of your applications while still being able to use applications which require PulseAudio at the same time. The following steps allow you to make PulseAudio use dmix instead of grabbing ALSA hardware device.\n\n- Remove the pulseaudio-alsa package, which provides compatibility layer between ALSA applications and PulseAudio. After this your ALSA applications will use ALSA directly without being hooked by PulseAudio.\n\n- In /etc/pulse/default.pa, comment or delete the load-module module-udev-detect line and add the following lines:\n\n```\n/etc/pulse/default.pa\n```\n\n```\nload-module module-alsa-sink device=dmix\nload-module module-alsa-source device=dsnoop\n```\n\n- Optional: If you use kmix you may want to control ALSA volume instead of PulseAudio volume: set KMIX_PULSEAUDIO_DISABLE=1 as an environment variable.\n\n- Now, reboot your computer and try running ALSA and PulseAudio applications at the same time. They both should produce sound simultaneously.\n\n"
+    },
+    {
+      "title": "OSS",
+      "level": 3,
+      "content": "There are multiple ways of making OSS-only programs output to PulseAudio:\n\n"
+    },
+    {
+      "title": "ossp",
+      "level": 4,
+      "content": "Install the ossp package and start osspd.service.\n\n"
+    },
+    {
+      "title": "padsp wrapper",
+      "level": 4,
+      "content": "Programs using OSS can work with PulseAudio by starting it with padsp(1) (included with libpulse):\n\n```\n$ padsp OSSprogram\n```\n\nA few examples:\n\n```\n$ padsp aumix\n$ padsp sox foo.wav -t ossdsp /dev/dsp\n```\n\nYou can also add a custom wrapper script like this:\n\n```\n/usr/local/bin/OSSprogram\n```\n\n```\n#!/bin/sh\nexec padsp /usr/bin/OSSprogram \"$@\"\n```\n\nMake sure /usr/local/bin comes before /usr/bin in your PATH.\n\n"
+    },
+    {
+      "title": "GStreamer",
+      "level": 3,
+      "content": "gst-plugins-good provides the pulseaudio plugin for applications using GStreamer.\n\n"
+    },
+    {
+      "title": "OpenAL",
+      "level": 3,
+      "content": "OpenAL Soft should use PulseAudio by default, but can be explicitly configured to do so:\n\n```\n/etc/openal/alsoft.conf\n```\n\n```\ndrivers=pulse,alsa\n```\n\n"
+    },
+    {
+      "title": "libao",
+      "level": 3,
+      "content": "Edit the libao configuration file:\n\n```\n/etc/libao.conf\n```\n\n```\ndefault_driver=pulse\n```\n\nBe sure to remove the dev=default option of the alsa driver or adjust it to specify a specific PulseAudio sink name or number.\n\nNote: **is** \n\n"
+    },
+    {
+      "title": "PulseEffects",
+      "level": 3,
+      "content": "PulseEffects is a GTK advanced utility for applying several audio effects (e.g. Noise reduction, Equalizer etc.) to audio input and output.\n\nYou may need to also install its optional dependency lsp-plugins in order to get plugins to work. If PulseEffects plugins are greyed out after installing plugins, trying to start the daemon produces an error, or no devices are shown in the Settings > PulseAudio tab, consider clearing the cache as shown in [4].\n\nA collection of PulseEffects presets can be found in community presets.\n\n"
+    },
+    {
+      "title": "Equalization",
+      "level": 3,
+      "content": "If you want to use a different equalizer rather that the one integrated in #PulseEffects, there are the following options.\n\n"
+    },
+    {
+      "title": "LADSPA module",
+      "level": 4,
+      "content": "Install pulseaudio-equalizer-ladspa, an equalizer based on LADSPA swh-plugins. Launch pulseaudio-equalizer-gtk GUI and tweak the parameters to match your expectations.\n\n"
+    },
+    {
+      "title": "Integrated module",
+      "level": 4,
+      "content": "PulseAudio has an integrated 10-band equalizer system. In order to use it, install pulseaudio-equalizer and load module-equalizer-sink:\n\n```\n$ pactl load-module module-equalizer-sink\n```\n\nAlso load module-dbus-protocol if your configuration does not load it by default.\n\nTo start the GUI, run qpaeq.\n\nTo load the equalizer module on every boot, create a .pa file in /etc/pulse/default.pa.d/ or edit ~/.config/pulse/default.pa and add the following lines:\n\n```\n### Load the integrated PulseAudio equalizer\nload-module module-equalizer-sink\n```\n\n"
+    },
+    {
+      "title": "Dynamic Range Compression",
+      "level": 3,
+      "content": "Dynamic range compression can be done with #PulseEffects, however PulseEffects might introduce much overhead and latency to audio stream, so if you only need a compression effect and a minor load on the system, other options are available using a module-ladspa-sink.\n\n"
+    },
+    {
+      "title": "Steve Harris plugin",
+      "level": 4,
+      "content": "Steve Harris LADSPA is a set of plugins containing various compression modules. Install swh-plugins and edit the configuration as the following:\n\n```\n~/.config/pulse/default.pa\n```\n\n```\n.include /etc/pulse/default.pa\n\nset-default-sink your_card_sink_name\n\nload-module module-ladspa-sink sink_name=shw_sc4 sink_master=your_card_sink_name plugin=sc4_1882 label=sc4 control=,,,,,,\nset-default-sink shw_sc4\n```\n\nYou have to specify your card sink name, get it from pacmd list-sinks. In order to apply the changes, stop and restart PulseAudio. The above configuration has empty control options using the default values.\n\nTo tweak the module with custom control parameters, fill them respecting the right order.\n\nTable content:\nControl option | Description\nRMS/peak (0/1) | The blanace between the RMS and peak envelope followers. RMS is generally better for subtle, musical compression and peak is better for heavier, fast compression and percussion.\nAttack time (ms) | The attack time in milliseconds.\nRelease time (ms) | The release time in milliseconds.\nThreshold level (dB) | The point at which the compressor will start to kick in.\nRatio (1:n) | The gain reduction ratio used when the signal level exceeds the threshold. 1 means no compression; higher values stronger compression.\nKnee radius (dB) | The distance from the threshold where the knee curve starts.\nMakeup gain (dB) | Controls the gain of the makeup input signal in decibels.\n\nOther plugins can be found in Steve Harris' LADSPA Plugin Documentation.\n\n"
+    },
+    {
+      "title": "Calf plugin",
+      "level": 4,
+      "content": "For a more professional compressor, you can use the one developed by Calf Studio Gear. Install calf-ladspaAUR and edit the configuration as the following\n\n```\n~/.config/pulse/default.pa\n```\n\n```\n.include /etc/pulse/default.pa\n\nset-default-sink your_card_sink_name\n\nload-module module-ladspa-sink sink_name=calf_comp_x2 sink_master=your_card_sink_name plugin=veal label=Compressor control=,,,,,,,,,,\nset-default-sink calf_comp_x2\n```\n\nThe plugin has 11 control options. If you want to insert custom values, read the following table and do not forget to specify them in the right order.\n\nTable content:\nControl option | Default | Min | Max | Type | Info\nBypass | 0 | 0 | 1 | Bool | \nLevel in | 1 | 0.015625 | 64 | Float db | \nThreshold | 0.125 | 0.000976563 | 1 | Float dbFs | For example, to set -18 db, the right value is 10^(-18/20) = 0.158\nRatio | 2 | 1 | 20 | Float | \nAttack | 20 | 0.01 | 2000 | Float ms | \nRelease | 250 | 0.01 | 2000 | Float ms | \nMakeup | 1 | 1 | 64 | Float db | \nKnee | 2.828427125 | 1 | 8 | Float db | \nRMS/Peak | 0 | 0 | 1 | Bool | 0 = RMS; 1 = Peak\nStereo Link | 0 | 0 | 1 | Bool | 0 = Average; 1 = Max\nMix | 1 | 0 | 1 | Float | Percentage\nTo understand the meaning of every single option, read the Calf Compressor Documentation.\n\n"
+    },
+    {
+      "title": "Microphone echo/noise cancellation",
+      "level": 3,
+      "content": "Arch does not load the PulseAudio echo-cancellation module by default, therefore, we have to add it in /etc/pulse/default.pa.d/. First you can test if the module is present with pacmd and entering list-modules. If you cannot find a line showing name: <module-echo-cancel> you have to create:\n\n```\n/etc/pulse/default.pa.d/noise-cancellation.pa\n```\n\n```\n### Enable Echo/Noise-Cancellation\nload-module module-echo-cancel use_master_format=1 aec_method=webrtc aec_args=\"analog_gain_control=0 digital_gain_control=1\" source_name=echoCancel_source sink_name=echoCancel_sink\nset-default-source echoCancel_source\nset-default-sink echoCancel_sink\n```\n\nthen restart PulseAudio:\n\n```\n$ pulseaudio -k\n$ pulseaudio --start\n```\n\nand check if the module is activated by starting pavucontrol. Under Recording, the input device should show Echo-Cancel Source Stream from.\n\nTurning on beamforming=1 in the aec_args can also significantly reduce background noise if you have more than one microphone (which is common on many new laptops). However, beamforming requires specifying your mic_geometry (see below).\n\nIf you want existing streams to be automatically moved to the new sink and source, you have to load the module-switch-on-connect with ignore_virtual=no before.\n\n"
+    },
+    {
+      "title": "Possible 'aec_args' for 'aec_method=webrtc'",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nHere is a list of possible 'aec_args' for 'aec_method=webrtc' with their default values [6][7]:\n\n- analog_gain_control=1 - Analog AGC - 'Automatic Gain Control' done over changing the volume directly - Will most likely lead to distortions.\n- digital_gain_control=0 - Digital AGC - 'Automatic Gain Control' done in post processing (higher CPU load).\n- experimental_agc=0 - Allow enabling of the webrtc experimental AGC mechanism.\n- agc_start_volume=85 - Initial volume when using AGC - Possible values 0-255 - A too low initial volume may prevent the AGC algorithm from ever raising the volume high enough [8].\n- high_pass_filter=1 - ?\n- noise_suppression=1 - Noise suppression.\n- voice_detection=1 - VAD - Voice activity detection.\n- extended_filter=0 - The extended filter is more complex and less sensitive to incorrect delay reporting from the hardware than the regular filter. The extended filter mode is disabled by default, because it seemed produce worse results during double-talk [9]. Enable this option if your microphone or speaker has a larger latency, for example, if you use a wireless microphone or some HDMI TVs as speaker.\n- intelligibility_enhancer=0 - Some bits for webrtc intelligibility enhancer.\n- drift_compensation=0 - Drift compensation to allow echo cancellation between different devices (such as speakers on your laptop and the microphone on your USB webcam). - only possible with \"mobile=0\".\n- beamforming=0 - This can significantly reduce background noise. See [10][11] mic_geometry=x1,y1,z1,x2,y2,z2 - Only with \"beamforming=1\". target_direction=a,e,r - Only with \"beamforming=1\". Note: If the module does not want to load with this argument, set azimuth (a) to the desired value, but set elevation (e) and radius (r) to 0.\n- mobile=0 - ? routing_mode=speakerphone - Possible Values \"quiet-earpiece-or-headset,earpiece,loud-earpiece,speakerphone,loud-speakerphone\" - only valid with \"mobile=1\". comfort_noise=1 - ? - only valid with \"mobile=1\".\n\n- mic_geometry=x1,y1,z1,x2,y2,z2 - Only with \"beamforming=1\".\n- target_direction=a,e,r - Only with \"beamforming=1\". Note: If the module does not want to load with this argument, set azimuth (a) to the desired value, but set elevation (e) and radius (r) to 0.\n\n- routing_mode=speakerphone - Possible Values \"quiet-earpiece-or-headset,earpiece,loud-earpiece,speakerphone,loud-speakerphone\" - only valid with \"mobile=1\".\n- comfort_noise=1 - ? - only valid with \"mobile=1\".\n\n"
+    },
+    {
+      "title": "Disable audio post processing in certain applications",
+      "level": 4,
+      "content": "If you are using the module-echo-cancel, you probably do not want other applications to do additional audio post processing. Here is a list for disabling audio post processing in following applications:\n\n- Mumble: Configure > Settings > Audio Input Echo Cancellation: select Disabled Noise suppression: select Disabled Max. Amplification: set slider to 1.00\n- TeamSpeak: Tools -> Options -> Capture Uncheck: 'Typing attenuation', 'Remove background noise', 'Echo cancellation' and 'Echo reduction (Ducking)'\n- Firefox: see Firefox tweaks#Disable WebRTC audio post processing\n- Steam: Settings > Voice > Advanced Options > Show Disable the following sliders: Echo cancellation, Noise cancellation, Automatic volume/gain control\n- Skype: Tools -> Settings... -> Audio & Video -> Microphone -> Automatically adjust microphone settings -> off\n\n1. Configure > Settings > Audio Input\n1. Echo Cancellation: select Disabled\n1. Noise suppression: select Disabled\n1. Max. Amplification: set slider to 1.00\n\n1. Tools -> Options -> Capture\n1. Uncheck: 'Typing attenuation', 'Remove background noise', 'Echo cancellation' and 'Echo reduction (Ducking)'\n\n1. Settings > Voice > Advanced Options > Show\n1. Disable the following sliders: Echo cancellation, Noise cancellation, Automatic volume/gain control\n\n1. Tools -> Settings... -> Audio & Video -> Microphone -> Automatically adjust microphone settings -> off\n\n"
+    },
+    {
+      "title": "Script for reloading module-echo-cancel",
+      "level": 4,
+      "content": "Since the module-echo-cancel is not always needed, or must be reloaded if the source_master or sink_master has changed, it is nice to have a easy way to load or reload the module-echo-cancel.\n\nCreate the following script and make it executable:\n\n```\nechoCancelEnable.sh\n```\n\n```\n#!/bin/sh\naecArgs=\"$*\"\n# If no \"aec_args\" are passed on to the script, use this \"aec_args\" as default:\n[ -z \"$aecArgs\" ] && aecArgs=\"analog_gain_control=0 digital_gain_control=1\"\nnewSourceName=\"echoCancelSource\"\nnewSinkName=\"echoCancelSink\"\n\n# \"module-switch-on-connect\" with \"ignore_virtual=no\" (needs PulseAudio 12 or higher) is needed to automatically move existing streams to a new (virtual) default source and sink.\nif ! pactl list modules short | grep \"module-switch-on-connect.*ignore_virtual=no\" >/dev/null 2>&1; then\n\techo Load module \\\"module-switch-on-connect\\\" with \\\"ignore_virtual=no\\\"\n\tpactl unload-module module-switch-on-connect 2>/dev/null\n\tpactl load-module module-switch-on-connect ignore_virtual=no\nfi\n\n# Reload \"module-echo-cancel\"\necho Reload \\\"module-echo-cancel\\\" with \\\"aec_args=$aecArgs\\\"\npactl unload-module module-echo-cancel 2>/dev/null\nif pactl load-module module-echo-cancel use_master_format=1 aec_method=webrtc aec_args=\\\"$aecArgs\\\" source_name=$newSourceName sink_name=$newSinkName; then\n\t# Set a new default source and sink, if module-echo-cancel has loaded successfully.\n\tpacmd set-default-source $newSourceName\n\tpacmd set-default-sink $newSinkName\nfi\n```\n\nTo run the script easily from the graphical environment, you can create a desktop launcher for it.\n\n"
+    },
+    {
+      "title": "Recurrent neural network noise suppression (RNNoise)",
+      "level": 3,
+      "content": "Installing the package noise-suppression-for-voice will allow real-time noise suppression based on RNNoise: Learning Noise Suppression [12]. Configuration details can be found on the projects Github site [13]. One can install Cadmus (cadmus-debAUR or cadmus-appimageAUR) which is a GUI frontend for @werman's PulseAudio real-time noise suppression plugin.\n\nAnother alternative is noisetorchAUR which is also built on top of RNNoise. There is not only input noise cancellation but also an output.\n\n"
+    },
+    {
+      "title": "QEMU",
+      "level": 3,
+      "content": "Refer to QEMU#Creating an audio backend for a detailed guide on how to configure PulseAudio within QEMU.\n\n"
+    },
+    {
+      "title": "AlsaMixer.app",
+      "level": 3,
+      "content": "Install pulseaudio-alsa and make alsamixer.appAUR dockapp for the windowmakerAUR use PulseAudio, e.g.:\n\n```\n$ AlsaMixer.app --device pulse\n```\n\nHere is a two examples where the first one is for ALSA and the other one is for PulseAudio. You can run multiple instances of it. Use the -w option to choose which of the control buttons to bind to the mouse wheel.\n\n```\n$ AlsaMixer.app -3 Mic -1 Master -2 PCM --card 0 -w 1\n$ AlsaMixer.app --device pulse -1 Capture -2 Master -w 2\n```\n\nSee #ALSA for details.\n\n"
+    },
+    {
+      "title": "XMMS2",
+      "level": 3,
+      "content": "Make it switch to PulseAudio output:\n\n```\n$ xmms2 server config output.plugin pulse\n```\n\nand to ALSA:\n\n```\n$ xmms2 server config output.plugin alsa\n```\n\nTo make XMMS2 use a different output sink, e.g.:\n\n```\n$ xmms2 server config pulse.sink alsa_output.pci-0000_04_01.0.analog-stereo.monitor\n```\n\nSee also the official guide.\n\n"
+    },
+    {
+      "title": "KDE Plasma Workspaces and Qt",
+      "level": 3,
+      "content": "PulseAudio will automatically be used by KDE / Qt applications. It is supported by default in the KDE sound mixer. For more information see the KDE page in the PulseAudio wiki.\n\nIf the phonon-gstreamer backend is used for Phonon, GStreamer should also be configured as described in #GStreamer.\n\n"
+    },
+    {
+      "title": "Audacious",
+      "level": 3,
+      "content": "Audacious natively supports PulseAudio. In order to use it, set File > Settings > Audio > Output plugin > PulseAudio Output.\n\n"
+    },
+    {
+      "title": "Music Player Daemon (MPD)",
+      "level": 3,
+      "content": "Configure MPD to use PulseAudio. See also Music Player Daemon/Tips and tricks#PulseAudio.\n\n"
+    },
+    {
+      "title": "MPlayer",
+      "level": 3,
+      "content": "MPlayer natively supports PulseAudio output with the -ao pulse option. It can also be configured to default to PulseAudio output, in ~/.mplayer/config for per-user, or /etc/mplayer/mplayer.conf for system-wide:\n\n```\n/etc/mplayer/mplayer.conf\n```\n\n```\nao=pulse\n```\n\n"
+    },
+    {
+      "title": "mpv",
+      "level": 3,
+      "content": "mpv supports PulseAudio same as written for #MPlayer. Configuration in ~/.config/mpv/mpv.conf per-user, or /etc/mpv/mpv.conf system-wide.\n\n"
+    },
+    {
+      "title": "guvcview",
+      "level": 3,
+      "content": "guvcview when using the PulseAudio input from a Webcam may have the audio input suspended resulting in no audio being recorded. You can check this by executing:\n\n```\n$ pactl list sources\n```\n\nIf the audio source is \"suspended\" then create the folowing .pa file:\n\n```\n/etc/pulse/default.pa.d/no-module-suspend-on-idle.pa\n```\n\n```\nunload-module module-suspend-on-idle\n```\n\nAnd then either restarting PulseAudio or your computer will only idle the input source instead of suspending it. guvcview will then correctly record audio from the device.\n\n"
+    },
+    {
+      "title": "Networked audio",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with PulseAudio/Examples#PulseAudio over network.** This article or section is a candidate for merging with PulseAudio/Examples#PulseAudio over network.\n\nThis article or section is a candidate for merging with PulseAudio/Examples#PulseAudio over network.\n\nOne of PulseAudio's unique features is its ability to stream audio from clients over TCP to a server running the PulseAudio daemon reliably within a LAN. Ensure that client and server systems agree on the time (i.e., use NTP), or audio streams may be choppy or may not work at all. For a more detailed guide visit the official PulseAudio documentation.\n\nTo enable the TCP module on the server (the computer that actually outputs sound), create the following .pa file:\n\n```\n/etc/pulse/default.pa.d/tcp.pa\n```\n\n```\nload-module module-native-protocol-tcp\n```\n\nOr you can use the paprefs GUI application (root is not required). Go to Network Server > Enable network access to local sound devices.\n\nTo make sure module-native-protocol-tcp is loaded on the server, you can use:\n\n```\n$ pacmd list-modules | grep module-native-protocol-tcp\n```\n\nIt is a requirement that both the client and server share the same cookie. Ensure that the clients and server share the same cookie file found under ~/.config/pulse/cookie. It does not matter whose cookie file you use (the server or a client's), just that the server and client(s) share the same one.\n\nIf it is undesirable to copy the cookie file from clients, anonymous clients can access the server by passing auth-anonymous to module-native-protocol-tcp on the server (again in /etc/pulse/default.pa.d/):\n\n```\nload-module module-native-protocol-tcp auth-anonymous=1\n```\n\nIt is also possible to authenticate based on client IP address:\n\n```\nload-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;192.168.0.0/24\n```\n\nChange the LAN IP subnet to match that of those clients you wish to have access to the server.\n\n"
+    },
+    {
+      "title": "Starting system-wide on boot",
+      "level": 3,
+      "content": "The PulseAudio daemon normally starts as a user service when a user logs in and attempts to play some sort of audio. For running a dedicated PulseAudio server accepting client connections over TCP, the daemon must be started on boot as a system service. Note that in most desktop use cases, system mode likely is not the right choice.\n\nTo run PulseAudio in a system mode, first we need to set up users and groups needed by system-wide PulseAudio server instance [14]:\n\n1. Add user pulse. PulseAudio daemon switches to this user after starting. # useradd -d /var/run/pulse -s /usr/bin/nologin -G audio pulse\n1. Optionally add user pulse to the bluetooth group, if you have it (BlueZ) and want PulseAudio to use Bluetooth. # usermod -aG bluetooth pulse\n1. Add group pulse-access. This group is used by PulseAudio server for access control. # groupadd pulse-access\n1. Add users to pulse-access group, if you want them to have access to the system-wide PulseAudio instance. # usermod -aG pulse-access root\n\n```\n# useradd -d /var/run/pulse -s /usr/bin/nologin -G audio pulse\n```\n\n```\n# usermod -aG bluetooth pulse\n```\n\n```\n# groupadd pulse-access\n```\n\n```\n# usermod -aG pulse-access root\n```\n\nCreate the service pulseaudio.service in /etc/systemd/system containing the following:\n\n```\n/etc/systemd/system/pulseaudio.service\n```\n\n```\n[Unit]\nDescription=Sound Service\n\n[Service]\n# Note that notify will only work if --daemonize=no\nType=notify\nExecStart=/usr/bin/pulseaudio --daemonize=no --exit-idle-time=-1 --disallow-exit=true --system --disallow-module-loading\nRestart=always\n\n[Install]\nWantedBy=default.target\n```\n\nThen enable pulseaudio.service at the system level. You will also need to disable the user-level PulseAudio service across the whole system by masking the pulseaudio.socket with the --global flag.\n\nThis is necessary even if you are accessing the system over SSH, to make sure the user-level PulseAudio service will never start.\n\nWhen PulseAudio starts in the system mode, /etc/pulse/system.pa is used instead of default.pa, so be sure to put any necessary settings in system.pa.\n\n"
+    },
+    {
+      "title": "Selecting the server",
+      "level": 3,
+      "content": "For a single shell or command you can set the PULSE_SERVER environment variable to the host name or IP address of the desired PulseAudio server:\n\n```\n$ env PULSE_SERVER=server-hostname-or-ip mplayer test.mp3\n```\n\nAlternatively, you can create or modify ~/.config/pulse/client.conf or /etc/pulse/client.conf to set a default-server persistently:\n\n```\ndefault-server = server-hostname-or-ip\n```\n\nIt is also possible to specify multiple servers separated by spaces which are subsequently tried by PulseAudio[16]:\n\n```\ndefault-server = server1 backup\n```\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with PulseAudio/Examples.** This article or section is a candidate for merging with PulseAudio/Examples.\n\nThis article or section is a candidate for merging with PulseAudio/Examples.\n\n"
+    },
+    {
+      "title": "Keyboard volume control",
+      "level": 3,
+      "content": "Map the following commands to your volume keys: XF86AudioRaiseVolume, XF86AudioLowerVolume and XF86AudioMute.\n\nFirst find out which sink corresponds to the audio output you would like to control. To list available sinks:\n\n```\n$ pactl list sinks short\n```\n\nSuppose sink 0 is to be used, to raise the volume:\n\n```\n$ sh -c \"pactl set-sink-mute 0 false ; pactl set-sink-volume 0 +5%\"\n```\n\nTo lower the volume:\n\n```\n$ sh -c \"pactl set-sink-mute 0 false ; pactl set-sink-volume 0 -5%\"\n```\n\nTo mute/unmute the volume:\n\n```\n$ pactl set-sink-mute 0 toggle\n```\n\nTo mute/unmute the microphone:\n\n```\n$ pactl set-source-mute 1 toggle\n```\n\n- To have keyboard shortcuts operate always on the default sink, specify @DEFAULT_SINK@ as the sink number, for example pactl set-sink-mute @DEFAULT_SINK@ toggle.\n- For more advanced control, such as limiting the maximum volume, consider using one of the console front-ends.\n\n"
+    },
+    {
+      "title": "Play sound from a non-interactive shell (systemd service, cron)",
+      "level": 3,
+      "content": "Replace user with the user running PulseAudio:\n\n```\n# machinectl shell --uid=user .host /usr/bin/paplay /usr/share/sounds/freedesktop/stereo/complete.oga\n```\n\n"
+    },
+    {
+      "title": "X11 Bell Events",
+      "level": 3,
+      "content": "To get PulseAudio to handle X11 bell events, run the following commands after the X11 session has been started:\n\n```\n$ pactl upload-sample /usr/share/sounds/freedesktop/stereo/bell.oga bell-window-system\n$ pactl load-module module-x11-bell display=$DISPLAY\n```\n\nOr use configuration files /etc/pulse/default.pa.d/ or ~/.config/pulse/default.pa:\n\n```\n~/.config/pulse/default.pa\n```\n\n```\n.include /etc/pulse/default.pa\n\n# audible bell\nload-sample-lazy bell-window-system /usr/share/sounds/freedesktop/stereo/bell.oga\nload-module module-x11-bell\n```\n\nTo adjust the volume of the X11 bell, run the following command:\n\n```\n$ xset b 100\n```\n\n100 is a percentage. This requires the xorg-xset package. See Autostarting for a way to run these commands automatically when the X11 session is started.\n\n"
+    },
+    {
+      "title": "Switch on connect",
+      "level": 3,
+      "content": "The switch-on-connect module switches the output sound to new devices when connected. For example, if you plug in a USB headset, the output will be switched to that. If you unplug it, the output will be set back to the last device.\n\nThis module is disabled by default for being too aggressive, but can be enabled by adding the line load-module module-switch-on-connect to your ~/.config/pulse/default.pa.\n\n"
+    },
+    {
+      "title": "Script for switching output ports",
+      "level": 3,
+      "content": "Some sound cards present the option of multiple analog outputs, being switchable through using PulseAudio ports. But switching manually can become a chore, so you can automate this with the pactl command.\n\nList available ports:\n\n```\n$ LC_ALL=C.UTF-8 pactl list sinks\n```\n\n```\nSink #0\n\t...\n\tPorts:\n\t\tanalog-output-speaker: Speakers (type: Speaker, priority: 10000, availability unknown)\n\t\tanalog-output-headphones: Headphones (type: Headphones, priority: 9900, not available)\n\tActive Port: analog-output-speaker\n```\n\nCurrent port can be obtained through:\n\n```\n$ LC_ALL=C.UTF-8 pactl list sinks | grep \"Active Port\" | cut -d ' ' -f 3-\n```\n\nSwitch the active port:\n\n```\n$ pactl set-sink-port sink-index port\n```\n\nThis process can be automated through a simple script. This script then can be given a shortcut by the user:\n\n```\n~/pa.sh (or anything the user wants)\n```\n\n```\n#!/bin/sh\n\n# This script uses notify-send from the libnotify package to warn the user of the currently swapped to port.\n# User could adapt it to their needs or change it.\n\nCURRENT_PORT=$(LC_ALL=C.UTF-8 pactl list sinks | grep \"Active Port\" | cut -d ' ' -f 3-)\n\nif [ \"$CURRENT_PORT\" = \"analog-output-speaker\" ] ; then\n  pactl set-sink-port 0 \"analog-output-headphones\"\n  notify-send --expire-time=2000 \"PulseAudio\" \"Headphones\"\nelse\n  pactl set-sink-port 0 \"analog-output-speaker\"\n  notify-send --expire-time=2000 \"PulseAudio\" \"Speakers\"\nfi\n```\n\nThis script is intended to swap between two ports. First checking the current port then swapping it. Users might need to change the sink index number and the port names to fit their machine.\n\n"
+    },
+    {
+      "title": "Disable muting media on entering voice call (module-role-cork)",
+      "level": 3,
+      "content": "When entering a voice call (e.g. in Microsoft Teams, maybe others too) any media applications might be muted. To disable this behaviour you can simply disable this module in PulseAudio configuration:\n\n```\n/etc/pulse/default.pa.d/no-cork.pa\n```\n\n```\nunload-module module-role-cork\n```\n\n"
+    },
+    {
+      "title": "Advanced configuration and use cases",
+      "level": 2,
+      "content": "See PulseAudio/Examples.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "See PulseAudio/Troubleshooting.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- PulseAudio official website, including documentation\n- PulseAudio under the hood\n\n"
+    }
+  ]
+}

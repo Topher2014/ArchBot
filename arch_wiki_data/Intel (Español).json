@@ -1,0 +1,171 @@
+{
+  "title": "Intel (Español)",
+  "url": "https://wiki.archlinux.org/title/Intel_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-07-29** \n\nArtículos relacionados\n\n- Intel GMA 3600\n- Xorg (Español)\n- Kernel mode setting (Español)\n- Xrandr\n- Hybrid graphics\n- Vulkan\n- GPGPU\n\nIntel provee y mantiene controladores de código abierto, por lo que sus tarjetas de video son esencialmente plug-and-play.\n\nPara un listado más detallado de modelos de GPU Intel, con sus correspondientes chipsets y CPUs, vea Wikipedia:List of Intel graphics processing units.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete mesa, que provee el controlador DRI para aceleración en 3D.\n\n- Para soporte de aplicaciones 32-bit también instale lib32-mesa desde el repositorio multilib.\n- Para el controlador DDX (que provee aceleración en 2D en Xorg), instale el paquete xf86-video-intel (usualmente no es recomendado, revise la nota más abajo).\n- Para sopore de Vulkan (Ivy Bridge y más reciente) instale el paquete vulkan-intel.\n\nVéase también Hardware video acceleration.\n\n"
+    },
+    {
+      "title": "Carga",
+      "level": 2,
+      "content": "El módulo de núcleo proporcionado por Intel debería cargar automáticamente al arranque del sistema.\n\nSi esto no ocurre, entonces:\n\n- Asegúrese que no tiene nomodeset o vga= como un parámetro de núcleo, puesto que Intel requiere mode-setting del núcleo.\n- También revise que Intel no esté desactivada mediante alguna lista negra modprobe dentro de /etc/modprobe.d/ o de /usr/lib/modprobe.d/.\n\n"
+    },
+    {
+      "title": "Iniciar de forma anticipada KMS",
+      "level": 3,
+      "content": "Kernel mode setting (Español) es soportado por los chipsets de Intel que utilizan el controlador DRM i915, lo cual es mandatorio y está activado de forma predeterminada.\n\nRefiérase a Kernel mode setting#Early KMS start para instrucciones de cómo habilitar KMS lo más pronto posible durante el proceso de arranque.\n\n"
+    },
+    {
+      "title": "Habilitar la carga del firmware GuC / HuC",
+      "level": 3,
+      "content": "Para los procesadores Skylake y más recientes algunas características de video (e.g. control de velocidad de CBR en el modo de codificación de bajo consumo en SKL) pueden requerir utilizar un firmware de GPU actualizado, lo que actualmente (versión 4.16) no está habilitado por defecto. Habilitar la carga de firmware GuC/HuC puede causar problemas en algunos sistemas; desactívelo si experimenta congelamientos (por ejemplo, al iniciar después de una hibernación).\n\nPara aquellos procesadores es necesario añadir i915.enable_guc=2 a los parámetros de núcleo para habilitar la carga del firmware de GuC y HuC. Alternativamente, si initramfs ya incluye el módulo i915 (vea Kernel mode setting#Early KMS start), puede establecer estas opciones mediante un archivo en /etc/modprobe.d/, e.g.:\n\n```\n/etc/modprobe.d/i915.conf\n```\n\n```\noptions i915 enable_guc=2\n```\n\n"
+    },
+    {
+      "title": "Configuración de Xorg",
+      "level": 2,
+      "content": "Puede no existir la necesidad de configuraciones para ejecutar Xorg.\n\nSin embargo, si Xorg no inicia (y para tomar ventaja de algunas opciones del controlador) puede crear un archivo de configuración para Xorg similar al mostrado debajo:\n\n```\n/etc/X11/xorg.conf.d/20-intel.conf\n```\n\n```\nSection \"Device\"\n  Identifier \"Intel Graphics\"\n  Driver \"intel\"\nEndSection\n```\n\nOpciones adicionales son añadidas por el usuario en nuevas líneas debajo de Driver. Para un listado completo de opciones, vea el manual intel(4).\n\n"
+    },
+    {
+      "title": "AccelMethod",
+      "level": 3,
+      "content": "Puede que necesite indicar Option \"AccelMethod\" al momento de crear el archivo de configuración, las opciones clásicas son UXA, SNA (predeterminado) y BLT.\n\nSi experimenta problemas con la opción predeterminada SNA (e.g. gráficos pixelados, texto corrupto, etc), intente utilizar UXA en su lugar, lo que puede lograr añadiendo la siguiente línea a su archivo de configuración:\n\n```\nOption      \"AccelMethod\"  \"uxa\"\n```\n\nVea intel(4) bajo Option \"AccelMethod\".\n\n"
+    },
+    {
+      "title": "Opciones basadas en módulos",
+      "level": 2,
+      "content": "El módulo de kernel i915 permite configurarse mediante las opciones del módulo. Algunas opciones del módulo impactan el ahorro de energía.\n\nUna lista de todas las opciones junto a una breve descripción y valores predeterminados puede ser generada con la siguiente órden:\n\n```\n$ modinfo -p i915\n```\n\nPara verificar las opciones actualmente activadas, ejecute:\n\n```\n# systool -m i915 -av\n```\n\nNotará que muchas opciones contienen el valor predeterminado -1, resultando en un ahorro de energía predeterminado por chip. No obstante, es posible configurar un ahorro de energía más agresivo utilizando las opciones del módulo.\n\n"
+    },
+    {
+      "title": "Compresión de framebuffer (enable_fbc)",
+      "level": 3,
+      "content": "Hacer uso de compresión Framebuffer (FBC) puede reducir el consumo de energía y a su vez reducir el ancho de banda requerido para los refrescos de pantalla.\n\nPara habilitar FBC utilice i915.enable_fbc=1 como parámetro de kernel o establézcalo en /etc/modprobe.d/i915.conf:\n\n```\n/etc/modprobe.d/i915.conf\n```\n\n```\noptions i915 enable_fbc=1\n```\n\nNote: Habilitar la compresión frame buffer en CPUs anteriores a Sandy Bridge resulta en interminables mensajes de error:\n\n```\nkernel: drm: not enough stolen space for compressed buffer, disabling.\n```\n\nHabilitar la compresión frame buffer en CPUs anteriores a Sandy Bridge resulta en interminables mensajes de error:\n\n```\n# dmesg\n```\n\n```\n[ 2360.475430] [drm] not enough stolen space for compressed buffer (need 4325376 bytes), disabling\n[ 2360.475437] [drm] hint: you may be able to increase stolen memory size in the BIOS to avoid this\n```\n\n"
+    },
+    {
+      "title": "Fastboot",
+      "level": 3,
+      "content": "La meta de Intel Fastboot es preservar el frame-buffer del modo en que fue establecido por la BIOS o el gestor de arranque para evitar parpadeos hasta que Xorg comience [3].\n\nPara habilitar fastboot, establezca i915.fastboot=1 como parámetro de núcleo o establézcalo en /etc/modprobe.d/i915.conf:\n\n```\n/etc/modprobe.d/i915.conf\n```\n\n```\noptions i915 fastboot=1\n```\n\n"
+    },
+    {
+      "title": "Soporte para virtualización de targeta gráfica Intel GVT-g",
+      "level": 3,
+      "content": "Vea Intel GVT-g para detalles.\n\n"
+    },
+    {
+      "title": "Ajuste del modo de escalado",
+      "level": 3,
+      "content": "Esto puede ser resultar de utilidad para algunas aplicaciones a pantalla completa.\n\n```\n$ xrandr --output LVDS1 --set PANEL_FITTING param\n```\n\ndonde param puede ser:\n\n- center: la resolución será mantenida exactamente como fue definida, sin realizar un escalado,\n- full: escala la resolución de modo que utiliza la totalidad de la pantalla o\n- full_aspect: escala la resolución al máximo posible, pero mantiene la relación de aspecto.\n\nSi no funciona, intente lo siguiente:\n\n```\n$ xrandr --output LVDS1 --set \"scaling mode\" param\n```\n\ndonde param puede ser \"Full\", \"Center\" o \"Full aspect\".\n\n"
+    },
+    {
+      "title": "Decodificación de H.264 en GMA 4500 por aceleración de hardware",
+      "level": 3,
+      "content": "El paquete libva-intel-driver sólo provee decodificación MPEG-2 acelerada por hardware para las series de GPU GMA 4500. El soporte de decodificación de H.264 es mantenido en una rama g45-h264 separada, que puede ser utilizada instalando el paquete libva-intel-driver-g45-h264AUR. No obstante, note que este soporte es experimental y su desarrollo ha sido abandonado. Utilizar VA-API con este controlador en las series de GPU GMA 4500 bajará la carga de la CPU, pero puede no otorgar una reproducción suave como lo haría el método de reproducción sin aceleración por hardware. Pruebas utilizando mplayer mostraron que la utilización de vaapi para reproducir videos codificados con H.264 a una resolución de 1080p redujeron a la mitad la carga en la CPU (comparado con la superposición XV), pero resultaron en una reproducción muy agitada; mientras que a una resolución de 720p funcionó razonablemente bien [6]. Ajustar una mayor asignación de memoria ram en la bios resulta en una considerablemente mejor reproducción decodificada por hardware. Inclusive la h264 a 1080p funciona bien una vez lo anterior es realizado. Una reproducción suave (1080p/720p) funciona tambien con mpv-gitAUR en combinación con ffmpeg-gitAUR y libva-intel-driver-g45-h264AUR.\n\n"
+    },
+    {
+      "title": "Controlador antiguo de OpenGL (i965)",
+      "level": 3,
+      "content": "A partir de Mesa 19.2, un nuevo controlador OpenGL, Iris, está disponible para pruebas. En Mesa 20.0, el controlador Iris fue promovido a ser el predeterminado para Gen8+. Ciertas aplicaciones se ejecutan más rápido con él. Puede desactivarlo y regresar al antiguo controlador i965 ajustando la variable de entorno MESA_LOADER_DRIVER_OVERRIDE=i965 antes de empezar cualquier aplicación OpenGL. Este ajuste no afecta las aplicaciones de Vulkan.\n\n"
+    },
+    {
+      "title": "Anulando la versión de OpenGL reportada",
+      "level": 3,
+      "content": "La variable de entorno MESA_GL_VERSION_OVERRIDE puede ser utilizada para anular la versión de OpenGL reportada a cualquier aplicación. Por ejemplo, ajustar MESA_GL_VERSION_OVERRIDE=4.5 reportará OpenGL 4.5.\n\n"
+    },
+    {
+      "title": "Ajustar brillo y gamma",
+      "level": 3,
+      "content": "Vea Backlight.\n\n"
+    },
+    {
+      "title": "Desgarro",
+      "level": 3,
+      "content": "El método de aceleración SNA causa desgarros en algunas máquinas. Para arreglarlo, habilite la opción \"TearFree\" en el controlador añadiendo la siguiente línea a su archivo de configuración:\n\n```\n/etc/X11/xorg.conf.d/20-intel.conf\n```\n\n```\nSection \"Device\"\n  Identifier \"Intel Graphics\"\n  Driver \"intel\"\n\n  Option \"TearFree\" \"true\"\nEndSection\n```\n\nVea el reporte original de bug para mayor información.\n\n- Esta opción puede no funcionar cuando SwapbuffersWait está establecido como false.\n- Esta opción puede incrementar considerablemente la asignació de memoria y reducir el rendimiento. [7]\n- Esta opción es problemática para aplicaciones sensibles a la sincronización vsync, como Super Meat Boy.\n- Esta opción no funciona con el método de aceleración UXA, solamente con SNA.\n\n"
+    },
+    {
+      "title": "Deshabilitar la sincronización vertical (VSYNC)",
+      "level": 3,
+      "content": "De utilidad cuando:\n\n- Chromium/Chrome presenta retrasos y un rendimiento lento debido a la GPU y se ejecuta con suavidad con la bandera --disable-gpu\n- glxgears no muestra el rendimiento deseado\n\nEl controlador de intel utiliza Triple Buffering[enlace roto 2023-07-30] para sincronización vertical, esto permite un rendimiento total y evita el desgarro. Para desactivar la sincronización vertical (e.g para una evaluación comparativa) utilice este .drirc en su directorio de usuario:\n\n```\n~/.drirc\n```\n\n```\n<device screen=\"0\" driver=\"dri2\">\n\t<application name=\"Default\">\n\t\t<option name=\"vblank_mode\" value=\"0\"/>\n\t</application>\n</device>\n```\n\n"
+    },
+    {
+      "title": "Problemas con DRI3",
+      "level": 3,
+      "content": "DRI3 es la versión predeterminada de DRI en xf86-video-intel. En algunos sistemas esto puede causar problemas como este. Para regresar a DRI2 añada la siguiente línea a su archivo de configuración:\n\n```\nOption \"DRI\" \"2\"\n```\n\nPara el controlador modesetting, este método para deshabilitar DRI3 no funciona. En su lugar, puede establecer la variable de entorno LIBGL_DRI3_DISABLE=1.\n\n"
+    },
+    {
+      "title": "Corrupción en la fuente y pantalla de aplicación GTK (falta glyphs después de suspender/resumir)",
+      "level": 3,
+      "content": "Si presenta la falta de fuente glyphs en aplicaciones GTK, la siguiente solución puede ayudar. Edite /etc/environment para añadir la siguiente línea:\n\n```\n/etc/environment\n```\n\n```\nCOGL_ATLAS_DEFAULT_BLIT_MODE=framebuffer\n```\n\nVéase también FreeDesktop bug 88584.\n\n"
+    },
+    {
+      "title": "Pantalla blanca durante inicio del sistema, durante \"Loading modules\"",
+      "level": 3,
+      "content": "Si está utilizando el \"inicio retrasado\" de KMS y la pantalla se va a negro durante \"Loading modules\", puede ayudar añadir i915 y intel_agp a initramfs. Vea la sección Kernel mode setting#Early KMS start.\n\nAlternativamente, anexar el siguiente parámetro de núcleo también funciona:\n\n```\nvideo=SVIDEO-1:d\n```\n\nSi necesita una salida de video mediante VGA, entonces intente lo siguiente:\n\n```\nvideo=VGA-1:1280x800\n```\n\n"
+    },
+    {
+      "title": "X se congela/quebra con el controlador de intel",
+      "level": 3,
+      "content": "Algunos problemas con X quebrándose, la GPU colgándose, o problemas relacionados con X congelándose, pueden ser solucionados deshabilitando la utilización de la GPU con la opción NoAccel; añada la siguientes líneas a su archivo de configuración:\n\n```\nOption \"NoAccel\" \"True\"\n```\n\nAlternativamente, intente deshabilitar solamente la aceleración en 3D con la opción DRI:\n\n```\nOption \"DRI\" \"False\"\n```\n\n"
+    },
+    {
+      "title": "Baytrail se congela completamente",
+      "level": 3,
+      "content": "Si está utilizando el núcelo > 3.16 en la arquitectura Baytrail y encuentra congelamientos arbitrarios del sistema, la siguiente opción de núcleo es una solución provisoria hasta que este bug sea arreglado en el núcleo linux.\n\n```\nintel_idle.max_cstate=1\n```\n\nEste es originalmente un bug de la CPU Intel que puede ser provocado por cierta transición c-state. También puede ocurrir con el núcleo linux 3.16 o Windows, aunque aparentemente esto rara vez ocurre. La opción de núcleo va a prevenir el congelamiento al evitar las transiciones c-state, pero también resultará en un incremento del consumo energético.\n\n"
+    },
+    {
+      "title": "Añadir resoluciones no detectadas",
+      "level": 3,
+      "content": "Este problema es cubierto en la página de Xrandr.\n\n"
+    },
+    {
+      "title": "Backlight no es ajustable",
+      "level": 3,
+      "content": "Si después de resumir desde una suspensión, los atajos de teclado para cambiar el brillo de pantalla no surten efecto, revise su configuración con la estipulada en el artículo Backlight.\n\nSi el problema persiste, intente uno de los siguientes parámetros de núcleo:\n\n```\nacpi_osi=Linux\nacpi_osi=\"!Windows 2012\"\nacpi_osi=\n```\n\nTambién asegúrese que no está utilizando el modo fastboot (el parámetro de núcleo i915.fastboot), es conocido por quebrar los controles de backlight.\n\n"
+    },
+    {
+      "title": "Corrupción o falta de respuesta en Chromium y Firefox",
+      "level": 3,
+      "content": "Si experimenta corrupción, falta de respuesta, retrasos o un rendimiento lento en Chromium y/o Firefox algunas soluciones posibles son:\n\n- Establecer el AccelMethod a \"uxa\"\n- Deshabilitar VSYNC\n- Habilitar la opción TearFree\n- Deshabilitar \"DRI\" y el método de aceleración (probado en Intel Iris décima generación): Option \"NoAccel\" \"True\" Option \"DRI\" \"False\"\n\n```\nOption \"NoAccel\" \"True\"\nOption \"DRI\" \"False\"\n```\n\n"
+    },
+    {
+      "title": "Núcleo se quebra en versión 4.0+ con chips Broadwell/Core-M",
+      "level": 3,
+      "content": "Segundos después de la carga de X/Wayland la máquina se congela en su totalidad y journalctl registra un quiebre en el núcleo haciendo referencia a la tarjeta gráfica de Intel como puede verse a continuación:\n\n```\nJun 16 17:54:03 hostname kernel: BUG: unable to handle kernel NULL pointer dereference at           (null)\nJun 16 17:54:03 hostname kernel: IP: [<          (null)>]           (null)\n...\nJun 16 17:54:03 hostname kernel: CPU: 0 PID: 733 Comm: gnome-shell Tainted: G     U     O    4.0.5-1-ARCH #1\n...\nJun 16 17:54:03 hostname kernel: Call Trace:\nJun 16 17:54:03 hostname kernel:  [<ffffffffa055cc27>] ? i915_gem_object_sync+0xe7/0x190 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffffa0579634>] intel_execlists_submission+0x294/0x4c0 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffffa05539fc>] i915_gem_do_execbuffer.isra.12+0xabc/0x1230 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffffa055d349>] ? i915_gem_object_set_to_cpu_domain+0xa9/0x1f0 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffff811ba2ae>] ? __kmalloc+0x2e/0x2a0\nJun 16 17:54:03 hostname kernel:  [<ffffffffa0555471>] i915_gem_execbuffer2+0x141/0x2b0 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffffa042fcab>] drm_ioctl+0x1db/0x640 [drm]\nJun 16 17:54:03 hostname kernel:  [<ffffffffa0555330>] ? i915_gem_execbuffer+0x450/0x450 [i915]\nJun 16 17:54:03 hostname kernel:  [<ffffffff8122339b>] ? eventfd_ctx_read+0x16b/0x200\nJun 16 17:54:03 hostname kernel:  [<ffffffff811ebc36>] do_vfs_ioctl+0x2c6/0x4d0\nJun 16 17:54:03 hostname kernel:  [<ffffffff811f6452>] ? __fget+0x72/0xb0\nJun 16 17:54:03 hostname kernel:  [<ffffffff811ebec1>] SyS_ioctl+0x81/0xa0\nJun 16 17:54:03 hostname kernel:  [<ffffffff8157a589>] system_call_fastpath+0x12/0x17\nJun 16 17:54:03 hostname kernel: Code:  Bad RIP value.\nJun 16 17:54:03 hostname kernel: RIP  [<          (null)>]           (null)\n```\n\nEsto puede arreglarse deshabilitando el soporte a execlist, el cual fue cambiado a predeterminado en el núcleo 4.0. Añada el siguiente parámetro de núcleo:\n\n```\ni915.enable_execlists=0\n```\n\nEsto es conocido por estar quebrado hasta al menos el núcleo 4.0.5.\n\n"
+    },
+    {
+      "title": "Retraso en el invitado Windows",
+      "level": 3,
+      "content": "La salida de video del invitado Windows en VirtualBox algunas veces se cuelga hasta que el anfitrión fuerza una actualización de pantalla (e.g. moviendo el cursor). Quitando la opción enable_fbc=1 arregla el problema.\n\n"
+    },
+    {
+      "title": "Parpadeo de la pantalla",
+      "level": 3,
+      "content": "Panel Self Refresh (PSR), una característica para el ahorro de energía utilizada por la iGPU de Intel es conocida por causar pestañeos en algunas instancias FS#49628 FS#49371 FS#50605. Una solución temporal es deshabilitar esta función utilizando el parámetro de núcleo i915.enable_psr=0.\n\n"
+    },
+    {
+      "title": "OpenGL 2.1 con el controlador i915",
+      "level": 3,
+      "content": "La actualización de mesa desde la versión 13.x a la versión 17 puede quebrar el soporte para OpenGL 2.1 en GPUs Intel de tercera generación (GMA3100, véalo aquí), como es descrito en este artículo, revirtiéndolo a OpenGL 1.4. Sin embargo, esto puede ser restaurado manualmente ajustando las opciones /etc/drirc o ~/.drirc del siguiente modo:\n\n```\n/etc/drirc\n```\n\n```\n<driconf>\n...\n    <device driver=\"i915\">\n        <application name=\"Default\">\n            <option name=\"stub_occlusion_query\" value=\"true\" />\n            <option name=\"fragment_shader\" value=\"true\" />\n        </application>\n    </device>\n...\n</driconf>\n```\n\n"
+    },
+    {
+      "title": "Problema de KMS: la consola está limitada a un área pequeña",
+      "level": 3,
+      "content": "Uno de los puertos de video de baja resolución puede estar habilitado en el arranque, lo que está causando que la consola utilice un área reducida de la pantalla. Para arreglarlo, deshabilite explícitamente el puerto con un ajuste de módulo i915 con video=SVIDEO-1:d en el parámetro de línea de órden del núcleo en el gestor de arranque. Vea parámetros de núcleo mayor información.\n\nSi aquello no funciona, intente deshabilitar TV1 o VGA1 en lugar de SVIDEO-1. Los nombre de puertos de video pueden ser listados con xrandr.\n\n"
+    },
+    {
+      "title": "Colores desgastados (problemas con el rango de colores)",
+      "level": 3,
+      "content": "La propiedad \"Broadcast RGB\" en el controlador de Intel define un rango de color que puede ser utilizado por el monitor; puede ser \"Limited 16:235\" (que limita el rango de color para algunas pantallas que no pueden procesar correctamente las señales de rango de color completas) y \"Full\". Desde el núcleo 3.9, la nueva propiedad predeterminada \"Automatic\" intenta determinar si la pantalla soporta el rango de colores total, y si no lo detecta/falla el rango de color se establece en \"Limited 16:235\". Si una falla en la detección limita el rango de colores, esto resulta en colores desgastados y en grises ennegrecidos. En algunas pantallas/conectores, a pesar de que el rango total de colores es soportado correctamente, la detección automática falla y establece el rango de colores limitado (reporte de upstream bug, núcleo 4.18-4.20).\n\nPuede establecer el ajuste de rango de color deseado forzosamente ejecutando xrandr --output <OUT> --set \"Broadcast RGB\" \"Full\" (reemplace <OUT> con la salida de dispositivo apropiada, listada ejecutando xrandr). No hay una forma de volver este ajuste persistente en xorg.conf.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- https://01.org/linuxgraphics/documentation[enlace roto 2023-09-16] (incluye una lista de hardware soportado).\n\n"
+    }
+  ]
+}

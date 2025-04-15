@@ -1,0 +1,36 @@
+{
+  "title": "FAT (Русский)",
+  "url": "https://wiki.archlinux.org/title/FAT_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Файловые системы\n\nИз Википедии:Таблица размещения файлов:\n\n"
+    },
+    {
+      "title": "Создание файловой системы",
+      "level": 2,
+      "content": "Установите пакет dosfstools.\n\nmkfs.fat поддерживает создание FAT12, FAT16 и FAT32. По умолчанию используемый тип файловой системы выбирается автоматически по размеру раздела, но вы также можете явно прописать нужный тип с помощью опции -F. Подробнее смотрите mkfs.fat(8).\n\nФорматирование раздела в FAT32:\n\n```\n# mkfs.fat -F 32 /dev/раздел\n```\n\n"
+    },
+    {
+      "title": "Конфигурация ядра",
+      "level": 2,
+      "content": "Ниже приведен пример конфигурации монтирования по умолчанию в ядре:\n\n```\n$ zgrep -e FAT -e DOS /proc/config.gz | sort -r\n```\n\n```\n# DOS/FAT/NT Filesystems\nCONFIG_FAT_FS=m\nCONFIG_MSDOS_PARTITION=y\nCONFIG_FAT_FS=m\nCONFIG_MSDOS_FS=m\nCONFIG_VFAT_FS=m\nCONFIG_FAT_DEFAULT_CODEPAGE=437\nCONFIG_FAT_DEFAULT_IOCHARSET=\"iso8859-1\"\nCONFIG_NCPFS_SMALLDOS=y\n```\n\nКраткое описание этих параметров:\n\n- Настройки языка: CONFIG_FAT_DEFAULT_CODEPAGE, CONFIG_FAT_DEFAULT_IOCHARSET\n- Все имена файлов в нижнем регистре букв на разделах FAT, если они включены: CONFIG_NCPFS_SMALLDOS\n- Включает поддержку файловых систем FAT: CONFIG_FAT_FS, CONFIG_MSDOS_FS, CONFIG_VFAT_FS\n- Включает поддержку разметки жестких дисков FAT на компьютерах x86: CONFIG_MSDOS_PARTITION\n\nЕсли тип раздела, обнаруженный монтированием, является VFAT, тогда запускается скрипт /usr/bin/mount.vfat.\n\n```\n/usr/bin/mount.vfat\n```\n\n```\n#!/bin/bash\n#mount VFAT with full rw (read-write) permissions for all users\n#/usr/bin/mount -i -t vfat -oumask=0000,iocharset=utf8 \"$@\"\n#The above is the same as\nmount -i -t vfat -oiocharset=utf8,fmask=0000,dmask=0000 \"$@\"\n```\n\n"
+    },
+    {
+      "title": "Запись на FAT32 в качестве обычного пользователя",
+      "level": 2,
+      "content": "Чтобы записать на раздел FAT32, вы должны внести несколько изменений в файл fstab.\n\n```\n/etc/fstab\n```\n\n```\n/dev/sdxY    /mnt/some_folder  vfat   user,rw\n```\n\nФлаг user означает, что любой пользователь (даже не root) может монтировать и размонтировать раздел /dev/sdxY (mount(8) § Non-superuser mounts). Флаг rw дает доступ на чтение и запись.\n\nНапример, если ваш раздел FAT32 находится на /dev/sda9, и вы хотите смонтировать его на /mnt/fat32, вы должны использовать:\n\n```\n/etc/fstab\n```\n\n```\n/dev/sda9    /mnt/fat32        vfat   user,rw\n```\n\nТеперь любой пользователь может смонтировать его с помощью:\n\n```\n$ mount /mnt/fat32\n```\n\nИ размонтировать его с помощью:\n\n```\n$ umount /mnt/fat32\n```\n\nИмейте в виду, что FAT не поддерживает права доступа Linux. С параметрами монтирования по умолчанию все файлы будут считаться исполняемыми. Вы можете использовать опцию showexec вместо параметров umask и dmask, которые отметит исполняемыми только файлы Windows (com, exe, bat). Смотрите также mount(8).\n\n"
+    },
+    {
+      "title": "Определение типа FAT",
+      "level": 2,
+      "content": "Если вы хотите узнать, какой конкретно тип FAT используется на определённом разделе, используйте команду file:\n\n```\n# file -s /dev/раздел\n```\n\n```\n/dev/раздел: DOS/MBR boot sector, code offset 0x3c+2, OEM-ID \"mkfs.fat\", sectors/cluster 4, root entries 512, sectors 4096 (volumes <=32 MB), Media descriptor 0xf8, sectors/FAT 3, sectors/track 32, heads 64, serial number 0x5bc09c21, unlabeled, FAT (12 bit)\n```\n\nТакже можно использовать команду minfo из пакета mtools:\n\n```\n# minfo -i /dev/раздел ::\n```\n\n```\ndevice information:\n===================\nfilename=\"/dev/раздел\"\nsectors per track: 32\nheads: 64\ncylinders: 2\n\nmedia byte: f8\n\nmformat command line: mformat -t 2 -h 64 -s 32 -i \"/dev/раздел\" ::\n\nbootsector information\n======================\nbanner:\"mkfs.fat\"\nsector size: 512 bytes\ncluster size: 4 sectors\nreserved (boot) sectors: 1\nfats: 2\nmax available root directory slots: 512\nsmall size: 4096 sectors\nmedia descriptor byte: 0xf8\nsectors per fat: 3\nsectors per track: 32\nheads: 64\nhidden sectors: 0\nbig size: 0 sectors\nphysical drive id: 0x80\nreserved=0x0\ndos4=0x29\nserial number: 5BC09C21\ndisk label=\"NO NAME    \"\ndisk type=\"FAT12   \"\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- MountFATFileSystems\n\n"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "title": "Fan speed control (日本語)",
+  "url": "https://wiki.archlinux.org/title/Fan_speed_control_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nこの記事あるいはセクションは翻訳の途中です。 ノート: 翻訳が古くなっています。 (議論: トーク:ファンスピード制御#)\n\n関連記事\n\n- Lm_sensors\n- CPU の低電圧化\n- PHC\n- CPU 周波数スケーリング\n\nファン制御はシステムに様々な恩恵をもたらします。CPU があまり使われていないときにファンを完全に停止することでシステムを静かにしたり電力を節約することが可能です。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 概要\n- 2 Fancontrol (lm-sensors) 2.1 lm-sensors 2.1.1 fan_div の増加 2.2 設定 2.2.1 調整 2.3 fancontrol\n- 3 NBFC 3.1 インストール 3.2 設定\n- 4 Dell ノートパソコン 4.1 インストール 4.2 設定 4.3 BIOS によるファンスピード制御を無効化 4.4 サービスとしてインストール\n- 5 ThinkPad ノートパソコン 5.1 インストール 5.2 実行 5.3 消滅した古いパッケージ\n- 6 Asus ノートパソコン 6.1 カーネルモジュールの概要 6.2 asus-nb-wmi 6.3 asus_fan 6.4 pmwconfig で設定ファイルを生成\n- 7 AMDGPU の sysfs によるファン制御 7.1 手動制御の設定 7.2 amdgpu-fan 7.3 amdfand-bin 7.4 ファンカーブスクリプト 7.4.1 ファンカーブスクリプトを設定\n\n- 2.1 lm-sensors 2.1.1 fan_div の増加\n- 2.2 設定 2.2.1 調整\n- 2.3 fancontrol\n\n- 2.1.1 fan_div の増加\n\n- 2.2.1 調整\n\n- 3.1 インストール\n- 3.2 設定\n\n- 4.1 インストール\n- 4.2 設定\n- 4.3 BIOS によるファンスピード制御を無効化\n- 4.4 サービスとしてインストール\n\n- 5.1 インストール\n- 5.2 実行\n- 5.3 消滅した古いパッケージ\n\n- 6.1 カーネルモジュールの概要\n- 6.2 asus-nb-wmi\n- 6.3 asus_fan\n- 6.4 pmwconfig で設定ファイルを生成\n\n- 7.1 手動制御の設定\n- 7.2 amdgpu-fan\n- 7.3 amdfand-bin\n- 7.4 ファンカーブスクリプト 7.4.1 ファンカーブスクリプトを設定\n\n- 7.4.1 ファンカーブスクリプトを設定\n\n"
+    },
+    {
+      "title": "概要",
+      "level": 2,
+      "content": "デスクトップやノートパソコンのファンをコントロールする方法は複数存在します。必要に応じて選択してください:\n\n- Fancontrol (lm-sensors) - ファンの速度を設定するスクリプト (Bash で書かれています)。デスクトップやシングルファンのディスクリートグラフィックカードが載っていないノートパソコンに適しています。\n- NoteBook Fan Control (NBFC) - ノートパソコンのファンを制御するクロスプラットフォームのソリューション。C# で書かれており Mono ランタイムで動作します。Fancontrol でサポートされていない最新のノートパソコンに適しています。\n- Dell ノートパソコン - 一部の Dell のノートパソコンで使用できるファン制御デーモン。\n- ThinkPad ノートパソコン - 一部の ThinkPad ノートパソコンで使用できるファン設定。\n- Asus ノートパソコン - Fancontrol や手動制御で一部の Asus ノートパソコンを設定。\n\n"
+    },
+    {
+      "title": "Fancontrol (lm-sensors)",
+      "level": 2,
+      "content": "lm_sensors に含まれている fancontrol を使うことで CPU やケースのファンの速度や音をコントロールできます。\n\n新しいマザーボードの場合、サポートが Linux カーネルにまだ入っていない可能性があります。公式の lm-sensors デバイス表 を確認して、そのようなマザーボードの場合、実験的なドライバーが使えるかどうか見て下さい。\n\nfancontrol に必要なモジュールをロードするのに lm_sensors.service を使うのは推奨されません。代わりに、モジュールを /etc/modules-load.d/load_these.conf に手動で記述してください。モジュールがロードされる順番によって hwmon に必要なシンボリックリンクが作成される順番が決まるからです。言い換えれば、lm_sensors.service を使用すると起動する度に何が起きるかわからなくなり、一貫性の観点からファンコントロールの設定ファイルが無意味になってしまいます。\n\n/etc/conf.d/lm_sensors でモジュールを確認できます。モジュールが存在しない場合、root で sensors-detect を実行してください。modules-load.d ファイルでは1行毎に1つのモジュールを記述します。モジュールを指定すると再現可能な順番が作成されます。設定ファイルで絶対的なデバイス名を使用するという方法もあります [1]。\n\n"
+    },
+    {
+      "title": "lm-sensors",
+      "level": 3,
+      "content": "lm_sensors をセットアップしてください。\n\n```\n$ sensors\n```\n\n```\ncoretemp-isa-0000\nAdapter: ISA adapter\nCore 0:      +29.0°C  (high = +76.0°C, crit = +100.0°C)  \n\n[...]\n\nit8718-isa-0290\nAdapter: ISA adapter\nVcc:         +1.14 V  (min =  +0.00 V, max =  +4.08 V)   \nVTT:         +2.08 V  (min =  +0.00 V, max =  +4.08 V)   \n+3.3V:       +3.33 V  (min =  +0.00 V, max =  +4.08 V)   \nNB Vcore:    +0.03 V  (min =  +0.00 V, max =  +4.08 V)   \nVDRAM:       +2.13 V  (min =  +0.00 V, max =  +4.08 V)   \nfan1:        690 RPM  (min =   10 RPM)\ntemp1:       +37.5°C  (low  = +129.5°C, high = +129.5°C)  sensor = thermistor\ntemp2:       +25.0°C  (low  = +127.0°C, high = +127.0°C)  sensor = thermal diode\n```\n\n出力に CPU ファンの RPM の値が表示されない場合、fan divisor を増やす必要があります。ファンの速度が表示され0よりも高い場合は、次のステップにスキップしてください。\n\n"
+    },
+    {
+      "title": "fan_div の増加",
+      "level": 4,
+      "content": "sensors の出力の1行目は温度や電圧を調べるためにマザーボードによって使用されるチップセットです。\n\n/etc/sensors.d/ にファイルを作成してください:\n\n```\n/etc/sensors.d/fan-speed-control.conf\n```\n\n```\nchip \"coretemp-isa-*\"\nset fanX_div 4\n```\n\ncoretemp-isa- はチップセットの名前に、X は変更する CPU の番号に置き換えてください。\n\nファイルを保存して、root で実行:\n\n```\n# sensors -s\n```\n\nこのコマンドは設定ファイルをリロードします。もう一度 sensors を実行して、RPM が正しく読み出されたか確認して下さい。読み出されない場合は、divisor を 8, 16, 32 と増やしていってください。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 3,
+      "content": "sensors を正しく設定できたら、pwmconfig を実行してテストを行い、速度のコントロールを設定します。pwmconfig の手順にしたがって基本速度をセットアップしてください。デフォルトの設定オプションで新しいファイル /etc/fancontrol が作成されるはずです。\n\n"
+    },
+    {
+      "title": "調整",
+      "level": 4,
+      "content": "生成された設定をもっと細かく調整したい場合、以下が設定ファイルの例です:\n\n```\nINTERVAL=10\nDEVPATH=hwmon0=devices/platform/coretemp.0 hwmon2=devices/platform/w83627ehf.656\nDEVNAME=hwmon0=coretemp hwmon2=w83627dhg\nFCTEMPS=hwmon0/device/pwm1=hwmon0/device/temp1_input\nFCFANS= hwmon0/device/pwm1=hwmon0/device/fan1_input\nMINTEMP=hwmon0/device/pwm1=20\nMAXTEMP=hwmon0/device/pwm1=55\nMINSTART=hwmon0/device/pwm1=150\nMINSTOP=hwmon0/device/pwm1=105\n```\n\n- INTERVAL: デーモンが CPU 温度を問い合せてファンの速度を調整する頻度。INTERVAL は秒数で指定します。\n\n設定ファイルの残りの部分は設定オプションごとに (少なくとも) 2つの値に分けられます。それぞれの設定オプションではまずファンの速度を設定するのに書き出される PWM デバイスが指定されており、次の\"フィールド\"が実際に設定する値となっています。これによって複数のファンと温度の監視・コントロールが可能です。\n\n- FCTEMPS: CPU 温度を読み込むための温度インプットデバイス。上記の例では /sys/class/hwmon/hwmon0/device/temp1_input。\n- FCFANS: (温度と同じように) /sys/class/hwmon/hwmon0/device/fan1_input で読み込むことができる、現在のファン速度。\n- MINTEMP: CPU ファンを止める温度 (°C)。効率的な CPU はアイドル状態のときファンを必要としません。安全だということが確認できる温度の範囲内で設定してください。この値を0に設定するのは推奨されません。ハードウェアが壊れてしまう可能性があります。\n- MAXTEMP: ファンを最大速度で回す温度 (°C)。CPU が壊れたりシャットダウンする温度から10か20ほど低い温度に設定するべきです (°C)。この値を MINTEMP に近づけるとファンがずっと高回転することになります。\n- MINSTOP: ファンが回転を停止する PWM の値。ファンごとに値を少し変えます。/sys/class/hwmon/hwmon0/device/pwm1 に異なる値を echo (0 から 255 の間) して CPU ファンを監視することで調整できます。CPU ファンが停止したら、その値を使って下さい。\n- MINSTART: ファンが回転をもう一度開始する PWM の値。大きな電圧が必要になるので普通は MINSTOP より高い値にします。\n\nさらに設定ファイルが最新であることを fancontrol が検証するのに必要な2つの設定があります。設定名とイコール記号で始まって、スペースで区切られた hwmon-class-device=setting のグループが後ろに付く行です。設定のどこかに使用する hwmon クラスデバイスごとに設定を指定しないと、fancontrol は動作しません。\n\n- DEVPATH: 物理デバイスを設定。次のコマンドを実行することで確認できます:\n\n```\nreadlink -f /sys/class/hwmon/[your-hwmon-device]/device | sed -e 's/^\\/sys\\///'\n```\n\n- DEVNAME: デバイスの名前を設定。次を実行して下さい:\n\n```\n$ sed -e 's/[[:space:]=]/_/g' /sys/class/hwmon/[your-hwmon-device]/device/name\n```\n\n- MAXPWM や MINPWM オプションを使ってファンの速度の範囲を制限できます。詳しくは fancontrol のマニュアルページを見て下さい。\n- モジュールのロードのタイミングによって、再起動で DEVPATH だけでなく温度センサーのパスも変わることがあります (hwmon0/device/temp1_input が hwmon0/temp1_input になる)。これは大抵カーネルの更新時に起こります。システムログをチェックしてトラブルメーカーが誰なのか確認して下さい: # systemctl status fancontrol.service。そして設定ファイルを適切に修正して下さい。\n\n"
+    },
+    {
+      "title": "fancontrol",
+      "level": 3,
+      "content": "fancontrol を実行するには:\n\n```\n# /usr/bin/fancontrol\n```\n\n正しく設定できていればエラーが表示されずにシステムファンのコントロールが開始されます。このコマンドを実行した後、すぐにシステムファンが遅くなるのが聞こえるはずです。\n\nfancontrol を起動時に自動的に動作させるには、fancontrol.service を有効化してください。\n\n非公式の GUI として fancontrol-guiAUR または fancontrol-kcmAUR をインストールして使うこともできます。\n\n"
+    },
+    {
+      "title": "NBFC",
+      "level": 2,
+      "content": "NBFC はノートパソコンのためのクロスプラットフォームのファン制御ソリューションです。強力な設定システムを備えており、最新のノートパソコンを含めて様々なモデルのノートパソコンにあわせて調整できます。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 3,
+      "content": "NBFC は nbfcAUR または nbfc-gitAUR パッケージでインストールできます。インストールしたら nbfc.service を起動・有効化してください。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 3,
+      "content": "NBFC にはあらかじめプロファイルが付属しています。プロファイルは /opt/nbfc/Configs/ ディレクトリにインストールされます。プロファイルを使うときは、拡張子を付けずに正確なプロファイル名を使ってください (例えば some profile.xml なら \"some profile\" となります)。\n\nNBFC が推奨するプロファイルが存在しないか確認:\n\n```\n$ nbfc config -r\n```\n\nプロファイルが存在した場合、プロファイルを使ってみてファンの速度がどのように管理されるか確認してみてください。例:\n\n```\n$ nbfc config -a \"Asus Zenbook UX430UA\"\n```\n\n推奨モデルが存在しない場合、NBFC の git リポジトリ や /opt/nbfc/Configs/ を開いて同じメーカーから製造された類似機種が存在しないか確認してください。例えば Asus Zenbook UX430UQ の場合、Asus Zenbook UX430UA の設定は全く機能しませんが (ファンが常に停止した状態になります)、Asus Zenbook UX410UQ の設定は上手く機能します。\n\nオプションを確認するには nbfc を実行してください。詳しい情報は 上流のページ を参照してください。\n\n"
+    },
+    {
+      "title": "Dell ノートパソコン",
+      "level": 2,
+      "content": "i8kutilsAUR は Dell Inspiron や Latitude ノートパソコンでファンの速度を制御するデーモンです。dell_smm_hwmon ドライバー (旧名 i8k) による /proc/i8k インターフェイスが利用されます。ノートパソコンの機種によって結果は変わります。\n\ni8kutils は、一部の Dell Inspiron および Latitude ラップトップの CPU 温度に応じてファン速度を設定するデーモンです。これは、i8k ドライバー (dell_smm_hwmon のエイリアス) によって提供される /proc/i8k インターフェイスを使用します。結果はラップトップの正確なモデルによって異なります。\n\nfancontrol がシステムで動作しない場合は、ignore_dmi=1 カーネルモジュールパラメータ を使用して dell_smm_hwmon をロードします。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 3,
+      "content": "i8kutilsAUR ファン速度を制御するためのメインパッケージです。さらに、次のものをインストールすることもできます。\n\n- acpi — i8kmon を使用するには、i8kmon をインストールする必要があります。\n- tcl — i8kmon をバックグラウンドサービスとして実行する為に必要です。 (--daemon オプションを使用)\n- tk — X11 デスクトップアプレットとして実行するには、tcl と一緒にインストールする必要があります。\n- dell-bios-fan-control-gitAUR — BIOS がファン制御をオーバーライドする場合に推奨されます。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 3,
+      "content": "デフォルトでは i8kmon は CPU の温度やファンの速度を受動的に監視することしかしません。ファン速度の制御を有効にするには、--auto オプションを使用して実行するか、あるいは /etc/i8kutils/i8kmon.conf で永続的にオプションを有効にしてください:\n\n```\nset config(auto)       1\n```\n\n同じ設定ファイルでファンの速度が変化する温度を調整できます。使用できるファンの速度は3つだけです (high, low, off)。以下のようになっているセクションを見てください:\n\n```\nset config(0)  {{0 0}  -1  55  -1  55}\nset config(1)  {{1 1}  45  75  45  75}\nset config(2)  {{2 2}  65 128  65 128}\n```\n\n上記の例では CPU 温度が 55 °C に達したらファンを低速で回し始め、75 °C で高速に切り替えます。65 °C まで温度が落ちたら低速に戻り、45 °C になったらファンは完全に停止します。\n\n"
+    },
+    {
+      "title": "BIOS によるファンスピード制御を無効化",
+      "level": 3,
+      "content": "i8kmon で制御できない場合は BIOS によるファンの速度コントロールをオフにする必要があります。ノートパソコンによっては smm ユーティリティを使ってオフにできます。このユーティリティは I/O ポートに直接書き込みを行ってプロセッサの System Management Mode を呼び出すため非常に危険です。自己責任で使ってください。\n\nsmm は手動でコンパイル・インストールする必要があります。64ビット環境では、gcc-multilib[リンク切れ: 置換パッケージ: gcc] が必要です。i8kutils のソースにある smm.c ファイルを見つけてコンパイルしてください:\n\n```\n$ gcc -m32 -o smm smm.c\n```\n\nBIOS によるファンの速度制御を無効化するには、以下のコマンドを root で実行:\n\n```\n# ./smm 30a3\n```\n\n再度有効化するには:\n\n```\n# ./smm 31a3\n```\n\n"
+    },
+    {
+      "title": "サービスとしてインストール",
+      "level": 3,
+      "content": "以下のようなユニットファイルを使うことで systemd サービスとして i8kmon を自動で起動できます:\n\n```\n/etc/systemd/system/i8kmon.service\n```\n\n```\n[Unit]\nDescription=i8kmon\n\n[Service]\n#ExecStartPre=/usr/bin/smm 30a3  # uncomment to disable BIOS fan control\n#ExecStopPost=/usr/bin/smm 31a3  # ... and re-enable it afterwards\nExecStart=/usr/bin/i8kmon -d\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "ThinkPad ノートパソコン",
+      "level": 2,
+      "content": "デフォルトでは、組み込みコントローラ (EC) がファンの速度を制御します。速度が遅すぎる、または音がうるさい場合、デーモンを使用することで制御を乗っ取ることができます。ただし危険性も伴います: あなたが責任を持って温度をコントロールしなければならなくなります。過度の高温はノートパソコンの寿命が縮まったり、致命的なダメージを与える可能性があります。安全上の理由からファンの制御はデフォルトで無効になっています。ファンの制御を有効にするには、カーネルパラメータに fan_control=1 を追加してください。\n\n現在 AUR からインストールすることができるファン制御デーモンは simpfand-gitAUR と thinkfanAUR です。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 3,
+      "content": "thinkfanAUR をインストールしてください。インストールしたら、パッケージに含まれているファイルを確認してください:\n\n```\n# pacman -Ql thinkfan\n```\n\nthinkfan パッケージは以下の内容の /usr/lib/modprobe.d/thinkpad_acpi.conf をインストールするため、ファン制御はデフォルトで有効になります:\n\n```\noptions thinkpad_acpi fan_control=1\n```\n\nファンのレベルを確認するには:\n\n```\n$ su\n# modprobe thinkpad_acpi\n# cat /proc/acpi/ibm/fan\n```\n\nデフォルトではファンレベルが \"auto\" になっているはずです。/proc/acpi/ibm/fan に設定したいレベルを echo することで手動でファンの速度を制御できます。thinkfan デーモンは自動的に設定を行います。\n\nサンプル設定ファイルのどれか (例: /usr/share/doc/thinkfan/examples/thinkfan.conf.simple) を /etc/thinkfan.conf にコピーして、必要に応じて編集してください。このファイルではどのセンサーを読み込むのか指定したり、ファンを制御するのに使用するインターフェイスを指定します。/proc/acpi/ibm/fan が使用できない場合、汎用の hwmon センサーが使われるように以下のように指定する必要があります:\n\n```\nhwmon /sys/devices/virtual/thermal/thermal_zone0/temp\n```\n\n"
+    },
+    {
+      "title": "実行",
+      "level": 3,
+      "content": "thinkfan を手動で (root で) 実行して設定をテストできます:\n\n```\n# thinkfan -n\n```\n\n他のプログラムを実行してみて負担によってどのようにファンが変わるか確認してください。\n\n適切に設定できたら、以下のコマンドで thinkfan コマンドを起動できます (root で実行):\n\n```\n# systemctl start thinkfan\n```\n\nもしくはシステムの起動時に自動的にロードするには:\n\n```\n# systemctl enable thinkfan\n```\n\n"
+    },
+    {
+      "title": "消滅した古いパッケージ",
+      "level": 3,
+      "content": "tpfandAUR[リンク切れ: アーカイブ: aur-mirror] と tpfand-no-halAUR[リンク切れ: アーカイブ: aur-mirror] (HAL 不要版) はすでに開発が止まっており、インストールできません。AUR に存在していた GTK+ フロントエンドの tpfan-adminAUR[リンク切れ: アーカイブ: aur-mirror] パッケージは温度の監視や分岐点を視覚的に変更することができました。\n\ntpfand が開発されなくなったことにより、tpfanco と呼ばれるフォークが存在していました (実行ファイルの名前は tpfand と同じです): tpfanco-svnAUR[リンク切れ: アーカイブ: aur-mirror]。\n\ntpfand の設定ファイルは /etc/tpfand.conf でした (tpfanco も同じファイルを使用します)。\n\nさらに、AUR の tpfand-profilesAUR[リンク切れ: アーカイブ: aur-mirror] パッケージは様々な thinkpad モデルの最新のファンプロファイルを提供していました。\n\n"
+    },
+    {
+      "title": "Asus ノートパソコン",
+      "level": 2,
+      "content": "このセクションでは Fancontrol (lm-sensors) の Asus ノートパソコンでのドライバー設定について説明します。\n\n"
+    },
+    {
+      "title": "カーネルモジュールの概要",
+      "level": 3,
+      "content": "- asus-nb-wmi は Linux カーネルに含まれているカーネルモジュールで、Asus 製ノートパソコンでは自動的にロードされます。制御できるのはシングルファンだけで、ファンがふたつある場合、制御することはできません。このモジュールをブラックリストに追加するとキーボードバックライトが動作しなくなります。\n- asus_fan は一部の古い Asus ノートパソコンのファンを制御できるカーネルモジュールです。最新のモデルでは機能しません。\n\n設定ファイルでは sysfs ファイルのフルパスを使います (例: /sys/devices/platform/asus-nb-wmi/hwmon/hwmon[[:print:]]*/pwm1)。hwmon1 という名前は再起動した後に他の番号に変わってしまう可能性があるためです。Fancontrol (lm-sensors) は Bash で書かれているため、設定ファイルではフルパスを使うことが可能です。完全な /etc/fancontrol の設定例は ASUS N550JV#Fan control を参照してください。\n\n"
+    },
+    {
+      "title": "asus-nb-wmi",
+      "level": 3,
+      "content": "asus-nb-wmi カーネルモジュールはカーネルに含まれているため特にパッケージのインストールは必要ありません。\n\n以下が制御するコマンドです。ファンを制御できるかどうか確認してください:\n\n```\n# echo 255 > /sys/devices/platform/asus-nb-wmi/hwmon/hwmon[[:print:]]*/pwm1           # Full fan speed (Value: 255)\n# echo 0 > /sys/devices/platform/asus-nb-wmi/hwmon/hwmon[[:print:]]*/pwm1             # Fan is stopped (Value: 0)\n# echo 2 > /sys/devices/platform/asus-nb-wmi/hwmon/hwmon[[[:print:]]*/pwm1_enable     # Change fan mode to automatic\n# echo 1 > /sys/devices/platform/asus-nb-wmi/hwmon/hwmon[[:print:]]*/pwm1_enable      # Change fan mode to manual\n```\n\n上記のコマンドでファンを制御できたら #pmwconfig で設定ファイルを生成に進んでください。\n\n"
+    },
+    {
+      "title": "asus_fan",
+      "level": 3,
+      "content": "asus-fan-dkms-gitAUR をインストールしてください。カーネルモジュールをロード:\n\n```\n# modprobe asus_fan\n```\n\nファンを制御できるかどうか確認してください:\n\n```\n# echo 255 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1          # Full CPU fan speed (Value: 255)\n# echo 0 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1            # CPU fan is stopped (Value: 0)\n# echo 255 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1          # Full GFX fan speed (Value: 255)\n# echo 0 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1            # GFX fan is stopped (Value: 0)\n# echo 2 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1_enable     # Change CPU fan mode to automatic\n# echo 1 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm1_enable     # Change CPU fan mode to manual\n# echo 2 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm2_enable     # Change GFX fan mode to automatic\n# echo 1 > /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/pwm2_enable     # Change GFX fan mode to manual\n# cat /sys/devices/platform/asus_fan/hwmon/hwmon[[:print:]]*/temp1_input          # Display GFX temperature (will always be 0 when GFX is disabled/unused)\n```\n\n問題なく機能するようであれば、起動時にカーネルモジュールをロードするように設定すると良いでしょう:\n\n```\n/etc/modules-load.d/asus_fan.conf\n```\n\n```\n# Load asus_fan module on boot:\nasus_fan\n```\n\n#pmwconfig で設定ファイルを生成に進んでください。\n\n"
+    },
+    {
+      "title": "pmwconfig で設定ファイルを生成",
+      "level": 3,
+      "content": "pwmconfig で設定ファイルを生成したときに There are no working fan sensors, all readings are 0 というエラーが表示される場合、コンソールを開いて以下のコマンドを実行してください:\n\n```\n# watch -n 1 \"echo 2 > /sys/devices/platform/<kernel_module>/hwmon/hwmon[[:print:]]*/pwm1_enable\"\n```\n\nasus_fan カーネルモジュールを使っていてファンが2個搭載されている場合、別のコンソールで以下のコマンドを実行してください:\n\n```\n# watch -n 1 \"echo 2 > /sys/devices/platform/<kernel_module>/hwmon/hwmon[[:print:]]*/pwm2_enable\"\n```\n\n最後に、別のコンソールで以下のコマンドを実行:\n\n```\n# pwmconfig\n```\n\n設定ファイルが生成されたら、watch コマンドを実行しているコンソールは止めてください。Fancontrol (lm-sensors) に進んでください。\n\n"
+    },
+    {
+      "title": "AMDGPU の sysfs によるファン制御",
+      "level": 2,
+      "content": "AMDGPU カーネルドライバは sysfs の hwmon を通して、グラフィックカードのファン制御を提供します。\n\n"
+    },
+    {
+      "title": "手動制御の設定",
+      "level": 3,
+      "content": "ファンの制御を自動から手動に切り替えるために以下を実行してください:\n\n```\n# echo \"1\" > /sys/class/drm/card0/device/hwmon/hwmon0/pwm1_enable\n```\n\n例えば、ファンの速度を 50% に設定するには(100% は 255 PWM サイクルなので、希望するファン速度のパーセンテージに 2.55 を掛けて計算します):\n\n```\n# echo \"128\" > /sys/class/drm/card0/device/hwmon/hwmon0/pwm1\n```\n\nファン制御を自動に戻すには:\n\n```\n# echo \"2\" > /sys/class/drm/card0/device/hwmon/hwmon0/pwm1_enable\n```\n\n"
+    },
+    {
+      "title": "amdgpu-fan",
+      "level": 3,
+      "content": "amdgpu-fanAUR パッケージは AMDGPU 対応のビデオカード用の、Python で書かれた自動ファンコントローラです。\"speed-matrix\" を使って、GPU の温度とファンの回転数を対応付けます。例えば:\n\n```\nspeed_matrix:  # -[temp(*C), speed(0-100%)]\n- [0, 0]\n- [40, 30]\n- [60, 50]\n- [80, 100]\n```\n\namdgpu-fan.service を起動/有効化してファン制御サービスを起動してください。\n\n"
+    },
+    {
+      "title": "amdfand-bin",
+      "level": 3,
+      "content": "amdfand-binAUR パッケージは amdgpu-fanAUR のネイティブな代替です。amdfand.service を起動/有効化してファン制御サービスを起動してください。\n\nこのツールには GUI クライアントもあります: amdguid-glow-binAUR (Xorg) と amdguid-wayland-binAUR (Wayland) です。クライアントを起動する前に、amdgui-helper.service を起動/有効化する必要があります。\n\n"
+    },
+    {
+      "title": "ファンカーブスクリプト",
+      "level": 3,
+      "content": "hwmon のsysfs が提供する機能はファンの制御だけでなく、GPU 温度の読み出しも提供します:\n\n```\ncat /sys/class/drm/card0/device/hwmon/hwmon0/temp1_input\n```\n\nこれは GPU の温度を °C + 3つのゼロで出力します(例: 33°C の場合 33000)。\n\ngrmat による amdgpu-fancontrol bash スクリプトは、説明した sysfs hwmon 機能を使って完全自動のファン制御を行います。また、スクリプトの先頭で抽象化された設定フィールドを提供することにより、ファンカーブの温度/PWM サイクルの割当やヒステリシスをかんたんに調整できます。\n\n安全上の理由により、スクリプトはシャットダウン時にファン制御を再び自動に設定します。これにより、ファンの回転数が上がる場合があります。これは、function reset_on_fail セクションで set_fanmode 1 を設定すれば、セキュリティを犠牲にして回避することができます。\n\n"
+    },
+    {
+      "title": "ファンカーブスクリプトを設定",
+      "level": 4,
+      "content": "スクリプトの起動は systemd init システムを通して行うことが推奨されます。この方法ではスクリプトの上長出力を journalctl/systemctl status で読むことができます。この目的のための .service ユニットファイルが GitHub リポジトリにすでに含まれています。\n\nまた、場合によっては、ハイバネート後にスクリプトが自動的に再び正しく機能するようにするために、root-resume.service を通してスクリプトを再起動する必要があります:\n\n```\n/etc/systemd/system/root-resume.service\n```\n\n```\n[Unit]\nDescription=Local system resume actions\nAfter=suspend.target\n\n[Service]\nType=simple\nExecStart=/usr/bin/systemctl restart amdgpu-fancontrol.service\n\n[Install]\nWantedBy=suspend.target\n```\n\n"
+    }
+  ]
+}

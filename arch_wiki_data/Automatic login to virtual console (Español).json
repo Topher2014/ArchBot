@@ -1,0 +1,56 @@
+{
+  "title": "Automatic login to virtual console (Español)",
+  "url": "https://wiki.archlinux.org/title/Automatic_login_to_virtual_console_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-10** \n\nArtículos relacionados\n\n- Gestor de pantalla\n\nUn getty es el nombre genérico de un programa que gestiona una línea de terminal y su terminal conectada. Su propósito es proteger el sistema del acceso no autorizado. En general, cada proceso getty se inicia mediante systemd y gestiona una sola línea de terminal.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "agetty es el getty predeterminado en Arch Linux, como parte del paquete util-linux. Modifica la configuración de TTY mientras espera un inicio de sesión para que las nuevas líneas no se traduzcan a CR-LF. Esto tiende a causar un \"efecto escalera\" para los mensajes impresos en la consola. Agetty gestiona las consolas virtuales y seis de estas consolas virtuales se proporcionan de forma predeterminada en Arch Linux. Normalmente se puede acceder a ellas presionando desde Control+Alt+F1 hasta Control+Alt+F6.\n\nLas alternativas incluyen:\n\n- mingetty — Un getty mínimo que permite inicios de sesión automáticos.\n\n- fbgetty — Una consola getty como mingetty, que soporta framebuffers.\n\n- mgetty — Un programa versátil para manejar todos los aspectos de un módem bajo Unix.\n\n"
+    },
+    {
+      "title": "Añadir consolas virtuales adicionales",
+      "level": 2,
+      "content": "Abra el archivo /etc/systemd/logind.conf y configure la opción NAutoVTs=6 a la cantidad de consolas virtuales que desee al inicio.\n\nSi desea iniciar una temporalmente, puede iniciar un servicio getty en el TTY deseado escribiendo:\n\n```\n$ systemctl start getty@ttyN.service\n```\n\n"
+    },
+    {
+      "title": "Inicio de sesión automático a la consola virtual",
+      "level": 2,
+      "content": "La configuración se basa en archivos de entrada de systemd para anular los parámetros predeterminados pasados ​​a agetty.\n\nLa configuración es diferente para las consolas virtuales y las serie. En la mayoría de los casos, quiere configurar el inicio de sesión automático en una consola virtual, cuyo nombre de dispositivo es ttyN, donde N es un número. La configuración de inicio de sesión automático para consolas serie será ligeramente diferente. Los nombres de los dispositivos de las consolas serie aparecen como ttySN, donde N es un número.\n\n"
+    },
+    {
+      "title": "Consola virtual",
+      "level": 3,
+      "content": "Edite la unidad provista ya sea manualmente creando el siguiente fragmento de código, o ejecutando systemctl edit getty@tty1 y pegando su contenido:\n\n```\n/etc/systemd/system/getty@tty1.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/usr/bin/agetty --autologin usuario --noclear %I $TERM\n```\n\nSi no desea un inicio de sesión automático completo, pero tampoco desea escribir su nombre de usuario, puede reemplazar --autologin usuario por --skip-login --login-options usuario.\n\nSi desea utilizar un tty distinto a tty1, véase el FAQ de systemd.\n\n"
+    },
+    {
+      "title": "Consola serie",
+      "level": 3,
+      "content": "Cree el siguiente archivo (y directorios principales):\n\n```\n/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/usr/bin/agetty --autologin usuario -s %I 115200,38400,9600 vt102\n```\n\n"
+    },
+    {
+      "title": "Consola Nspawn",
+      "level": 3,
+      "content": "Para configurar el inicio de sesión automático para un contenedor systemd-nspawn, anule console-getty.service:\n\n```\n/etc/systemd/system/console-getty.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty --noclear --autologin usuario --keep-baud console 115200,38400,9600 $TERM\n```\n\nSi se utiliza el método machinectl login mi-contenedor para acceder al contenedor, también añada --autologin usuario a la plantilla container-getty@.service que gestiona los pseudo ttys pts/[0-9:\n\n```\n/etc/systemd/system/container-getty@.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty --noclear --autologin usuario --keep-baud pts/%I 115200,38400,9600 $TERM\n```\n\n"
+    },
+    {
+      "title": "Solicitar solo la contraseña para un usuario predeterminado en el inicio de sesión de la consola virtual",
+      "level": 2,
+      "content": "Getty se puede utilizar para iniciar sesión desde una consola virtual con un usuario predeterminado, escribiendo la contraseña pero sin necesidad de introducir el nombre de usuario. Por ejemplo, para solicitar la contraseña de usuario en tty1:\n\n```\n/etc/systemd/system/getty@tty1.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -n -o usuario %I\n```\n\ny después:\n\n```\n# systemctl enable getty@tty1\n```\n\n"
+    },
+    {
+      "title": "Mantener los mensajes de arranque en tty1",
+      "level": 2,
+      "content": "De manera predeterminada, Arch tiene habilitado el servicio getty@tty1. El archivo de servicio ya pasa --noclear, lo que evita que Agetty borre la pantalla. Sin embargo systemd borra la pantalla antes de iniciarla. Para deshabilitar este comportamiento, cree /etc/systemd/system/getty@tty1.service.d/noclear.conf:\n\n```\n/etc/systemd/system/getty@tty1.service.d/noclear.conf\n```\n\n```\n[Service]\nTTYVTDisallocate=no\n```\n\nEsto reemplaza solo TTYVTDisallocate para agetty en TTY1, y deja el archivo de servicio global /usr/lib/systemd/system/getty@.service sin tocar. Véase Systemd (Español)#Modificar los archivos de unidad suministrados.\n\n- Asegúrese de eliminar quiet de los parámetros del kernel.\n- El inicio tardío de KMS puede hacer que se borren los primeros mensajes de arranque. Véase Kernel mode setting#Early KMS start o Kernel mode setting#Disabling modesetting.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Systemd (Español)#Cambiar el target predeterminado para arrancar\n- El TTY desmitificado\n- Wikipedia:es:Tty (unix)\n\n"
+    }
+  ]
+}

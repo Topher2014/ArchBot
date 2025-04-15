@@ -1,0 +1,111 @@
+{
+  "title": "Numlock",
+  "url": "https://wiki.archlinux.org/title/Numlock",
+  "sections": [
+    {
+      "title": "Early bootup (mkinitcpio)",
+      "level": 3,
+      "content": "You can enable numlock right after the kernel boots in the initramfs. This is the only way to ensure numlock is on even during full-disk encryption password entry. Install mkinitcpio-numlockAUR and add the numlock mkinitcpio hook before encrypt in the /etc/mkinitcpio.conf HOOKS array:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nHOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont numlock block encrypt lvm2 filesystems fsck)\n...\n```\n\nThen regenerate the initramfs for the change to take effect.\n\nAn advantage of using this method is that the numlock setting will be replicated in the later boot process, and new virtual consoles will default to having numlock on.\n\n"
+    },
+    {
+      "title": "With systemd service",
+      "level": 3,
+      "content": "First install the numlockx package.\n\nThen create a script to set the numlock on relevant TTYs:\n\n```\n/usr/local/bin/numlock\n```\n\n```\n#!/bin/bash\n\nfor tty in /dev/tty{1..6}\ndo\n    /usr/bin/setleds -D +num < \"$tty\";\ndone\n```\n\nOnce the script is created, you will need to make it executable. Otherwise the script cannot run.\n\nThen create and enable a systemd service:\n\n```\n/etc/systemd/system/numlock.service\n```\n\n```\n[Unit]\nDescription=numlock\n\n[Service]\nExecStart=/usr/local/bin/numlock\nStandardInput=tty\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "Extending getty@.service",
+      "level": 3,
+      "content": "This is simpler than using a separate service and does not hardcode the number of VTs in a script. Create a drop-in snippet for getty@.service which are applied on top of the original unit:\n\n```\n/etc/systemd/system/getty@.service.d/activate-numlock.conf\n```\n\n```\n[Service]\nExecStartPre=/bin/sh -c 'setleds -D +num < /dev/%I'\n```\n\nTo disable the numlock activation hint displaying on the login screen, edit getty@tty1.service and add --nohints to agetty options:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty '-p -- \\\\u' --nohints --noclear %I $TERM\n```\n\n"
+    },
+    {
+      "title": "Bash alternative",
+      "level": 3,
+      "content": "Add setleds -D +num to ~/.bash_profile. Note that, unlike the other methods, this will not take effect until after you log in.\n\n"
+    },
+    {
+      "title": "X.org",
+      "level": 2,
+      "content": "Various methods are available.\n\n"
+    },
+    {
+      "title": "startx",
+      "level": 3,
+      "content": "Install the numlockx package and add it to the xinitrc file before any exec statement:\n\n```\n~/.xinitrc\n```\n\n```\nnumlockx &\nexec window manager\n```\n\n"
+    },
+    {
+      "title": "MATE",
+      "level": 3,
+      "content": "By default, MATE saves the last state on logout and restores it during the next login. To enable numlock on every login, you must change the following dconf properties:\n\n```\n$ dconf write org.mate.peripherals-keyboard remember-numlock-state false\n$ dconf write org.mate.peripherals-keyboard numlock-state 'on'\n```\n\n"
+    },
+    {
+      "title": "KDE Plasma",
+      "level": 3,
+      "content": "Go to System Settings > Input & Output > Keyboard, in the Hardware tab, in the NumLock on Plasma Startup section, choose the desired NumLock behavior.\n\nFor this to work, make sure that System Settings > System > Session > Background Services > Keyboard Daemon is enabled.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n"
+    },
+    {
+      "title": "GDM",
+      "level": 3,
+      "content": "Make sure that you have numlockx installed then add the following code to ~/.xprofile:\n\n```\nif [ -x /usr/bin/numlockx ]; then\n    /usr/bin/numlockx on\nfi\n```\n\n"
+    },
+    {
+      "title": "GNOME",
+      "level": 3,
+      "content": "Run the following command:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard numlock-state true\n```\n\nIn order to remember last state of numlock key (whether you disabled or enabled), use:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard remember-numlock-state true\n```\n\nAlternatively, you can use add numlockx on (from numlockx) to a startup script or ~/.profile.\n\n"
+    },
+    {
+      "title": "Xfce",
+      "level": 3,
+      "content": "In the file ~/.config/xfce4/xfconf/xfce-perchannel-xml/keyboards.xml, make sure the following values are set to true:\n\n```\n~/.config/xfce4/xfconf/xfce-perchannel-xml/keyboards.xml\n```\n\n```\n<property name=\"Numlock\" type=\"bool\" value=\"true\"/>\n<property name=\"RestoreNumlock\" type=\"bool\" value=\"true\"/>\n```\n\n"
+    },
+    {
+      "title": "SDDM",
+      "level": 3,
+      "content": "In the file /etc/sddm.conf, under the [General] section, set Numlock=on:\n\n```\n[General]\n...\nNumlock=on\n```\n\n"
+    },
+    {
+      "title": "SLiM",
+      "level": 3,
+      "content": "In the file /etc/slim.conf, find the line and uncomment it (remove the #):\n\n```\n/etc/slim.conf\n```\n\n```\nnumlock             on\n```\n\n"
+    },
+    {
+      "title": "OpenBox",
+      "level": 3,
+      "content": "In the autostart file, add:\n\n```\n~/.config/openbox/autostart\n```\n\n```\nnumlockx &\n```\n\n"
+    },
+    {
+      "title": "LightDM",
+      "level": 3,
+      "content": "See LightDM#NumLock on by default.\n\n"
+    },
+    {
+      "title": "LXDM",
+      "level": 3,
+      "content": "Set the option in lxdm.conf:\n\n```\n/etc/lxdm/lxdm.conf\n```\n\n```\nnumlock=1\n```\n\n"
+    },
+    {
+      "title": "LXQt",
+      "level": 3,
+      "content": "Set the option in ~/.config/lxqt/session.conf:\n\n```\n~/.config/lxqt/session.conf\n```\n\n```\n[Keyboard]\nnumlock=true\n```\n\n"
+    },
+    {
+      "title": "Sway",
+      "level": 3,
+      "content": "See Sway#Initially enable CapsLock/NumLock.\n\n"
+    },
+    {
+      "title": "Hyprland",
+      "level": 3,
+      "content": "Set the option in ~/.config/hypr/hyprland.conf:\n\n```\n~/.config/hypr/hyprland.conf\n```\n\n```\ninput {\n  numlock_by_default = true\n  ...\n}\n```\n\n"
+    },
+    {
+      "title": "SDDM with KWIN (KDE Plasma)",
+      "level": 3,
+      "content": "Set the option in /var/lib/sddm/.config/kcminputrc:\n\n```\n/var/lib/sddm/.config/kcminputrc\n```\n\n```\n[Keyboard]\nNumLock=0\n```\n\n"
+    },
+    {
+      "title": "DWL",
+      "level": 3,
+      "content": "Initialize the xkb_rules struct with the numpad:mac option:\n\n```\n[dwl_source_root]/config.def.h\n```\n\n```\nstatic const struct xkb_rule_names xkb_rules = {\n  .options = \"numpad:mac\",\n};\n```\n\n"
+    }
+  ]
+}

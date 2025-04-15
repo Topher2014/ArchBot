@@ -1,0 +1,61 @@
+{
+  "title": "Mkinitcpio/Minimal initramfs",
+  "url": "https://wiki.archlinux.org/title/Mkinitcpio/Minimal_initramfs",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article shows how to create a slim, minimal initramfs for a system with a specific, known and static hardware configuration. The procedure is expounded from Optimizing Bootup With mkinitcpio by Falconindy (Dave Reisner).\n\n"
+    },
+    {
+      "title": "Udev requirement",
+      "level": 2,
+      "content": "The big advantage of creating your own initramfs images is that you can eliminate udev. This hook alone is responsible for quite a bit of size (~700-800 KiB with LZ4 and LZOP, less with other algorithms) in the initramfs image. Not only will the bigger size lead to longer boots (more data to decompress) but initializing udev itself will also take some extra time. However, some things require udev. This includes resolving UUID, LABEL, PARTUUID and PARTLABEL identifiers (workaround hook without-udev) and the assembly of LVM and mdadm devices that contain the root partition. If you are unsure if you need udev, continue with the directions on this page up until the #Initial test. If not everything works without udev, re-enable the hook and try again.\n\nAlso, while most keyboards (AT, PS/2, USB) do not require the use of the udev hook, Logitech USB devices using the Logitech Unified Receiver do. At this point you could either include udev in all images or rely on a fallback image that does.\n\nIf you need udev, your minimization efforts will most likely be in vain. You may still be able to shrink the image size by ~600 KiB, but boot times will not be significantly improved. Continuing on in this scenario can still be a worthwhile learning experience.\n\n"
+    },
+    {
+      "title": "Editing .preset files",
+      "level": 2,
+      "content": "In Falconidy's tutorial, he edits /etc/mkinitcpio.conf and runs mkinitcpio -g to create the test initramfs image, leaving the known-good initramfs images on the system untouched. However, if you blindly run mkinitcpio -P afterwards, even the fallback image will be stripped down.\n\nA safer way to prepare for taking the creation of the initramfs files into your own hands is to modify the .preset files in /etc/mkinitcpio.d. The following example configuration will supplant default with the minimal initramfs image and create a new normal image that is built The Arch Way. If things go wrong, you can rely on the normal or fallback images. When you are finished, you can drop the normal_* lines from the configuration and remove the initramfs-linux*-normal.img files.\n\n```\n...\n\nPRESETS=('default' 'normal' 'fallback')\n...\n\ndefault_options=\"-S udev,block,mdadm_udev,filesystems,keyboard,fsck,consolefont\"\n...\n\n#normal_config=\"/etc/mkinitcpio.conf\"\nnormal_image=\"/boot/initramfs-linux-normal.img\"\n#normal_options=\"\"\n...\n```\n\n"
+    },
+    {
+      "title": "Finding needed modules",
+      "level": 2,
+      "content": "The quickest way to find out what modules you need is to reboot your system with the fallback initramfs image and add break=postmount to the kernel parameters in your boot loader so you get dropped to the command line once the root filesystem is mounted.\n\nOnce your system reboots, run the following command to see what modules you need:\n\n```\nlsmod | awk 'NF==3{print $1}'\n```\n\nWrite down the modules that were loaded and type exit to continue booting.\n\nAlternatively, Install the package hwdetect to help determine necessary modules. Though unmaintained, it can provide valuable information. Also, see Kernel modules to get started with the native tools.\n\n"
+    },
+    {
+      "title": "Initial edit of mkinitcpio.conf",
+      "level": 2,
+      "content": "Edit /etc/mkinitcpio.conf and modify the MODULES= array. A worthwhile note is that /etc/mkinitcpio.conf is sourced, so you can build the MODULES array like in a bash script.\n\n```\nMODULES=()   # filesystems\nMODULES+=()  # storage\nMODULES+=()  # keyboard\nMODULES+=()  # miscellaneous\n```\n\nAdd all your modules to the last miscellaneous line. As you sort through your modules, you can place them in the appropriate line.\n\nYou will also need the binaries to do filesystem checks on the root device and any other mount points in /etc/fstab that have been set to do so.\n\n- For ext[2|3|4] devices:\n\n```\nBINARIES=(fsck fsck.ext[2|3|4] e2fsck)\n```\n\n- For vfat (UEFI boot) partitions:\n\n```\nBINARIES=(fsck fsck.vfat dosfsck)\n```\n\n- For btrfs single disk device:\n\n```\nBINARIES=(fsck fsck.btrfs btrfsck)\n```\n\n- For btrfs multi disk device:\n\n```\nBINARIES=(fsck fsck.btrfs btrfs btrfsck)\n```\n\n- For xfs devices\n\n```\nBINARIES=(fsck fsck.xfs xfs_repair)\n```\n\n- The third option in each of these example are optional, but their exclusion will prevent you from repairing a damaged filesystem, necessitating a boot from another initramfs.\n- Users are encouraged to add entries pertaining to other filesystems.\n\n"
+    },
+    {
+      "title": "Initial test",
+      "level": 2,
+      "content": "Edit /etc/mkinitcpio.conf and run mkinitcpio -P to rebuild all of your initramfs images. Then reboot.\n\nYour first boot should be successful if you do not need udev. If something does not work (eg, Arch cannot find your root partition or your keyboard does not work) then you will need to go back and remove udev from the -S parameter in the default_options line and try again. If you need udev, keep in mind that you will not see a significant improvement in boot time and continuing on is only good for a learning experience.\n\n"
+    },
+    {
+      "title": "Sorting out modules",
+      "level": 2,
+      "content": "Now that you have a known-good bootable initramfs, it is time to slim down the initramfs even further. The normal method is to remove a few modules at a time, rebuild the initramfs images, and reboot to see if everything is still OK. If you find out that everything is not OK, reboot with the fallback initramfs image and re-add the deleted modules until everything is OK again. Rinse and repeat until you have only the modules you need. As this can be a tedious experience, the following lists are provided to give people a head-start in the elimination process.\n\n"
+    },
+    {
+      "title": "Filesystem modules",
+      "level": 3,
+      "content": "- ext[2,3,4]\n- xfs\n- jfs\n- reiserfs\n\n"
+    },
+    {
+      "title": "Storage device modules",
+      "level": 3,
+      "content": "- sd_mod for all SCSI, SATA, and PATA (IDE) devices\n- ahci for SATA devices on modern AHCI controllers\n- nvme and nvme_core for NVMe (M.2, PCI-E) devices\n- sata_* for SATA devices on IDE-mode controllers\n- pata_* for PATA (IDE) devices\n- ehci_pci and usb_storage for USB storage devices\n- virtio_blk and virtio_pci for QEMU/KVM VMs using VirtIO for storage\n\n"
+    },
+    {
+      "title": "Keyboard modules",
+      "level": 3,
+      "content": "- atkbd for AT and PS/2 keyboards, and the emulated keyboard in QEMU/KVM.\n- hid_generic, ohci_pci, and usbhid for normal USB keyboards.\n- hid_apple for Apple keyboards.\n- hid_logitech_dj, uhci_hcd, and usbhid for Logitech USB keyboards using the Logitech Unified Receiver (requires the udev hook).\n\n"
+    },
+    {
+      "title": "Finishing up",
+      "level": 2,
+      "content": "Once you have slimmed your initramfs as far as it will go, remove (or comment-out) the normal_* lines from your .preset files and remove the initramfs-linux*-normal.img files from /boot.\n\n"
+    }
+  ]
+}

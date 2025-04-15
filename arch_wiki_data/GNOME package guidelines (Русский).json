@@ -1,0 +1,61 @@
+{
+  "title": "GNOME package guidelines (Русский)",
+  "url": "https://wiki.archlinux.org/title/GNOME_package_guidelines_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nПакеты GNOME в Arch Linux следуют определённой схеме.\n\n"
+    },
+    {
+      "title": "URL источников",
+      "level": 2,
+      "content": "Пакеты GNOME обычно следуют двум схемам URL источника: выпущенный tarball, хранящийся на FTP-сервере GNOME, и конкретный коммит в Git-репозитории программы.\n\n"
+    },
+    {
+      "title": "Использование выпущенного tarball",
+      "level": 3,
+      "content": "Скачиваемый tarball можно получить с https://download.gnome.org с помощью такого массива source:\n\n```\nsource=(\"https://download.gnome.org/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz\")\n```\n\nгде ${pkgver%.*} возвращает major.minor версию пакета путём удаления суффикса у pkgver (который является micro версией пакета). Например, если pkgver=3.28.0, то ${pkgver%.*} вернёт 3.28.\n\n"
+    },
+    {
+      "title": "Использование commit в Git-репозитории",
+      "level": 3,
+      "content": "Другая распространённая практика — использование в качестве источника конкретного коммита из git-репозитория GNOME-программы. Это не будет считаться VCS-пакетом, поскольку установка конкретного коммита (смотрите PKGBUILD(5) § USING VCS SOURCES) не приводит к использованию самых новых коммитов и обновлению pkgver, вместо этого используются исходники именно из указанного коммита.\n\nШаблон:\n\n```\nPKGBUILD\n```\n\n```\nurl=\"https://gitlab.gnome.org/GNOME/$pkgname\"\nmakedepends=(git)\n_commit=хэш_коммита  # tags/X.Y.Z \nsource=(\"git+${url}.git#commit=$_commit\")\nmd5sums=('SKIP')\n\npkgver() {\n  cd $pkgname\n  git describe --tags | sed 's/-/+/g'\n}\n```\n\nЗамените хэш_коммита на нужый Git-коммит, а pkgver() замените в соответствии с требованиями упаковываемого пакета (смотрите VCS package guidelines#Git).\n\nОбратите внимание, что, поскольку исходный текст загружается с помощью git, пакет git должен быть указан в makedepends, а в checksums должно быть 'SKIP', как и в случае с любым другим VCS-пакетом. Настоятельно рекомендуется использовать функцию pkgver(), так как она позволяет задать pkgver, соответствующий указанному коммиту.\n\n"
+    },
+    {
+      "title": "Системы сборки Meson и GNU",
+      "level": 2,
+      "content": "Исторически GNOME использовал для сборки своих приложений GNU Build System. Несмотря на то, что некоторые активные и неактивные приложения по-прежнему используют его, большинство активных приложений GNOME перешли на Meson Build System.\n\nИнструкции по созданию пакетов с использованием Meson, которые подойдут для большинства приложений GNOME, описаны в статье Meson package guidelines.\n\n"
+    },
+    {
+      "title": "Схемы GSettings",
+      "level": 2,
+      "content": "GSettings — это текущие схемы, используемые приложениями GNOME, которые можно получить/прочитать/отредактировать с помощью графического инструмента dconf или консольного инструмента gsettings (предоставляется пакетом glib2, который, скорее всего, уже установлен в качестве зависимости). Раньше GSettings требовал некоторого внимания со стороны упаковщика, но сейчас вмешательство не требуется.\n\nНекоторые наблюдения:\n\n- Приложения, использующие GSettings, обычно зависят от GTK (gtk3 или новее), поэтому зависимости, связанные с GSettings, обычно уже удовлетворены.\n- Раньше требовался флаг --disable-schemas-compile в ./configure, чтобы избежать перекомпиляции базы данных GSettings при выполнении функции package(), но уже некоторое время это не относится к GNOME-приложениям, в основном к приложениям, использующим Meson в качестве системы сборки.\n\n"
+    },
+    {
+      "title": "Схемы GConf",
+      "level": 2,
+      "content": "Большинство пакетов GNOME уже используют #Схемы GSettings, но вы можете столкнуться со старым пакетом GNOME, в котором ещё используются схемы GConf. В таком случае нужно добавить gconfAUR в массив depends.\n\nСхемы Gconf устанавливаются в системную базу данных GConf, чего следует избегать. Некоторые пакеты предоставляют флаг --disable-schemas-install в ./configure, который почти никогда не работает. Однако в gconftool-2 есть переменная GCONF_DISABLE_MAKEFILE_SCHEMA_INSTALL, которую можно установить, чтобы запретить gconftool-2 обновлять какие-либо базы данных.\n\nПри создании пакетов, которые устанавливают файлы схем GConf, используйте\n\n```\nmake GCONF_DISABLE_MAKEFILE_SCHEMA_INSTALL=1 DESTDIR=\"${pkgdir}\" install\n```\n\nв функции package() в PKGBUILD.\n\n"
+    },
+    {
+      "title": "Документация ScrollKeeper",
+      "level": 2,
+      "content": "Приложения GNOME в настоящее время не используют ScrollKeeper, но можно встретить GTK2-приложения с такой документацией.\n\nНачиная с GNOME 2.20, нет необходимости выполнять какую-либо команду для ScrollKeeper, так как rarianAUR читает его OMF-файлы напрямую. Команда scrollkeeper-update ничего не делает. Единственное требование — добавить gnome-doc-utilsAUR в массив makedepends.\n\nОтключить генерацию документации можно с помощью флага --disable-scrollkeeper в ./configure.\n\n"
+    },
+    {
+      "title": "Кэш значков GTK",
+      "level": 2,
+      "content": "Многие графические приложения GNOME устанавливают в систему значки, которые добавляются в кэш с помощью gtk-update-icon-cache. Каждый раз при добавлении или удалении значка он используется для обновления кэша.\n\nNote: **не** \n\n- Не вызывайте gtk-update-icon-cache в файле .install, так как кэш значков обновляется с помощью хуков pacman, начиная с версии gtk-update-icon-cache=3.20.3-2.\n- Пакет не должен зависеть от gtk-update-icon-cache, так как эта зависимость будет удовлетворяться пакетами типа gtk4 и т. д.\n\n"
+    },
+    {
+      "title": "Файлы .desktop",
+      "level": 2,
+      "content": "Многие пакеты устанавливают совместимые с Freedesktop.org файлы .desktop и регистрируют в них записи MimeType. Эта информация хранится в базе данных, которая должна обновляться при каждом добавлении или удалении. Именно эту функцию выполняет update-desktop-database.\n\n- Не вызывайте update-desktop-database в файле .install, так как база данных автоматически обновляется с помощью хуков pacman, начиная с версии desktop-file-utils=0.22-2.\n- Пакет не должен зависеть от desktop-file-utils, так как эта зависимость будет удовлетворяться пакетами типа gtk4 и т. д.\n\n"
+    },
+    {
+      "title": "Файлы AppStream и metainfo",
+      "level": 2,
+      "content": "Большинство GNOME-приложений, как и многие другие, придерживается спецификации AppStream от Freedesktop.org и предоставляет файл metainfo, чтобы описание приложения отображалось в центрах приложений, таких как gnome-software или Flathub.\n\nПриложения GNOME обычно выполняют валидацию файлов metainfo при помощи appstream-util, когда в функции check() вызывается meson test. Если appstream-glib не установлен, то данная проверка будет просто пропущена (то есть процесс сборки не будет прерван).\n\nОпределить, что appstream-util используется приложением, можно двумя способами:\n\n- Первый способ — найти appstream-util в исходном коде, выполнив grep -R appstream-util или посмотрев файл data/meson.build;\n- Другой метод — в логах сборки поискать Program appstream-util found: NO\n\n```\nProgram appstream-util found: NO\n```\n\nДобавьте appstream-glib в массив checkdepends, чтобы выполнялась валидация файла metainfo.\n\n"
+    }
+  ]
+}

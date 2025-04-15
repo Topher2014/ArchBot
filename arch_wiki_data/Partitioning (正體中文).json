@@ -1,0 +1,161 @@
+{
+  "title": "Partitioning (正體中文)",
+  "url": "https://wiki.archlinux.org/title/Partitioning_(%E6%AD%A3%E9%AB%94%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "相關文章\n\n- File systems\n- fdisk\n- gdisk\n- Parted (正體中文)\n- fstab (正體中文)\n- LVM\n- Swap\n- Arch boot process\n- Unified Extensible Firmware Interface\n- systemd-repart\n\nNote: **本條目或段落需要進行翻譯。** 本條目或段落需要進行翻譯。\n\n本條目或段落需要進行翻譯。\n\n英文維基百科寫道：\n\nAn entire disk may be allocated to a single partition, or multiple ones for cases such as dual-booting, maintaining a swap partition, or to logically separate data such as audio and video files. The partitioning scheme is stored in a partition table such as Master Boot Record (MBR) or GUID Partition Table (GPT).\n\nPartition tables are created and modified using one of many partitioning tools. The tools available for Arch Linux are listed in the #分割工具 section.\n\nPartitions usually contain a file system directly which is accomplished by creating a file system on (a.k.a. formatting) the partition. Alternatively, partitions can contain LVM, block device encryption or RAID, which ultimately provide device files on which a file system can be placed (or the devices can be stacked further).\n\nAny block device (e.g. disk, partition, LUKS device, LVM logical volume or RAID array) that directly contains a mountable file system is called a volume.\n\n"
+    },
+    {
+      "title": "分割表",
+      "level": 2,
+      "content": "有兩種主流的分割表 (partition table) 可供使用。以下段落 (#主開機記錄 (MBR)、#GUID 分割表 (GPT)) 分別介紹這兩種分割表，接續的段落則討論如何從這兩種分割表之間做出選擇。第三種較少見的分割方式是無分割磁碟 (partitionless disk)，也會在最後一併進行討論。\n\n使用#分割工具檢視區塊裝置的分割表：\n\n```\n# parted /dev/sdX print\n```\n\n或\n\n```\n# fdisk -l /dev/sdX\n```\n\nNote: 上述指令中的 /dev/sdX 對應要檢視的區塊裝置代號。例如 SATA 碟可能是 /dev/sda、NVMe 碟可能是 /dev/nvme0n1、eMMC 碟可能是 /dev/mmcblk0。關於區塊裝置命名方式的詳細資訊，請參閱 Device file#Block device names。\n\n上述指令中的 /dev/sdX 對應要檢視的區塊裝置代號。例如 SATA 碟可能是 /dev/sda、NVMe 碟可能是 /dev/nvme0n1、eMMC 碟可能是 /dev/mmcblk0。關於區塊裝置命名方式的詳細資訊，請參閱 Device file#Block device names。\n\n"
+    },
+    {
+      "title": "主開機記錄",
+      "level": 3,
+      "content": "主開機記錄 (MBR) 是儲存裝置的最初 512 位元組。內含作業系統啟動程序載入程式，以及該儲存裝置的分割表，在 BIOS 系統中扮演重要的角色。關於 MBR 的結構，請見 Wikipedia:Master boot record#Disk partitioning。\n\n- MBR 不位於分割內，它位於裝置的第一個磁區 (實體位移 0)，在第一個分割之前。\n- 若開機磁區位於無分割的裝置或獨立的分割中，則稱為磁碟區開機記錄 (VBR)。\n\n"
+    },
+    {
+      "title": "主開機記錄 (啟動程式碼)",
+      "level": 4,
+      "content": "主開機記錄 (MBR) 的最初 440 位元組為啟動程式碼區域 (bootstrap code area)。BIOS 系統的啟動程式碼內通常含有第一階段啟動程序載入程式。啟動程式碼可以透過 dd 備份、還原或移除。\n\n"
+    },
+    {
+      "title": "主開機記錄 (分割表)",
+      "level": 4,
+      "content": "In the MBR partition table (also known as DOS or MS-DOS partition table) there are 3 types of partitions:\n\n- Primary\n- Extended Logical\n\n- Logical\n\nPrimary partitions can be bootable and are limited to four partitions per disk or RAID volume. If the MBR partition table requires more than four partitions, then one of the primary partitions needs to be replaced by an extended partition containing logical partitions within it.\n\nExtended partitions can be thought of as containers for logical partitions. A hard disk can contain no more than one extended partition. The extended partition is also counted as a primary partition so if the disk has an extended partition, only three additional primary partitions are possible (i.e. three primary partitions and one extended partition). The number of logical partitions residing in an extended partition is unlimited. A system that dual boots with Windows will require for Windows to reside in a primary partition.\n\nThe customary numbering scheme is to create primary partitions sda1 through sda3 followed by an extended partition sda4. The logical partitions on sda4 are numbered sda5, sda6, etc.\n\n"
+    },
+    {
+      "title": "GUID 分割表",
+      "level": 3,
+      "content": "GUID Partition Table (GPT) is a partitioning scheme that is part of the Unified Extensible Firmware Interface specification; it uses globally unique identifiers (GUIDs), or UUIDs in the Linux world, to define partitions and partition types. It is designed to succeed the Master Boot Record partitioning scheme method.\n\nAt the start of a GUID Partition Table disk there is a protective Master Boot Record (PMBR) to protect against GPT-unaware software. This protective MBR just like an ordinary MBR has a bootstrap code area which can be used for BIOS/GPT booting with boot loaders that support it.\n\n"
+    },
+    {
+      "title": "選擇 GPT 或是 MBR",
+      "level": 3,
+      "content": "GUID 分割表 (GPT) 是另一個現代的分割方式，設計用來取代老舊的主開機記錄 (MBR) 系統。GPT 有幾項優點，不像 MBR 有一些古怪之處，這些古怪之處源自於久遠的 MS-DOS 年代。不過由於格式化工具最近的發展，想要提升 GPT 和 MBR 的可靠度和性能都很容易。\n\nSome points to consider when choosing:\n\n- To dual-boot with Windows (both 32-bit and 64-bit) using Legacy BIOS, the MBR scheme is required.\n- To dual-boot Windows 64-bit using UEFI mode instead of BIOS, the GPT scheme is required.\n- If you are installing on older hardware, especially on old laptops, consider choosing MBR because its BIOS might not support GPT (but see below how to fix it).\n- If you are partitioning a disk that is larger than 2 TiB (≈2.2 TB), you need to use GPT.\n- It is recommended to always use GPT for UEFI boot, as some UEFI implementations do not support booting to the MBR while in UEFI mode.\n- If none of the above apply, choose freely between GPT and MBR. Since GPT is more modern, it is recommended in this case.\n\nSome advantages of GPT over MBR are:\n\n- Provides a unique disk GUID and unique partition GUID (PARTUUID) for each partition – a good filesystem-independent way of referencing partitions and disks. GUIDs are a prerequisite for the Discoverable Partitions Specification that can be utilized in a systemd-enabled initramfs.\n- Provides a filesystem-independent partition name (PARTLABEL).\n- Arbitrary number of partitions - depends on space allocated for the partition table - No need for extended and logical partitions. By default the GPT table contains space for defining 128 partitions. However if you want to define more partitions, you can allocate more space to the partition table (currently only gdisk is known to support this feature).\n- Uses 64-bit LBA for storing Sector numbers - maximum addressable disk size is 2 ZiB. MBR is limited to addressing 2 TiB of space per drive.[1]\n- Stores a backup header and partition table at the end of the disk that aids in recovery in case the primary ones are damaged.\n- CRC32 checksums to detect errors and corruption of the header and partition table.\n\nThe section on #分割工具 contains a table indicating which tools are available for creating and modifying GPT and MBR tables.\n\n"
+    },
+    {
+      "title": "無分割磁碟",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nPartitionless disk a.k.a. superfloppy refers to a storage device without a partition table, having one file system occupying the whole storage device. The boot sector present on a partitionless device is called a volume boot record (VBR).\n\n"
+    },
+    {
+      "title": "Btrfs 分割",
+      "level": 4,
+      "content": "Btrfs can occupy an entire data storage device and replace the MBR or GPT partitioning schemes. See the Btrfs#Partitionless Btrfs disk instructions for details.\n\n"
+    },
+    {
+      "title": "分割計畫",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n並沒有硬性規定如何分割硬碟。不過使用者仍可以遵循以下通則。分割計畫 (partitioning scheme) 取決於多項因素，例如期望的彈性、速度、安全性、可用磁碟空間的限制等，完全依個人偏好而定。若要雙開 Arch Linux 和 Windows 作業系統，請參閱雙開 Windows。\n\n- UEFI 系統通常需要一個 EFI 系統分割。\n- 以 GPT 進行分割的 BIOS 系統，如果搭配 GRUB 作為啟動程序載入程式，則需要一個 BIOS 開機分割。\n\nNote: 若使用 Btrfs，副磁碟區 (subvolume) 可用來模擬分割。請參閱Btrfs#掛接副磁碟區一節。\n\n若使用 Btrfs，副磁碟區 (subvolume) 可用來模擬分割。請參閱Btrfs#掛接副磁碟區一節。\n\n"
+    },
+    {
+      "title": "單一根分割",
+      "level": 3,
+      "content": "這是最簡單又最有彈性的方法。有鑑於消費級儲存裝置的空間大小不斷提升，單一根分割應該足以應對大部分的使用情況。 A swap file can be created and easily resized as needed. It usually makes sense to start by considering a single / partition and then separate out others based on specific use cases like RAID, encryption, a shared media partition, etc… See #多個分割 for a description of some common to uncommon dedicated partitions.\n\nThe suggested minimum size is 23–32 GiB for a single root partition. More space may be needed for user files and when using a swap file. A bare minimal installation requires about 2 GiB. As examples, a simple server can fit under 4 GiB while a full KDE Plasma installation uses 10 GiB. Both examples require frequent purges of the package cache.\n\nA GPT partition should have the \"Linux root (x86-64)\" type GUID 4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709 (8304 type for gdisk). An MBR partition should have the default \"Linux\" type ID 83.\n\n"
+    },
+    {
+      "title": "多個分割",
+      "level": 3,
+      "content": "Separating out a path as a partition allows for the choice of a different filesystem and mount options. In some cases like a media partition, they can also be shared between operating systems.\n\nBelow are some example layouts that can be used when partitioning, and the following subsections detail a few of the directories which can be placed on their own separate partition and then mounted at mount points under /. See file-hierarchy(7) for a full description of the contents of these directories.\n\n"
+    },
+    {
+      "title": "/",
+      "level": 4,
+      "content": "The root directory is the top of the hierarchy, the point where the primary filesystem is mounted and from which all other filesystems stem. All files and directories appear under the root directory /, even if they are stored on different physical devices. The contents of the root filesystem must be adequate to boot, restore, recover, and/or repair the system. Therefore, certain directories under / are not candidates for separate partitions.\n\nThe / partition or root partition is necessary and it is the most important. The other partitions can be replaced by it.\n\nNote: **must** \n\n/ traditionally contains the /usr directory, which can grow significantly depending upon how much software is installed. 15–20 GiB should be sufficient for most users with modern hard disks. If you plan to store a swap file here and do not plan on using a separate /var, you might need a larger partition size (i.e. adding the size of your RAM to be able to hibernate and an additional 8–12 GiB for /var).\n\nA GPT partition should have the \"Linux root (x86-64)\" type GUID 4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709 (8304 for gdisk). An MBR partition should have the default \"Linux\" type ID 83.\n\n"
+    },
+    {
+      "title": "/boot",
+      "level": 4,
+      "content": "The /boot directory contains the vmlinuz and initramfs images as well as the boot loader configuration file and boot loader stages. It also stores data that is used before the kernel begins executing user-space programs. /boot is not required for normal system operation, but only during boot and kernel upgrades (when regenerating the initial ramdisk).\n\nNote: See Arch boot process#Boot loader for more information on boot loader requirements and capabilities.\n\n- Your boot loader must be capable of accessing the /boot partition. That means the boot loader must have support for everything starting from the block devices, stacked block devices (LVM, RAID, dm-crypt, LUKS, etc.) and ending with the file system on which the kernel(s) and initramfs image(s) reside.\n- File systems can get new features not yet supported by boot loaders (e.g. archlinux/packaging/packages/grub#7, FS#79857, FS#59047, FS#58137, FS#51879, FS#46856, FS#38750, FS#21733 and fscrypt encrypted directories), making them unsuitable for a /boot partition unless disabling incompatible features. This can be typically avoided by using FAT32 since it is supported by practically everything and it will not be getting any new features.\n\nSee Arch boot process#Boot loader for more information on boot loader requirements and capabilities.\n\nWhen using an EFI system partition as /boot, the requirements are as described in the EFI system partition article—the correct partition type must be set.\n\nIn other cases, it is recommended to set the partition type to Extended Boot Loader (XBOOTLDR) Partition which is GPT partition type GUID BC13C2FF-59E6-4262-A352-B275FD6F7172 (ea00 type for gdisk, xbootldr type for fdisk) or MBR partition type ID ea.\n\nIn both cases the suggested size for the partition is 1 GiB, which should give enough space to house multiple kernels. If still in doubt, 4 GiB ought to be enough for anybody.\n\n"
+    },
+    {
+      "title": "/home",
+      "level": 4,
+      "content": "The /home directory contains user-specific configuration files, caches, application data and media files.\n\nSeparating out /home allows / to be re-partitioned separately, but note that you can still reinstall Arch with /home untouched even if it is not separate—the other top-level directories just need to be removed, and then pacstrap can be run.\n\nYou should not share home directories between users on different distributions, because they use incompatible software versions and patches. Instead, consider sharing a media partition or at least using different home directories on the same /home partition. The size of this partition varies.\n\nA GPT partition should have the \"Linux home\" type GUID 933AC7E1-2EB4-4F13-B844-0E14E2AEF915 (8302 type for gdisk, home type for fdisk). An MBR partition should have the default \"Linux\" type ID 83.\n\n"
+    },
+    {
+      "title": "Swap",
+      "level": 4,
+      "content": "A swap is a file or partition that provides disk space used as virtual memory. Swap files and swap partitions are equally performant, but swap files are much easier to resize as needed. A swap partition can potentially be shared between operating systems, but not if hibernation is used.\n\nSince computers have gained memory capacities superior to a gibibit, the previous \"twice the amount of physical RAM\" rule has become outdated. A sane default size is 4 GiB.\n\nTo use hibernation (a.k.a suspend to disk) it is advised to create the swap partition at the size of RAM. Although the kernel will try to compress the suspend-to-disk image to fit the swap space there is no guarantee it will succeed if the used swap space is significantly smaller than RAM. See Power management/Suspend and hibernate#Hibernation for more information.\n\nA GPT partition should have the \"Linux swap\" type with GUID 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F (8200 type for gdisk, swap type for fdisk). An MBR partition should have the \"Linux swap\" type ID 82.\n\n"
+    },
+    {
+      "title": "/data",
+      "level": 4,
+      "content": "One can consider mounting a \"data\" partition to cover various files to be shared by all users. Using the /home partition for this purpose is fine as well. The size of this partition varies.\n\nA GPT partition should have the default \"Linux filesystem\" type GUID 0FC63DAF-8483-4772-8E79-3D69D8477DE4. An MBR partition should have the default \"Linux\" type ID 83.\n\n"
+    },
+    {
+      "title": "/var",
+      "level": 4,
+      "content": "The /var directory stores variable data such as spool directories and files, administrative and logging data, pacman's cache, etc. It is used, for example, for caching and logging, and hence frequently read or written. Keeping it in a separate partition avoids running out of disk space due to flunky logs, etc.\n\nIt exists to make it possible to mount /usr as read-only. Everything that historically went into /usr that is written to during system operation (as opposed to installation and software maintenance) must reside under /var.\n\n- /var contains many small files. The choice of file system type should consider this fact if a separate partition is used.\n- Since /var is frequently read or written, it is recommended that you consider the location of this partition on a spinning disk.\n\n/var will contain, among other data, the pacman cache. Retaining these packages is helpful in case a package upgrade causes instability, requiring a downgrade to an older, archived package. The pacman cache will grow as the system is expanded and updated, but it can be safely cleared if space becomes an issue.\n\n8–12 GiB on a desktop system should be sufficient for /var, depending on how much software will be installed. For users of NVIDIA, Wayland and GDM, consider adding to this partition size as to have enough free space to fit your whole video memory.\n\nA GPT partition should have the \"Linux variable data\" a.k.a \"Linux /var\" type GUID 4D21B016-B534-45C2-A9FB-5C16E091FD2D (8310 type for gdisk). An MBR partition should have the default \"Linux\" type ID 83.\n\n"
+    },
+    {
+      "title": "分割示例",
+      "level": 3,
+      "content": "以下範例假設 /dev/sda 為待操作的磁碟，/dev/sda1 為第一個分割。如果分割的是 NVMe 硬碟、SD 或 eMMC 卡，區塊裝置的命名方式會有所不同，例如 /dev/nvme0n1 的分割從 /dev/nvme0n1p1 開始；/dev/mmcblk0 的分割從 /dev/mmcblk0p1 開始。詳細資訊請參閱 Device file#Block device names。\n\n- UEFI 開機不需要 \"boot\" 旗標 (flag)，開機只需要 NVRAM 中的開機項目 (boot entry)。Parted 及其前端在 GPT 上使用 \"boot\" 旗標是為了標示該分割為 EFI 系統分割。\n- 不一定要將所有必要/想要的分割全部建立在同一個磁碟上，也不一定要每個磁碟都使用同一種分割表格。\n\n"
+    },
+    {
+      "title": "UEFI/GPT 分割示例",
+      "level": 4,
+      "content": "Table content:\n系統掛接點 | 分割 | 分割類型 GUID | 建議大小\n/boot 或 /efi1 | /dev/sda1 | C12A7328-F81F-11D2-BA4B-00A0C93EC93B: EFI 系統分割 | 1 GiB\n[SWAP] | /dev/sda2 | 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F: Linux swap | 至少 4 GiB 或 RAM 的大小才能使用休眠\n/ | /dev/sda3 | 4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709: Linux x86-64 root (/) | 裝置的剩餘空間。至少 23–32 GiB。\n\n"
+    },
+    {
+      "title": "BIOS/MBR 分割示例",
+      "level": 4,
+      "content": "Table content:\n系統掛接點 | 分割 | 分割類型 ID | 啟動旗標 | 建議大小\n[SWAP] | /dev/sda1 | 82: Linux swap | 否 | 至少 4 GiB 或 RAM 的大小才能使用休眠\n/ | /dev/sda2 | 83: Linux | 是 | 裝置的剩餘空間。至少 23–32 GiB。\nN/A | 未分配空間2 | N/A | N/A | 至少 16.5 KiB，位於磁碟末端。\n\n"
+    },
+    {
+      "title": "BIOS/GPT 分割示例",
+      "level": 4,
+      "content": "Table content:\n系統掛接點 | 分割 | 分割類型 GUID | 建議大小\nNone | /dev/sda1 | 21686148-6449-6E6F-744E-656564454649: BIOS boot partition3 | 1 MiB\n[SWAP] | /dev/sda2 | 0657FD6D-A4AB-43C4-84E5-0933C84B4F4F: Linux swap | 至少 4 GiB 或 RAM 的大小才能使用休眠\n/ | /dev/sda3 | 4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709: Linux x86-64 root (/) | 裝置的剩餘空間。至少 23–32 GiB。\n\n1. 如果選用的啟動程序載入程式 (boot loader) 能夠存取核心和 initramfs 映像所在的檔案系統，則 ESP 可以掛接在 /efi。詳細資訊請參閱 EFI system partition#Typical mount points；相關警告請參閱 Arch boot process#Boot loader。\n1. 若使用 MBR 進行分割，在磁碟末端至少要保留 33 個 512 位元組大小的磁區 (16.5 KiB)，日後才能轉換成 GPT。此空間會用於備份 GPT 標頭。\n1. 只有在 BIOS 以 GRUB 從 GPT 磁碟開機時才需要使用 BIOS 開機分割。使用其他的啟動程序載入程式並不需要此分割。此分割與 /boot 無關。請勿將其格式化或掛接檔案系統。\n\n"
+    },
+    {
+      "title": "分割工具",
+      "level": 3,
+      "content": "The following programs are used to create and/or manipulate device partition tables and partitions. See the linked articles for the exact commands to be used.\n\nThis table will help you to choose utility for your needs:\n\nTable content:\nName | Package | MBR | GPT | CLI | TUI | Scripting utility\nfdisk | util-linux | Yes | Yes | fdisk(8) | cfdisk(8) | sfdisk(8)\nGPT fdisk | gptfdisk | No | Yes | gdisk(8) | cgdisk(8) | sgdisk(8)\nParted | parted | Yes | Yes | parted(8) | No | parted(8)\n\n"
+    },
+    {
+      "title": "GUI 前端",
+      "level": 4,
+      "content": "- blivet-gui — Graphical tool for storage configuration. It uses parted as backend via python-blivetAUR and libblockdev.\n\n- GNOME Disks — A GNOME utility for dealing with storage devices. It uses parted as backend via udisks2 and libblockdev. Part of gnome.\n\n- GParted — Partition editor for graphically managing your disk partitions. It can be used to resize, copy and move partitions without data loss. It uses parted as backend.\n\n- KDE Partition Manager — Utility to help you manage the disks, partitions, and file systems on your computer. It uses sfdisk as backend via kpmcore. Part of kde-system.\n\n"
+    },
+    {
+      "title": "備份",
+      "level": 3,
+      "content": "- fdisk can create a backup of the partitions table. See fdisk#Backup and restore partition table.\n- GPT fdisk can create a binary backup consisting of the protective MBR, the main GPT header, the backup GPT header, and one copy of the partition table. See GPT fdisk#Backup and restore partition table.\n\n"
+    },
+    {
+      "title": "復原",
+      "level": 3,
+      "content": "- gpart — A utility that guesses the contents of a destroyed MBR partition table. Its usage is explained in the gpart(8) man page.\n\n- GPT fdisk — A partitioning tool that can restore the primary GPT header (located at the start of the disk) from the secondary GPT header (located at the end of the disk) or vice versa.\n\n- TestDisk — A utility that supports recovering lost partitions on both MBR and GPT.\n\n"
+    },
+    {
+      "title": "對齊分割",
+      "level": 2,
+      "content": "經驗法則表示應該將分割的起點和大小以 mebibyte 為單位對齊。請見 Advanced Format#Partition alignment。\n\nNote: 未正確對齊的分割將無法以 4096 位元組磁區使用 dm-crypt/LUKS。\n\n未正確對齊的分割將無法以 4096 位元組磁區使用 dm-crypt/LUKS。\n\n"
+    },
+    {
+      "title": "GPT 核心支援",
+      "level": 2,
+      "content": "The CONFIG_EFI_PARTITION option in the kernel config enables GPT support in the kernel (despite the name, EFI PARTITION which looks close to EFI system partition). This option must be built in the kernel and not compiled as a loadable module. This option is required even if GPT disks are used only for data storage and not for booting. This option is enabled by default in all Arch's officially supported kernels. In case of a custom kernel, enable this option by doing CONFIG_EFI_PARTITION=y.\n\n"
+    },
+    {
+      "title": "誘導舊型 BIOS 從 GPT 開機",
+      "level": 3,
+      "content": "Some old BIOSes (from before year 2010) attempt to parse the boot sector and refuse to boot it if it does not contain a bootable MBR partition. This is a problem if one wants to use GPT on this disk, because, from the BIOS viewpoint, it contains only one, non-bootable, MBR partition of type ee (i.e., the protective MBR partition). One can mark the protective MBR entry as bootable using fdisk -t mbr /dev/sda, and it will work on some BIOSes. However, the UEFI specification prohibits the protective MBR partition entry from being bootable, and UEFI-based boards do care about this, even in the legacy boot mode. So, this matters if one wants to create a GPT-based USB flash drive that is supposed to boot both on modern UEFI-based boards and also on old BIOSes that insist on finding a bootable MBR partition. It is not possible to solve this problem using traditional tools such as fdisk or gdisk, but it is possible to create a fake MBR partition entry suitable for both kinds of BIOSes manually as a sequence of bytes.\n\nThe command below will overwrite the second MBR partition slot and add a bootable partition there of type 0 (i.e. unused), covering only the first sector of the device. It will not interfere with the GPT or with the first MBR partition entry which normally contains a protective MBR partition.\n\n```\n# printf '\\200\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\001\\0\\0\\0' | dd of=/dev/sda bs=1 seek=462\n```\n\nThe end result will look like this:\n\n```\n# fdisk -t mbr -l /dev/sda\n```\n\n```\nDisk /dev/sda: 232.9 GiB, 250059350016 bytes, 488397168 sectors\nDisk model: ST3250820AS\nUnits: sectors of 1 * 512 = 512 bytes\nSector size (logical/physical): 512 bytes / 512 bytes\nI/O size (minimum/optimal): 512 bytes / 512 bytes\nDisklabel type: dos\nDisk identifier: 0x00000000\n\nDevice     Boot Start       End   Sectors   Size Id Type\n/dev/sda1           1 488397167 488397167 232.9G ee GPT\n/dev/sda2  *        0         0         1   512B  0 Empty\n\nPartition table entries are not in disk order.\n```\n\n"
+    },
+    {
+      "title": "啟用 RAID 時裝置無法顯示",
+      "level": 3,
+      "content": "If a SATA or NVMe drive is visible in firmware setup, but not to Linux (e.g. fdisk -l does not list it), it is possible that the controller is in firmware RAID mode.\n\nFor NVMe, the journal should show something like:\n\n```\nkernel: ahci 0000:00:17.0: Found 1 remapped NVMe devices.\nkernel: ahci 0000:00:17.0: Switch your BIOS from RAID to AHCI mode to use them.\n```\n\nThe solution is to enter firmware setup and disable NVMe RAID mode and change the SATA controller operation mode from RAID to AHCI. Mind that the setting may have a different name (e.g. \"Intel Rapid Storage Technology\", \"Intel RST\", \"Intel VMD controller\" or \"VMD\") and it could also be per-controller or per-port.\n\n"
+    },
+    {
+      "title": "另請參閱",
+      "level": 2,
+      "content": "- Wikipedia:Disk partitioning\n- Wikipedia:Binary prefix\n- Understanding Disk Drive Terminology\n- Rod Smith's page on What's a GPT? and Booting OSes from GPT\n- Make the most of large drives with GPT and Linux - IBM Developer\n- Microsoft's Windows and GPT FAQ\n- Partition Alignment (with examples)\n\n"
+    }
+  ]
+}

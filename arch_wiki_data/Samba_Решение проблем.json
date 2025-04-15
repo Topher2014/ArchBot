@@ -1,0 +1,296 @@
+{
+  "title": "Samba/Решение проблем",
+  "url": "https://wiki.archlinux.org/title/Samba/%D0%A0%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5_%D0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Интеграция Active Directory\n- Samba/Контроллер домена Active Directory\n- NFS (Русский)\n\nSamba — это реализация сетевого протокола SMB. Она облегчает организацию общего доступа к файлам и принтерам между системами Linux и Windows и является альтернативой NFS.\n\nСоздание общих ресурсов описано в разделе #Сервер; подключение к общим ресурсам описано в разделе #Клиент.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 3,
+      "content": "Установите пакет samba.\n\nSamba настраивается с помощью файла /etc/samba/smb.conf, который подробно документирован на странице руководства smb.conf(5).\n\nВ связи с тем, что пакет samba поставляется без данного файла, вам нужно создать его перед запуском smb.service.\n\nВы можете воспользоваться документированным примером, как в smb.conf.default из git-репозитория Samba для создания /etc/samba/smb.conf.\n\n- Значение log file в стандартном файле настроек указывает в место, доступное только для чтения, что будет вызывать ошибки. Можно воспользоваться одним из следующих решений: Задайте расположение, доступное для записи: log file = /var/log/samba/%m.log Используйте бекенд для нефайлового журналирования: замените logging = syslog на syslog only = yes или используйте logging = systemd\n- Если требуется; workgroup, указанная в секции [global], должна соответствовать домашней группе (workgroup) Windows (по умолчанию: WORKGROUP).\n\n- Задайте расположение, доступное для записи: log file = /var/log/samba/%m.log\n- Используйте бекенд для нефайлового журналирования: замените logging = syslog на syslog only = yes или используйте logging = systemd\n\n"
+    },
+    {
+      "title": "Включение и запуск служб",
+      "level": 4,
+      "content": "Для работы общего доступа к файлам запустите и включите службу smb.service. Смотрите smbd(8) для более подробной информации.\n\nЕсли вы хотите, чтобы сервер был доступен по имени хоста NetBIOS, пропишите желаемое имя в опции netbios name в smb.conf и запустите и включите службу nmb.service. Смотрите nmbd(8) для более подробной информации.\n\n"
+    },
+    {
+      "title": "Настройка межсетевого экрана",
+      "level": 4,
+      "content": "Если вы используете межсетевой экран, не забудьте открыть необходимые порты (как правило, 137-139 + 445). Для получения информации о полном списке портов, смотрите использование портов Samba.\n\nПрофиль Ufw для SMB/CIFS доступен в стандартной установке UFW в ufw-fileserver.\n\nРазрешите Samba, выполнив команду ufw allow CIFS от имени root.\n\nЕсли вы удалили профиль, создайте или отредактируйте файл /etc/ufw/applications.d/samba, добавив следующее:\n\n```\n[Samba]\ntitle=LanManager-like file and printer server for Unix\ndescription=The Samba software suite is a collection of programs that implements the SMB/CIFS protocol for unix systems, allowing you to serve files and printers to Windows, NT, OS/2 and DOS clients. This protocol is sometimes also referred to as the LanManager or NetBIOS protocol.\nports=137,138/udp|139,445/tcp\n```\n\nЗатем загрузите этот профиль в UFW, запустив команду ufw app update Samba как root.\n\nПосле этого можно разрешить доступ к Samba, запустив ufw allow Samba от имени root.\n\nДля настройки firewalld, чтобы разрешить Samba в зоне home, выполните:\n\n```\n# firewall-cmd --permanent --add-service={samba,samba-client,samba-dc} --zone=home\n```\n\nЭти три службы таковы:\n\n- samba: для общего доступа к файлам.\n- samba-client: для просмотра общих ресурсов других устройств по сети.\n- samba-dc: для контроллера домена Active Directory.\n\nПараметр --permanent сделает изменения постоянными.\n\n"
+    },
+    {
+      "title": "Управление пользователями",
+      "level": 4,
+      "content": "В следующем разделе описывается создание локальной (tdbsam) базы данных пользователей Samba. Для аутентификации пользователей и других целей Samba также может быть привязана к домену Active Directory, может сама служить контроллером домена Active Directory или использоваться с сервером LDAP.\n\nДля работы Samba требуется какой-нибудь Linux-пользователь — вы можете использовать существующего пользователя или создать нового.\n\nХотя имена пользователей Samba общие с системными пользователями, Samba использует для них отдельные пароли. Чтобы добавить нового пользователя Samba, воспользуйтесь следующей, заменив пользователь_samba на имя нужного пользователя:\n\n```\n# smbpasswd -a пользователь_samba\n```\n\nБудет предложено задать пароль для этого пользователя.\n\nВ зависимости от роли сервера может понадобиться изменить разрешения и атрибуты файлов для аккаунта Samba.\n\nЕсли вы хотите разрешить новому пользователю только доступ к Samba-ресурсам и запретить полноценный вход в систему, можно ограничить возможности входа:\n\n- отключить командную оболочку - usermod --shell /usr/bin/nologin --lock пользователь_samba\n- отключить вход по SSH - измените опцию AllowUsers в файле /etc/ssh/sshd_config\n\nСм. также рекомендации по повышению защищённости системы.\n\nСписок добавленных в Samba пользователей можно посмотреть с помощью команды pdbedit(8):\n\n```\n# pdbedit -L -v\n```\n\nЧтобы сменить пароль пользователя, используйте smbpasswd:\n\n```\n# smbpasswd пользователь_samba\n```\n\n"
+    },
+    {
+      "title": "Создание общего ресурса для анонимных пользователей",
+      "level": 4,
+      "content": "1. Создайте пользователя Linux, который будет использоваться для анонимных пользователей Samba:\n\n```\n# useradd guest -s /bin/nologin\n```\n\n2. Добавьте в /etc/samba/smb.conf:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n...\n[global]\nsecurity = user\nmap to guest = bad user\nguest account = guest\n\n[guest]\n    comment = guest\n    path = /tmp/\n    public = yes\n    only guest = yes\n    writable = yes\n    printable = no\n```\n\nТеперь все анонимные пользователи будут использовать Linux-пользователя guest для доступа к каталогам, указанным в guest.path (в данном примере /tmp/).\n\nУбедитесь, что общие ресурсы корректно настроены в соответствии с секцией Share Definitions из smb.conf.default.\n\n"
+    },
+    {
+      "title": "Включение следования по символическим ссылкам",
+      "level": 3,
+      "content": "```\n/etc/samba/smb.conf\n```\n\n```\n...\n[global]\n   follow symlinks = yes\n   wide links = yes\n   unix extensions = no\n```\n\nПосле изменений перезапустите службу smb.service.\n\n"
+    },
+    {
+      "title": "Создание ресурсов общего доступа от имени обычного пользователя",
+      "level": 4,
+      "content": "Usershares — это возможность, позволяющая обычным пользователям добавлять, изменять и удалять собственные ресурсы общего доступа.\n\n1. Создайте каталог, в котором будут храниться описания пользовательских общих ресурсов: # mkdir /var/lib/samba/usershares\n1. Создайте группу для пользователей, которые смогут создавать общие ресурсы: # groupadd -r sambashare\n1. Измените владельца каталога на root, а группу на sambashare: # chown root:sambashare /var/lib/samba/usershares\n1. Измените разрешения каталога usershares, чтобы только пользователи из группы sambashare могли создавать файлы. Эта команда также устанавливает sticky bit, благодаря которому пользователи не смогут удалять чужие общие ресурсы: # chmod 1770 /var/lib/samba/usershares\n\n```\n# mkdir /var/lib/samba/usershares\n```\n\n```\n# groupadd -r sambashare\n```\n\n```\n# chown root:sambashare /var/lib/samba/usershares\n```\n\n```\n# chmod 1770 /var/lib/samba/usershares\n```\n\nЗадайте эти переменные в конфигурационном файле smb.conf:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  usershare path = /var/lib/samba/usershares\n  usershare max shares = 100\n  usershare allow guests = yes\n  usershare owner only = yes\n```\n\nДобавьте вашего пользователя в группу sambashare. Замените ваше_имя_пользователя на имя вашего linux-пользователя:\n\n```\n# gpasswd sambashare -a ваше_имя_пользователя\n```\n\nПерезапустите службы smb.service и nmb.service.\n\nЗавершите сеанс и войдите снова, чтобы применилось добавление новой группы к вашему пользователю.\n\nЕсли вы хотите предоставить общий доступ к файлам, находящимся в вашем домашнем каталоге, не забудьте задать доступ как минимум на чтение другим пользователям (chmod a+rX).\n\nТеперь у вас должна появиться возможность настраивать общий доступ samba, используя графический интерфейс. Например, в Thunar или Dolphin вы можете нажать правую кнопку мыши на любом каталоге и предоставить для него общий доступ в сети.\n\nДля настройки общего доступа через командную строку используйте одну из следующих команд:\n\n```\n# net usershare add имя-ресурса абсолютный-путь [комментарий] [пользователь:{R|D|F}] [guest_ok={y|n}]\n# net usershare delete имя-ресурса\n# net usershare list wildcard-имя-ресурса\n# net usershare info wildcard-имя-ресурса\n```\n\n"
+    },
+    {
+      "title": "Установка и форсирование прав доступа",
+      "level": 4,
+      "content": "Разрешения могут быть применены и к серверу, и к отдельным ресурсам:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  ;inherit owner = unix only ; Наследовать владельца родительского каталога для новых файлов и каталогов\n  ;inherit permissions = yes ; Наследовать разрешения родительского каталога для новых файлов и каталогов\n  create mask = 0664\n  directory mask = 2755\n  force create mode = 0644\n  force directory mode = 2755\n  ...\n\n[media]\n  comment = Ресурс, доступный для greg и pcusers\n  path = /path/to/media\n  valid users = greg @pcusers\n  force group = +pcusers\n  public = no\n  writable = yes\n  create mask = 0664\n  directory mask = 2775\n  force create mode = 0664\n  force directory mode = 2775\n\n[public]\n  comment = Общий ресурс, в котором archie имеет доступ на запись\n  path = /path/to/public\n  public = yes\n  read only = yes\n  write list = archie\n  printable = no\n\n[guests]\n  comment = Ресурс, разрешающий чтение и запись всем пользователям\n  path = /path/to/guests\n  public = yes\n  only guest = yes\n  writable = yes\n  printable = no\n```\n\nСм. smb.conf(5) для более подробной информации о настройке прав доступа.\n\n"
+    },
+    {
+      "title": "Ограничение версии протокола для повышения безопасности",
+      "level": 4,
+      "content": "В файле /etc/samba/smb.conf добавьте опции server min protocol и server max protocol для ограничения используемых версий протокола:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  server min protocol = SMB2_02\n  ; server max protocol = SMB3\n```\n\nСм. server max protocol в smb.conf(5) для обзора поддерживаемых протоколов.\n\nДля совместимости со старыми клиентами и/или серверами вам может понадобиться указать client min protocol = CORE или server min protocol = CORE, но имейте в виду, что это делает вас уязвимым в связи с эксплойтами в SMB1, в том числе к ransomware атакам.\n\nКлиентам, использующим mount.cifs, может понадобиться указать правильный vers=*, например:\n\n```\n# mount -t cifs //SERVER/имя-ресурса /mnt/точка-монтирования -o username=пользователь,password=пароль,iocharset=utf8,vers=3.1.1\n```\n\nПодробнее см. mount.cifs(8).\n\n"
+    },
+    {
+      "title": "Использование шифрования SMB",
+      "level": 4,
+      "content": "Нативное шифрование транспорта SMB доступно с версии SMB 3.0. Среди клиентов, поддерживающих такое шифрование, имеются Windows 8 и новее, Windows Server 2012 новее, smbclient в Samba 4.1 и новее.\n\nДля использования шифрования по умолчанию установите параметр server smb encrypt глобально или для отдельных ресурсов. Возможные значения — off, enabled (значение по умолчанию), desired или required:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  server smb encrypt = desired\n```\n\nСмотрите smb.conf(5) для более подробной информации, особенно разделы Effects for SMB1 и Effects for SMB2.\n\n"
+    },
+    {
+      "title": "Отключение общего доступа к принтерам",
+      "level": 4,
+      "content": "По умолчанию Samba предоставляет общий доступ к принтерам, настроенным через CUPS.\n\nЕсли вам это не нужно, используйте следующие опции для отключения:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  load printers = no\n  printing = bsd\n  printcap name = /dev/null\n  disable spoolss = yes\n  show add printer wizard = no\n```\n\n"
+    },
+    {
+      "title": "Запрет определённых расширений файлов в общем ресурсе Samba",
+      "level": 4,
+      "content": "Samba предоставляет опцию для блокирования файлов по определённым паттернам, вроде расширений файлов. Её можно использовать для предотвращения распространения вирусов или для того, чтобы пользователи не тратили место на определённые файлы. Более подробную информацию можно найти в smb.conf(5).\n\n```\n/etc/samba/smb.conf\n```\n\n```\n...\n[myshare]\n  comment = Private\n  path = /mnt/data\n  read only = no\n  veto files = /*.exe/*.com/*.dll/*.bat/*.vbs/*.tmp/*.mp3/*.avi/*.mp4/*.wmv/*.wma/\n```\n\n"
+    },
+    {
+      "title": "Увеличение пропускной способности",
+      "level": 4,
+      "content": "Большинству пользователей подойдут настройки по умолчанию. Однако корректное использование 'socket options' может улучшить производительность, но ошибки в настройке также могут и ухудшить её. Проверяйте эффекты, прежде чем вносить какие-либо серьезные изменения.\n\nЧитайте smb.conf(5) прежде чем применять описанные здесь опции.\n\nЭти опции прописываются в файле /etc/samba/smb.conf в секции [global].\n\nSMB3 multi-channel может улучшить производительности, однако иногда может испортить данные из-за race conditions. В будущих версиях ситуация может улучшиться:\n\n```\nserver multi channel support = yes\n```\n\nОграничение времени бездействия полезно для предотвращения исчерпания ресурсов сервера из-за большого количества неактивных подключений:\n\n```\ndeadtime = 30\n```\n\nИспользование sendfile улучшает эффективность использования процессора и повышает скорость Samba:\n\n```\nuse sendfile = yes\n```\n\nУстановка min receivefile size разрешает zero-copy запись непосредственно из буфера сокета в кэш файловой системы (если доступен). Это может улучшить производительность, но требует тестирования:\n\n```\nmin receivefile size = 16384\n```\n\nАсинхронное чтение/запись файлов может повысить производительность:\n\n```\naio read size = 1\naio write size = 1\n```\n\nУвеличение размера буферов приёма/отправки и флаги оптимизации сокетов могут быть полезны для улучшения производительности. Рекомендуется протестировать каждый флаг отдельно, так как они могут вызывать проблемы в некоторых сетях:\n\n```\nsocket options = IPTOS_LOWDELAY TCP_NODELAY IPTOS_THROUGHPUT SO_RCVBUF=131072 SO_SNDBUF=131072\n```\n\n"
+    },
+    {
+      "title": "Включение доступа для старых клиентов или устройств",
+      "level": 4,
+      "content": "Последние версии Samba больше не предлагают старые методы аутентификации и протоколы, которые всё ещё используются некоторыми старыми клиентами (IP-камерами и т.д.). Такие устройства обычно требуют от сервера разрешения аутентификации NTLMv1 и протокола NT1, известного как CIFS. Чтобы эти устройства работали с последней версией Samba, добавьте эти два параметра в секцию [global]:\n\n```\nserver min protocol = NT1\nntlm auth = yes\n```\n\nДля анонимного/гостевого доступа достаточно лишь первого параметра. Если старое устройство использует имя и пароль для доступа, то нужен и второй параметр тоже.\n\n"
+    },
+    {
+      "title": "Включение поиска Spotlight",
+      "level": 4,
+      "content": "Spotlight позволяет поддерживающим его клиентам (например, MacOS Finder) быстро искать общие файлы.\n\nУстановите и запустите OpenSearch. Установите fs2es-indexerAUR, настройте каталоги, которые вы хотите индексировать, в /etc/fs2es-indexer/config.yml, и запустите/включите fs2es-indexer.service для периодического индексирования.\n\nИзмените smb.conf как описано в Samba wiki и перезапустите smb.service для применения изменений.\n\n"
+    },
+    {
+      "title": "Клиент",
+      "level": 2,
+      "content": "Установите пакет smbclient, который предоставляет ftp-подобный интерфейс командной строки. Часто используемые команды описаны в smbclient(1).\n\nВ качестве легковесной альтернативы (без возможности посмотреть список общих ресурсов и т.д.) можно использовать cifs-utils, который предоставляет команду /usr/bin/mount.cifs.\n\nНекоторые среды рабочего стола также имеют графический интерфейс для доступа к общим ресурсам и управления ими (смотрите #Настройка файлового менеджера).\n\n- smbclient требует наличия файла /etc/samba/smb.conf (смотрите раздел #Установка); можно просто создать пустой файл командой touch.\n- После установки cifs-utils или smbclient загрузите модуль ядра cifs или перезагрузитесь, чтобы не возникало ошибок монтирования.\n\n"
+    },
+    {
+      "title": "Просмотр публичных ресурсов для общего доступа",
+      "level": 3,
+      "content": "Чтобы вывести список общедоступных ресурсов на сервере:\n\n```\n$ smbclient -L hostname -U%\n```\n\nТакже можно использовать команду $ smbtree -N, которая покажет древовидную диаграмму всех общих ресурсов. Она использует широковещательные (broadcast) запросы и потому не рекомендуется для использования в сетях с большим числом компьютеров, но может быть полезна для проверки правильности имён общих ресурсов. Опция -N (-no-pass) отключает запрос пароля.\n\n"
+    },
+    {
+      "title": "Имена хостов NetBIOS/WINS",
+      "level": 3,
+      "content": "Клиенты Samba обрабатывают имена хостов NetBIOS автоматически по умолчанию (поведение регулируется опцией name resolve order в smb.conf). Другие программы (в том числе mount.cifs) используют Name Service Switch, который не использует NetBIOS по умолчанию.\n\nПакет smbclient предоставляет драйвер libnss для разрешения имён NetBIOS. Для его использования установите его вместе с пакетом samba (который предоставляет демон winbindd), запустите и включите службу winbind.service и добавьте wins в строку hosts в файле nsswitch.conf(5):\n\n```\n/etc/nsswitch.conf\n```\n\n```\n...\nhosts: mymachines resolve [!UNAVAIL=return] files myhostname dns wins\n...\n```\n\nТеперь в процессе разрешения имён (например, при использовании mount.cifs или просто ping имя-netbios) демон winbindd будет отправлять запросы с использованием протокола NetBIOS Name Service (NBNS, также известен как WINS).\n\nПо умолчанию он отправляет широковещательный (broadcast) запрос в локальную сеть. Если у вас есть WINS-сервер, вы можете добавить wins server = ip-сервера-wins в smb.conf и перезапустить winbind.service, тогда winbindd и другие клиенты Samba станут отправлять unicast-запросы на указанный IP.\n\nЕсли вы хотите, чтобы разрешение имени локального компьютера (которое указывается в опции netbios name в smb.conf) тоже работало, запустите и включите службу nmb.service, которая будет обрабатывать входящие запросы.\n\nВы можете протестировать разрешение WINS с помощью nmblookup. По умолчанию он отправляет широковещательные запросы в вашу локальную сеть независимо от значения опции wins server.\n\nИмейте в виду, что WINS использует трафик, приходящий из порта 137.\n\n"
+    },
+    {
+      "title": "Отключение поддержки NetBIOS/WINS",
+      "level": 4,
+      "content": "Если разрешение имён хостов NetBIOS/WINS не используется, может быть предпочтительно отключение этого протокола:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  disable netbios = yes\n  dns proxy = no\n```\n\nЗатем отключите/остановите winbind.service.\n\n"
+    },
+    {
+      "title": "Ручное монтирование",
+      "level": 3,
+      "content": "Создайте точку монтирования для ресурса:\n\n```\n# mkdir /mnt/точка_монтирования\n```\n\nПримонтируйте ресурс, в качестве type указав mount.cifs. Не все опции из перечисленных ниже необходимы или желательны:\n\n```\n# mount -t cifs //СЕРВЕР/имя_ресурса /mnt/точка_монтирования -o username=имя_пользователя,password=пароль,workgroup=рабочая_группа,iocharset=utf8,uid=пользователь,gid=группа\n```\n\nОпции uid и gid соответствуют локальному (клиентскому) пользователю/группе, которые получат доступ на чтение и запись по указанному пути.\n\n- Если используемые uid и gid не соответствуют пользователю на сервере, могут помочь опции forceuid и forcegid. Но имейте в виду, что тогда права доступа, отображаемые на клиенте, могут не соответствовать реальным правам доступа на сервере. Подробности смотрите в разделе File And Directory Ownership And Permissions в mount.cifs(8) § FILE AND DIRECTORY OWNERSHIP AND PERMISSIONS.\n- Для подключения общего ресурса Windows без аутентификации укажите \"username=*\".\n\n- СЕРВЕР — Имя сервера.\n- имя_ресурса — Название каталога с общим доступом.\n- точка_монтирования — Локальный каталог, в который будет примонтирован ресурс.\n- [-o опции] — Смотрите страницу руководства mount.cifs(8) для получения информации.\n\nNote: **/** \n\n- Не используйте слэш / в конце пути. //СЕРВЕР/имя_ресурса/ не будет работать.\n- Если примонтированный вами ресурс работает нестабильно или зависает (freeze), попробуйте включить другую версию протокола SMB, используя опцию vers=. Например, vers=2.0 для Windows Vista.\n- Если при завершении работы системы на примонтированных ресурсах происходят таймауты, смотрите wpa_supplicant#Problem with mounted network shares (cifs) and shutdown.\n\n"
+    },
+    {
+      "title": "Хранение пароля от общих ресурсов",
+      "level": 4,
+      "content": "Хранение паролей в доступном для чтения файле не рекомендуется. Более безопасным методом является использование файла, например, внутри /etc/samba/credentials:\n\n```\n/etc/samba/credentials/share\n```\n\n```\nusername=имя_пользователя\npassword=пароль\n```\n\nВ команде mount замените опции username=myuser,password=mypass на credentials=/etc/samba/credentials/share.\n\nДля безопасности этот файл должен быть доступен только для root:\n\n```\n# chown root:root /etc/samba/credentials\n# chmod 700 /etc/samba/credentials\n# chmod 600 /etc/samba/credentials/share\n```\n\n"
+    },
+    {
+      "title": "С использованием NetworkManager и GIO/gvfs",
+      "level": 4,
+      "content": "NetworkManager может быть настроен на запуск скриптов при изменении состояния сети. Приведённый ниже скрипт использует команду gio, чтобы автоматически монтировать общие ресурсы Samba аналогично тому, как делает ваш файловый менеджер, как описано ниже. Скрипт также безопасно размонтирует их перед отключением сети путём отслеживания событий pre-down и vpn-pre-down. Сделайте скрипт исполняемым после создания.\n\n```\n/etc/NetworkManager/dispatcher.d/30-samba.sh\n```\n\n```\n#!/bin/sh\n\n# Найдите UUID нужного соединения с помощью команды «nmcli con show».\n# Поддерживаются все типы соединений NetworkManager: беспроводные, VPN, проводные...\nWANTED_CON_UUID=\"CHANGE-ME-NOW-9c7eff15-010a-4b1c-a786-9b4efa218ba9\"\n\n# Пользователь, под которым будет примонтирован общий ресурс\nUSER=\"yourusername\"\n# Путь, который отображается в вашем файловом менеджере, когда вы вручную монтируете нужный общий ресурс\nSMB_URL=\"smb://servername/share\"\n\n# Получаем runtime-каталог пользователя. Если его нет, то просто выходим\nXDG_RUNTIME_DIR=$(loginctl show-user --property=RuntimePath --value \"$USER\") || exit 0\n\nif [ \"$CONNECTION_UUID\" = \"$WANTED_CON_UUID\" ]; then\n    \n    # Параметр скрипта $1: название сетевого интерфейса, не используется\n    # Параметр скрипта $2: отправленное событие\n    \n    case \"$2\" in\n        \"up\")\n            su $USER -c \"DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus gio mount $SMB_URL\"\n            ;;\n        \"pre-down\"|\"vpn-pre-down\")\n            su $USER -c \"DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus gio mount -uf $SMB_URL\"\n            ;;\n    esac\nfi\n```\n\nСоздайте символическую ссылку в каталоге /etc/NetworkManager/dispatcher.d/pre-down, чтобы скрипт получал события pre-down:\n\n```\n# ln -s /etc/NetworkManager/dispatcher.d/30-samba.sh /etc/NetworkManager/dispatcher.d/pre-down.d/30-samba.sh\n```\n\n"
+    },
+    {
+      "title": "С помощью записи в fstab",
+      "level": 4,
+      "content": "Простой пример cifs записи в fstab с аутентификацией:\n\n```\n/etc/fstab\n```\n\n```\n//СЕРВЕР/имя_ресурса /mnt/точка_монтирования cifs _netdev,nofail,username=имя_пользователя,password=пароль 0 0\n```\n\nNote: **s** \n\n- Пробелы в именах ресурсов должны быть заменены на \\040 (восьмеричный ASCII-код для пробелов). Например, //СЕРВЕР/имя ресурса должно быть заменено на //СЕРВЕР/имя\\040ресурса в /etc/fstab.\n- Чтобы разрешить монтирование простым пользователям без прав root, когда точка монтирования находится в доступном пользователю каталоге (например, домашнем), добавьте опцию users (обязательно с s на конце).\n\n"
+    },
+    {
+      "title": "С помощью юнита systemd",
+      "level": 4,
+      "content": "Создайте новый файл .mount в каталоге /etc/systemd/system, например mnt-myshare.mount. Смотрите systemd.mount(5) для более подробной информации.\n\nWhat= путь к общему ресурсу\n\nWhere= путь, куда он будет примонтирован\n\nOptions= опции монтирования\n\n- К сетевым точкам монтирования автоматически добавляются After-зависимости remote-fs-pre.target, network.target и network-online.target, а также Before-зависимость remote-fs.target, если не указана опция nofail; иначе используется Wants.\n- Добавьте noauto в Options для отключения автоматического монтирования (если его не будет монтировать какой-нибудь другой юнит).\n- Если в качестве адреса сервера вы хотите использовать имя хоста вместо IP-адреса, добавьте nss-lookup.target в After. Это может предотвратить ошибки монтироваия при загрузке.\n\n```\n/etc/systemd/system/mnt-myshare.mount\n```\n\n```\n[Unit]\nDescription=Mount Share at boot\n\n[Mount]\nWhat=//server/share\nWhere=/mnt/myshare\nOptions=_netdev,credentials=/etc/samba/credentials/myshare,iocharset=utf8,rw\nType=cifs\nTimeoutSec=30\n\n[Install]\nWantedBy=multi-user.target\n```\n\n- На случай, если удалённая система станет недоступна, добавьте ForceUnmount=true в секцию [Mount], чтобы разрешить принудительное размонтирование.\n- Если общий ресурс имеет группы с доступом только для чтения, добавьте uid=пользователь или gid=группа в Options=, чтобы указать пользователя/группу, которые имеют право на запись.\n\nДля использования mnt-myshare.mount запустите этот юнит и включите его для автоматического монтирования при загрузке системы.\n\nДля автоматического монтирования ресурса (при обращении к нему, как autofs) можно использовать следующий блок automount:\n\n```\n/etc/systemd/system/mnt-myshare.automount\n```\n\n```\n[Unit]\nDescription=Automount myshare\n\n[Automount]\nWhere=/mnt/myshare\n\n[Install]\nWantedBy=multi-user.target\n```\n\nОстановите и отключите юнит mnt-myshare.mount, а вместо него запустите и включите юнит mnt-myshare.automount.\n\n"
+    },
+    {
+      "title": "smbnetfs",
+      "level": 4,
+      "content": "Для начала удостоверьтесь, что вам доступны все ресурсы, которые вам нужны для монтирования:\n\n```\n$ smbtree -U удаленный_пользователь\n```\n\nЕсли это не работает, найдите и измените следующую строку в /etc/samba/smb.conf подобным образом:\n\n```\ndomain master = auto\n```\n\nЗатем перезапустите smb.service и nmb.service.\n\nЕсли всё работает как нужно, установите пакет smbnetfs.\n\nЗатем добавьте следующую строку в файл /etc/fuse.conf:\n\n```\nuser_allow_other\n```\n\nСкопируйте каталог /etc/smbnetfs/.smb в вашу домашнюю директорию:\n\n```\n$ cp -a /etc/smbnetfs/.smb ~\n```\n\nЗатем создайте ссылку на файл smb.conf:\n\n```\n$ ln -sf /etc/samba/smb.conf ~/.smb/smb.conf\n```\n\nЕсли для доступа к каким-либо общим ресурсам нужен пароль, измените файл ~/.smb/smbnetfs.auth, прописав в нём пароли для определённых хостов примерно так:\n\n```\n~/.smb/smbnetfs.auth\n```\n\n```\nauth\t\t\t\"хост\" \"пользователь\" \"пароль\"\n```\n\nТакже можно добавить записи для определённых хостов, которые будут монтироваться smbnetfs, если это необходимо. Более подробную информацию можно найти в ~/.smb/smbnetfs.conf.\n\nЕсли вы используете Dolphin или GNOME Files, можно добавить следующую опцию ~/.smb/smbnetfs.conf, чтобы избежать предупреждений о переполненном диске, так как smbnetfs по умолчанию сообщает, что свободно 0 байт:\n\n```\n~/.smb/smbnetfs.conf\n```\n\n```\nfree_space_size 1073741824\n```\n\nКогда вы закончите настройку, необходимо выполнить\n\n```\n$ chmod 600 ~/.smb/smbnetfs.*\n```\n\nВ противном случае smbnetfs пожалуется: 'insecure config file permissions'.\n\nНаконец, чтобы примонтировать сетевое окружение Samba в каталог по вашему выбору, выполните\n\n```\n$ smbnetfs точка_монтирования\n```\n\nПакет в Arch Linux также поддерживает дополнительный \"общесистемный\" режим для smbnetfs. Чтобы его включить, вам необходимо выполнить указанные изменения в каталоге /etc/smbnetfs/.smb.\n\nЗатем вы можете запустить и/или включить в автозагрузку демон smbnetfs обычным способом. Общесистемной точкой монтирования является /mnt/smbnet/.\n\n"
+    },
+    {
+      "title": "autofs",
+      "level": 4,
+      "content": "Смотрите статью Autofs для получения информации об автомонтировщике ядра (kernel-based) Linux.\n\n"
+    },
+    {
+      "title": "GNOME Files, Nemo, Caja, Thunar и PCManFM",
+      "level": 4,
+      "content": "Чтобы получить доступ к ресурсам samba через GNOME Files, Nemo, Caja, Thunar или PCManFM, установите пакет gvfs-smb, доступный в официальных репозиториях.\n\nНажмите Ctrl+l и введите smb://имя_сервера/ресурс в панель адреса, чтобы получить доступ к ресурсу.\n\nПримонтированный ресурс, вероятно, будет представлен в файловой системе по пути /run/user/ваш_UID/gvfs или ~/.gvfs.\n\n"
+    },
+    {
+      "title": "KDE",
+      "level": 4,
+      "content": "Приложения KDE (например, Dolphin) имеют встроенную возможность просмотра ресурсов Samba, в этом случае нет необходимости в дополнительных пакетах. Используйте адрес smb://имя_сервера/имя_ресурса для подключения и просмотра файлов. Для доступа к файлам из приложений, не являющихся частью KDE, можно установить kio-fuse.\n\nГрафический интерфейс настроек предоставляется пакетом kdenetwork-filesharing.\n\n"
+    },
+    {
+      "title": "Другие графические окружения",
+      "level": 4,
+      "content": "Есть несколько полезных программ, но им могут требоваться пакеты, созданные для них. Это может быть сделано с помощью Arch package build system. Хорошая новость заключается в том, что они не нуждаются в особом окружении, устанавливаемом для их поддержки, так что они \"тянут\" за собой меньше пакетов.\n\n- pyneighborhoodAUR доступен AUR.\n- Плагины LinNeighborhood, RUmba, xffm-samba для Xffm недоступен в официальных репозиториях или в AUR. Поскольку они не поддерживаются официально (или поддерживаются, но неофициально), они могут быть устаревшими и не работать в полной мере\n\n"
+    },
+    {
+      "title": "Обнаружение общих сетевых ресурсов",
+      "level": 3,
+      "content": "Если о других системах в локальной сети ничего не известно, а инструменты вроде smbnetfs не подходят, можно попробовать поискать ресурсы Samba вручную.\n\nСперва установите пакеты nmap и smbclient.\n\nИспользуйте nmap для сканирования локальной сети и поиска систем с открытым TCP-портом 445, который используется протоколом SMB. Имейте в виду, что вам может понадобиться использовать опцию -Pn или задать другой тип пинг-сканирования, так как Windows-системы обычно защищены межсетевым экраном.\n\n```\n$ nmap -p 445 \"192.168.1.*\"\n```\n\n```\nStarting Nmap 7.92 ( https://nmap.org ) at 2022-03-13 12:00 UTC\nNmap scan report for 192.168.1.1\nHost is up (0.0011s latency).\n\nPORT    STATE  SERVICE\n445/tcp open  microsoft-ds\n\nNmap scan report for 192.168.1.2\nHost is up (0.00011s latency).\n\nPORT    STATE SERVICE\n445/tcp open  microsoft-ds\n\nNmap done: 256 IP addresses (2 hosts up) scanned in 2.45 seconds\n```\n\nПервый результат — другая система; второй — клиент, с которого было выполнено сканирование.\n\nТеперь можно подключиться к этим IP-адресам напрямую, но если вы хотите использовать имена хостов NetBIOS, можно использовать nmblookup(1), чтобы узнать имена NetBIOS. Имейте в виду, что это не будет работать, если NetBIOS отключен на стороне сервера.\n\n```\n$ nmblookup -A 192.168.1.1\n```\n\n```\nLooking up status of 192.168.1.1\n        PUTER           <00> -         B <ACTIVE>\n        HOMENET         <00> - <GROUP> B <ACTIVE>\n        PUTER           <03> -         B <ACTIVE>\n        PUTER           <20> -         B <ACTIVE>\n        HOMENET         <1e> - <GROUP> B <ACTIVE>\n        USERNAME        <03> -         B <ACTIVE>\n        HOMENET         <1d> -         B <ACTIVE>\n        MSBROWSE        <01> - <GROUP> B <ACTIVE>\n```\n\nНезависимо от вывода, смотрите на <20>, который обозначает хост с открытыми сервисами.\n\nС помощью smbclient(1) чтобы посмотреть список доступных ресурсов на сервере. Вместо IP-адреса можно использовать NetBIOS-имя (PUTER в данном примере), если оно доступно. Если будет запрошен пароль, можно просто нажать Enter — список общих ресурсов всё равно отобразится:\n\n```\n$ smbclient -L \\\\192.168.1.1\n```\n\n```\nSharename       Type      Comment\n---------       ----      -------\nMY_MUSIC        Disk\nSHAREDDOCS      Disk\nPRINTER$        Disk\nPRINTER         Printer\nIPC$            IPC       Remote Inter Process Communication\n\nServer               Comment\n---------            -------\nPUTER\n\nWorkgroup            Master\n---------            -------\nHOMENET               PUTER\n```\n\n"
+    },
+    {
+      "title": "Удалённое управление компьютером Windows",
+      "level": 3,
+      "content": "Samba предлагает набор инструментов для взаимодействия с Windows. Они могут пригодиться, если доступ к компьютеру Windows через удалённый рабочий стол невозможен, как показано на некоторых примерах.\n\nОтправка команды shutdown с комментарием:\n\n```\n$ net rpc shutdown -C \"comment\" -I IPADDRESS -U USERNAME%PASSWORD\n```\n\nПринудительное выключение можно вызвать, заменив -C с комментарием на один -f. Для перезапуска можно добавить -r, за которым следует -C или -f.\n\nОстановка и запуск служб:\n\n```\n$ net rpc service stop SERVICENAME -I IPADDRESS -U USERNAME%PASSWORD\n```\n\nСписок доступных команд net rpc:\n\n```\n$ net rpc\n```\n\n"
+    },
+    {
+      "title": "Не удаётся запустить Samba SMB/CIFS сервер",
+      "level": 3,
+      "content": "- Проверьте smb.conf на наличие ошибок с помощью testparm(1).\n- Проверьте корректность прав доступа в /var/cache/samba/ и перезапустите smb.service:\n\n```\n# chmod 0755 /var/cache/samba/msg\n```\n\n"
+    },
+    {
+      "title": "Проблемы с разрешениями на SELinux",
+      "level": 3,
+      "content": "SELinux по умолчанию не позволяет samba получать доступ к домашним каталогам пользователей. Чтобы решить эту проблему, выполните команду:\n\n```\n# setsebool -P samba_enable_home_dirs 1\n```\n\nАналогично, samba_export_all_ro и samba_export_all_rw дадут доступ к чтению и записи всех файлов.\n\n"
+    },
+    {
+      "title": "Проблемы с разрешениями на AppArmor",
+      "level": 3,
+      "content": "Если используется путь к ресурсу, расположенному вне домашнего каталога или каталога usershares, внесите его в белый список в /etc/apparmor.d/local/usr.sbin.smbd. Например:\n\n```\n/etc/apparmor.d/local/usr.sbin.smbd\n```\n\n```\n\"/data/\" rk,\n\"/data/**\" lrwk,\n```\n\n"
+    },
+    {
+      "title": "No dialect specified on mount",
+      "level": 3,
+      "content": "Клиент использует неподдерживаемую версию SMB/CIFS, которую сервер не принимает.\n\nСмотрите #Ограничение версии протокола для повышения безопасности.\n\n"
+    },
+    {
+      "title": "Клиенты Windows продолжают запрашивать пароль, даже если общие ресурсы Samba созданы с правами гостя",
+      "level": 3,
+      "content": "Установите опцию map to guest в секции global в файле /etc/samba/smb.conf:\n\n```\nmap to guest = Bad User\n```\n\nС версии Samba 4.10.10 используйте Bad Password вместо Bad User.\n\n"
+    },
+    {
+      "title": "Проблемы подключения к Windows 7 - mount error(12): cannot allocate memory",
+      "level": 3,
+      "content": "Известная ошибка Windows 7 \"mount error(12): cannot allocate memory\" может быть исправлена установкой пары ключей в реестре системы Windows:\n\n- HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\LargeSystemCache (установить значение 1)\n- HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters\\Size (установить значение 3)\n\nВ качестве альтернативы можно запустить командную строку от имени Администратора и выполнить следующее:\n\n```\nreg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v \"LargeSystemCache\" /t REG_DWORD /d 1 /f\nreg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters\" /v \"Size\" /t REG_DWORD /d 3 /f\n```\n\nВыполните одно из следующих действий, чтобы изменения вступили в силу:\n\n- Перезагрузите Windows\n- Перезапустите службу на сервере через services.msc\n- Выполните в командной строке net stop lanmanserver и net start lanmanserver; после остановки служба может перезапуститься автоматически\n\nИсходная статья.\n\n"
+    },
+    {
+      "title": "Проблемы подключения к Windows 10 1709 и новее - \"Windows cannot access\" 0x80004005",
+      "level": 3,
+      "content": "Эта ошибка затрагивает некоторые машины под управлением Windows 10 версии 1709 и более поздних версий. Она не связана с отключением SMB1 в этой версии, а связана с тем, что Microsoft отключила небезопасный вход для гостей в этой версии для некоторых.\n\nЧтобы исправить ситуацию, откройте редактор групповой политики (gpedit.msc). Перейдите к настройке Конфигурация компьютера\\Административные шаблоны\\Сеть\\Рабочая станция Lanman > Включить небезопасные гостевые входы и включите её. В качестве альтернативы измените следующее значение в реестре:\n\n```\n[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters]\n\"AllowInsecureGuestAuth\"=dword:1\n```\n\n"
+    },
+    {
+      "title": "Ошибка: Failed to retrieve printer list: NT_STATUS_UNSUCCESSFUL",
+      "level": 3,
+      "content": "Если вы являетесь домашним пользователем, используете samba исключительно для организации общего доступа к файлам с сервера или NAS и не заинтересованы в организации общего доступа к принтерам, вы можете исправить эту ошибку, добавив следующие строки в файл /etc/samba/smb.conf:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  load printers = No\n  printing = bsd\n  printcap name = /dev/null\n  disable spoolss = Yes\n```\n\nПерезапустите службу smb.service и проверьте журнал:\n\n```\n# cat /var/log/samba/smbd.log\n```\n\nи больше ошибка не должна появляться.\n\n"
+    },
+    {
+      "title": "Не удается предоставить общий доступ к папке",
+      "level": 3,
+      "content": "Проблема проявляется в том, что, когда вы пытаетесь предоставить общий доступ к папке через Dolphin (файловый менеджер), и вначале, вроде бы, все работает нормально, после перезапуска Dolphin иконка ресурса исчезла из папки, а в терминале (Konsole) вы видите следующий вывод:\n\n```\n‘net usershare’ returned error 255: net usershare: usershares are currently disabled\n```\n\nДля решения проблемы включите пользовательские общие ресурсы, как это описано в разделе #Создание ресурсов общего доступа от имени обычного пользователя.\n\n"
+    },
+    {
+      "title": "\"Просмотр\" сети выдает ошибку \"Не удалось получить список ресурсов с сервера\" (Failed to retrieve share list from server)",
+      "level": 3,
+      "content": "И вы используете межсетевой экран (iptables), поскольку не доверяете вашей локальной (школа, университет, отель) сети. Это может происходить по следующей причине: когда smbclient просматривает локальную сеть, он посылает широковещательный запрос на udp-порт 137. Затем серверы сети отвечают вашему клиенту, но, поскольку исходный адрес ответа отличается от адреса назначения, который видел iptables при отправке запроса, iptables не признает ответ как \"установленное соединение\" (\"ESTABLISHED\") или \"относящийся к запросу\" (\"RELATED\"), и, следовательно, пакет отбрасывается. Возможное решение - добавление:\n\n```\niptables -t raw -A OUTPUT -p udp -m udp --dport 137 -j CT --helper netbios-ns\n```\n\nв вашу конфигурацию iptables.\n\nДля Uncomplicated Firewall добавьте nf_conntrack_netbios_ns в конце следующей строки в /etc/default/ufw:\n\n```\nIPT_MODULES=\"nf_conntrack_ftp nf_nat_ftp nf_conntrack_irc nf_nat_irc\"\n```\n\nи затем выполните следующие команды от имени root:\n\n```\necho 1 > /proc/sys/net/netfilter/nf_conntrack_helper\nufw allow CIFS\nufw reload\n```\n\nЧтобы сделать изменения постоянными, добавьте следующую строку в конце файла /etc/ufw/sysctl.conf:\n\n```\nnet.netfilter.nf_conntrack_helper=1\n```\n\n"
+    },
+    {
+      "title": "protocol negotiation failed: NT_STATUS_INVALID_NETWORK_RESPONSE",
+      "level": 3,
+      "content": "Вероятно, клиент не имеет доступа к общим ресурсам. Удостоверьтесь, что IP-адрес клиента прописан в строке hosts allow = файла /etc/samba/smb.conf.\n\nТакже проблема может быть в том, что клиент использует недопустимую версию протокола. Для проверки попробуйте подключиться с помощью smbclient, вручную указав максимальную версию протокола:\n\n```\n$ smbclient -U <пользователь> -L //<сервер> -m <версия протокола, например SMB2> -W <домен>\n```\n\nЕсли команда выполнится успешно, создайте файл конфигрурации:\n\n```\n~/.smb/smb.conf\n```\n\n```\n[global]\n  workgroup = <домен>\n  client max protocol = SMB2\n```\n\n"
+    },
+    {
+      "title": "Подключение к серверу завершилось неудачей: (Error NT_STATUS_UNSUCCESSFUL)",
+      "level": 3,
+      "content": "Вероятно, вы указываете smbclient неправильное имя сервера. Чтобы узнать его, запустите на сервере команду hostnamectl и найдите строку \"Transient hostname\".\n\n"
+    },
+    {
+      "title": "Подключение к серверу завершилось неудачей: (Error NT_STATUS_CONNECTION_REFUSED)",
+      "level": 3,
+      "content": "Убедитесь, что сервер запущен.\n\n"
+    },
+    {
+      "title": "Protocol negotiation failed: NT_STATUS_CONNECTION_RESET",
+      "level": 3,
+      "content": "Вероятно, на сервере запрещён SMB1. Добавьте опцию client max protocol = SMB2 в /etc/samba/smb.conf. Или просто добавьте -m SMB2 к команде smbclient.\n\n"
+    },
+    {
+      "title": "Правильный пароль не подходит (ошибка 1326)",
+      "level": 3,
+      "content": "В Samba 4.5 аутентификация NTLMv1 по умолчанию отключена. Рекомендуется установить последние доступные обновления на клиентах и запретить доступ для неподдерживаемых клиентов.\n\nЕсли вам всё ещё нужна поддержка очень старых клиентов без поддержки NTLMv2 (например, Windows XP), можно включить NTLMv1, однако это не рекомендуется по соображениям безопасности:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  lanman auth = yes\n  ntlm auth = yes\n```\n\nЕсли клиенты NTLMv2 не могут пройти аутентификацию при включенном NTLMv1, создайте на клиенте следующий файл:\n\n```\n/home/user/.smb/smb.conf\n```\n\n```\n[global]\n  sec = ntlmv2\n  client ntlmv2 auth = yes\n```\n\nЭто изменение также влияет на общие ресурсы samba, смонтированные с помощью mount.cifs. Если после обновления до Samba 4.5 монтирование не удаётся, добавьте опцию sec=ntlmssp к команде монтирования, например:\n\n```\nmount.cifs //server/share /mnt/point -o sec=ntlmssp,...\n```\n\nСмотрите mount.cifs(8): ntlmssp — Использовать хэширование паролей NTLMv2, заключённое в Raw NTLMSSP сообщении. По умолчанию в основных версиях ядра до версии 3.8 было sec=ntlm. В версии 3.8 значение по умолчанию было изменено на sec=ntlmssp.\n\n"
+    },
+    {
+      "title": "Сопоставление зарезервированных символов Windows",
+      "level": 3,
+      "content": "Начиная с ядра 3.18, модуль cifs по умолчанию использует опцию \"mapposix\". При монтировании ресурса с использованием расширений unix и конфигурации Samba по умолчанию, файлы и каталоги, содержащие один из семи зарезервированных символов Windows : \\ * < > ? , отображаются, но доступ к ним невозможен.\n\nВозможные решения:\n\n- Использовать недокументированную опцию монтирования nomapposix для cifs\n\n```\n# mount.cifs //server/share /mnt/point -o nomapposix\n```\n\n- Настроить Samba для переадресации символов стиля mapposix (\"SFM\", Services for Mac) на правильные родные символы с помощью fruit\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  vfs objects = catia fruit\n  fruit:encoding = native\n```\n\n- Написать своё сопоставление запрещённых символов с помощью catia\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n  vfs objects = catia\n  catia:mappings = 0x22:0xf022, 0x2a:0xf02a, 0x2f:0xf02f, 0x3a:0xf03a, 0x3c:0xf03c, 0x3e:0xf03e, 0x3f:0xf03f, 0x5c:0xf05c, 0x7c:0xf07c, 0x20:0xf020\n```\n\nПоследний подход (использование catia или fruit) имеет недостаток, заключающийся в фильтрации файлов с непечатаемыми символами.\n\n"
+    },
+    {
+      "title": "Папка, к которой открыт доступ через графический интерфейс, недоступна для гостей",
+      "level": 3,
+      "content": "Этот раздел предполагает, что:\n\n1. Общие папки настроены, как описано в разделе #Создание ресурсов общего доступа от имени обычного пользователя\n1. Общая папка создана через графический интерфейс и не пользователем root\n1. Включен гостевой доступ для папки\n1. Служба Samba перезапускалась с момента последнего изменения файла /etc/samba/smb.conf\n\nВ качестве примера далее используются следующие значения:\n\n- Общая папка находится внутри домашнего каталога пользователя (/home/yourUser/Shared)\n- Имя общей папки — MySharedFiles\n- Гостевой доступ открыт только для чтения.\n- Пользователи Windows будут иметь доступ к содержимому общей папки без аутентификации\n\n"
+    },
+    {
+      "title": "Проверьте правильность конфигурации samba",
+      "level": 4,
+      "content": "Выполните следующую команду из терминала, чтобы проверить правильность настроек:\n\n```\n$ testparm\n```\n\n"
+    },
+    {
+      "title": "Проверьте правильность создания общей папки",
+      "level": 4,
+      "content": "Выполните следующие команды из терминала:\n\n```\n$ cd /var/lib/samba/usershare\n$ ls\n```\n\nЕсли всё хорошо, должен быть файл с именем mysharedfiles\n\nПосмотрите его содержимое:\n\n```\n$ cat mysharedfiles\n```\n\nСодержимое файла должно быть примерно таким:\n\n```\n/var/lib/samba/usershare/mysharedfiles\n```\n\n```\npath=/home/yourUser/Shared\ncomment=\nusershare_acl=S-1-1-0:r\nguest_ok=y\nsharename=MySharedFiles\n```\n\n"
+    },
+    {
+      "title": "Проверьте доступ к папке от имени гостя",
+      "level": 4,
+      "content": "Выполните следующую команду из терминала. Если будет запрошен пароль, просто нажмите Enter:\n\n```\n$ smbclient -L localhost\n```\n\nЕсли всё хорошо, в столбце Sharename должен присутствовать MySharedFiles.\n\nВыполните следующую команду, чтобы получить доступ к общей папке в качестве гостя (анонимный вход)\n\n```\n$ smbclient -N //localhost/MySharedFiles\n```\n\nЕсли всё хорошо, должно появиться приглашение samba-клиента:\n\n```\nsmb: \\>\n```\n\nПроверьте, что гость может посмотреть содержимое папки:\n\n```\nsmb: \\> ls\n```\n\nЕсли появится ошибка NTFS_STATUS_ACCESS_DENIED, то проблема скорее всего связана с правами доступа к каталогам Unix. Убедитесь, что пользователь samba имеет доступ к нужной папке и всем родительским папкам. Это можно проверить, войдя в учётную запись нужного пользователя (например, с помощью sudo) и попытавшись перейти в нужный каталог.\n\n"
+    },
+    {
+      "title": "Mount error: Host is down",
+      "level": 3,
+      "content": "Такая ошибка может появиться при монтировании общих ресурсов Synology NAS. Для решения проблемы используйте опцию vers=1.0.\n\n"
+    },
+    {
+      "title": "Software caused connection abort",
+      "level": 3,
+      "content": "Файловые менеджеры, использующие gvfs-smb, могут выдавать ошибку Software caused connection abort при записи файла на общий ресурс/сервер. Это может быть связано с тем, что на сервере используется SMB/CIFS версии 1, которую многие маршрутизаторы используют для организации общего доступа к USB-накопителям (например, маршрутизаторы Belkin). Для записи на эти общие ресурсы укажите версию CIFS с помощью опции vers=1.0. Например:\n\n```\n/etc/fstab\n```\n\n```\n//СЕРВЕР/имя_ресурса /mnt/точка_монтирования cifs _netdev,guest,file_mode=0777,dir_mode=0777,vers=1.0 0 0\n```\n\nЭто также может произойти после обновления Samba до версии 4.11, в которой SMB1 отключен по умолчанию. Его можно включить с помощью следующей опции:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\nclient min protocol = CORE\n```\n\n"
+    },
+    {
+      "title": "Ошибка аутентификации",
+      "level": 3,
+      "content": "Убедитесь в отсутствии пробелов перед именем пользователя в настройках Samba:\n\n```\n~/.samba\n```\n\n```\nusername= user\npassword=pass\n```\n\nПравильно так:\n\n```\n~/.samba\n```\n\n```\nusername=user\npassword=pass\n```\n\n"
+    },
+    {
+      "title": "Windows 1709 и новее не видит сервер samba при просмотре сети",
+      "level": 3,
+      "content": "В Windows 10 версии 1511 поддержка SMBv1 и, соответственно, обнаружение устройств NetBIOS были отключены по умолчанию. Более новые версии Windows, начиная с версии 1709 (\"Fall Creators Update\"), больше не позволяют установить клиент SMBv1. Это приводит к тому, что хосты с Samba не отображаются в просмотре сети в Проводнике. Хотя проблем с подключением нет и Samba будет работать нормально, пользователи могут захотеть, чтобы их хосты Samba всё-таки отображались. wsdd реализует демон Web Service Discovery. Благодаря ему (Samba) хосты, такие как NAS, могут быть обнаружены клиентами Web Service Discovery, такими как Windows. Настройки по умолчанию должны работать для большинства установок, и всё, что вам нужно сделать, это запустить и включить службу wsdd.service.\n\nНастройки по умолчанию (представлять себя, используя имя хоста машины и рабочую группу \"WORKGROUP\") должна подходить в большинстве случаев. Если нужно, вы можете изменить настройки, передав wsdd дополнительные аргументы, добавив их в /etc/conf.d/wsdd (подробности есть в руководстве wsdd).\n\nwsdd2AUR делает то же самое, но написан на C, а не на Python. По умолчанию он берёт параметры netbios name и workgroup из файла smb.conf.\n\n"
+    },
+    {
+      "title": "Файлы из IOS больше не могут копироваться в общий ресурс Samba в Arch Linux, начиная с IOS 14.5",
+      "level": 3,
+      "content": "Начиная с IOS 14.5 при попытке передачи данных с устройства под управлением IOS с помощью приложения \"Файлы\" на общий ресурс samba в Arch Linux возникает ошибка:\n\n```\nThe operation couldn't be completed\nOperation canceled\n```\n\nЧтобы исправить эту проблему, добавьте следующее в секцию [global] файла smb.conf и перезапустите службу smb.service: [1]\n\n```\n## addition for IOS Files transfer-to server\nvfs object = fruit streams_xattr\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Samba: An Introduction\n- Официальный сайт Samba\n- Samba 3.2.x HOWTO and Reference Guide (устаревшая, но всё ещё самая подробная документация)\n- Википедия\n- Gentoo:Samba/Guide\n- Debian:Samba/ServerSimple\n- KSMBD[устаревшая ссылка 2023-06-17 ⓘ] - Сервер ядра linux, реализующий протокол SMB3 в пространстве ядра для обмена файлами по сети.\n- Ускорение работы Samba\n\n"
+    }
+  ]
+}

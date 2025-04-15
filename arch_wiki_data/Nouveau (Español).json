@@ -1,0 +1,106 @@
+{
+  "title": "Nouveau (Español)",
+  "url": "https://wiki.archlinux.org/title/Nouveau_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-02-10** \n\nArtículos relacionados\n\n- NVIDIA\n- Xorg\n- Bumblebee\n\nEste artículo trata sobre el controlador de código abierto Nouveau[enlace roto 2025-04-06] para tarjetas gráficas NVIDIA. Para obtener información sobre el controlador propietario, consulte NVIDIA.\n\nBusque el nombre en código[enlace roto 2025-04-06] de su tarjeta (se puede encontrar una lista más detallada en Wikipedia), y compárelo con la matriz de características para ver las características soportadas.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete mesa, que proporciona el controlador DRI para la aceleración 3D.\n\n- Para obtener soporte de las aplicaciones 32 bits, instale también el paquete lib32-mesa del repositorio multilib.\n- Para obtener el controlador DDX (la cual proporciona aceleración 2D en Xorg), instale el paquete xf86-video-nouveau.\n\nVéase también Aceleración por hardware.\n\n"
+    },
+    {
+      "title": "Carga",
+      "level": 2,
+      "content": "El módulo del kernel de Nouveau debería cargarse automáticamente al arrancar el sistema. Si no lo hace, entonces:\n\n- Asegúrese de que no tiene nomodeset o vga= como parámetro del kernel, ya que Nouveau requiere la configuración del modo kernel.\n- Además, compruebe que no tiene Nouveau deshabilitado usando cualquier técnica de lista negra de modprobe dentro de /etc/modprobe.d/ o /usr/lib/modprobe.d/.\n- Si después de todo lo anterior nouveau sigue sin cargar, compruebe dmesg para saber si hay un error de opcode. Añada nouveau.config=NvBios=PRAMIN a sus parámetros del Kernel para evitar la deshabilitación del módulo.[1]\n- Compruebe si /etc/X11/xorg.conf existe y hace referencia al controlador nvidia. Probablemente sea una buena idea renombrar el archivo.\n\n"
+    },
+    {
+      "title": "Habilitar el inicio anticipado KMS",
+      "level": 3,
+      "content": "El Kernel Mode Setting (KMS) es requerido por el controlador Nouveau. Por defecto, el KMS se realiza después de cargar los otros módulos del kernel. Verá el texto \"Cargando módulos\" y el tamaño del texto puede cambiar, posiblemente con un parpadeo indeseado. Véase Nouveau KernelModeSetting para más detalles.\n\nTambién es posible iniciar el KMS lo antes posible en el proceso de arranque, al cargar initramfs.\n\nPara ello, añada nouveau a la matriz MODULES en /etc/mkinitcpio.conf (los nombres de los módulos están separados por espacios):\n\n```\nMODULES=\"... nouveau ...\"\n```\n\nSi usa un archivo EDID personalizado, también debería incluirlo en el initramfs:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nFILES=\"/lib/firmware/edid/your_edid.bin\"\n```\n\nVuelva a generar la imagen inicial del ramdisk:\n\n```\n# mkinitcpio -p <kernel preset; e.g. linux>\n```\n\nSi tiene problemas con Nouveau que le conllevan a recompilar nouveau-drm varias veces por razones de testeo, no añada nouveau al initramfs. Es demasiado fácil olvidarse de recompilar initramfs y solo hará más difícil cualquier prueba. Use \"Late start\" solo cuando esté seguro de que el sistema es estable. Puede haber problemas adicionales con initramfs si necesita un firmware personalizado (generalmente no es aconsejable).\n\n"
+    },
+    {
+      "title": "Mantener el controlador NVIDIA instalado",
+      "level": 3,
+      "content": "Si desea mantener el driver propietario de NVIDIA instalado (y no está usando OpenGL), pero quiere usar el controlador Nouveau, comente la lista negra de nouveau en /etc/modprobe.d/nouveau_blacklist.conf, /usr/lib/modprobe.d/nvidia.conf, o /usr/lib/modprobe.d/nvidia-dkms.conf modificándolo de la siguiente manera:\n\n```\n#blacklist nouveau\n```\n\nY dígale a Xorg que cargue nouveau en vez de nvidia creando el archivo /etc/X11/xorg.conf.d/20-nouveau.conf con el siguiente contenido:\n\n```\nSection \"Device\"\n    Identifier \"Nvidia card\"\n    Driver \"nouveau\"\nEndSection\n```\n\nSi ya ha utilizado el controlador de NVIDIA, y desea probar Nouveau sin necesidad de reiniciar, asegúrese de que el módulo 'nvidia' ya no está cargado:\n\n```\n# rmmod nvidia\n```\n\nDespués, cargue el módulo 'nouveau':\n\n```\n# modprobe nouveau\n```\n\nY compruebe que se cargó correctamente mirando los mensajes del kernel:\n\n```\n# dmesg\n```\n\n"
+    },
+    {
+      "title": "Instalar los últimos paquetes de desarrollo",
+      "level": 3,
+      "content": "Para obtener las últimas mejoras de Nouveau\n\n- linux-gitAUR Use PKGBUILD para utilizar el árbol de Nouveau en https://github.com/skeggsb/linux/[enlace roto 2024-01-13], en vez de hacer un paquete de cero.\n- libdrm-gitAUR\n- lib32-libdrm-gitAUR\n- lib32-mesa-gitAUR\n- mesa-gitAUR\n- xf86-video-nouveau-gitAUR\n\n"
+    },
+    {
+      "title": "Dual head",
+      "level": 3,
+      "content": "Véase Multihead#RandR para saber cómo configurar múltiples monitores usando RandR.\n\n"
+    },
+    {
+      "title": "Configurar la resolución de la consola",
+      "level": 3,
+      "content": "Puede pasar la resolución a nouveau con la opción de línea de kernel video= (véase KMS).\n\n"
+    },
+    {
+      "title": "Gestión de energía",
+      "level": 3,
+      "content": "La falta de una adecuada gestión de energía en el controlador nouveau es una de las principales causas de los problemas de rendimiento, ya que la mayoría de tarjetas permanecerán en su estado de menor energía con velocidades de reloj más bajas durante su uso. El soporte experimental para el reclocking de la GPU está disponible para algunas tarjetas (véase Nouveau PowerManagement) y desde el kernel 4.5 puede ser controlado a través de una interfaz debugfs localizada en /sys/kernel/debug/dri/*/pstate.\n\nPor ejemplo, para comprobar los estados de energía disponibles y la configuración actual de la primera tarjeta de su sistema, ejecute\n\n```\n# cat /sys/kernel/debug/dri/0/pstate\n```\n\nTambién es posible establecer/forzar manualmente un determinado estado de energía escribiendo en dicha interfaz:\n\n```\n# echo pstate > /sys/kernel/debug/dri/0/pstate\n```\n\n"
+    },
+    {
+      "title": "Control del ventilador",
+      "level": 4,
+      "content": "Si está implementado para su tarjeta, es posible configurar el control de los ventiladores a través de /sys.\n\n```\n$ find /sys -name pwm1_enable\n/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/hwmon/hwmon1/pwm1_enable\n$ readlink /sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/driver\n../../../../bus/pci/drivers/nouveau\n```\n\nEs posible ajustar pwm1_enable a los valores 0, 1 o 2, lo que significa que el control del ventilador sería NINGUNO, MANUAL y AUTO respectivamente. Si elige el control manual del ventilador, puede configurar pwm1 manualmente, por ejemplo a 40 para el 40%.\n\nTambién puede establecerse mediante una regla udev:\n\n```\n$ cat /etc/udev/rules.d/50-nouveau-hwmon.rules\nACTION==\"add\", SUBSYSTEM==\"hwmon\", DRIVERS==\"nouveau\", ATTR{pwm1_enable}=\"2\"\n```\n\nFuentes:\n\n- https://floppym.blogspot.de/2013/07/fan-control-with-nouveau.html\n- https://web.archive.org/web/20141031191559/https://kalgan.cc/blog/posts/Controlling_nVidia_cards_fans_with_nouveau_in_Debian/\n\n"
+    },
+    {
+      "title": "Optimus",
+      "level": 3,
+      "content": "Existen dos posibilidades para usar Optimus en un portátil (también conocido como gráficos híbridos, cuando se tienen dos GPUs en el portátil): Bumblebee y PRIME\n\n"
+    },
+    {
+      "title": "Sincronización vertical",
+      "level": 3,
+      "content": "Los compositores de Xorg son propensos a mostrar problemas con Nouveau. A diferencia de la mayoría de ellos, Picom ofrece un montón de opciones de configuración para obtener un resultado más suave y libre de tearing. Una configuración que se espera que ofrezca un buen resultado sería la siguiente\n\n```\npicom -b --unredir-if-possible --backend xr_glx_hybrid --vsync --use-damage --glx-no-stencil\n```\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 2,
+      "content": "Agregue drm.debug=14 y log_buf_len=16M a sus parámetros del kernel para activar la depuración de vídeo:\n\nCree un registro verboso de Xorg:\n\n```\n$ startx -- -logverbose 9 -verbose 9\n```\n\nVea los parámetros y valores del módulo de vídeo cargado:\n\n```\n$ modinfo -p video\n```\n\n"
+    },
+    {
+      "title": "Desactivar MSI",
+      "level": 3,
+      "content": "Si sigue teniendo problemas para cargar el módulo o iniciar X server, agregue nouveau.config=NvMSI=0 a sus parámetros del Kernel.\n\nFuente: https://bugs.freedesktop.org/show_bug.cgi?id=78441\n\n"
+    },
+    {
+      "title": "Problema de salidas fantasma",
+      "level": 3,
+      "content": "Es posible que el controlador nouveau detecte salidas \"fantasma\". Por ejemplo, que tanto VGA-1 como LVDS-1 se muestren como conectados pero sólo LVDS-1 esté realmente presente.\n\nEsto causa problemas de visualización y/o impide la suspensión al cerrar la tapa.\n\n"
+    },
+    {
+      "title": "Parámetros del kernel",
+      "level": 4,
+      "content": "El problema se puede solucionar desactivando la salida fantasma (VGA-1 en los ejemplos dados) con los parámetros del kernel:\n\n```\nvideo=VGA-1:d\n```\n\nDonde d = deshabilitar.\n\nEl módulo del kernel de nouveau también tiene una opción para deshabilitar la detección de salida de TV [2]:\n\n```\ntv_disable=1\n```\n\n"
+    },
+    {
+      "title": "Configuración de Xorg",
+      "level": 4,
+      "content": "La salida fantasma se puede desactivar en Xorg añadiendo lo siguiente a /etc/X11/xorg.conf.d/20-nouveau.conf:\n\n```\nSection \"Monitor\"\nIdentifier \"VGA-1\"\nOption \"Ignore\" \"1\"\nEndSection\n```\n\nFuente: https://web.archive.org/web/20170118202740/http://gentoo-en.vfose.ru/wiki/Nouveau\n\n"
+    },
+    {
+      "title": "Xrandr",
+      "level": 4,
+      "content": "Xrandr puede desactivar la salida:\n\n```\n$ xrandr --output VGA-1 --off\n```\n\nEsto puede añadirse a la configuración de xinit.\n\n"
+    },
+    {
+      "title": "Bloqueos aleatorios con mensajes de error del kernel",
+      "level": 3,
+      "content": "Al usar Nouveau, algunos chips de Nvidia pueden causar bloqueos aleatorios del sistema y más comúnmente lanzar muchos mensajes del kernel, vistos con dmesg. Pruebe a agregar el parámetro del kernel nouveau.noaccel=1. Véase [3] para más información.\n\nComo alternativa, también puede usar la variable de entorno QT_XCB_FORCE_SOFTWARE_OPENGL=1 para desactivar la aceleración de OpenGL en las aplicaciones Qt.\n\n"
+    },
+    {
+      "title": "Flat Panel Table Invalid",
+      "level": 3,
+      "content": "Las tarjetas gráficas NVIDIA con chipsets recientes pueden causar problemas de arranque - esto incluye que X11 no pueda iniciarse y que lspci se congele indefinidamente[4][5][6][7][8].\n\nEsto puede romper las distribuciones/medios de instalación en vivo. Se puede detectar ejecutando lspci, o comprobando el registro de systemd para el error:\n\n```\nnouveau E[     DRM]Pointer to flat panel table invalid\n```\n\nEl sistema podría iniciar si el controlador Nouveau está desactivado al pasar los siguientes parámetros del kernel:\n\n```\nmodprobe.blacklist=nouveau\n```\n\nEl controlador Nouveau puede entonces cargarse con\n\n```\nmodprobe nouveau\n```\n\nEn consecuencia, el sistema debería funcionar correctamente. Si tiene otra tarjeta gráfica Nvidia, o simplemente desea estar seguro, puede desactivar la tarjeta problemática mediante:\n\n```\n$ echo 1 > /sys/bus/pci/devices/[id tarjeta del dispositivo]/remove\n```\n\nEl controlador propietario de Nvidia funciona bien actualmente (versión 381).\n\n"
+    }
+  ]
+}

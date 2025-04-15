@@ -1,0 +1,271 @@
+{
+  "title": "GRUB (Polski)",
+  "url": "https://wiki.archlinux.org/title/GRUB_(Polski)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Powiązane artykuły\n\n- Arch boot process\n- Master Boot Record\n- GUID Partition Table\n- Unified Extensible Firmware Interface\n- GRUB Legacy\n- GRUB/EFI examples\n- GRUB/Tips and tricks\n- Multiboot USB drive\n\nGRUB (GRand Unified Bootloader) to boot loader. Obecny GRUB jest również określany jako GRUB 2. Oryginalny GRUB, lub GRUB Legacy, odpowiada wersji 0.9x. Ta strona opisuje wyłącznie GRUB 2.\n\n"
+    },
+    {
+      "title": "Obsługiwane systemy plików",
+      "level": 2,
+      "content": "GRUB posiada własne wsparcie dla wielu systemów plików, w szczególności FAT32, ext4, Btrfs lub XFS. Zobacz #Nieobsługiwane systemy plików dla niektórych zastrzeżeń.\n\n"
+    },
+    {
+      "title": "Systemy UEFI",
+      "level": 2,
+      "content": "- Zaleca się przeczytanie i zrozumienie stron Unified Extensible Firmware Interface, Partitioning#GUID Partition Table i Arch boot process#UEFI 2.\n- Podczas instalacji w celu użycia UEFI ważne jest, aby uruchomić nośnik instalacyjny w trybie UEFI, w przeciwnym razie efibootmgr nie będzie w stanie dodać wpisu rozruchowego GRUB UEFI. Instalacja na awaryjnej ścieżce rozruchowej będzie nadal działać nawet w trybie BIOS, ponieważ nie dotyka pamięci NVRAM.\n- Aby uruchomić komputer z dysku przy użyciu UEFI, wymagana jest partycja systemowa EFI. Postępuj zgodnie z EFI system partition#Check for an existing partition, aby dowiedzieć się, czy już ją masz, w przeciwnym razie musisz ją utworzyć.\n- Cały ten artykuł zakłada, że wstawianie dodatkowych modułów GRUB2 poprzez insmod jest możliwe. Jak omówiono w #Shim-lock, nie jest tak w przypadku systemów UEFI z włączonym Secure Boot. Jeśli chcesz użyć jakiegokolwiek dodatkowego modułu GRUB, który nie jest zawarty w standardowym pliku GRUB EFI grubx64.efi w systemie z włączonym Secure Boot, musisz ponownie wygenerować GRUB EFI grubx64.efi za pomocą grub-mkstandalone lub ponownie zainstalować GRUB za pomocą grub-install z dołączonymi dodatkowymi modułami GRUB.\n\n"
+    },
+    {
+      "title": "Instalacja",
+      "level": 3,
+      "content": "- Oprogramowanie UEFI nie jest implementowane w sposób spójny przez różnych producentów. Procedura opisana poniżej ma działać na szerokiej gamie systemów UEFI, ale osoby doświadczające problemów pomimo zastosowania tej metody są zachęcane do dzielenia się szczegółowymi informacjami i, jeśli to możliwe, znalezionymi obejściami dla konkretnego przypadku sprzętowego. Dla takich przypadków przygotowano artykuł GRUB/EFI examples.\n- Sekcja zakłada instalację GRUB-a dla x64 (64-bitowego) UEFI. W przypadku IA32 (32-bitowego) UEFI (nie mylić z 32-bitowymi procesorami), zastąp x86_64-efi przez i386-efi tam, gdzie jest to właściwe. Postępuj zgodnie z instrukcjami w Unified Extensible Firmware Interface#Checking the firmware bitness, aby określić bitowość UEFI.\n\nNajpierw zainstaluj pakiety grub i efibootmgr: GRUB jest programem ładującym, podczas gdy efibootmgr jest używany przez skrypt instalacyjny GRUB-a do zapisywania wpisów rozruchowych w pamięci NVRAM.\n\nNastępnie wykonaj poniższe kroki, aby zainstalować GRUB na dysku:\n\n1. Zamontuj partycję systemową EFI i w pozostałej części tej sekcji zastąp esp jej punktem montowania.\n1. Wybierz identyfikator programu ładującego, tutaj o nazwie GRUB. Katalog o tej nazwie zostanie utworzony w esp/EFI/ w celu przechowywania pliku binarnego EFI i jest to nazwa, która pojawi się w menu rozruchowym UEFI w celu identyfikacji wpisu rozruchowego GRUB.\n1. Wykonaj poniższe polecenie, aby zainstalować aplikację GRUB EFI grubx64.efi do esp/EFI/GRUB/ i zainstalować jej moduły do /boot/grub/x86_64-efi/.\n\n- Upewnij się, że instalujesz pakiety i uruchamiasz polecenie grub-install z systemu, w którym GRUB będzie zainstalowany jako bootloader. Oznacza to, że jeśli uruchamiasz system ze środowiska instalacji, musisz znajdować się w chroot podczas uruchamiania grub-install. Jeśli z jakiegoś powodu konieczne jest uruchomienie grub-install spoza zainstalowanego systemu, należy dołączyć opcję --boot-directory= ze ścieżką do zamontowanego katalogu /boot, np --boot-directory=/mnt/boot.\n- Niektóre płyty główne nie obsługują bootloader-id ze spacjami\n\n```\n# grub-install --target=x86_64-efi --efi-directory=esp --bootloader-id=GRUB\n```\n\nPo zakończeniu powyższej instalacji, główny katalog GRUB znajduje się w /boot/grub/. Przeczytaj GRUB/Tips and tricks#Alternative install method, aby dowiedzieć się jak wskazać alternatywną lokalizację. Zauważ, że grub-install próbuje również utworzyć wpis w menedżerze rozruchu oprogramowania układowego, nazwany GRUB w powyższym przykładzie - to jednak nie powiedzie się, jeśli wpisy rozruchowe są pełne; użyj efibootmgr, aby usunąć niepotrzebne wpisy.\n\nPamiętaj o wygenerowaniu głównego pliku konfiguracyjnego po sfinalizowaniu konfiguracji.\n\n- --efi-directory i --bootloader-id są specyficzne dla GRUB UEFI, --efi-directory zastępuje --root-directory, który jest przestarzały.\n- Można zauważyć brak opcji device_path (np.: /dev/sda) w poleceniu grub-install. W rzeczywistości każda podana opcja device_path zostanie zignorowana przez skrypt instalacyjny GRUB UEFI. W rzeczywistości programy ładujące UEFI w ogóle nie używają kodu rozruchowego MBR ani sektora rozruchowego partycji.\n\nZobacz Rozwiązywanie problemów z UEFI w przypadku problemów. Dodatkowo zobacz GRUB/Tips and tricks#UEFI further reading.\n\n"
+    },
+    {
+      "title": "Obsługa Secure Boot",
+      "level": 3,
+      "content": "GRUB w pełni obsługuje bezpieczny rozruch przy użyciu kluczy CA lub shim, jednak polecenie instalacji różni się w zależności od tego, którego zamierzasz użyć.\n\n- Nieprawidłowe skonfigurowanie Secure Boot może uniemożliwić uruchomienie systemu. Jeśli z jakiegokolwiek powodu nie możesz uruchomić systemu po włączeniu bezpiecznego rozruchu, powinieneś wyłączyć go w oprogramowaniu układowym i ponownie uruchomić system.\n- Ładowanie niepotrzebnych modułów w bootloaderze może potencjalnie stanowić zagrożenie dla bezpieczeństwa, używaj tych poleceń tylko wtedy, gdy ich potrzebujesz.\n\n"
+    },
+    {
+      "title": "Klucze CA",
+      "level": 4,
+      "content": "Aby skorzystać z kluczy CA, polecenie jest następujące:\n\n```\n# grub-install --target=x86_64-efi --efi-directory=esp --bootloader-id=GRUB --modules=„tpm” --disable-shim-lock\n```\n\n"
+    },
+    {
+      "title": "Shim-lock",
+      "level": 4,
+      "content": "Podczas korzystania z Shim-lock, GRUB może zostać pomyślnie uruchomiony w trybie Secure Boot tylko wtedy, gdy jego plik binarny EFI zawiera wszystkie moduły niezbędne do odczytu systemu plików zawierającego obrazy vmlinuz i initramfs.\n\nOd wersji GRUB 2.06.r261.g2f4430cc0, ładowanie modułów w trybie bezpiecznego rozruchu poprzez insmod nie jest już dozwolone, ponieważ naruszałoby to oczekiwanie, aby nie ładować dowolnego kodu. Jeśli moduły GRUB-a nie są osadzone w pliku binarnym EFI, a GRUB spróbuje załadować je sideloadem/insmodem, GRUB nie uruchomi się z komunikatem:\n\n```\nerror: prohibited by secure boot policy\nbłąd: zabronione przez politykę bezpiecznego rozruchu\n```\n\nUbuntu, zgodnie z oficjalnym skryptem kompilacji, osadza następujące moduły GRUB w podpisanym pliku binarnym GRUB EFI grubx64.efi:\n\n- „podstawowe” moduły, niezbędne do uruchomienia systemu z płyty CD lub dysku z prostą partycją: all_video, boot, btrfs, cat, chain, configfile, echo, efifwsetup, efinet, ext2, fat, font, gettext, gfxmenu, gfxterm, gfxterm_background, gzio, halt, help, hfsplus, iso9660, jpeg, keystatus, loadenv, loopback, linux, ls, lsefi, lsefimmap, lsefisystab, lssal, memdisk, minicmd, normal, ntfs, part_apple, part_msdos, part_gpt, password_pbkdf2, png, probe, reboot, regexp, search, search_fs_uuid, search_fs_file, search_label, sleep, smbios, squash4, test, true, video, xfs, zfs, zfscrypt, zfsinfo\n- moduły „specyficzne dla platformy” dla architektury x86_64-efi, niezbędne dla np.: play: aby odtwarzać dźwięki podczas uruchamiania cpuid: do procesora podczas uruchamiania tpm: do obsługi Measured Boot / Trusted Platform Modules\n- moduły „zaawansowane”, składający się z modułów: cryptodisk: uruchamianie z szyfrowanych w trybie zwykłym dysków. gcry_algorithm: do obsługi określonych algorytmów haszujących i szyfrujących luks: do uruchamiania z dysków szyfrowanych za pomocą LUKS: lvm: uruchamianie z dysków woluminów logicznych LVM mdraid09, mdraid1x, raid5rec, raid6rec: do uruchamiania z wirtualnych dysków RAID.\n\n- play: aby odtwarzać dźwięki podczas uruchamiania\n- cpuid: do procesora podczas uruchamiania\n- tpm: do obsługi Measured Boot / Trusted Platform Modules\n\n- cryptodisk: uruchamianie z szyfrowanych w trybie zwykłym dysków.\n- gcry_algorithm: do obsługi określonych algorytmów haszujących i szyfrujących\n- luks: do uruchamiania z dysków szyfrowanych za pomocą LUKS:\n- lvm: uruchamianie z dysków woluminów logicznych LVM\n- mdraid09, mdraid1x, raid5rec, raid6rec: do uruchamiania z wirtualnych dysków RAID.\n\nMusisz skonstruować listę modułów GRUB w postaci zmiennej powłoki, którą oznaczamy jako GRUB_MODULES. Możesz użyć najnowszego skryptu Ubuntu jako punktu startowego i usunąć moduły, które nie są potrzebne w twoim systemie. Pominięcie modułów sprawi, że proces uruchamiania będzie stosunkowo szybszy i zaoszczędzi trochę miejsca na partycji ESP.\n\nPotrzebny jest również plik/sekcja Secure Boot Advanced Targeting (SBAT) zawarty w pliku binarnym EFI, aby poprawić bezpieczeństwo; jeśli GRUB jest uruchamiany z programu ładującego UEFI shim. Ten plik/sekcja SBAT zawiera metadane o pliku binarnym GRUB (wersja, opiekun, deweloper, adres URL upstream) i ułatwia shimowi blokowanie niektórych wersji GRUB-a przed załadowaniem, jeśli mają luki w zabezpieczeniach[1][2], jak wyjaśniono w dokumencie UEFI shim bootloader secure boot life-cycle improvements od shim.\n\nShim bootloadera UEFI pierwszego stopnia nie uruchomi grubx64.efi, jeśli brakuje sekcji SBAT z grubx64.efi!\n\nJeśli GRUB jest zainstalowany, przykładowy plik SBAT .csv znajduje się pod /usr/share/grub/sbat.csv.\n\nPonownie zainstaluj GRUB używając dostarczonego pliku /usr/share/grub/sbat.csv i wszystkich potrzebnych GRUB_MODULES i podpisz go:\n\n```\n# grub-install --target=x86_64-efi --efi-directory=esp --modules=${GRUB_MODULES} --sbat /usr/share/grub/sbat.csv\n# sbsign --key MOK.key --cert MOK.crt --output esp/EFI/GRUB/grubx64.efi esp/EFI/GRUB/grubx64.efi\n# cp esp/EFI/GRUB/grubx64.efi esp/EFI/BOOT/grubx64.efi\n```\n\nUruchom ponownie komputer, wybierz klucz w MokManager, a Secure Boot powinien działać.\n\n"
+    },
+    {
+      "title": "Korzystanie z Secure Boot",
+      "level": 4,
+      "content": "Po instalacji zobacz Secure Boot#Implementing Secure Boot, aby uzyskać instrukcje dotyczące jego włączenia.\n\nJeśli używasz metody kluczy CA, zarządzanie kluczami, rejestracja i podpisywanie plików może być zautomatyzowane za pomocą sbctl, zobacz Secure Boot#Assisted process with sbctl po szczegóły.\n\n"
+    },
+    {
+      "title": "Instrukcje specyficzne dla tablicy partycji GUID (GPT)",
+      "level": 3,
+      "content": "W konfiguracji BIOS/GPT wymagana jest partycja rozruchowa BIOS. GRUB osadza swój core.img na tej partycji.\n\n- Przed wypróbowaniem tej metody należy pamiętać, że nie wszystkie systemy będą w stanie obsłużyć ten schemat partycjonowania. Przeczytaj więcej na Partitioning#GUID Partition Table.\n- Partycja rozruchowa BIOS-u jest potrzebna GRUB-owi tylko w konfiguracji BIOS/GPT. W konfiguracji BIOS/MBR, GRUB używa luki post-MBR do osadzenia core.img. W przypadku GPT nie ma jednak gwarantowanego niewykorzystanego miejsca przed pierwszą partycją.\n- W przypadku systemów UEFI ta dodatkowa partycja nie jest wymagana, ponieważ w tym przypadku nie odbywa się osadzanie sektorów rozruchowych. Jednak systemy UEFI nadal wymagają partycji systemowej EFI.\n\nUtwórz partycję mebibajtową (+1M z fdisk lub gdisk) na dysku bez systemu plików i z typem partycji GUID 21686148-6449-6E6F-744E-656564454649.\n\n- Wybierz typ partycji BIOS boot dla fdisk.\n- Wybierz kod typu partycji ef02 dla gdisk.\n- Dla parted ustaw/aktywuj flagę bios_grub na partycji.\n\nTa partycja może być w dowolnej kolejności, ale musi znajdować się na pierwszych 2 TiB dysku. Partycja ta musi zostać utworzona przed instalacją GRUB-a. Gdy partycja będzie gotowa, zainstaluj bootloader zgodnie z poniższymi instrukcjami.\n\nPrzestrzeń przed pierwszą partycją może być również użyta jako partycja rozruchowa BIOS-u, choć będzie poza specyfikacją wyrównania GPT. Ponieważ partycja nie będzie regularnie używana, można pominąć kwestie wydajności, chociaż niektóre narzędzia dyskowe będą wyświetlać ostrzeżenie o tym. W fdisk lub gdisk utwórz nową partycję zaczynającą się od sektora 34 i rozciągającą się do 2047 i ustaw jej typ. Aby widoczne partycje zaczynały się od podstawy, rozważ dodanie tej partycji jako ostatniej.\n\n"
+    },
+    {
+      "title": "Instrukcje dotyczące głównego rekordu rozruchowego (MBR)",
+      "level": 3,
+      "content": "Zwykle odstęp post-MBR (po 512-bajtowym regionie MBR i przed początkiem pierwszej partycji) w wielu systemach partycjonowanych MBR wynosi 31 KiB, gdy kwestie wyrównania cylindra zgodności z DOS są spełnione w tablicy partycji. Zaleca się jednak, aby odstęp po MBR wynosił około 1 do 2 MB, aby zapewnić wystarczającą ilość miejsca na osadzenie GRUB-a core.img (FS#24103). Zaleca się użycie narzędzia do partycjonowania, które obsługuje 1 MiB wyrównywanie partycji, aby uzyskać tę przestrzeń, a także aby spełnić inne kwestie niezwiązane z 512-bajtowymi sektorami (które nie są związane z osadzaniem core.img).\n\n"
+    },
+    {
+      "title": "Instalacja",
+      "level": 3,
+      "content": "Zainstaluj pakiet grub. (Zastąpi on grub-legacyAUR, jeśli jest już zainstalowany):\n\n```\n# grub-install --target=i386-pc /dev/sdX\n```\n\ngdzie i386-pc jest celowo używane niezależnie od rzeczywistej architektury, a /dev/sdX jest dyskiem (nie partycją), na którym ma zostać zainstalowany GRUB. Na przykład /dev/sda lub /dev/nvme0n1, lub /dev/mmcblk0. Zobacz Device file#Block device names by zapoznać się ze schematem nazewnictwa urządzeń blokowych.\n\nTeraz należy wygenerować główny plik konfiguracyjny.\n\nJeśli używasz LVM dla swojego /boot, możesz zainstalować GRUB na wielu dyskach fizycznych.\n\nZobacz grub-install(8) i GRUB Manual po więcej szczegółów na temat polecenia grub-install.\n\n"
+    },
+    {
+      "title": "Konfiguracja",
+      "level": 2,
+      "content": "W zainstalowanym systemie GRUB ładuje plik konfiguracyjny /boot/grub/grub.cfg przy każdym uruchomieniu systemu. Możesz postępować zgodnie z #Generowany grub.cfg, aby użyć narzędzia, lub #Własny grub.cfg, aby utworzyć go ręcznie.\n\n"
+    },
+    {
+      "title": "Generowany grub.cfg",
+      "level": 3,
+      "content": "Ta sekcja obejmuje tylko edycję pliku konfiguracyjnego /etc/default/grub. Więcej informacji można znaleźć w GRUB/Tips and tricks.\n\n"
+    },
+    {
+      "title": "Generowanie głównego pliku konfiguracyjnego",
+      "level": 4,
+      "content": "Po instalacji należy wygenerować główny plik konfiguracyjnego /boot/grub/grub.cfg. Na proces generowania mogą wpływać różne opcje w /etc/default/grub i skrypty w /etc/grub.d/. Lista opcji w /etc/default/grub i zwięzły opis każdej z nich znajduje się na stronie dokumentacji GNU.\n\nJeśli nie wykonałeś dodatkowej konfiguracji, automatyczne generowanie określi główny system plików systemu do uruchomienia dla pliku konfiguracyjnego. Aby to się powiodło, ważne jest, aby system był uruchomiony lub chrootowany.\n\n- Domyślną ścieżką pliku jest /boot/grub/grub.cfg, a nie /boot/grub/i386-pc/grub.cfg.\n- Jeśli próbujesz uruchomić grub-mkconfig w kontenerze chroot lub systemd-nspawn, możesz zauważyć, że nie działa: grub-probe: error: failed to get canonical path of /dev/sdaX. W takim przypadku spróbuj użyć arch-chroot, jak opisano w poście BBS.\n\nUżyj narzędzia grub-mkconfig do wygenerowania /boot/grub/grub.cfg:\n\n```\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\nDomyślnie skrypty generujące automatycznie dodają wpisy menu dla wszystkich zainstalowanych jąder Arch Linux do wygenerowanej konfiguracji.\n\n- Po zainstalowaniu lub usunięciu jądra, wystarczy ponownie uruchomić powyższe polecenie grub-mkconfig.\n- Aby uzyskać wskazówki dotyczące zarządzania wieloma wpisami GRUB-a, na przykład podczas korzystania z jąder linux i linux-lts, zobacz GRUB/Tips and tricks#Multiple entries.\n\nAby automatycznie dodać wpisy dla innych zainstalowanych systemów operacyjnych, zobacz #Wykrywanie innych systemów operacyjnych.\n\nDodatkowe niestandardowe pozycje menu można dodać edytując /etc/grub.d/40_custom i ponownie generując /boot/grub/grub.cfg. Możesz też utworzyć /boot/grub/custom.cfg i dodać je tam. Zmiany w /boot/grub/custom.cfg nie wymagają ponownego uruchomienia grub-mkconfig, ponieważ /etc/grub.d/41_custom dodaje niezbędną instrukcję source do wygenerowanego pliku konfiguracyjnego.\n\nZobacz #Przykłady wpisów w menu startowym, aby zapoznać się z przykładami niestandardowych wpisów w menu.\n\n"
+    },
+    {
+      "title": "Wykrywanie innych systemów operacyjnych",
+      "level": 4,
+      "content": "Aby grub-mkconfig wyszukiwał inne zainstalowane systemy i automatycznie dodawał je do menu, zainstaluj pakiet os-prober i zamontuj partycje, z których uruchamiane są inne systemy. Następnie ponownie uruchom grub-mkconfig. Jeśli otrzymasz następujące dane wyjściowe: Warning: os-prober will not be executed to detect other bootable partitions, edytuj /etc/default/grub i dodaj/usuń komentarz:\n\n```\nGRUB_DISABLE_OS_PROBER=false\n```\n\nNastępnie spróbuj ponownie.\n\n- Dokładny punkt montowania nie ma znaczenia, os-prober odczytuje mtab w celu zidentyfikowania miejsc do wyszukiwania wpisów startowych.\n- Pamiętaj, aby montować partycje za każdym razem, gdy uruchamiasz grub-mkconfig, aby za każdym razem uwzględnić inne systemy operacyjne.\n- os-prober może nie działać poprawnie po uruchomieniu w chroot. Spróbuj ponownie po ponownym uruchomieniu systemu, jeśli tego doświadczysz.\n\nW przypadku systemu Windows zainstalowanego w trybie UEFI należy upewnić się, że partycja systemowa EFI zawierająca Menedżera rozruchu systemu Windows (bootmgfw.efi) jest zamontowana. Uruchom os-prober jako root, aby wykryć i wygenerować dla niego wpis.\n\nW przypadku systemu Windows zainstalowanego w trybie BIOS, zamontuj partycję systemową Windows (jej etykieta systemu plików powinna być System Reserved lub SYSTEM). Uruchom os-prober jako root, aby wykryć i wygenerować dla niego wpis.\n\n- Partycje NTFS mogą nie zawsze być wykrywane po zamontowaniu ich przy użyciu domyślnych sterowników Linuksa. Jeśli GRUB ich nie wykrywa, spróbuj zainstalować NTFS-3G i ponownie zamontować.\n- Zaszyfrowane partycje Windows mogą wymagać odszyfrowania przed zamontowaniem. W przypadku BitLockera można to zrobić za pomocą cryptsetup lub dislockerAUR. To powinno wystarczyć, aby os-prober dodał prawidłowy wpis.\n\n"
+    },
+    {
+      "title": "Dodatkowe argumenty",
+      "level": 4,
+      "content": "Aby przekazać niestandardowe dodatkowe argumenty do obrazu Linuksa, można ustawić zmienne GRUB_CMDLINE_LINUX + GRUB_CMDLINE_LINUX_DEFAULT. + GRUB_CMDLINE_LINUX_DEFAULT w /etc/default/grub. Te dwie zmienne są dołączane do siebie i przekazywane do jądra podczas generowania zwykłych wpisów rozruchowych. Dla wpisu rozruchowego recovery, tylko GRUB_CMDLINE_LINUX jest używane podczas generowania.\n\nUżycie obu nie jest konieczne, ale może być przydatne. Na przykład, można użyć GRUB_CMDLINE_LINUX_DEFAULT=\"resume=UUID=uuid-of-swap-partitio quiet\" gdzie uuid-partycji-wymiany jest UUID partycji wymiany, aby włączyć wznawianie po hibernacja. Spowoduje to wygenerowanie wpisu rozruchu odzyskiwania bez wznowienia i bez quiet tłumienia komunikatów jądra podczas rozruchu z tego wpisu menu. Chociaż inne (zwykłe) pozycje menu miałyby je jako opcje.\n\nDomyślnie grub-mkconfig określa UUID głównego systemu plików dla konfiguracji. Aby to wyłączyć, należy odkomentować GRUB_DISABLE_LINUX_UUID=true.\n\nAby wygenerować wpis odzyskiwania GRUB-a należy upewnić się, że GRUB_DISABLE_RECOVERY nie jest ustawiony na true w /etc/default/grub.\n\nWięcej informacji można znaleźć w artykule na temat parametrów jądra.\n\n"
+    },
+    {
+      "title": "Ustawianie pozycji menu najwyższego poziomu",
+      "level": 4,
+      "content": "Domyślnie grub-mkconfig sortuje dołączone jądra za pomocą sort -V i używa pierwszego jądra na tej liście jako wpisu najwyższego poziomu. Oznacza to, że na przykład, ponieważ /boot/vmlinuz-linux-lts jest sortowane przed /boot/vmlinuz-linux, jeśli masz zainstalowane zarówno linux-lts, jak i linux, jądro LTS będzie wpisem menu najwyższego poziomu, co może nie być pożądane. Można to zmienić podając GRUB_TOP_LEVEL=sciezka_do_jadra w /etc/default/grub. Na przykład, aby zwykłe jądro było pozycją menu najwyższego poziomu, można użyć GRUB_TOP_LEVEL=„/boot/vmlinuz-linux”.\n\n"
+    },
+    {
+      "title": "LVM",
+      "level": 4,
+      "content": "Jeśli korzystasz z LVM dla partycji głównej /boot lub /, upewnij się, że moduł lvm jest wstępnie załadowany:\n\n```\n/etc/default/grub\n```\n\n```\nGRUB_PRELOAD_MODULES=\"... lvm\"\n```\n\n"
+    },
+    {
+      "title": "RAID",
+      "level": 4,
+      "content": "GRUB zapewnia wygodną obsługę woluminów RAID. Należy załadować moduły GRUB mdraid09 lub mdraid1x, aby umożliwić natywne adresowanie woluminu:\n\n```\n/etc/default/grub\n```\n\n```\nGRUB_PRELOAD_MODULES=\"... mdraid09 mdraid1x\"\n```\n\nNa przykład /dev/md0 staje się:\n\n```\nset root=(md/0)\n```\n\npodczas gdy partycjonowany wolumin RAID (np. /dev/md0p1) staje się:\n\n```\nset root=(md/0,1)\n```\n\nAby zainstalować gruba przy użyciu RAID1 jako partycji /boot (lub przy użyciu /boot umieszczonego na partycji głównej RAID1), w systemach BIOS wystarczy uruchomić grub-install na obu dyskach, np:\n\n```\n# grub-install --target=i386-pc --debug /dev/sda\n# grub-install --target=i386-pc --debug /dev/sdb\n```\n\nGdzie macierz RAID 1 zawierająca /boot znajduje się na /dev/sda i /dev/sdb.\n\n"
+    },
+    {
+      "title": "Zaszyfrowane /boot",
+      "level": 4,
+      "content": "GRUB posiada również specjalne wsparcie dla uruchamiania z zaszyfrowanym /boot. Odbywa się to poprzez odblokowanie LUKS blockdevice w celu odczytania jego konfiguracji i załadowania z niego initramfs i kernel. Opcja ta próbuje rozwiązać problem posiadania niezaszyfrowanej partycji rozruchowej.\n\nAby włączyć tę funkcję, należy zaszyfrować partycję z /boot znajdującą się na niej przy użyciu LUKS w normalny sposób. Następnie dodaj następującą opcję do /etc/default/grub:\n\n```\n/etc/default/grub\n```\n\n```\nGRUB_ENABLE_CRYPTODISK=y\n```\n\nTa opcja jest używana przez grub-install do generowania grub core.img.\n\nZainstaluj GRUB po zmodyfikowaniu tej opcji lub zaszyfrowaniu partycji.\n\nBez dalszych zmian zostaniesz dwukrotnie poproszony o podanie hasła: pierwsze dla GRUB-a w celu odblokowania punktu montowania /boot we wczesnym rozruchu, drugie w celu odblokowania samego głównego systemu plików zaimplementowanego przez initramfs. Aby tego uniknąć, można użyć pliku klucza.\n\n- Jeśli chcesz generować główny plik konfiguracyjny, upewnij się, że /boot jest zamontowany.\n- Aby wykonać aktualizacje systemu obejmujące punkt montowania /boot, należy upewnić się, że zaszyfrowany /boot jest odblokowany i zamontowany przed wykonaniem aktualizacji. W przypadku oddzielnej partycji /boot, można to osiągnąć automatycznie podczas rozruchu, używając crypttab z plikiem klucza.\n\n- Jeśli używasz specjalnej mapy klawiszy, domyślna instalacja GRUB-a nie będzie jej znała. Jest to istotne dla sposobu wprowadzania hasła w celu odblokowania urządzenia blokującego LUKS. Zobacz GRUB/Tips and tricks#Manual configuration of core image for early boot.\n- Jeśli wystąpią problemy z wyświetleniem monitu o hasło (błędy dotyczące cryptouuid, cryptodisk lub „nie znaleziono urządzenia”), spróbuj ponownie zainstalować GRUB i dodać --modules=„part_gpt part_msdos” na końcu polecenia grub-install.\n\nUżyj grub-install jak opisano w sekcji #Instalacja, aby utworzyć bootowalny obraz GRUB z obsługą LUKS. Należy pamiętać o następujących zastrzeżeniach:\n\n- Początkowa obsługa LUKS2 została dodana do GRUB 2.06, ale z kilkoma ograniczeniami, które zostały tylko częściowo rozwiązane w GRUB 2.12rc1. Zobacz GRUB bug #55093.\n- Od wersji GRUB 2.12rc1, grub-install może utworzyć obraz rdzenia w celu odblokowania LUKS2. Jednak obsługuje on tylko PBKDF2, a nie Argon2.\n- Argon2id (domyślny tryb cryptsetup) i Argon2i PBKDF nie są obsługiwane (GRUB bug #59409), tylko PBKDF2 jest.\n\nJeśli wprowadzisz nieprawidłowe hasło podczas rozruchu i skończysz w powłoce ratunkowej GRUB, spróbuj cryptomount -a, aby zamontować wszystkie (miejmy nadzieję, że tylko jedną) zaszyfrowane partycje lub użyj cryptomount -u $crypto_uuid, aby zamontować konkretną. Następnie wykonaj insmod normal i normal jak zwykle.\n\nJeśli wprowadzisz poprawne hasło, ale natychmiast zostanie zwrócony błąd Invalid passphrase, upewnij się, że podano właściwe moduły kryptograficzne. Użyj cryptsetup luksDump /dev/nvme0n1p2 i sprawdź, czy funkcja skrótu (SHA-256, SHA-512) jest zgodna z zainstalowanymi modułami (gcry_sha256, gcry_sha512), a algorytm PBKDF to pbkdf2. Algorytmy hash i PBDKDF można zmienić dla istniejących kluczy za pomocą cryptsetup luksConvertKey --hash sha256 --pbkdf pbkdf2 /dev/nvme0n1p2. W normalnych okolicznościach przetworzenie hasła powinno zająć kilka sekund.\n\n"
+    },
+    {
+      "title": "Własny grub.cfg",
+      "level": 3,
+      "content": "Ta sekcja opisuje ręczne tworzenie wpisów rozruchowych GRUB-a w /boot/grub/grub.cfg zamiast polegania na grub-mkconfig.\n\nPodstawowy plik konfiguracyjny GRUB-a wykorzystuje następujące opcje:\n\n- (hdX,Y) jest partycją Y na dysku X, numery partycji zaczynają się od 1, numery dysków zaczynają się od 0\n- set default=N to domyślny wpis rozruchowy, który jest wybierany po upływie limitu czasu dla akcji użytkownika\n- set timeout=M to czas M oczekiwania w sekundach na wybór użytkownika przed uruchomieniem domyślnej opcji\n- menuentry „title” {opcje wpisu} to wpis startowy zatytułowany title.\n- set root=(hdX,Y) ustawia partycję rozruchową, na której przechowywane jest jądro i moduły GRUB (partycja rozruchowa nie musi być oddzielną partycją i może być po prostu katalogiem pod partycją „root”) (/)\n\n"
+    },
+    {
+      "title": "LoaderDevicePartUUID",
+      "level": 4,
+      "content": "Aby GRUB ustawił zmienną LoaderDevicePartUUID UEFI wymaganą przez systemd-gpt-auto-generator(8) dla Automatyczne montowanie partycji GPT, załaduj moduł bli w grub.cfg:\n\n```\nif [ \"$grub_platform\" = \"efi\" ]; then\n  insmod bli\nfi\n```\n\n"
+    },
+    {
+      "title": "Przykłady wpisów w menu startowym",
+      "level": 4,
+      "content": "Wskazówki dotyczące zarządzania wieloma wpisami GRUB-a, na przykład podczas korzystania z jąder linux i linux-lts, można znaleźć w GRUB/Tips and tricks#Multiple entries.\n\nPozycje menu rozruchowego Archiso i Archboot znajdują się w sekcji Multiboot USB drive#Boot entries.\n\n```\nmenuentry \"Wyłączenie systemu\" {\n\techo \"Wyłącznie systemu...\"\n\thalt\n}\n```\n\n```\nmenuentry \"Ponowne uruchomienie systemu\" {\n\techo \"Ponowne uruchamianie systemu...\"\n\treboot\n}\n```\n\n```\nif [ ${grub_platform} == \"efi\" ]; then\n\tmenuentry 'Ustawienia oprogramowania sprzętowego UEFI' --id 'uefi-firmware' {\n\t\tfwsetup\n\t}\nfi\n```\n\nPo uruchomieniu w trybie UEFI, GRUB może łańcuchowo ładować inne pliki binarne EFI.\n\n```\nif [ ${grub_platform} == \"efi\" ]; then\n\tumieść tutaj wpisy menu tylko dla UEFI\nfi\n```\n\nMożna uruchomić Powłokę UEFI, umieszczając ją w katalogu głównym partycji systemowej EFI i dodając ten wpis do menu:\n\n```\nmenuentry \"Powłoka UEFI\" {\n\tinsmod fat\n\tinsmod chain\n\tsearch --no-floppy --set=root --file /shellx64.efi\n\tchainloader /shellx64.efi\n}\n```\n\nPobierz gdisk EFI i skopiuj gdisk_x64.efi do esp/EFI/tools/.\n\n```\nmenuentry \"gdisk\" {\n\tinsmod fat\n\tinsmod chain\n\tsearch --no-floppy --set=root --file /EFI/tools/gdisk_x64.efi\n\tchainloader /EFI/tools/gdisk_x64.efi\n}\n```\n\nJeśli posiadasz zunifikowany obraz jądra wygenerowany w wyniku Secure Boot lub w inny sposób, możesz dodać go do menu rozruchowego. Na przykład:\n\n```\nmenuentry \"Arch Linux\" {\n\tinsmod fat\n\tinsmod chain\n\tsearch --no-floppy --set=root --fs-uuid FILESYSTEM_UUID\n\tchainloader /EFI/Linux/arch-linux.efi\n}\n```\n\nZakładając, że druga dystrybucja znajduje się na partycji sda2:\n\n```\nmenuentry \"Inny Linux\" {\n\tset root=(hd0,2)\n\tlinux /boot/vmlinuz (dodaj inne opcje zgodnie z potrzebami)\n\tinitrd /boot/initrd.img (jeśli inne jądro go używa/potrzebuje)\n}\n```\n\nAlternatywnie, GRUB może wyszukać właściwą partycję według identyfikatora UUID lub etykiety systemu plików:\n\n```\nmenuentry \"Inny Linux\" {\n        # zakładając, że UUID to 763A-9CB6\n\tsearch --no-floppy --set=root --fs-uuid 763A-9CB6\n\n        # wyszukiwanie według etykiety INNY_LINUX (upewnij się, że etykieta partycji jest jednoznaczna)\n        #search --no-floppy --set=root --label INNY_LINUX\n\n\tlinux /boot/vmlinuz (dodaj tutaj inne opcje zgodnie z potrzebami, na przykład: root=UUID=763A-9CB6)\n\tinitrd /boot/initrd.img (jeśli inne jądro go używa/potrzebuje)\n}\n```\n\nJeśli inna dystrybucja ma już prawidłowy folder /boot z zainstalowanym GRUB-em, grub.cfg, jądrem i initramfs, GRUB może zostać poinstruowany, aby załadować te inne pliki grub.cfg w locie podczas rozruchu. Na przykład dla hd0 i czwartej partycji GPT:\n\n```\nmenuentry \"configfile hd0,gpt4\"  {\n        insmod part_gpt\n        insmod btrfs\n        insmod ext2\n        set root='hd0,gpt4'\n        configfile /boot/grub/grub.cfg\n}\n```\n\nPo wybraniu tej pozycji GRUB ładuje plik grub.cfg z drugiego woluminu i wyświetla to menu. Wszelkie zmiany zmiennych środowiskowych dokonane za pomocą poleceń w pliku nie zostaną zachowane po zakończeniu configfile. Naciśnij Esc, aby powrócić do pierwszego menu GRUB-a.\n\nTen tryb określa, gdzie znajduje się program ładujący systemu Windows i ładuje go łańcuchowo po GRUB-ie po wybraniu pozycji menu. Głównym zadaniem jest znalezienie partycji systemowej EFI i uruchomienie z niej programu ładującego.\n\n```\nif [ \"${grub_platform}\" == \"efi\" ]; then\n\tmenuentry \"Microsoft Windows Vista/7/8/8.1 UEFI/GPT\" {\n\t\tinsmod part_gpt\n\t\tinsmod fat\n\t\tinsmod chain\n\t\tsearch --no-floppy --fs-uuid --set=root $hints_string $fs_uuid\n\t\tchainloader /EFI/Microsoft/Boot/bootmgfw.efi\n\t}\nfi\n```\n\ngdzie $hints_string i $fs_uuid są uzyskiwane za pomocą następujących dwóch poleceń.\n\nPolecenie $fs_uuid określa identyfikator UUID partycji systemowej EFI:\n\n```\n# grub-probe --target=fs_uuid esp/EFI/Microsoft/Boot/bootmgfw.efi\n```\n\n```\n1ce5-7f28\n```\n\nAlternatywnie można uruchomić lsblk --fs i odczytać UUID partycji systemowej EFI.\n\nPolecenie $hints_string określi lokalizację partycji systemowej EFI, w tym przypadku dysku twardego 0:\n\n```\n# grub-probe --target=hints_string esp/EFI/Microsoft/Boot/bootmgfw.efi\n```\n\n```\n--hint-bios=hd0,gpt1 --hint-efi=hd0,gpt1 --hint-baremetal=ahci0,gpt1\n```\n\nTe dwa polecenia zakładają, że ESP używany przez Windows jest zamontowany pod adresem esp. Mogą istnieć różnice w ścieżce do pliku EFI systemu Windows, ponieważ jest to system Windows i tak dalej.\n\nNote: **partycja systemowa** \n\nW całej tej sekcji zakłada się, że partycja Windows to /dev/sda1. Inna partycja zmieni każde wystąpienie hd0,msdos1.\n\nW obu przykładach XXXX-XXXX to UUID systemu plików, który można znaleźć za pomocą polecenia lsblk --fs.\n\nDla Windows Vista/7/8/8.1/10:\n\n```\nif [ \"${grub_platform}\" == \"pc\" ]; then\n\tmenuentry \"Microsoft Windows Vista/7/8/8.1/10 BIOS/MBR\" {\n\t\tinsmod part_msdos\n\t\tinsmod ntfs\n\t\tinsmod ntldr\n\t\tsearch --no-floppy --fs-uuid --set=root --hint-bios=hd0,msdos1 --hint-efi=hd0,msdos1 --hint-baremetal=ahci0,msdos1 XXXX-XXXX\n\t\tntldr /bootmgr\n\t}\nfi\n```\n\nDla Windows XP:\n\n```\nif [ \"${grub_platform}\" == \"pc\" ]; then\n\tmenuentry \"Microsoft Windows XP\" {\n\t\tinsmod part_msdos\n\t\tinsmod ntfs\n\t\tinsmod ntldr\n\t\tsearch --no-floppy --fs-uuid --set=root --hint-bios=hd0,msdos1 --hint-efi=hd0,msdos1 --hint-baremetal=ahci0,msdos1 XXXX-XXXX\n\t\tntldr /ntldr\n\t}\nfi\n```\n\nNote: **Nie** Nie używaj bootrec.exe /Fixmbr, ponieważ wyczyści to GRUB. Możesz też użyć funkcji Boot Repair w menu Troubleshooting - nie wymaże ona GRUB-a, ale naprawi większość błędów. Ponadto lepiej jest mieć podłączony zarówno docelowy dysk twardy, jak i TYLKO urządzenie rozruchowe. Windows zazwyczaj nie naprawia informacji rozruchowych, jeśli podłączone są inne urządzenia.\n\n```\nX:\\> bootrec.exe /fixboot\nX:\\> bootrec.exe /RebuildBcd\n```\n\nNie używaj bootrec.exe /Fixmbr, ponieważ wyczyści to GRUB. Możesz też użyć funkcji Boot Repair w menu Troubleshooting - nie wymaże ona GRUB-a, ale naprawi większość błędów. Ponadto lepiej jest mieć podłączony zarówno docelowy dysk twardy, jak i TYLKO urządzenie rozruchowe. Windows zazwyczaj nie naprawia informacji rozruchowych, jeśli podłączone są inne urządzenia.\n\nMożliwe jest użycie etykiet systemu plików, czytelnych dla człowieka ciągów znaków dołączonych do systemów plików, poprzez użycie opcji --label w komendzie search. Po pierwsze, upewnij się, że system plików ma etykietę.\n\nNastępnie dodaj wpis przy użyciu etykiet. Przykład:\n\n```\nmenuentry \"Arch Linux, session texte\" {\n  search --label --set=root archroot\n  linux /boot/vmlinuz-linux root=/dev/disk/by-label/archroot ro\n  initrd /boot/initramfs-linux.img\n}\n```\n\n"
+    },
+    {
+      "title": "Używanie powłoki poleceń",
+      "level": 2,
+      "content": "Ponieważ MBR jest zbyt mały, aby przechowywać wszystkie moduły GRUB-a, znajduje się tam tylko menu i kilka podstawowych poleceń. Większość funkcjonalności GRUB-a pozostaje w modułach w /boot/grub/, które są wstawiane w razie potrzeby. W warunkach błędu (np. jeśli zmieni się układ partycji) GRUB może nie uruchomić się. W takim przypadku może pojawić się powłoka poleceń.\n\nGRUB oferuje wiele powłok/promptów. Jeśli wystąpi problem z odczytaniem menu, ale bootloader jest w stanie znaleźć dysk, prawdopodobnie zostaniesz przeniesiony do \"normalnej\" powłoki:\n\n```\ngrub>\n```\n\nW przypadku poważniejszego problemu (np. gdy GRUB nie może znaleźć wymaganych plików), użytkownik może zostać przeniesiony do powłoki \"ratunkowej\":\n\n```\ngrub rescue>\n```\n\nPowłoka ratunkowa jest ograniczonym podzbiorem normalnej powłoki, oferującym znacznie mniej funkcji. Jeśli zostaniesz przeniesiony do powłoki ratunkowej, najpierw spróbuj wstawić \"normalny\" moduł, a następnie uruchom \"normalną\" powłokę:\n\n```\ngrub rescue> set prefix=(hdX,Y)/boot/grub\ngrub rescue> insmod (hdX,Y)/boot/grub/i386-pc/normal.mod\nrescue:grub> normal\n```\n\n"
+    },
+    {
+      "title": "Obsługa pagera",
+      "level": 3,
+      "content": "GRUB obsługuje pager do odczytywania poleceń, które dostarczają długich danych wyjściowych (takich jak polecenie help). Działa to tylko w normalnym trybie powłoki, a nie w trybie ratunkowym. Aby włączyć pager, w powłoce poleceń GRUB wpisz:\n\n```\nsh:grub> set pager=1\n```\n\n"
+    },
+    {
+      "title": "Używanie środowiska powłoki poleceń do uruchamiania systemów operacyjnych",
+      "level": 3,
+      "content": "```\ngrub>\n```\n\nŚrodowisko powłoki poleceń GRUB-a może być używane do uruchamiania systemów operacyjnych. Powszechnym scenariuszem może być uruchamianie systemu Windows / Linux przechowywanego na dysku / partycji poprzez ładowanie łańcuchowe.\n\nŁadowanie łańcuchowe oznacza ładowanie innego boot-loadera z bieżącego, tj. ładowanie łańcuchowe.\n\nInny program ładujący może być osadzony na początku dysku partycjonowanego (MBR), na początku partycji lub dysku bez partycji (VBR) lub jako plik binarny EFI w przypadku UEFI.\n\n"
+    },
+    {
+      "title": "Łańcuchowe ładowanie VBR partycji",
+      "level": 4,
+      "content": "```\nset root=(hdX,Y)\nchainloader +1\nboot\n```\n\nX=0,1,2... Y=1,2,3...\n\nNa przykład do łańcuchowego ładowania systemu Windows zapisanego na pierwszej partycji pierwszego dysku twardego,\n\n```\nset root=(hd0,1)\nchainloader +1\nboot\n```\n\nPodobnie GRUB zainstalowany na partycji może być ładowany łańcuchowo.\n\n"
+    },
+    {
+      "title": "Łańcuchowe ładowanie MBR dysku lub VBR dysku bez partycji",
+      "level": 4,
+      "content": "```\nset root=hdX\nchainloader +1\nboot\n```\n\n"
+    },
+    {
+      "title": "Ładowanie łańcuchowe systemu Windows/Linux zainstalowanego w trybie UEFI",
+      "level": 4,
+      "content": "```\ninsmod fat\nset root=(hd0,gpt4)\nchainloader (${root})/EFI/Microsoft/Boot/bootmgfw.efi\nboot\n```\n\ninsmod fat służy do ładowania modułu systemu plików FAT w celu uzyskania dostępu do programu ładującego Windows na partycji systemowej EFI. (hd0,gpt4) lub /dev/sda4 jest partycją systemową EFI w tym przykładzie. Wpis w linii chainloader określa ścieżkę do pliku .efi, który ma zostać załadowany łańcuchowo.\n\n"
+    },
+    {
+      "title": "Normalne ładowanie",
+      "level": 4,
+      "content": "Zobacz przykłady w #Korzystanie z konsoli ratunkowej\n\n"
+    },
+    {
+      "title": "Korzystanie z konsoli ratunkowej",
+      "level": 3,
+      "content": "Najpierw zobacz #Używanie powłoki poleceń. Jeśli nie można aktywować standardowej powłoki, jednym z możliwych rozwiązań jest uruchomienie systemu przy użyciu Live CD lub innego dysku ratunkowego, aby poprawić błędy konfiguracji i ponownie zainstalować GRUB. Jednak taki dysk rozruchowy nie zawsze jest dostępny (ani konieczny); konsola ratunkowa jest zaskakująco solidna.\n\nDostępne polecenia w GRUB rescue obejmują insmod, ls, set i unset. W tym przykładzie użyto set i insmod. set modyfikuje zmienne, a insmod wstawia nowe moduły w celu dodania funkcjonalności.\n\nPrzed uruchomieniem użytkownik musi znać lokalizację swojej partycji /boot (może to być oddzielna partycja lub podkatalog w katalogu głównym):\n\n```\ngrub rescue> set prefix=(hdX,Y)/boot/grub\n```\n\ngdzie X to numer dysku fizycznego, a Y to numer partycji.\n\nAby rozszerzyć możliwości konsoli, należy dodać moduł linux:\n\n```\ngrub rescue> insmod i386-pc/linux.mod\n```\n\nlub po prostu\n\n```\ngrub rescue> insmod linux\n```\n\nWprowadza to polecenia linux i initrd, które powinny być znane.\n\nPrzykładem może być uruchomienie Arch Linux:\n\n```\nset root=(hd0,5)\nlinux /boot/vmlinuz-linux root=/dev/sda5\ninitrd /boot/initramfs-linux.img\nboot\n```\n\nW przypadku oddzielnej partycji rozruchowej (np. podczas korzystania z UEFI), ponownie zmień odpowiednio linie:\n\n```\nset root=(hd0,5)\nlinux (hdX,Y)/vmlinuz-linux root=/dev/sda6\ninitrd (hdX,Y)/initramfs-linux.img\nboot\n```\n\nPo pomyślnym uruchomieniu instalacji Arch Linux, użytkownicy mogą poprawić grub.cfg w razie potrzeby, a następnie ponownie zainstalować GRUB.\n\nAby ponownie zainstalować GRUB i całkowicie naprawić problem, zmieniając /dev/sda w razie potrzeby. Zobacz #Instalacja po szczegóły.\n\n"
+    },
+    {
+      "title": "Systemy UEFI",
+      "level": 3,
+      "content": "Przed usunięciem grub upewnij się, że jakiś inny bootloader jest zainstalowany i skonfigurowany do przejęcia.\n\n```\n$ efibootmgr\n```\n\n```\nBootOrder: 0003,0001,0000,0002\nBoot0000* Windows Boot Manager  HD(2,GPT,4dabbedf-191b-4432-bc09-8bcbd1d7dabf,0x109000,0x32000)/File(\\EFI\\Microsoft\\Boot\\bootmgfw.efi)\nBoot0001* GRUB  HD(2,GPT,4dabbedf-191b-4432-bc09-8bcbd1d7dabf,0x109000,0x32000)/File(\\EFI\\GRUB\\grubx64.efi)\nBoot0002* Linux-Firmware-Updater        HD(2,GPT,5dabbedf-191b-4432-bc09-8bcbd1d7dabf,0x109000,0x32000)/File(\\EFI\\arch\\fwupdx64.efi)\nBoot0003* Linux Boot Manager    HD(2,GPT,4dabbedf-191b-4432-bc09-8bcbd1d7dabf,0x109000,0x32000)/File(\\EFI\\systemd\\systemd-bootx64.efi)\n```\n\nJeśli BootOrder ma grub jako pierwszy wpis, zainstaluj inny bootloader, aby umieścić go z przodu, taki jak systemd-boot powyżej. grub można następnie usunąć używając jego bootnum.\n\n```\n# efibootmgr --delete-bootnum -b 1\n```\n\nUsuń także katalogi esp/EFI/grub i /boot/grub.\n\n"
+    },
+    {
+      "title": "Systemy BIOS",
+      "level": 3,
+      "content": "Aby zastąpić grub dowolnym innym programem ładującym BIOS, wystarczy go zainstalować, co spowoduje nadpisanie kodu rozruchowego MBR.\n\ngrub-install tworzy katalog /boot/grub, który musi zostać usunięty ręcznie. Chociaż niektórzy użytkownicy będą chcieli go zachować, jeśli będą chcieli ponownie zainstalować grub.\n\nPo migracji do UEFI/GPT można chcieć usunąć kod rozruchowy MBR za pomocą dd.\n\n"
+    },
+    {
+      "title": "Nieobsługiwane systemy plików",
+      "level": 3,
+      "content": "W przypadku, gdy GRUB nie obsługuje głównego systemu plików, należy utworzyć alternatywną partycję /boot z obsługiwanym systemem plików. W niektórych przypadkach wersja rozwojowa GRUB-a grub-gitAUR może mieć natywną obsługę systemu plików.\n\nJeśli GRUB jest używany z nieobsługiwanym systemem plików, nie jest w stanie wyodrębnić UUID dysku, więc zamiast tego używa klasycznych nietrwałych nazw /dev/sdXx. W takim przypadku może być konieczna ręczna edycja /boot/grub/grub.cfg i zastąpienie root=/dev/sdXx root=UUUID=XXXXXXXX-XXXX-XXXX-XXXXXXXXXX. Możesz użyć polecenia blkid, aby uzyskać identyfikator UUID urządzenia, zobacz Persistent block device naming.\n\nPodczas gdy GRUB obsługuje F2FS od wersji 2.0.4, nie może poprawnie odczytać plików rozruchowych z partycji F2FS, która została utworzona z włączoną flagą extra_attr.\n\n"
+    },
+    {
+      "title": "Włączanie komunikatów debugowania",
+      "level": 3,
+      "content": "Dodaj:\n\n```\nset pager=1\nset debug=all\n```\n\ndo grub.cfg.\n\n"
+    },
+    {
+      "title": "Komunikat o błędzie w stylu msdos",
+      "level": 3,
+      "content": "```\ngrub-setup: warn: This msdos-style partition label has no post-MBR gap; embedding will not be possible!\ngrub-setup: warn: Embedding is not possible. GRUB can only be installed in this setup by using blocklists.\n            However, blocklists are UNRELIABLE and its use is discouraged.\ngrub-setup: error: If you really want blocklists, use --force.\n```\n\nTen błąd może wystąpić podczas próby instalacji GRUB w kontenerze VMware. Więcej informacji na ten temat tutaj. Dzieje się tak, gdy pierwsza partycja zaczyna się tuż po MBR (blok 63), bez zwykłej przestrzeni 1 MiB (2048 bloków) przed pierwszą partycją. Przeczytaj #Instrukcje specyficzne dla tablicy partycji GUID (GPT)\n\n"
+    },
+    {
+      "title": "Typowe błędy instalacji",
+      "level": 4,
+      "content": "- Błąd, który może wystąpić na niektórych urządzeniach UEFI to Could not prepare Boot variable: Read-only file system Należy ponownie zamontować /sys/firmware/efi/efivars z włączoną opcją odczytu i zapisu. # mount -o remount,rw,nosuid,nodev,noexec --types efivarfs efivarfs /sys/firmware/efi/efivars. Zobacz Gentoo Wiki na temat instalacji bootloadera.\n- Jeśli masz problem z uruchomieniem grub-install z sysfs lub procfs i jest napisane, że musisz uruchomić modprobe efivarfs spróbuj mounting the efivarfs z powyższym poleceniem.\n- Bez opcji --target lub --directory, grub-install nie może określić, który firmware zainstalować. W takich przypadkach grub-install wypisze source_dir does not exist. Please specify --target or --directory.\n- Jeśli po uruchomieniu grub-install pojawi się error: esp doesn't look like an EFI partition, to najprawdopodobniej partycja nie jest sformatowana w FAT32.\n\n```\n# mount -o remount,rw,nosuid,nodev,noexec --types efivarfs efivarfs /sys/firmware/efi/efivars\n```\n\n"
+    },
+    {
+      "title": "Tworzenie wpisu GRUB w menedżerze rozruchu oprogramowania układowego",
+      "level": 4,
+      "content": "grub-install automatycznie próbuje utworzyć pozycję menu w menedżerze rozruchu. Jeśli tak się nie stanie, zobacz UEFI#efibootmgr, aby uzyskać instrukcje dotyczące użycia efibootmgr do utworzenia wpisu menu. Problemem może być jednak to, że nie uruchomiłeś płyty CD/USB w trybie UEFI, jak w Installation guide (Polski)#Zweryfikuj tryb uruchomionego systemu.\n\nJako kolejny przykład tworzenia wpisu GRUB w menedżerze rozruchu oprogramowania układowego, rozważ efibootmgr -c. Zakłada on, że /dev/sda1 jest partycją systemową EFI i jest zamontowany w /boot/efi. Które są domyślnym zachowaniem efibootmgr. Tworzy nową opcję rozruchu o nazwie „Linux” i umieszcza ją na początku listy kolejności rozruchu. Opcje mogą być przekazywane w celu modyfikacji domyślnego zachowania. Domyślnym programem ładującym system operacyjny jest \\EFI\\arch\\grub.efi.\n\n"
+    },
+    {
+      "title": "Zrzut do powłoki ratunkowej",
+      "level": 4,
+      "content": "Jeśli GRUB ładuje się, ale spada do powłoki ratunkowej bez żadnych błędów, może to być spowodowane jednym z tych dwóch powodów:\n\n- Może to być spowodowane brakiem lub błędem grub.cfg. Stanie się tak, jeśli GRUB UEFI został zainstalowany z --boot-directory i brakuje grub.cfg,\n- Zdarza się to również, jeśli partycja rozruchowa, która jest zakodowana w pliku grubx64.efi, uległa zmianie.\n\n"
+    },
+    {
+      "title": "GRUB UEFI nie został załadowany",
+      "level": 4,
+      "content": "Przykład działającego UEFI:\n\n```\n# efibootmgr -u\n```\n\n```\nBootCurrent: 0000\nTimeout: 3 seconds\nBootOrder: 0000,0001,0002\nBoot0000* GRUB HD(1,800,32000,23532fbb-1bfa-4e46-851a-b494bfe9478c)File(\\EFI\\GRUB\\grubx64.efi)\nBoot0001* Shell HD(1,800,32000,23532fbb-1bfa-4e46-851a-b494bfe9478c)File(\\shellx64.efi)\nBoot0002* Festplatte BIOS(2,0,00)P0: SAMSUNG HD204UI\n```\n\nJeśli ekran jest czarny tylko przez sekundę, a następnie próbowana jest następna opcja rozruchu, zgodnie z tym postem, przeniesienie GRUB-a do katalogu głównego partycji może pomóc. Opcja rozruchu musi zostać usunięta, a następnie ponownie utworzona. Wpis dla GRUB powinien wyglądać następująco:\n\n```\nBoot0000* GRUB HD(1,800,32000,23532fbb-1bfa-4e46-851a-b494bfe9478c)File(\\grubx64.efi)\n```\n\n"
+    },
+    {
+      "title": "Domyślna/zastępcza ścieżka rozruchowa",
+      "level": 4,
+      "content": "Niektóre oprogramowania sprzętowe UEFI wymagają pliku rozruchowego w znanej lokalizacji, zanim pokażą wpisy rozruchowe UEFI NVRAM. W takim przypadku grub-install będzie twierdzić, że efibootmgr dodał wpis do rozruchu GRUB-a, jednak wpis ten nie pojawi się w selektorze kolejności rozruchu VisualBIOS. Rozwiązaniem jest zainstalowanie GRUB-a na domyślnej/zastępczej ścieżce rozruchowej:\n\n```\n# grub-install --target=x86_64-efi --efi-directory=esp --removable\n```\n\nAlternatywnie można przenieść już zainstalowany plik wykonywalny GRUB EFI do ścieżki domyślnej/zwrotnej:\n\n```\n# mv esp/EFI/grub esp/EFI/BOOT\n# mv esp/EFI/BOOT/grubx64.efi esp/EFI/BOOT/BOOTX64.EFI\n```\n\n"
+    },
+    {
+      "title": "Nieprawidłowa sygnatura",
+      "level": 3,
+      "content": "Jeśli próba uruchomienia systemu Windows powoduje błąd „nieprawidłowego podpisu”, np. po zmianie konfiguracji partycji lub dodaniu dodatkowych dysków twardych, należy (ponownie) przenieść konfigurację urządzenia GRUB i pozwolić mu na ponowną konfigurację:\n\n```\n# mv /boot/grub/device.map /boot/grub/device.map-old\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\ngrub-mkconfig powinno teraz wymieniać wszystkie znalezione opcje rozruchu, w tym Windows. Jeśli to działa, usuń /boot/grub/device.map-old.\n\n"
+    },
+    {
+      "title": "Rozruch zawiesza się",
+      "level": 3,
+      "content": "Jeśli uruchamianie utknie bez żadnego komunikatu o błędzie po załadowaniu jądra i początkowego ramdysku przez GRUB, spróbuj usunąć parametr jądra add_efi_memmap.\n\n"
+    },
+    {
+      "title": "Arch nie znaleziony w innym systemie operacyjnym",
+      "level": 3,
+      "content": "Niektórzy donoszą, że inne dystrybucje mogą mieć problemy z automatycznym znalezieniem Arch Linuksa za pomocą os-prober. Jeśli ten problem wystąpi, donoszono, że wykrywanie może być poprawione dzięki obecności /etc/lsb-release. Ten plik i narzędzie aktualizujące jest dostępne z pakietem lsb-release.\n\n"
+    },
+    {
+      "title": "Ostrzeżenie podczas instalacji w chroot",
+      "level": 3,
+      "content": "Podczas instalacji GRUB-a na systemie LVM w środowisku chroot (np. podczas instalacji systemu) mogą pojawić się ostrzeżenia takie jak\n\n```\n/run/lvm/lvmetad.socket: connect failed: No such file or directory\n```\n\nlub\n\n```\nWARNING: failed to connect to lvmetad: No such file or directory. Falling back to internal scanning.\n```\n\nDzieje się tak, ponieważ /run nie jest dostępny wewnątrz chroot. Ostrzeżenia te nie uniemożliwią uruchomienia systemu, pod warunkiem, że wszystko zostało wykonane poprawnie, więc można kontynuować instalację.\n\n"
+    },
+    {
+      "title": "GRUB ładuje się powoli",
+      "level": 3,
+      "content": "GRUB can take a long time to load when disk space is low. Check if you have sufficient free disk space on your /boot or / partition when you are having problems.\n\n"
+    },
+    {
+      "title": "error: unknown filesystem",
+      "level": 3,
+      "content": "GRUB może wyświetlić error: unknown filesystem i odmówić uruchomienia z kilku powodów. Jeśli jesteś pewien, że wszystkie UUID są poprawne, a wszystkie systemy plików są prawidłowe i obsługiwane, może to być spowodowane tym, że BIOS Boot Partition znajduje się poza pierwszymi 2 TiB dysku [4]. Użyj wybranego narzędzia do partycjonowania, aby upewnić się, że ta partycja znajduje się w całości w pierwszych 2 TiB, a następnie ponownie zainstaluj i skonfiguruj GRUB.\n\nBłąd ten może być również spowodowany przez system plików ext4 z nieobsługiwanym zestawem funkcji:\n\n- large_dir - nieobsługiwany.\n- metadata_csum_seed - będzie obsługiwany w GRUB 2.11 (commit).\n\n"
+    },
+    {
+      "title": "grub-reboot nie resetuje się",
+      "level": 3,
+      "content": "GRUB wydaje się nie być w stanie zapisywać na partycjach root Btrfs [5]. Jeśli użyjesz grub-reboot do uruchomienia innego wpisu, nie będzie on w stanie zaktualizować swojego środowiska na dysku. Uruchom grub-reboot z innego wpisu (na przykład podczas przełączania się między różnymi dystrybucjami) lub rozważ inny system plików. Możesz zresetować „lepki” wpis, wykonując grub-editenv create i ustawiając GRUB_DEFAULT=0 w /etc/default/grub (nie zapomnij o grub-mkconfig -o /boot/grub/grub.cfg).\n\n"
+    },
+    {
+      "title": "Stary Btrfs uniemożliwia instalację",
+      "level": 3,
+      "content": "Jeśli dysk zostanie sformatowany za pomocą Btrfs bez tworzenia tablicy partycji (np. /dev/sdx), a następnie zostanie zapisana tablica partycji, niektóre części formatu BTRFS pozostaną. Większość narzędzi i systemów operacyjnych tego nie widzi, ale GRUB odmówi instalacji, nawet z --force\n\n```\n# grub-install: warning: Attempting to install GRUB to a disk with multiple partition labels. This is not supported yet..\n# grub-install: error: filesystem `btrfs' does not support blocklists.\n```\n\nMożesz wyzerować dysk, ale najprostszym rozwiązaniem, które pozostawia dane w spokoju, jest wymazanie superbloku Btrfs za pomocą wipefs -o 0x10040 /dev/sdx.\n\n"
+    },
+    {
+      "title": "Nie znaleziono systemu Windows 8/10",
+      "level": 3,
+      "content": "Ustawienie w Windows 8/10 o nazwie „Hiberboot”, „Hybrid Boot” lub „Fast Boot” może uniemożliwić zamontowanie partycji Windows, więc grub-mkconfig nie znajdzie instalacji Windows. Wyłączenie Hiberboot w Windows pozwoli na dodanie go do menu GRUB.\n\n"
+    },
+    {
+      "title": "GRUB Rescue i zaszyfrowany /boot",
+      "level": 3,
+      "content": "Podczas korzystania z zaszyfrowanego /boot, jeśli nie wprowadzisz poprawnego hasła, zostaniesz przeniesiony do powłoki grub-rescue.\n\nTen monit grub-rescue ma ograniczone możliwości. Użyj następujących poleceń, aby ukończyć rozruch:\n\n```\ngrub rescue> cryptomount <partition>\ngrub rescue> insmod normal\ngrub rescue> normal\n```\n\nZobacz ten post na blogu dla lepszego opisu.\n\n"
+    },
+    {
+      "title": "GRUB jest zainstalowany, ale menu nie jest wyświetlane przy starcie systemu",
+      "level": 3,
+      "content": "Sprawdź /etc/default/grub czy GRUB_TIMEOUT jest ustawiony na 0, w takim przypadku ustaw go na liczbę dodatnią: ustawia on liczbę sekund przed załadowaniem domyślnego wpisu GRUB. Sprawdź również, czy GRUB_TIMEOUT_STYLE jest ustawiony na hidden i ustaw go na menu, aby menu było wyświetlane domyślnie. Następnie regeneruj główny plik konfiguracyjny i uruchom ponownie komputer, aby sprawdzić, czy wszystko działa.\n\nJeśli to nie zadziała, mogą występować problemy z niekompatybilnością terminala graficznego. Ustaw GRUB_TERMINAL_OUTPUT na console w /etc/default/grub, aby wyłączyć terminal graficzny GRUB-a.\n\n"
+    },
+    {
+      "title": "Zobacz także",
+      "level": 2,
+      "content": "- Wikipedia:GNU GRUB\n- Oficjalny podręcznik GRUB\n- Strona wiki Ubuntu dla GRUB-a\n- Strona wiki GRUB opisująca kroki kompilacji dla systemów UEFI\n- Wikipedia:BIOS Boot partition\n- Jak skonfigurować GRUB-a\n\n"
+    }
+  ]
+}

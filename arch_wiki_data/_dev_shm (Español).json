@@ -1,0 +1,36 @@
+{
+  "title": "/dev/shm (Español)",
+  "url": "https://wiki.archlinux.org/title//dev/shm_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-10-22** \n\ntmpfs es un sistema de archivos temporal que reside en la memoria y/o partición(es) de intercambio. Montar directorios como tmpfs puede ser una forma eficaz de acelerar el acceso a sus archivos o de asegurarse de que su contenido se borre automáticamente al reiniciar.\n\n"
+    },
+    {
+      "title": "Utilización",
+      "level": 2,
+      "content": "Algunos directorios en los que se utilice comúnmente tmpfs(5) son /tmp, /var/lock y /var/run. No lo utilice en /var/tmp, porque ese directorio está destinado a archivos temporales que se conservan durante los reinicios.\n\nArch utiliza un directorio tmpfs /run, con /var/run y /var/lock simplemente existiendo como enlaces simbólicos por compatibilidad. También se utiliza para /tmp por la configuración predeterminada de systemd y no requiere una entrada en fstab a menos que se necesite una configuración específica.\n\nglibc 2.2 y posterior espera que tmpfs se monte en /dev/shm para memoria compartida POSIX. El montaje de tmpfs en /dev/shm es gestionado automáticamente por systemd y la configuración manual en fstab no es necesaria.\n\nGeneralmente, las tareas y los programas que ejecutan operaciones frecuentes de lectura/escritura pueden beneficiarse del uso de un directorio tmpfs. Algunas aplicaciones pueden incluso recibir una ganancia sustancial al descargar algunos (o todos) sus datos en la memoria compartida. Por ejemplo, reubicar el perfil de Firefox en la RAM muestra una mejora significativa en el rendimiento.\n\n"
+    },
+    {
+      "title": "Ejemplos",
+      "level": 2,
+      "content": "De forma predeterminada, una partición tmpfs tiene su tamaño máximo establecido en la mitad de la RAM disponible, sin embargo, es posible cambiar este valor. Para establecer explícitamente un tamaño máximo, en este ejemplo para cambiarlo en /tmp, utilice la opción de montaje size:\n\n```\n/etc/fstab\n```\n\n```\ntmpfs   /tmp         tmpfs   rw,nodev,nosuid,size=2G          0  0\n```\n\nPara especificar un montaje más seguro, especifique la siguiente opción de montaje:\n\n```\n/etc/fstab\n```\n\n```\ntmpfs   /www/cache    tmpfs  rw,size=1G,nr_inodes=5k,noexec,nodev,nosuid,uid=usuario,gid=grupo,mode=1700 0 0\n```\n\nVéase la página de manual tmpfs(5) y Security (Español)#Sistema de archivos para más información.\n\nReinicie para que los cambios surtan efecto. Tenga en cuenta que aunque pueda ser tentador ejecutar mount -a para que los cambios sean efectivos inmediatamente, esto hará que los archivos que actualmente residen en estos directorios sean inaccesibles (esto es especialmente problemático para ejecutar programas con archivos de bloqueo, por ejemplo). Sin embargo, si todos están vacíos, debería ser seguro ejecutar mount -a en lugar de reiniciar (o montarlos individualmente).\n\nDespués de aplicar los cambios, verifique que surtieron efecto mirando /proc/mounts y utilizando findmnt:\n\n```\n$ findmnt /tmp\n```\n\n```\nTARGET SOURCE FSTYPE OPTIONS\n/tmp   tmpfs  tmpfs  rw,nosuid,nodev,relatime\n```\n\ntmpfs también puede cambiar de tamaño temporalmente sin la necesidad de reiniciar, por ejemplo, cuando necesite ejecutarse rápidamente un trabajo de compilación grande. En este caso, ejecute:\n\n```\n# mount -o remount,size=4G /tmp\n```\n\n"
+    },
+    {
+      "title": "Desactivar el montaje automático",
+      "level": 2,
+      "content": "En systemd, /tmp se monta automáticamente como un tmpfs, si no es ya un punto de montaje dedicado (ya sea tmpfs o en disco) en /etc/fstab. Para desactivar el montaje automático, enmascare la unidad systemd tmp.mount.\n\nLos archivos ya no se almacenarán en un tmpfs, sino en el dispositivo de bloque. El contenido de /tmp ahora se conservará entre reinicios, lo que podría no ser el comportamiento deseado. Para recuperar el comportamiento anterior y limpiar el directorio /tmp automáticamente al reiniciar, considere utilizar tmpfiles.d(5):\n\n```\n/etc/tmpfiles.d/tmp.conf\n```\n\n```\n# véase tmpfiles.d(5)\n# activar siempre la limpieza del directorio /tmp\nD! /tmp 1777 root root 0\n\n# eliminar los archivos en /var/tmp con más de 10 días\nD /var/tmp 1777 root root 10d\n\n# los puntos de montaje del espacio de nombres (PrivateTmp=yes) se excluyen de la eliminación\nx /tmp/systemd-private-*\nx /var/tmp/systemd-private-*\nX /tmp/systemd-private-*/tmp\nX /var/tmp/systemd-private-*/tmp\n```\n\n"
+    },
+    {
+      "title": "Abrir enlaces simbólicos en tmpfs cuando falla la raíz",
+      "level": 3,
+      "content": "Considerando que /tmp está utilizando tmpfs, cambie el directorio actual a /tmp, luego cree un archivo y un enlace simbólico a ese archivo en el mismo directorio /tmp. Es de esperar que se produzcan errores de permiso denegado al intentar leer el enlace simbólico debido a que /tmp tiene el \"bit pegajoso\" activado.\n\nEste comportamiento se puede controlar mediante /proc/sys/fs/protected_symlinks o simplemente mediante sysctl: sysctl -w fs.protected_symlinks=0. Véase Sysctl#Configuration para hacerlo permanente.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Documentación del kernel Linux\n\n"
+    }
+  ]
+}

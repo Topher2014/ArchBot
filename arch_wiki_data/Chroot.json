@@ -1,0 +1,101 @@
+{
+  "title": "Chroot",
+  "url": "https://wiki.archlinux.org/title/Chroot",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Linux Containers\n- PRoot\n- systemd-nspawn\n- DeveloperWiki:Building in a clean chroot\n\nA chroot is an operation that changes the apparent root directory for the current running process and their children. A program that is run in such a modified environment cannot access files and commands outside that environmental directory tree. This modified environment is called a chroot jail.\n\n"
+    },
+    {
+      "title": "Reasoning",
+      "level": 2,
+      "content": "Changing root is commonly done for performing system maintenance on systems where booting and/or logging in is no longer possible. Common examples are:\n\n- Reinstalling the boot loader.\n- Rebuilding the initramfs image.\n- Upgrading or downgrading packages.\n- Resetting a forgotten password.\n- Building packages in a clean chroot.\n\nSee also Wikipedia:Chroot#Limitations.\n\n"
+    },
+    {
+      "title": "Requirements",
+      "level": 2,
+      "content": "In order to use chroot, you need another Linux installation or installation media (of any distribution), with:\n\n- Root privilege (see #Without root privileges for alternatives).\n- The same instruction set architecture as the system being chrooted into. The architecture of the current environment can be discovered with: uname -m (e.g. i686 or x86_64). It is also possible to use QEMU to execute code that does not have a matching native architecture.\n- Kernel modules loaded that are needed in the chroot environment.\n- Swap enabled if needed: # swapon /dev/sdxY\n- Internet connection established if needed.\n\n```\n# swapon /dev/sdxY\n```\n\n"
+    },
+    {
+      "title": "Prepare new root location",
+      "level": 2,
+      "content": "The chroot target should be a directory which contains a file system hierarchy.\n\nIn the installation guide, this directory would be /mnt. For an existing installation, you need to mount existing partitions into /mnt yourself:\n\nRun lsblk and note the partition layout of your installation. It will be usually something like /dev/sdXY or if you have an NVMe drive /dev/nvme0nXpY.\n\nMount the file system:\n\n```\n# mount /dev/sdXY /mnt\n```\n\nIf you have an EFI system partition and need to make changes in it (e.g. updating the vmlinuz or initramfs images):\n\n```\n# mount /dev/sdXZ /mnt/esp\n```\n\nIf you have any discrete partitions, mount them too.\n\nIn the following examples, /path/to/new/root is the directory where the new root resides (e.g. /mnt).\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "- Some systemd tools such as hostnamectl, localectl and timedatectl can not be used inside a chroot, as they require an active dbus connection. [1]\n- The file system that will serve as the new root (/) of your chroot must be accessible (i.e., decrypted, mounted).\n\nThere are two main options for using chroot, described below.\n\n"
+    },
+    {
+      "title": "Using arch-chroot",
+      "level": 3,
+      "content": "The bash script arch-chroot(8) is part of the arch-install-scripts package. arch-chroot wraps the chroot(1) command while ensuring that important functionality is available, e.g. mounting /dev, /proc and other API filesystems, or exposing /etc/resolv.conf to the chroot.\n\n"
+    },
+    {
+      "title": "Enter a chroot",
+      "level": 4,
+      "content": "Run arch-chroot with the new root directory as first argument:\n\n```\n# arch-chroot /path/to/new/root\n```\n\nYou can now do most of the operations available from your existing installation. Some tasks which needs D-Bus will not work as noted in #Usage.\n\n"
+    },
+    {
+      "title": "Exit a chroot",
+      "level": 4,
+      "content": "To exit the chroot, use:\n\n```\n# exit\n```\n\n"
+    },
+    {
+      "title": "Run a single command and exit",
+      "level": 4,
+      "content": "To run a command from the chroot and exit again, append the command to the end of the line:\n\n```\n# arch-chroot /path/to/new/root mycommand\n```\n\nFor example, to run mkinitcpio -p linux for a chroot located at /mnt/arch, do:\n\n```\n# arch-chroot /mnt/arch mkinitcpio -p linux\n```\n\n"
+    },
+    {
+      "title": "Running on Btrfs",
+      "level": 3,
+      "content": "On a Btrfs root file system with subvolumes, you have to make sure that all subvolumes are properly mounted as specified in fstab before entering chroot.\n\nAn example with the Btrfs default setup from archinstall:\n\n```\n# mount -o subvol=@ /dev/sdXY /mnt\n# mount -o subvol=@home /dev/sdXY /mnt/home\n# mount -o subvol=@pkg /dev/sdXY /mnt/var/cache/pacman/pkg\n# mount -o subvol=@log /dev/sdXY /mnt/var/log\n# mount -o subvol=@snapshots /dev/sdXY /mnt/.snapshots\n# mount /dev/sdXZ /mnt/boot\n# arch-chroot /mnt\n```\n\n"
+    },
+    {
+      "title": "Using chroot",
+      "level": 3,
+      "content": "If you run chroot directly, below steps are needed before actual chroot.\n\nFirst, mount the temporary API filesystems:\n\n```\n# cd /path/to/new/root\n# mount -t proc /proc proc/\n# mount -t sysfs /sys sys/\n# mount --rbind /dev dev/\n```\n\nAnd optionally:\n\n```\n# mount --rbind /run run/\n```\n\nIf you are running a UEFI system, you will also need access to EFI variables. Otherwise, when installing GRUB, you will receive a message similar to: UEFI variables not supported on this machine:\n\n```\n# mount --rbind /sys/firmware/efi/efivars sys/firmware/efi/efivars/\n```\n\nNext, in order to use an internet connection in the chroot environment, copy over the DNS details:\n\n```\n# cp /etc/resolv.conf etc/resolv.conf\n```\n\nFinally, to change root into /path/to/new/root using a bash shell:\n\n```\n# chroot /path/to/new/root /bin/bash\n```\n\n- chroot: cannot run command '/usr/bin/bash': Exec format error, it is likely that the architectures of the host environment and chroot environment do not match.\n- chroot: '/usr/bin/bash': permission denied, remount with the execute permission: mount -o remount,exec /path/to/new/root. if checking this did not help, then make sure the base components of the new environment are intact (if it is an Arch root, try paccheck --root=/path/to/new/root --files --file-properties --md5sum glibc filesystem, from pacutils)\n\n- if checking this did not help, then make sure the base components of the new environment are intact (if it is an Arch root, try paccheck --root=/path/to/new/root --files --file-properties --md5sum glibc filesystem, from pacutils)\n\nAfter chrooting, it may be necessary to load the local Bash configuration:\n\n```\n# source /etc/profile\n# source ~/.bashrc\n```\n\n```\n# export PS1=\"(chroot) $PS1\"\n```\n\nWhen finished with the chroot, you can exit it via:\n\n```\n# exit\n```\n\nThen unmount the temporary file systems:\n\n```\n# cd /\n# umount --recursive /path/to/new/root\n```\n\n"
+    },
+    {
+      "title": "Run graphical applications from chroot",
+      "level": 2,
+      "content": "If you have an X server running on your system, you can start graphical applications from the chroot environment.\n\nTo allow the chroot environment to connect to an X server, open a virtual terminal inside the X server (i.e. inside the desktop of the user that is currently logged in), then run the xhost command, which gives permission to anyone to connect to the user's X server (see also Xhost):\n\n```\n$ xhost +local:\n```\n\nThen, to direct the applications to the X server from chroot, set the DISPLAY environment variable inside the chroot to match the DISPLAY variable of the user that owns the X server. So for example, run:\n\n```\n$ echo $DISPLAY\n```\n\nas the user that owns the X server to see the value of DISPLAY. If the value is \":0\" (for example), then run the following in the chroot environment:\n\n```\n# export DISPLAY=:0\n```\n\n"
+    },
+    {
+      "title": "Without root privileges",
+      "level": 2,
+      "content": "Chroot requires root privileges, which may not be desirable or possible for the user to obtain in certain situations. There are, however, various ways to simulate chroot-like behavior using alternative implementations.\n\n"
+    },
+    {
+      "title": "PRoot",
+      "level": 3,
+      "content": "PRoot may be used to change the apparent root directory and use mount --bind without root privileges. This is useful for confining applications to a single directory or running programs built for a different CPU architecture, but it has limitations due to the fact that all files are owned by the user on the host system. PRoot provides a --root-id argument that can be used as a workaround for some of these limitations in a similar (albeit more limited) manner to fakeroot.\n\n"
+    },
+    {
+      "title": "Fakechroot",
+      "level": 3,
+      "content": "fakechroot is a library shim which intercepts the chroot call and fakes the results. It can be used in conjunction with fakeroot to simulate a chroot as a regular user.\n\n```\n$ fakechroot fakeroot chroot ~/my-chroot bash\n```\n\n"
+    },
+    {
+      "title": "Unshare",
+      "level": 3,
+      "content": "unshare(1), part of util-linux, can be used to create a new kernel namespace. This works with the usual chroot command. For example:\n\n```\n$ unshare --map-root-user chroot ~/namespace /bin/sh\n```\n\n"
+    },
+    {
+      "title": "chroot detection",
+      "level": 3,
+      "content": "systemd-detect-virt --chroot detect whether invoked in a chroot environment. See systemd-detect-virt(1) for detection of other virtualized environments. For a broader discussion, and usage of traditional tools, see how-do-i-tell-im-running-in-a-chroot.\n\n"
+    },
+    {
+      "title": "arch-chroot: /path/to/new/root is not a mountpoint. This may have undesirable side effects.",
+      "level": 3,
+      "content": "Upon executing arch-chroot /path/to/new/root, a warning is issued:\n\n```\n==> WARNING: /path/to/new/root is not a mountpoint. This may have undesirable side effects.\n```\n\nSee arch-chroot(8) for an explanation and an example of using bind mounting to make the chroot directory a mountpoint.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Basic Chroot\n- Gentoo:Chroot\n\n"
+    }
+  ]
+}

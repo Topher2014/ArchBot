@@ -1,0 +1,51 @@
+{
+  "title": "Hybrid graphics (Español)",
+  "url": "https://wiki.archlinux.org/title/Hybrid_graphics_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2024-03-08** \n\nArtículos relacionados\n\n- NVIDIA Optimus (Español)\n- PRIME (Español)\n- Xorg (Español)\n- External GPU (Español)\n\nEl concepto de gráficos híbridos incluye dos tarjetas gráficas en un mismo ordenador. Los fabricantes de portátiles han desarrollado tecnologías que incluyen dos tarjetas gráficas con capacidades y consumos diferentes en un mismo ordenador. Los gráficos híbridos se han desarrollado para ofrecer un alto rendimiento y ahorrar energía manteniendo inactivo el procesador gráfico dedicado/discreto a menos que se necesite más rendimiento de renderizado 3D que el procesador gráfico integrado.\n\nExiste una gran variedad de tecnologías y cada fabricante ha desarrollado su propia solución a este problema. Esta tecnología está bien soportada en Windows, pero todavía está muy poco desarrollada en las distribuciones Linux. Este artículo intentará explicar un poco cada enfoque y describir algunas soluciones comunitarias a la falta de soporte de los sistemas GNU/Linux por parte de los fabricantes.\n\n"
+    },
+    {
+      "title": "Cambio dinámico",
+      "level": 2,
+      "content": "La mayoría de las nuevas tecnologías de gráficos híbridos incluyen dos tarjetas gráficas: la dedicada y la integrada están conectadas a un framebuffer y no hay multiplexor por hardware. La tarjeta integrada está siempre encendida y la tarjeta dedicada se enciende y apaga cuando es necesario ahorrar energía o mejorar el rendimiento. En la mayoría de los casos, no hay forma de utilizar sólo la tarjeta dedicada y toda el cambio y renderización se controla por software. Al iniciar, el kernel de Linux comienza a utilizar un modo de vídeo y a configurar los controladores gráficos de bajo nivel que utilizarán las aplicaciones. La mayoría de las distribuciones Linux utilizan X.org para crear un entorno gráfico. Por último, se lanzan algunos otros programas, primero un gestor de inicio de sesión y luego un gestor de ventanas, y así sucesivamente. Este sistema jerárquico ha sido diseñado para ser utilizado en la mayoría de los casos con una sola tarjeta gráfica.\n\n"
+    },
+    {
+      "title": "GPU discreta totalmente apagada",
+      "level": 3,
+      "content": "Puede que quieras desactivar el procesador gráfico de alto rendimiento para ahorrar batería.\n\n"
+    },
+    {
+      "title": "Usando BIOS/UEFI",
+      "level": 4,
+      "content": "Algunos fabricantes de portátiles ofrecen un conmutador en la BIOS o UEFI para desactivar por completo la tarjeta dedicada.\n\n"
+    },
+    {
+      "title": "Usando reglas udev",
+      "level": 4,
+      "content": "Asegúrese de que se ha eliminado cualquier configuración del gestor de pantalla para NVIDIA.\n\nPonga en la lista negra los controladores nouveau creando\n\n```\n/etc/modprobe.d/blacklist-nouveau.conf\n```\n\n```\nblacklist nouveau\noptions nouveau modeset=0\n```\n\nA continuación, cree\n\n```\n/etc/udev/rules.d/00-remove-nvidia.rules\n```\n\n```\n# Remove NVIDIA USB xHCI Host Controller devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x0c0330\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA USB Type-C UCSI devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x0c8000\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA Audio devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x040300\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA VGA/3D controller devices\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x03[0-9]*\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n```\n\nReinicia y ejecuta lspci para ver si tu GPU NVIDIA sigue apareciendo en la lista.\n\n"
+    },
+    {
+      "title": "Usando bbswitch",
+      "level": 4,
+      "content": "Con una GPU NVIDIA, esto se puede hacer de forma más segura utilizando bbswitch, que consiste en un paquete del kernel que emite automáticamente las llamadas ACPI correctas para desactivar la GPU discreta cuando no se necesita, o automáticamente en el arranque.\n\n"
+    },
+    {
+      "title": "Usando acpi_call",
+      "level": 4,
+      "content": "En caso contrario, y para GPUs no soportadas por bbswitch, se puede hacer lo mismo manualmente instalando el paquete acpi_call.\n\nUna vez instalado cargue el módulo del kernel:\n\n```\n# modprobe acpi_call\n```\n\nCon el módulo del kernel cargado, ejecuta el script en /usr/share/acpi_call/examples/turn_off_gpu.sh\n\nEl script recorrerá todos los buses de datos conocidos e intentará apagarlos. Obtendrá una salida similar a la siguiente:\n\n```\n# /usr/share/acpi_call/examples/turn_off_gpu.sh\n```\n\n```\nTrying \\_SB.PCI0.P0P1.VGA._OFF: failed\nTrying \\_SB.PCI0.P0P2.VGA._OFF: failed\nTrying \\_SB_.PCI0.OVGA.ATPX: failed\nTrying \\_SB_.PCI0.OVGA.XTPX: failed\nTrying \\_SB.PCI0.P0P3.PEGP._OFF: failed\nTrying \\_SB.PCI0.P0P2.PEGP._OFF: failed\nTrying \\_SB.PCI0.P0P1.PEGP._OFF: failed\nTrying \\_SB.PCI0.MXR0.MXM0._OFF: failed\nTrying \\_SB.PCI0.PEG1.GFX0._OFF: failed\nTrying \\_SB.PCI0.PEG0.GFX0.DOFF: failed\nTrying \\_SB.PCI0.PEG1.GFX0.DOFF: failed\nTrying \\_SB.PCI0.PEG0.PEGP._OFF: works!\nTrying \\_SB.PCI0.XVR0.Z01I.DGOF: failed\nTrying \\_SB.PCI0.PEGR.GFX0._OFF: failed\nTrying \\_SB.PCI0.PEG.VID._OFF: failed\nTrying \\_SB.PCI0.PEG0.VID._OFF: failed\nTrying \\_SB.PCI0.P0P2.DGPU._OFF: failed\nTrying \\_SB.PCI0.P0P4.DGPU.DOFF: failed\nTrying \\_SB.PCI0.IXVE.IGPU.DGOF: failed\nTrying \\_SB.PCI0.RP00.VGA._PS3: failed\nTrying \\_SB.PCI0.RP00.VGA.P3MO: failed\nTrying \\_SB.PCI0.GFX0.DSM._T_0: failed\nTrying \\_SB.PCI0.LPC.EC.PUBS._OFF: failed\nTrying \\_SB.PCI0.P0P2.NVID._OFF: failed\nTrying \\_SB.PCI0.P0P2.VGA.PX02: failed\nTrying \\_SB_.PCI0.PEGP.DGFX._OFF: failed\nTrying \\_SB_.PCI0.VGA.PX02: failed\n```\n\n¿Ves el \"works\"? Esto significa que el script ha encontrado un bus en el que se encuentra tu GPU y ahora ha apagado el chip. Para confirmarlo, el tiempo de batería restante debería haber aumentado.\n\nActualmente, el chip se volverá a encender con el siguiente reinicio. Para evitarlo utilize la carga automática de módulos:\n\n```\n/etc/modules-load.d/acpi_call.conf\n```\n\n```\n#Load 'acpi_call.ko' at boot.\nacpi_call\n```\n\nPara desactivar la GPU en el arranque es posible utilizar systemd-tmpfiles.\n\n```\n/etc/tmpfiles.d/acpi_call.conf\n```\n\n```\nw /proc/acpi/call - - - - \\\\_SB.PCI0.PEG0.PEGP._OFF\n```\n\nLa configuración anterior será cargada al iniciar por systemd. Lo que hace es escribir la señal OFF específica en el fichero /proc/acpi/call. Obviamente, sustituya _SB.PCI0.PEG0.PEGP._OFF por la que funcione en tu sistema (ten en cuenta que debes \"escapar\" la barra invertida).\n\nEn algunos sistemas, apagar la GPU discreta antes de inicializar el servidor X puede colgar el sistema. En estos casos, puede ser mejor desactivar la GPU después de la inicialización del servidor X, lo que es posible con algunos gestores de pantalla. En LightDM, por ejemplo, el parámetro de configuración de seat display-setup-script puede utilizarse para ejecutar un script como root que deshabilite la GPU.\n\n"
+    },
+    {
+      "title": "System76",
+      "level": 3,
+      "content": "Algunos portátiles de System76 (como el Oryx Pro) tienen su propia y exclusiva opción de gráficos híbridos. Para hacer uso de ella, instale system76-powerAUR, habilite system76-power.service, y ejecute system76-power graphics hybrid.\n\n"
+    },
+    {
+      "title": "Apagado completo de la GPU discreta",
+      "level": 4,
+      "content": "Primero asegúrese de que estás usando el modo de gráficos integrados ejecutando system76-power graphics integrated y reiniciando. Una vez en modo integrado, para apagar la tarjeta gráfica discreta ejecute system76-power graphics power off. Este comando no es persistente y deberá ejecutarse después de cada arranque.\n\n"
+    }
+  ]
+}

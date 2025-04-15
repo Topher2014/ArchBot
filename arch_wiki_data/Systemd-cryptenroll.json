@@ -1,0 +1,61 @@
+{
+  "title": "Systemd-cryptenroll",
+  "url": "https://wiki.archlinux.org/title/Systemd-cryptenroll",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- dm-crypt\n- Smartcards\n- Universal 2nd Factor\n- Trusted Platform Module\n- Unified Extensible Firmware Interface/Secure Boot\n\nFrom systemd-cryptenroll(1):\n\nsystemd-cryptenroll allows enrolling smartcards, FIDO2 tokens and Trusted Platform Module security chips into LUKS devices, as well as regular passphrases. These devices are later unlocked by systemd-cryptsetup@.service(8), using the enrolled tokens.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "systemd-cryptenroll is part of and packaged with systemd. However, extra packages are required to use hardware devices as keys:\n\n- To use PKCS#11 tokens, install libp11-kit, you may also need opensc and opensc-p11-kit-moduleAUR.\n- To use FIDO2 tokens, install libfido2.\n- To use TPM2 devices, install tpm2-tss.\n\n"
+    },
+    {
+      "title": "List keyslots",
+      "level": 2,
+      "content": "systemd-cryptenroll can list the keyslots in a LUKS device, similar to cryptsetup luksDump, but in a more user-friendly format.\n\n```\n# systemd-cryptenroll /dev/disk\n```\n\n```\nSLOT TYPE    \n   0 password\n   1 recovery\n   2 tpm2\n```\n\n"
+    },
+    {
+      "title": "Erasing keyslots",
+      "level": 2,
+      "content": "```\n# systemd-cryptenroll /dev/disk --wipe-slot=SLOT\n```\n\nWhere SLOT can be:\n\n- A single keyslot index, as represented in #List keyslots\n- A type of keyslot, which will erase all keyslots of that type. Valid types are empty, password, recovery, pkcs11, fido2, tpm2\n- A combination of all of the above, separated by commas\n- The string all, which erases all keyslots on the device. This option can only be used when enrolling another device or passphrase at the same time.\n\nThe --wipe-slot operation can be used in combination with all enrollment options, which is useful to update existing device enrollments:\n\n```\n# systemd-cryptenroll /dev/disk --wipe-slot=fido2 --fido2-device=auto\n```\n\n"
+    },
+    {
+      "title": "Regular password",
+      "level": 3,
+      "content": "This is equivalent to cryptsetup luksAddKey.\n\n```\n# systemd-cryptenroll /dev/disk --password\n```\n\n"
+    },
+    {
+      "title": "Recovery key",
+      "level": 3,
+      "content": "From systemd-cryptenroll(1):\n\nA recovery key is designed to be used as a fallback if the hardware tokens are unavailable, and can be used in place of regular passphrases whenever they are required.\n\n```\n# systemd-cryptenroll /dev/disk --recovery-key\n```\n\n"
+    },
+    {
+      "title": "Enrolling hardware devices",
+      "level": 2,
+      "content": "The --type-device options must point to a valid device path of their respective type. A list of available devices can be obtained by passing the list argument to this option. Alternatively, if you only have a single device of the desired type connected, the auto option can be used to automatically select it.\n\n"
+    },
+    {
+      "title": "PKCS#11 tokens or smartcards",
+      "level": 3,
+      "content": "The token or smartcard must contain a RSA key pair, which will be used to encrypt the generated key that will be used to unlock the volume.\n\n```\n# systemd-cryptenroll /dev/disk --pkcs11-token-uri=device\n```\n\n"
+    },
+    {
+      "title": "FIDO2 tokens",
+      "level": 3,
+      "content": "Any FIDO2 token that supports the \"hmac-secret\" extension can be used with systemd-cryptenroll. The following example would enroll a FIDO2 token to an encrypted LUKS2 block device, requiring only user presence as authentication.\n\n```\n# systemd-cryptenroll /dev/disk --fido2-device=device --fido2-with-client-pin=no\n```\n\nIn addition, systemd-cryptenroll supports using the token's built-in user verification methods:\n\n- --fido2-with-user-presence defines whether to verify the user presence (i.e. by tapping the token) before unlocking, defaults to yes\n- --fido2-with-user-verification defines whether to require user verification before unlocking, defaults to no\n\n- These options will have no effect if the token does not support these features.\n- See User Presence vs User Verification for more information on the difference between the two.\n\nBy default, the cryptographic algorithm used when generating a FIDO2 credential is es256 which denotes Elliptic Curve Digital Signature Algorithm (ECDSA) over NIST P-256 with SHA-256. If desired and provided by the FIDO2 token, a different cryptographic algorithm can be specified during enrollment.\n\nSuppose that a previous FIDO2 token has already been enrolled and the user wishes to enroll another, the following generates an eddsa credential which denotes EdDSA over Curve25519 with SHA-512 and authenticates the device with a previous enrolled token instead of a password.\n\n```\n# systemd-cryptenroll /dev/disk --fido2-device=device --fido2-credential-algorithm=eddsa --unlock-fido2-device=auto\n```\n\n"
+    },
+    {
+      "title": "Trusted Platform Module",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nsystemd-cryptenroll has native support for enrolling LUKS keys in TPMs. It requires the following:\n\n- tpm2-tss must be installed,\n- A LUKS2 device (currently the default type used by cryptsetup),\n- If you intend to use this method on your root partition, some tweaks need to be made to the initramfs (see dm-crypt/System configuration#Using systemd-cryptsetup-generator for advanced configuration) : mkinitcpio users: enable the systemd and sd-encrypt hooks. Note: The order of the entries in the hooks is important. A nonstandard ordering can make the system unbootable (you will need to rebuild the initrd from within arch-chroot to recover). See dm-crypt/System configuration#Examples for an example of the correct order. dracut users: enable the tpm2-tss module.\n\n- mkinitcpio users: enable the systemd and sd-encrypt hooks. Note: The order of the entries in the hooks is important. A nonstandard ordering can make the system unbootable (you will need to rebuild the initrd from within arch-chroot to recover). See dm-crypt/System configuration#Examples for an example of the correct order.\n- dracut users: enable the tpm2-tss module.\n\nTo begin, run the following command to list your installed TPMs and the driver in use:\n\n```\n$ systemd-cryptenroll --tpm2-device=list\n```\n\nA key may be enrolled in both the TPM and the LUKS volume using only one command. The following example generates a new random key, adds it to the volume so it can be used to unlock it in addition to the existing keys, and binds this new key to PCR 7 (Secure Boot state):\n\n```\n# systemd-cryptenroll --tpm2-device=auto /dev/sdX\n```\n\nwhere /dev/sdX is the full path to the encrypted LUKS volume. Use --unlock-key-file=/path/to/keyfile if the LUKS volume is unlocked by a keyfile instead of a passphrase.\n\nRefer to systemd-cryptenroll(1) and Trusted Platform Module#Accessing PCR registers for common PCR measurements in Linux. Adjust the --tpm2-pcrs=7 default as necessary (parameters are separated by the + symbol).\n\n- Make sure Secure Boot is active and in user mode when binding to PCR 7, otherwise, unauthorized boot devices could unlock the encrypted volume.\n- The state of PCR 7 can change if firmware certificates change, which can risk locking the user out. This can be implicitly done by fwupd[1] or explicitly by rotating Secure Boot keys.\n- Only binding to PCRs measured pre-boot (PCRs 0-7) opens a vulnerability from rogue operating systems. A rogue partition with metadata copied from the real root filesystem (such as partition UUID) can mimic the original partition. Then, initramfs will attempt to mount the rogue partition as the root filesystem (decryption failure will fall back to password entry), leaving pre-boot PCRs unchanged. The rogue root filesystem with files controlled by an attacker is still able to receive the decryption key for the real root partition. See Brave New Trusted Boot World and BitLocker documentation for additional information.\n- A solution for the root volume is to bind to an empty PCR 15 using --tpm2-pcrs=other_pcrs+15:sha256=0000000000000000000000000000000000000000000000000000000000000000. If you set any rd.luks kernel parameters or use /etc/crypttab.initramfs, additionally add the tpm2-measure-pcr=yes option to rd.luks.options= or the fourth field in /etc/crypttab.initramfs; this is not required when relying on GPT partition automounting. After the root volume is unlocked in early userspace, PCR 15 will change and the enrolled key will no longer be retrievable.\n\nThe combination of PCRs to bind to depends on the individual case to balance usability and lock-down. For example, you may require UEFI firmware updates without manual intervention to the Secure Boot state, or different boot devices. As another example, Microsoft's Bitlocker prefers PCR 7+11, but may also use other PCR combinations.\n\n- It is possible to require a PIN to be entered in addition to the TPM state being correct. Simply add the option --tpm2-with-pin=yes to the command above and enter the PIN when prompted.\n- systemd-cryptenroll does not check the TPM measurement before asking for the PIN, therefore consider using a unique PIN since the environment may be untrustworthy.\n\nTo check that the new key was enrolled, dump the LUKS configuration and look for a systemd-tpm2 token entry, as well as an additional entry in the Keyslots section:\n\n```\n# cryptsetup luksDump /dev/sdX\n```\n\nTo test that the key works, run the following command while the LUKS volume is closed:\n\n```\n# systemd-cryptsetup attach mapping_name /dev/sdX none tpm2-device=auto\n```\n\nwhere mapping_name is your chosen name for the volume once opened.\n\nSee dm-crypt/System configuration#crypttab and dm-crypt/System configuration#Trusted Platform Module and FIDO2 keys in order to unlock the volume at boot time.\n\nSee systemd-cryptenroll(1) and crypttab(5) for more information and examples.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Lennart's blog: Unlocking LUKS2 volumes with TPM2, FIDO2, PKCS#11 Security Hardware on systemd 248\n\n"
+    }
+  ]
+}

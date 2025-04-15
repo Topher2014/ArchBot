@@ -1,0 +1,76 @@
+{
+  "title": "Hiawatha",
+  "url": "https://wiki.archlinux.org/title/Hiawatha",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Hiawatha is an open source web server with security, ease of use and lightweight as its three key features. It supports among others CGI, FastCGI, IPv6, URL rewriting and reverse proxy and has security features no other webserver has, like blocking SQL injections, XSS, CSRF and exploit attempts.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the hiawathaAUR package.\n\n"
+    },
+    {
+      "title": "Directory structure",
+      "level": 3,
+      "content": "First, to give an overview of the overall directory structure of Hiawatha, the hierarchy suggested by the default configuration is shown below:\n\n- /etc/hiawatha/ - program configuration files\n- /etc/hiawatha/tls/ - website TLS certificate\n- /srv/http/hiawatha/ - root for the default blank website associated with the IP address\n- /var/lib/hiawatha/ - cache for http compression and uploads\n- /var/log/hiawatha/ - log files for the program and the default website\n- /srv/http/my-domain/public/ - website root\n- /srv/http/my-domain/log/ - website log files\n\n"
+    },
+    {
+      "title": "Basic webserver setup",
+      "level": 3,
+      "content": "The Hiawatha configuration file is /etc/hiawatha/hiawatha.conf. A configuration file example /etc/hiawatha/hiawatha.conf.sample is provided.\n\nIn the sample setup, there is one default website attached to the IP address of the domain, it is a dummy one directing to a blank html page. This is the page IP scanning robots and hackers will face.\n\nThen, the working webservers are defined with VirtualHost sections. Hiawatha can serve more than one webserver and each of these sections describes a different one. For initial testing purpose, you can create one VirtualHost for my-domain and save in its root directory /srv/http/my-domain/public a dummy index.html start file.\n\nNext, enable and start hiawatha.service and point your browser to http://my-domain. At that stage you should be able to load the website start page.\n\nFor further details, see the official how to and the hiawatha(1) manual page.\n\n"
+    },
+    {
+      "title": "CGI",
+      "level": 3,
+      "content": "Common Gateway Interface (CGI) scripts work with Hiawatha out of the box, the CGI module in the VirtualHost section just needs to be enabled as follows:\n\n```\n/etc/hiawatha/hiawatha.conf\n```\n\n```\nVirtualHost {\n    ...\n    ExecuteCGI = yes\n}\n```\n\n"
+    },
+    {
+      "title": "Interpreters for CGI scripts",
+      "level": 4,
+      "content": "To use CGI scripts in your website, you have to specify the common script file extension and the location of the binary that can run them. This is indicated in the main body of the configuration file:\n\n```\nCGIhandler = /usr/bin/php-cgi:php\nCGIhandler = /usr/bin/perl:pl\nCGIhandler = /usr/bin/python:py\n```\n\nFor further details see the official HowTo.\n\n"
+    },
+    {
+      "title": "FastCGI",
+      "level": 3,
+      "content": "Install fcgi.\n\nHiawatha supports two different methods to send information to the FastCGI process: the webserver can communicate over either a Unix domain socket or a TCP connection. The communication type is defined in the FastCGIServer section via the field ConnectTo.\n\n"
+    },
+    {
+      "title": "Enable SSL/TLS",
+      "level": 3,
+      "content": "First, a X.509 SSL/TLS certificate is required to use TLS. If you do not have one, you can use a #Self-signed certificate or use one for free from #Let's Encrypt certificate authority.\n\nThe order of the items in the certificate file must be as follows:\n\n```\nserverkey.pem\n```\n\n```\n-----BEGIN RSA PRIVATE KEY-----\n[webserver private key]\n-----END RSA PRIVATE KEY----- \n\n-----BEGIN CERTIFICATE-----\n[webserver certificate]\n-----END CERTIFICATE-----\n\n-----BEGIN CERTIFICATE-----\n[optional intermediate CA certificate]\n-----END CERTIFICATE-----\n```\n\nFor SSL/TLS support, the following Binding section that configures Hiawatha to use a certificate for HTTPS connections should be added:\n\n```\n/etc/hiawatha/hiawatha.conf\n```\n\n```\nBinding {\n    Port = 443\n    TLScertFile = /etc/hiawatha/tls/serverkey.pem\n}\n```\n\nOnce it is done, restart hiawatha.service.\n\n```\n/etc/hiawatha/hiawatha.conf\n```\n\n```\nVirtualHost {\n    Hostname = www.website.org\n    ...\n    TLScertFile = website.pem\n}\n```\n\n"
+    },
+    {
+      "title": "Reverse proxy",
+      "level": 3,
+      "content": "Hiawatha's man pages suggest using the following:\n\n```\nReverseProxy [!]<pattern> [<skip directories>] http[s]://<hostname>[:<port>][/<path>] [<timeout>] [keep-alive]\n```\n\n<timeout> is the time in seconds Hiawatha tries to connect to the other webservice. Adding keep-alive enables keep-alive connections to the final webserver.\n\nAs an example, a webservice reverse proxy configuration which forwards requests from https://service.domain.net to another local running web service on port 8181 looks like (timout 10s):\n\n```\n/etc/hiawatha/hiawatha.conf\n```\n\n```\nVirtualHost {\n        Hostname = service.domain.net\n        WebsiteRoot = /var/www/domain\n        StartFile = index.html\n        ReverseProxy .* http://127.0.0.1:8181/ 10\n        RequireTLS = yes\n}\n```\n\nIf a UNIX socket is needed instead:\n\n```\nReverseProxy .* /unix/socket 10\n```\n\n"
+    },
+    {
+      "title": "Self-signed certificate",
+      "level": 3,
+      "content": "To get a local self-signed certificate for personal use, testing or web development, the procedure in OpenSSL#Generate a self-signed certificate to create both a private key and a self-signed certificate can be followed.\n\nMake sure you did add the SSL bundle path to your hiawatha.conf as stated in #Enable SSL/TLS.\n\nAs this solution does not use an official certificate authority (CA), a security exception will need to be added the first time the website is visited.\n\n"
+    },
+    {
+      "title": "Configure",
+      "level": 4,
+      "content": "Hiawatha provides a script to obtain a Let’s Encrypt certificate in an automated fashion using the ACME v2 protocol.\n\nA configuration file example letsencrypt.conf is provided in the directory /usr/lib/hiawatha/letsencrypt. Two steps are needed to setup lefh:\n\n1. Copy the sample configuration file to the user's area ~/.letsencrypt/, typically /root/.letsencrypt/ if hiawatha is run as a system service.\n1. Edit the settings, in particular replace the value of ACCOUNT_EMAIL_ADDRESS by the chosen email address, lefh will not run with the initial example email address.\n\n"
+    },
+    {
+      "title": "Obtain a certificate",
+      "level": 4,
+      "content": "The detailed instructions are described in lefh(1) and the tool's configuration is defined in letsencrypt.conf. In short, there are two steps to get a certificate:\n\n1. Register an account with the Let's Encrypt certificate authority (CA). An account key file will be created. # lefh register\n1. Request a website certificate: www.my-domain.org must be the first hostname of a VirtualHost. Any following webserver's hostname will be used as an alternative hostname for the certificate. Note that wildcards can not be used in the hostname: even if Let's Encrypt accept this functionality, it can only be obtained via DNS challenge and this method is not supported by lefh.\n\n```\n# lefh register\n```\n\nThe file www.my-domain.org.pem will be created.\n\n```\n# lefh request www.my-domain.org\n```\n\nIf the above succeeds, you can switch from the testing to the production CA by changing the LE_CA_HOSTNAME setting in the configuration file and go through the two steps above again. Do not rush into production before making sure the test was successful: letsencrypt enforces rate limit for failed attempts and one may get temporarily banned.\n\n"
+    },
+    {
+      "title": "Auto renewal",
+      "level": 4,
+      "content": "The following command can be used to renew the certificate and restart the server upon renewal:\n\n```\n# lefh renew restart\n```\n\nBy default, the certificate will be renewed whenever it has less than 7 days to go and it will be written in the directory indicated in HIAWATHA_CERT_DIR. The number of days before renewal can be controlled via the RENEWAL_EXPIRE_THRESHOLD setting.\n\nA daily schedule of this script is appropriate as no action will be taken anyway before the threshold is reached. This daily automation can be achieved using either cron or systemd/Timers:\n\nIn order to automate the renewal of the certificate, schedule a cronjob for the root user to run the command line above.\n\nA systemd timer can be used for the repetition of the renewal process:\n\n```\n/etc/systemd/system/lefh-renew.service\n```\n\n```\n[Unit]\nDescription=Renew Let's Encrypt certificates for Hiawatha\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nUser=root\nWorkingDirectory=/tmp\nType=oneshot\nExecStart=/usr/bin/lefh renew restart\n```\n\n```\n/etc/systemd/system/lefh-renew.timer\n```\n\n```\n[Unit]\nDescription=Daily renewal of Let's Encrypt's certificates for Hiawatha\n\n[Timer]\nOnCalendar=daily\n# Be kind to the Let's Encrypt servers: add a random delay of 12 hours\nRandomizedDelaySec=12h\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n```\n\nStart and enable lefh-renew.timer.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Hiawatha Support page\n- Hiawatha on GitLab\n\n"
+    }
+  ]
+}

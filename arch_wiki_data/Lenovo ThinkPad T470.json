@@ -1,0 +1,56 @@
+{
+  "title": "Lenovo ThinkPad T470",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T470",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nDevice | PCI/USB ID | Working?\nGPU (Intel 620) | 8086:5916 | Yes\nGPU (Intel 520) | 8086:1916 | Yes\nGPU (NVIDIA) | 10de:134d | Yes\nEthernet (Intel I219-V) | 8086:2068 | Yes\nEthernet (Intel I219-LM) | 8086:156f | Yes\nWireless (Intel 8265/8275) | 8086:24fd | Yes\nWireless (Intel 8260) | 8086:24f3 | Yes\nBluetooth | 8087:0a2b | Yes\nWebcam | 5986:111c | Yes\nIR Camera | 5986:111d | Yes\nTrackPoint |  | Yes\nTouchpad |  | Yes\nTouchscreen | 2386:310e | Yes\nFingerprint Reader | 138a:0097 | Yes\nSD Card Reader | 0bda:0316 | Untested\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "The T470 is one of the models supported officially by Lenovo through the fwupd firmware update program.\n\nIf you are using a UEFI boot scheme, this is probably the easiest and most officially supported way to keep all the firmware programs updated.\n\nIf it does not work for you or if you prefer these methods, it is still possible to do the BIOS update by booting on a specially crafted disk or USB stick. By visiting the downloads section (T470) an ISO can be downloaded and burned to disk which will perform the update from Lenovo. Or extracted and copied on a USB Stick.\n\nAnother option that works if you got a CD-ISO from Lenovo is to follow this guide and convert the ISO to an IMG prior to dd-ing it to a USB stick.\n\n"
+    },
+    {
+      "title": "Kernel and hardware support",
+      "level": 2,
+      "content": "Hardware video acceleration with Kaby Lake seems to work fine via va-api.\n\nAs noted in Intel graphics, the xf86-video-intel driver seems to cause more issue than the builtin modesetting Xorg driver. Works fine without the intel driver (on a Skylake configuration).\n\nsuspend-resume results in the fan holding at 100% without ever spinning down. This is being tracked on the kernel bugtracker. The issue seems to be resolved by BIOS 1.43.\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 3,
+      "content": "As of writing this, the fingerprint reader is still under prototype development, but seems working fine on the T470.\n\nTo get the sensor working, install the python-validityAUR package, and its dependencies: fprintd-clients-gitAUR and open-fprintdAUR (which conflicts with the fprintd package in the official repositories, so uninstall this package first if it is installed). Enable/start the python3-validity.service.\n\nIf this fingerprint reader had been previously set up, either through Windows (dual-booted or through a Windows virtual machine), or from a previous setup of fprintd, you will likely need to reset the Validity fingerprint reader to factory defaults (must first stop python3-validity.service):\n\n```\n# validity-sensors-firmware\n# python /usr/share/python-validity/playground/factory-reset.py\n```\n\nThen, start python3-validity.service again. You can now enroll your fingers with fprintd-enroll as a regular (non-root) user. You may verify your enrolled fingerprints with fprintd-verify.\n\nAfter setting up the fingerprint sensor is complete, one can use it to login or authenticate for sudo or su.\n\nFor login, edit /etc/pam.d/login by adding pam_fprintd.so as sufficient to the top of the auth section:\n\n```\n/etc/pam.d/login\n```\n\n```\nauth sufficient pam_fprintd.so\n```\n\nNote, the pam-auth-update command from the python-validity README.md does not exist in Arch, and the lines it adds to files in the /etc/pam.d/ directory do not work. See the pam.conf(5) manual for details.\n\nDo the same for sudo with /etc/pam.d/sudo or su with /etc/pam.d/su\n\nSometimes the python3-validity service breaks after suspension of the device, a fix for this issue is to make a custom service to restart the service on exiting suspend. the name of this service does not matter but the location does see Systemd. here is a service that does the job:\n\n```\n[Unit]\nAfter=suspend.target\n[Service]\nType=simple\nStandardOutput=syslog\nExecStart=systemctl restart python3-validity\n[Install]\nWantedBy=suspend.target\n```\n\n"
+    },
+    {
+      "title": "Screen backlight",
+      "level": 3,
+      "content": "Without the intel driver (xf86-video-intel), neither xbacklight or xrandr brightness control are working. It is possible that, with the good acpi_* kernel parameters, the backlight related keys do their job.\n\nOther workaround exists, such as described on this post or in the wiki acpid#Enabling backlight control. Using the acpilightAUR package as a xbacklight replacement works well. You can also check this repository as a base to add the ACPI rules to call xbacklight when backlight keys are pressed.\n\n"
+    },
+    {
+      "title": "UEFI boot",
+      "level": 3,
+      "content": "After configuring the BIOS setup to allow UEFI boot (either UEFI only or both), it works flawlessly.\n\nFor booting directly with EFISTUB, the kernel executable (e.g. vmlinuz-linux) may need to be renamed with a .efi extension (e.g. vmlinuz-linux.efi) otherwise it will fail to load.\n\n"
+    },
+    {
+      "title": "BIOS GPT boot",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nI can confirm that issue. Even with a recent bios (1.52), it does not work.\n\nI had to trick my ThinkPad into UEFI (because my bios is locked, found that method by pure luck). It works by installing the syslinux bootloader on your freshly installed arch (be sure to follow the GPT specific instructions at Syslinux#GUID partition table) and the boot that syslinux with the arch install iso ('Boot existing OS' -> press TAB -> replace hd0 0 with hd1 0). Syslinux should show you an option to boot the Arch Linux installation in UEFI mode. Mount you Arch installation, arch-chroot into it and install GRUB (or your favorite bootloader) for UEFI. That did the trick for me.\n\nYou have to create a proper EFI system partition. Have a look at partitioning.\n\n"
+    },
+    {
+      "title": "Special buttons",
+      "level": 3,
+      "content": "See Laptop/Lenovo#Special buttons.\n\n"
+    },
+    {
+      "title": "Function keys for model 20K7 25th Anniversary Edition",
+      "level": 2,
+      "content": "Table content:\nSpecial Key | Visible?1 | Marked?2 | Effect\nFn | Yes | Yes | XF86WakeUp\nFn+F1 | No | No | No Effect\nFn+F2 | Yes | Yes | XF86ScreenSaver\nFn+F3 | Yes | Yes | XF86Battery\nFn+F4 | Yes | Yes | XF86Sleep\nFn+F5 | Yes | Yes | XF86TouchpadToggle\nFn+F6 | Yes | Yes | XF86WebCam\nFn+F7 | Yes | Yes | XF86Display\nFn+F8 | Yes | Yes | XF86WLAN\nFn+F9 | Yes | Yes | XF86Tools\nFn+F10 | Yes | Yes | XF86Bluetooth\nFn+F11 | No | Yes | No Effect\nFn+F12 | Yes | Yes | XF86Favorites\nFn+Home | No | Yes | XF86MonBrightnessUp\nFn+End | No | Yes | XF86MonBrightnessDown\nFn+PgUp | No | Yes | Cycle Keyboard Backlight\nMute Speaker | Yes | Yes | XF86AudioMute\nVolume Down | Yes | Yes | XF86AudioLowerVolume\nVolume Up | Yes | Yes | XF86AudioRaiseVolume\nMute Microphone | Yes | Yes | XF86AudioMicMute\nFn+Left | Yes | Yes | XF86AudioPrev\nFn+Up | Yes | Yes | XF86AudioStop\nFn+Down | Yes | Yes | XF86AudioPlay\nFn+Right | Yes | Yes | XF86AudioNext\nMenu | Yes | Yes | Menu\nBack | Yes | Yes | XF86Back\nForward | Yes | Yes | XF86Forward\n\n1. The key is visible to xev and similar tools\n1. The physical key has a symbol on it, which describes its function\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- ThinkWiki page\n- Product Specifications Reference (PSREF)\n- Hardware maintenance manual\n- User guide\n\n"
+    }
+  ]
+}

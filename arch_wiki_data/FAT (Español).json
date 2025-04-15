@@ -1,0 +1,36 @@
+{
+  "title": "FAT (Español)",
+  "url": "https://wiki.archlinux.org/title/FAT_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-02-03** \n\nArtículos relacionados\n\n- Sistemas de archivos\n\nDe Wikipedia:Tabla de asignación de archivos:\n\n"
+    },
+    {
+      "title": "Creación del sistema de archivos",
+      "level": 2,
+      "content": "Para crear un sistema de archivos FAT, instale dosfstools.\n\nmkfs.fat admite la creación de FAT12, FAT16 y FAT32, consulte Wikipedia:es:Tabla de asignación de archivos#Historia y versiones para obtener una explicación de sus diferencias. mkfs.fat seleccionará el tipo de FAT según el tamaño de la partición, para crear explícitamente un cierto tipo de sistema de archivos FAT use la opción -F. Vea mkfs.fat(8) para más información.\n\nFormatear una partición a FAT32:\n\n```\n# mkfs.fat -F 32 /dev/partición\n```\n\n"
+    },
+    {
+      "title": "Configuración del kernel",
+      "level": 2,
+      "content": "He aquí un ejemplo de la configuración predeterminada de montaje en el kernel:\n\n```\n$ zgrep -e FAT -e DOS /proc/config.gz | sort -r\n```\n\n```\n# DOS/FAT/NT Filesystems\nCONFIG_FAT_FS=m\nCONFIG_MSDOS_PARTITION=y\nCONFIG_FAT_FS=m\nCONFIG_MSDOS_FS=m\nCONFIG_VFAT_FS=m\nCONFIG_FAT_DEFAULT_CODEPAGE=437\nCONFIG_FAT_DEFAULT_IOCHARSET=\"iso8859-1\"\nCONFIG_NCPFS_SMALLDOS=y\n```\n\nUna breve descripción de las opciones:\n\n- Configuración de idioma: CONFIG_FAT_DEFAULT_CODEPAGE, CONFIG_FAT_DEFAULT_IOCHARSET\n- Todos los nombres de archivo a minúscula en una partición FAT, si están habilitados: CONFIG_NCPFS_SMALLDOS\n- Habilita la compatibilidad con los sistemas de archivos FAT: CONFIG_FAT_FS, CONFIG_MSDOS_FS, CONFIG_VFAT_FS\n- Habilita el soporte de un disco duro particionado en formato FAT en un ordenador con arquitectura x86: CONFIG_MSDOS_PARTITION\n\nSi el tipo de partición detectado por el montaje es VFAT, se ejecutará el script /usr/bin/mount.vfat.\n\n```\n/usr/bin/mount.vfat\n```\n\n```\n#!/bin/bash\n#montar VFAT con permisos rw (lectura-escritura) completos para todos los usuarios\n#/usr/bin/mount -i -t vfat -oumask=0000,iocharset=utf8 \"$@\"\n#Lo anterior es lo mismo que\nmount -i -t vfat -oiocharset=utf8,fmask=0000,dmask=0000 \"$@\"\n```\n\n"
+    },
+    {
+      "title": "Escribir en FAT32 como usuario normal",
+      "level": 2,
+      "content": "Para escribir en una partición FAT32, debe realizar algunos cambios en el archivo fstab.\n\n```\n/etc/fstab\n```\n\n```\n/dev/sdxY    /mnt/algún_directorio  vfat   user,rw,umask=000              0  0\n```\n\nLa marca user significa que cualquier usuario (incluso no root) puede montar y desmontar la partición /dev/sdX . rw otorga acceso de lectura-escritura; la opción umask elimina los permisos seleccionados, por ejemplo, umask=111 elimina los permisos de ejecución. El problema es que esta entrada también elimina los permisos de ejecución de los directorios, por lo que debemos corregirlo con dmask=000. Véase también Umask.\n\nSin estas opciones, todos los archivos serán ejecutables. Puede usar la opción showexec en lugar de las opciones umask y dmask, que muestra todos los ejecutables de Windows (com, exe, bat) en colores ejecutables.\n\nPor ejemplo, si su partición FAT32 está en /dev/sda9, y desea montarla en /mnt/fat32, entonces usaría:\n\n```\n/etc/fstab\n```\n\n```\n/dev/sda9    /mnt/fat32        vfat   user,rw,umask=111,dmask=000    0  0\n```\n\nAhora, cualquier usuario puede montarlo con:\n\n```\n$ mount /mnt/fat32\n```\n\nY desmontarlo con:\n\n```\n$ umount /mnt/fat32\n```\n\n"
+    },
+    {
+      "title": "Detectar el tipo de FAT",
+      "level": 2,
+      "content": "Si necesita saber qué tipo de sistema de archivos FAT utiliza una partición, ejecute la orden file:\n\n```\n# file -s /dev/partición\n```\n\n```\n/dev/partición: DOS/MBR boot sector, code offset 0x3c+2, OEM-ID \"mkfs.fat\", sectors/cluster 4, root entries 512, sectors 4096 (volumes <=32 MB), Media descriptor 0xf8, sectors/FAT 3, sectors/track 32, heads 64, serial number 0x5bc09c21, unlabeled, FAT (12 bit)\n```\n\nAlternativamente, puede ejecutar la orden minfo del paquete mtools:\n\n```\n# minfo -i /dev/partición ::\n```\n\n```\ndevice information:\n===================\nfilename=\"/dev/partición\"\nsectors per track: 32\nheads: 64\ncylinders: 2\n\nmedia byte: f8\n\nmformat command line: mformat -t 2 -h 64 -s 32 -i \"/dev/partición\" ::\n\nbootsector information\n======================\nbanner:\"mkfs.fat\"\nsector size: 512 bytes\ncluster size: 4 sectors\nreserved (boot) sectors: 1\nfats: 2\nmax available root directory slots: 512\nsmall size: 4096 sectors\nmedia descriptor byte: 0xf8\nsectors per fat: 3\nsectors per track: 32\nheads: 64\nhidden sectors: 0\nbig size: 0 sectors\nphysical drive id: 0x80\nreserved=0x0\ndos4=0x29\nserial number: 5BC09C21\ndisk label=\"NO NAME    \"\ndisk type=\"FAT12   \"\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Montar sistema de archivos FAT[enlace roto 2022-09-17]\n\n"
+    }
+  ]
+}

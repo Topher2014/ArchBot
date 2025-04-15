@@ -1,0 +1,76 @@
+{
+  "title": "MAC address spoofing (Français)",
+  "url": "https://wiki.archlinux.org/title/MAC_address_spoofing_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Cet article liste plusieurs méthodes pour modifier une adresse MAC (Media Access Control).\n\n"
+    },
+    {
+      "title": "Manuellement",
+      "level": 2,
+      "content": "Il y a deux méthodes pour modifier manuellement une adresse MAC: en installant iproute2 ou macchanger. Tous deux sont décris plus bas.\n\n"
+    },
+    {
+      "title": "iproute2",
+      "level": 3,
+      "content": "Tout d'abord, vous pouvez vérifier votre adresse MAC actuelle avec la commande :\n\n```\n# ip link show interface\n```\n\noù interface est le nom de votre interface réseau.\n\nLa section qui nous intéresse pour le moment est celle qui comporte \"link/ether\" suivi d'un nombre de 6 octets. Elle ressemblera probablement à quelque chose comme ceci :\n\n```\nlink/ether 00:1d:98:5a:d1:3a\n```\n\nLa première étape pour usurper l'adresse MAC est de mettre l'interface réseau hors service. Cela peut être accompli avec la commande :\n\n```\n# ip link set dev interface down\n```\n\nEnsuite, nous usurpons réellement notre MAC. N'importe quelle valeur hexadécimale fera l'affaire, mais certains réseaux peuvent être configurés pour refuser d'attribuer des adresses IP à un client dont le MAC ne correspond à aucun des fournisseurs connus. Par conséquent, à moins que vous ne contrôliez le(s) réseau(x) auquel(s) vous vous connectez, utilisez le préfixe MAC de n'importe quel fournisseur réel (en gros, les trois premiers octets), et utilisez des valeurs aléatoires pour les trois octets suivants. Pour plus d'informations, veuillez lire Wikipedia:fr:Organizationally Unique Identifier.\n\nPour changer le MAC, nous devons exécuter la commande :\n\n```\n# ip link set dev interface address XX:XX:XX:XX:XX:XX\n```\n\nOù n'importe quelle valeur de 6 octets suffira pour XX:XX:XX:XX:XX.\n\nLa dernière étape consiste à remettre en service l'interface réseau. Ceci peut être accompli en exécutant la commande :\n\n```\n# ip link set dev interface up\n```\n\nSi vous voulez vérifier que votre MAC a été usurpé, exécutez simplement ip link show interface à nouveau et vérifiez la valeur de 'link/ether'. Si cela a fonctionné, 'link/ether' devrait être l'adresse que vous avez décidé de changer.\n\n"
+    },
+    {
+      "title": "macchanger",
+      "level": 3,
+      "content": "Une autre méthode utilise macchanger (alias GNU MAC Changer). Celui-ci fournit diverses fonctionnalités, telles que modifier une adresse pour correspondre à un certain fabriquant ou même de la rendre complètement aléatoire.\n\nInstallez le paquet macchanger.\n\nLe changement s'effectue par interface, spécifiez le nom de l'interface réseau en remplacement de interface dans chacune des commandes suivantes.\n\nPour un changement vers une adresse complètement aléatoire:\n\n```\n# macchanger -r interface\n```\n\nPour rendre aléatoire uniquement les octets spécifiques au fabriquant du matériel de l'adresse MAC courante (c'est-à-dire pour que la carte réseau apparaisse toujours comme étant de la même marque en cas de vérification), utilisez la commande:\n\n```\n# macchanger -e interface\n```\n\nPour modifier l'adresse vers une valeur spécifique:\n\n```\n# macchanger --mac=XX:XX:XX:XX:XX:XX interface\n```\n\nOù XX:XX:XX:XX:XX:XX est l'adresse MAC que vous désirez utiliser.\n\nEnfin, pour revenir à la valeur originale, inscrite dans le hardware:\n\n```\n# macchanger -p interface\n```\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "systemd-networkd prend en charge l'usurpation d'adresse MAC via link files. (consultez systemd.link(5) pour plus de détails).\n\nPour définir une adresse MAC statique usurpée :\n\n```\n/etc/systemd/network/00-default.link\n```\n\n```\n[Match]\nMACAddress=original MAC\n\n[Link]\nMACAddress=spoofed MAC\nNamePolicy=kernel database onboard slot path\n```\n\nPour rendre l'adresse MAC aléatoire à chaque démarrage, définissez MACAddressPolicy=random au lieu de MACAddress=spoofed MAC.\n\n"
+    },
+    {
+      "title": "systemd-udevd",
+      "level": 3,
+      "content": "udev vous permet d'effectuer une usurpation d'adresse MAC en créant des règles udev. Utilisez l'attribut address pour faire correspondre le périphérique correct à son adresse MAC originale et la modifier à l'aide de la commande ip :\n\n```\n/etc/udev/rules.d/81-mac-spoof.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"net\", ATTR{address}==\"XX:XX:XX:XX:XX:XX\", RUN+=\"/usr/bin/ip link set dev $name address YY:YY:YY:YY:YY:YY:YY\"\n```\n\noù XX:XX:XX:XX:XX:XX est l'adresse MAC originale et YYY:YY:YY:YY:YY est la nouvelle, utilisez les minuscules pour l'adresse MAC.\n\n"
+    },
+    {
+      "title": "Création d'une unité",
+      "level": 4,
+      "content": "Vous trouverez ci-dessous deux exemples d'unités systemd pour changer une adresse MAC au démarrage, l'une définit un MAC statique en utilisant ip et l'autre utilise macchanger pour attribuer une adresse MAC aléatoire. Le network-pre.target de systemd est utilisé pour s'assurer que le MAC est changé avant le démarrage d'un gestionnaire de réseau comme Netctl ou NetworkManager, du service systemd-networkd ou dhcpcd.\n\nL'unité systemd définit une adresse MAC prédéfinie :\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=MAC Address Change %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ip link set dev %i address 36:aa:88:c8:75:3a\nExecStart=/usr/bin/ip link set dev %i up\n\n[Install]\nWantedBy=multi-user.target\n```\n\nL'unité systemd définit une adresse aléatoire tout en préservant les octets d'origine du vendeur de la carte réseau. Assurez-vous que macchanger est installé :\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=macchanger on %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nExecStart=/usr/bin/macchanger -e %I\nType=oneshot\n\n[Install]\nWantedBy=multi-user.target\n```\n\nUne adresse aléatoire complète peut être définie en utilisant l'option -r, consultez #macchanger.\n\n"
+    },
+    {
+      "title": "Activer le service",
+      "level": 4,
+      "content": "Ajoutez l'interface réseau souhaitée au nom du service (par exemple, eth0) et activez le service (par exemple, macspoof@eth0.service).\n\nRedémarrez, ou arrêtez et démarrez les services prérequis et requis dans l'ordre approprié. Si vous avez le contrôle de votre réseau, vérifiez que le MAC usurpé a été détecté par votre routeur en examinant les tables d'adresses statiques ou DHCP du routeur.\n\n"
+    },
+    {
+      "title": "netctl interfaces",
+      "level": 3,
+      "content": "Vous pouvez utiliser un netctl hook pour exécuter une commande chaque fois qu'un profil netctl est relancé pour une interface réseau spécifique. Remplacez interface en conséquence :\n\n```\n/etc/netctl/interfaces/interface\n```\n\n```\n#!/usr/bin/env sh\n/usr/bin/macchanger -r interface\n```\n\nRendez le script exécutable.\n\nSource : akendo.eu (archive)\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "Consultez NetworkManager (Français)#Configuration de la randomisation des adresses MAC.\n\n"
+    },
+    {
+      "title": "wpa_supplicant",
+      "level": 3,
+      "content": "wpa_supplicant peut utiliser une adresse MAC aléatoire pour chaque connexion ESS (AP) (consultez [1] pour plus de détails).\n\nAjoutez ceci à votre configuration :\n\n```\n/etc/wpa_supplicant/wpa_supplicant-wlan0.conf\n```\n\n```\nmac_addr=1\npreassoc_mac_addr=1\ngas_rand_mac_addr=1\n```\n\n"
+    },
+    {
+      "title": "iwd",
+      "level": 3,
+      "content": "Pour randomiser l'adresse MAC au démarrage de iwd (consultez iwd.config(5) pour plus de détails) :\n\n```\n/etc/iwd/main.conf\n```\n\n```\n[General]\nAddressRandomization=once\nAddressRandomizationRange=nic\n```\n\nLa spécification de AddressRandomizationRange permet de contrôler la partie de l'adresse qui est randomisée. Si la valeur nic est définie, seuls les octets spécifiques à la carte réseau (les trois derniers octets) sont randomisés. L'adresse mac permanente de l'interface réseau est utilisée pour les 3 premiers octets. Si la valeur full est utilisée, les six octets de l'adresse sont randomisés.\n\n"
+    },
+    {
+      "title": "La connexion à un réseau DHCPv4 échoue",
+      "level": 3,
+      "content": "Si vous ne pouvez pas vous connecter à un réseau DHCPv4 et que vous utilisez dhcpcd, qui est la valeur par défaut de NetworkManager, vous devrez peut-être modifier la configuration de dhcpcd pour obtenir un bail.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Wikipedia:MAC spoofing\n- Page GitHub de Macchanger]\n- Article sur DebianAdmin avec plus d'options macchanger.\n\n"
+    }
+  ]
+}

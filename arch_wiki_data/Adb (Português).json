@@ -1,0 +1,56 @@
+{
+  "title": "Adb (Português)",
+  "url": "https://wiki.archlinux.org/title/Adb_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Android Debug Bridge (ADB) é uma ferramenta de linha de comando para instalar, desinstalar e debugar apps, transferir arquivos e acessar a console de um dispositivo.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "ADB faz parte das Ferramentas de Plataforma do pacote SDK e do pacote android-tools.\n\n"
+    },
+    {
+      "title": "Conectando um dispositivo",
+      "level": 3,
+      "content": "- Alguns dispositivos precisam estar com o modo MTP habilitado para o ADB funcionar. Outros necessitam do modo PTP habilitado.\n- Regras udev específicas de vários dispositivos estão incluídas no pacote libmtp então, se você tiver instalado este, os passos adiante podem ser desnecessários.\n- Certifique-se que seu cabo USB é capaz de carregar e transferir dados simultaneamente. Alguns cabos USB distribuídos com dispositivos móveis não possuem o pino de dados no cabo.\n\nPara conectar um dispositivo ou telefone através do ADB no Arch você precisa:\n\n1. Talvez instalar o pacote android-udev caso você deseje conectar no dispositivo através de uma entrada no /dev/.\n1. Conectar seu dispositivo na USB.\n1. Habilitar USB Debugging(ou depuração USB) nas configurações do seu dispositivo: Jelly Bean (4.2) ou versões mais recentes: Acesse Configurações > Sobre o Dispositivo toque 7 vezes em Número de Versão ou Versão de Compilação até que uma popup apareça avisando que você ativou o modo desenvolvedor. Número de compilação pode estar sob um menu chamado Informações do software em versões mais novas do sistema operacional Android. Vá então para Configurações > Opções do desenvolvedor > Depuração USB e habilite esta opção. O dispositivo irá perguntar se você deseja aceitar a conexão vinda do computador. Para permitir permanentemente copie o arquivo ~/.android/adbkey.pub no caminho /data/misc/adb/adb_keys do dispositivo. Versões anteriores: Normalmente é feito em Configurações > Aplicativos > Desenvolvimento > Depuração USB. Reinicie o telefone para garantir que a depuração USB está habilitada.\n\n- Jelly Bean (4.2) ou versões mais recentes: Acesse Configurações > Sobre o Dispositivo toque 7 vezes em Número de Versão ou Versão de Compilação até que uma popup apareça avisando que você ativou o modo desenvolvedor. Número de compilação pode estar sob um menu chamado Informações do software em versões mais novas do sistema operacional Android. Vá então para Configurações > Opções do desenvolvedor > Depuração USB e habilite esta opção. O dispositivo irá perguntar se você deseja aceitar a conexão vinda do computador. Para permitir permanentemente copie o arquivo ~/.android/adbkey.pub no caminho /data/misc/adb/adb_keys do dispositivo.\n- Versões anteriores: Normalmente é feito em Configurações > Aplicativos > Desenvolvimento > Depuração USB. Reinicie o telefone para garantir que a depuração USB está habilitada.\n\nCaso o comando (adb devices reconheça seu dispositivo exibindo \"device\" e não \"unauthorized\" ou se estiver visível pela sua IDE, está feito. Caso contrário, siga as instruções abaixo.\n\n"
+    },
+    {
+      "title": "Descobrindo IDs de dispositivo",
+      "level": 3,
+      "content": "Cada dispositivo Android possui um ID de fabricante e produto (vendor/product). Exemplo do HTC Evo:\n\n```\nvendor id: 0bb4\nproduct id: 0c8d\n```\n\nConecte seu dispositivo e execute:\n\n```\n$ lsusb\n```\n\nUma saída similar a esta deverá ser exibida\n\n```\nBus 002 Device 006: ID 0bb4:0c8d High Tech Computer Corp.\n```\n\n"
+    },
+    {
+      "title": "Adicionando regras no udev",
+      "level": 3,
+      "content": "Utilize as regras do pacote android-udev (ou android-udev-gitAUR), instale as regras manualmente do Android developer, ou utilize o seguinte modelo para suas regras udev substituindo [VENDOR ID] e and [PRODUCT ID] pelos do seu dispositivo. Copie estas regras para /etc/udev/rules.d/51-android.rules:\n\n```\n/etc/udev/rules.d/51-android.rules\n```\n\n```\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"[VENDOR ID]\", MODE=\"0660\", GROUP=\"adbusers\"\nSUBSYSTEM==\"usb\",ATTR{idVendor}==\"[VENDOR ID]\",ATTR{idProduct}==\"[PRODUCT ID]\",SYMLINK+=\"android_adb\"\nSUBSYSTEM==\"usb\",ATTR{idVendor}==\"[VENDOR ID]\",ATTR{idProduct}==\"[PRODUCT ID]\",SYMLINK+=\"android_fastboot\"\n```\n\nPara reiniciar as regras do udev execute:\n\n```\n# udevadm control --reload-rules\n```\n\nCertifique-se que você faz parte do grupo de usuários adbusers para ter acesso a dispositivos adb.\n\n"
+    },
+    {
+      "title": "Detectando o dispositivo",
+      "level": 3,
+      "content": "Após configurar as regras no udev, desconecte e reconecte seu dispositivo.\n\nEntão, execute:\n\n```\n$ adb devices\n```\n\numa saída similar a esta será exibida:\n\n```\nList of devices attached \nHT07VHL00676    device\n```\n\nSe o adb ainda não detectar o dispositivo após conectá-lo novamente, mate e reinicie o servidor adb como root e verifique os dispositivos novamente:\n\n```\n$ sudo adb kill-server\n$ sudo adb start-server\n$ adb devices\n```\n\n"
+    },
+    {
+      "title": "Transferindo arquivos",
+      "level": 3,
+      "content": "Usando o adb você pode transferir arquivos entre o dispositivo e o seu computador. Para transferir arquivos para o dispositivo, execute\n\n```\n$ adb push <o-que-copiar> <onde-por>\n```\n\nE para puxar arquivos do dispositivo, execute\n\n```\n$ adb pull <o-que-puxar> <diretório-local>\n```\n\nVeja também #Compilação de ferramentas ADB.\n\n"
+    },
+    {
+      "title": "Backup e restauração",
+      "level": 3,
+      "content": "Você também pode fazer backup e restaurar seu dispositivo com adb. Além disso, nenhuma raiz é necessária para seguir o processo. Os comandos abaixo levaram ao backup do seu dispositivo em um único arquivo que também pode ser restaurado sucessivamente.\n\nO comando para criar um backup é\n\n```\n$ adb backup -apk -shared -all -f nome-arquivo-backup.ab\n```\n\nA lista de parâmetros do comando é\n\n```\nadb backup [-f <file>] [-apk|-noapk] [-shared|-noshared] [-all] [-system|nosystem] [<pacotes...>]\n```\n\nEm seguida, confirme o processo na tela do seu dispositivo e forneça uma senha, se uma senha de backup foi definida anteriormente.\n\nO comando para restaurar um backup anterior é\n\n```\n$ adb restore mybackup.ab\n```\n\n"
+    },
+    {
+      "title": "Compilação de ferramentas ADB",
+      "level": 2,
+      "content": "- adbfs-rootless-gitAUR - Sistema de arquivos FUSE utilizando o protocolo ADB\n- adb-sync (disponível em adb-sync-gitAUR) - ferramenta para sincronizar arquivos entre o computador e um dispositivo Android através do protocolo ADB.\n- AndroidScreencast (disponível em androidscreencast-binAUR) – visualizar e controlar seu dispositivo Android do computador (protocolo ADB).\n- logcat-colorAUR[link quebrado: package not found] - uma alternativa colorida e altamente configurável ao comando padrão adb logcat.\n- scrcpy (disponível como scrcpy) – exibe e controla seu dispositivo Android\n\n"
+    },
+    {
+      "title": "Solução de problemas",
+      "level": 2,
+      "content": "- Caso você receba uma lista vazia (your device is not there), você não habilitou a Depuração USB no seu dispositivo. Faça isto acessando Configurações > Aplicativos > Desenvolvimento e habilitando a opção Depuração USB. Desde o Android 4.2 (Jelly Bean), o menu de desenvolvimento é oculto; para habilitar vá em Configurações > Sobre o Dispositivo toque 7 vezes em Número de Versão ou Versão de Compilação.\n\n- No Moto E, o dispositivo pode ter vendor/product IDs diferentes nos modos fastboot e sideload; se você receber o erro \"no permission\" verifique tais IDs utilizando o comando lsusb.\n\n"
+    }
+  ]
+}

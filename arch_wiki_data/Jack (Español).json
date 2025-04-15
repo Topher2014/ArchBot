@@ -1,0 +1,116 @@
+{
+  "title": "Jack (Español)",
+  "url": "https://wiki.archlinux.org/title/Jack_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-10-19** \n\nArtículos relacionados\n\n- Sistema de sonido\n- Audio profesional\n\nDe JACK Audio Connection Kit:\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Para que JACK funcione correctamente, su usuario debe ser agregado al grupo realtime para acceder a ulimits más altos definidos en /etc/security/limits.d/99-realtime-privileges.conf (proporcionado por el paquete realtime-privileges package), que es necesario para el procesamiento de audio en tiempo real.\n\nHay dos implementaciones de JACK, consulte esta comparación para ver la diferencia entre las dos. En resumen, Jack 1 y Jack 2 son implementaciones equivalentes del mismo protocolo. Los programas compilados contra Jack 1 funcionarán con Jack 2 sin recompilar (y viceversa).\n\n"
+    },
+    {
+      "title": "JACK2",
+      "level": 3,
+      "content": "JACK2 Es una implementación de C++ con soporte SMP. instálalo con el paquete jack2 Si está en una instalación de 64 bits y necesita ejecutar aplicaciones de 32 bits que requieren JACK, también instale el paquete lib32-jack2 desde el repositorio multilib.\n\n"
+    },
+    {
+      "title": "JACK2 D-Bus",
+      "level": 4,
+      "content": "JACK2 con D-Bus se puede instalar a través de jack2-dbus. Es igual que el paquete jack2 pero no proporciona el servidor \"jackd\" heredado.\n\nEstá controlado por la utilidad jack_control. La utilidad jack_control requiere que también instales el paquete jack2-dbus}.\n\n```\nLos comandos importantes se enumeran a continuación:\njack_control start  -  inicia el servidor jack\njack_control stop  - detiene el servidor jack\njack_control ds alsa  -  Selecciona alsa como el conductor (backend)\njack_control eps realtime True  -  establecer los parámetros del motor, como en tiempo real\njack_control dps period 256  -  establecer el período de parámetros del controlador a 256\n```\n\n"
+    },
+    {
+      "title": "JACK",
+      "level": 3,
+      "content": "utiliza una API de C y admite más de una tarjeta de sonido en Linux (más MIDI). instálalo con el paquete jackAUR. Si está en una instalación de 64 bits y necesita ejecutar aplicaciones de 32 bits que requieren JACK, también instale el paquete lib32-jackAUR[enlace roto: package not found] desde el repositorio multilib.\n\n"
+    },
+    {
+      "title": "GUI",
+      "level": 3,
+      "content": "- Cadence — Conjunto de herramientas útiles para la producción de audio. Realiza comprobaciones del sistema, administra JACK, llama a otras herramientas y realiza ajustes en el sistema.\n\n- Patchage — Bahía de parches modulares para sistemas de audio y MIDI basados en JACK y ALSA.\n\n- PatchMatrix — Parche de JACK en estilo de matriz de flujo.\n\n- QjackCtl — Aplicación Qt simple para controlar el demonio del servidor de sonido JACK.\n\n- Studio Controls — Herramienta para configurar JACK con dispostivos USB y puentes PulseAudio.\n\n"
+    },
+    {
+      "title": "Descripción general",
+      "level": 3,
+      "content": "La configuración correcta para sus necesidades de hardware y aplicaciones depende de varios factores. Su tarjeta de sonido y la CPU afectarán en gran medida la baja latencia que puede alcanzar al usar JACK.\n\nLa línea principal del kernel de Linux ahora admite la programación en tiempo real, por lo que ya no es necesario usar un kernel parcheado. Sin embargo, linux-rt en el AUR es un kernel parcheado que tiene algunos parches adicionales que pueden ayudar a obtener latencias más bajas.\n\n"
+    },
+    {
+      "title": "Una configuración de ejemplo basada en shell",
+      "level": 3,
+      "content": "La edición D-Bus de JACK2 puede hacer que el arranque sea mucho más fácil. Anteriormente, se usaba QjackCtl para iniciarlo, o se usaba un demonio o algún otro método. Pero utilizando jack2-dbus, JACK2 se puede iniciar y configurar fácilmente a través de un script de shell.\n\nCree un script de shell que se pueda ejecutar al iniciar sesión en X:\n\n```\nstart_jack.sh\n```\n\n```\n#!/bin/bash\n\njack_control start\njack_control ds alsa\njack_control dps device hw:HD2\njack_control dps rate 48000\njack_control dps nperiods 2\njack_control dps period 64\nsleep 10\na2jmidid -e &\nsleep 10\nqjackctl &\n```\n\nLo anterior iniciará una instancia de JACK de trabajo que otros programas pueden utilizar. Los detalles de cada línea siguen. Cuando descubra su propia mejor configuración, es útil hacer pruebas y errores utilizando la GUI de QjackCtl con una versión de D-Bus JACK2.\n\n"
+    },
+    {
+      "title": "Detalles de la configuración de ejemplo basada en shell",
+      "level": 4,
+      "content": "```\njack_control start\n```\n\nInicia JACK si aún no está iniciado.\n\n```\njack_control ds alsa\n```\n\nEstablece JACK para usar el conjunto de controladores ALSA.\n\n```\njack_control dps device hw:HD2\n```\n\nConfigura a JACK para usar una tarjeta de sonido compatible con ALSA llamada HD2. Uno puede encontrar los nombres con cat /proc/asound/cards. La mayoría de los tutoriales y configuraciones predeterminadas de ALSA utilizan números de tarjeta, pero esto puede resultar confuso cuando se utilizan dispositivos MIDI externos; Los nombres lo hacen más fácil.\n\n```\njack_control dps rate 48000\n```\n\nEstablece JACK para utilizar muestreo de 48000 khz. Sucede que funciona muy bien con esta tarjeta. Algunas tarjetas sólo se hacen 44100, muchos van a subir mucho más. Cuanto más alto vaya, más baja será su latencia, pero mejor deberán ser su tarjeta y su CPU, y el software también tiene que admitir esto.\n\n```\njack_control dps nperiods 2\n```\n\nEstablece JACK para usar 2 periodos. 2 es adecuado para la placa base, PCI, PCI-X, etc .; 3 para USB.\n\n```\njack_control dps period 64\n```\n\nEstablece JACK para usar 64 periodos por cuadro. Inferior es menos latencia, pero la configuración en este script proporciona 2.67 ms de latencia, que es bastante baja sin poner demasiado énfasis en el hardware en particular para el que se creó este ejemplo. Si un sistema de sonido USB estuviera en uso, podría ser bueno probar 32. Cualquier cosa menor a 3-4 ms debería estar bien para síntesis en tiempo real y/o efectos, 5 ms es lo más pequeño que un ser humano puede detectar. QjackCtl te dirá cómo estás; sin carga, lo que significa que no hay clientes conectados, deseará un máximo de 3-5% de uso de CPU, y si no puede obtener eso sin xruns (los números rojos que significan que el sistema no puede cumplir con las demandas), Tienes que mejorar tu hardware.\n\n```\nsleep 10\n```\n\nEspera a que lo anterior se asiente.\n\n```\na2jmidid -e &\n```\n\nInicie el puente MIDI de ALSA a JACK. Bueno para mezclar en aplicaciones que toman entrada MIDI a través de ALSA pero no JACK.\n\n```\nsleep 10\n```\n\nEspera a que lo anterior se asiente.\n\n```\nqjackctl &\n```\n\nCargar QjackCtl. La configuración de la GUI le dice que se ejecute en la bandeja del sistema. Recogerá la sesión JACK iniciada por D-Bus muy bien, y muy bien también. Mantiene el patchbay, las conexiones entre estas aplicaciones y cualquier otra aplicación habilitada para JACK para iniciarse manualmente. El patchbay se configura mediante la GUI manual, pero las conexiones preconfiguradas en el patchbay son creadas automáticamente por QjackCtl cuando se inician las aplicaciones.\n\n"
+    },
+    {
+      "title": "Una configuración de ejemplo basada en GUI",
+      "level": 3,
+      "content": "Esta configuración de ejemplo utiliza una configuración y administración más centrada en la GUI de JACK\n\n- Instale jack2-dbus.\n- Instale qjackctl, e informe a su sistema de escritorio/ventana GUI para que se ejecute al inicio.\n- Asegúrese de que se diga a QjackCtl que: usar la interfaz D-Bus, ejecutar en el arranque, guardar su configuración en la ubicación predeterminada, iniciar el servidor de audio JACK en el inicio de la aplicación, habilitar el icono de la bandeja del sistema, y inicio minimizado a la bandeja del sistema.\n- Reiniciar.\n- Después de iniciar sesión, verá QjackCtl en la bandeja del sistema. Haz clic izquierdo en él.\n- Ajustar la configuración en la interfaz gráfica de QjackCtl para reducir la latencia. La configuración de Tamaño de marco, Búfer de marco y Velocidad de bits afectan la latencia. Los tamaños de fotogramas más grandes reducen la latencia, los fotogramas inferiores reducen la latencia y los valores de bitrate más altos reducen la latencia, pero todos aumentan la carga en la tarjeta de sonido y en la CPU. Una latencia de aproximadamente ~ 5 ms es deseable para el monitoreo directo de instrumentos o micrófonos, ya que la latencia comienza a ser perceptible en latencias más altas.\n\n- usar la interfaz D-Bus,\n- ejecutar en el arranque,\n- guardar su configuración en la ubicación predeterminada,\n- iniciar el servidor de audio JACK en el inicio de la aplicación,\n- habilitar el icono de la bandeja del sistema, y\n- inicio minimizado a la bandeja del sistema.\n\n"
+    },
+    {
+      "title": "Jugando bien con ALSA",
+      "level": 3,
+      "content": "Para permitir que los programas Alsa se reproduzcan mientras se está ejecutando el conector, debe instalar el complemento del conector para alsa con alsa-plugins.\n\nY habilítelo editando (o creando) /etc/asound.conf (configuración de todo el sistema) para tener estas líneas:\n\n```\n# convertir alsa API sobre jack API\n# usarlo con\n#% aplay foo.wav\n\n# usa esto como predeterminado\npcm.!default {\n    type plug\n    slave { pcm \"jack\" }\n}\n\nctl.mixer0 {\n    type hw\n    card 1\n}\n\n# pcm tipo jack\npcm.jack {\n    type jack\n    playback_ports {\n        0 system:playback_1\n        1 system:playback_2\n    }\n    capture_ports {\n        0 system:capture_1\n        1 system:capture_2\n    }\n}\n```\n\nNo necesitas reiniciar tu computadora ni nada. Solo edita los archivos de configuración alsa, inicia el jack, y listo...\n\nRecuerde iniciarlo como usuario. Si lo inicia con jackd -d alsa como usuario X, no funcionará para el usuario Y. Otro enfoque, utilizando el dispositivo de bucle de retorno ALSA (más complejo pero probablemente más robusto), se describe en este artículo.\n\n"
+    },
+    {
+      "title": "GStreamer",
+      "level": 3,
+      "content": "GStreamer requiere que el paquete gst-plugins-good funcione con JACK, que contiene el complemento jackaudiosink que agrega compatibilidad con la reproducción de JACK.\n\nMás información (desactualizada): https://jackaudio.org/faq/gstreamer_via_jack.html\n\n"
+    },
+    {
+      "title": "PulseAudio",
+      "level": 3,
+      "content": "Si necesita mantener pulseaudio instalado (en caso de que lo requieran otros paquetes, como gnome-settings-daemon), es posible que desee evitar que se genere automáticamente con X y tomando el relevo de JACK.\n\nEdite /etc/pulse/client.conf, elimine el comentario \"autospawn\" y configúrelo en \"no\":\n\n```\n;autospawn = yes\nautospawn = no\n```\n\nSi desea que ambos se reproduzcan, consulte: PulseAudio/Examples#PulseAudio through JACK\n\n"
+    },
+    {
+      "title": "Firewire",
+      "level": 3,
+      "content": "Para evitar que ALSA pierda el tiempo con sus dispositivos firewire, debe incluir en la lista negra todos los módulos de kernel relacionados con firewire. Esto también evita que PulseAudio use Firewire. Crea el siguiente archivo:\n\n```\n/etc/modprobe.d/alsa-no-jack.conf\n```\n\n```\nblacklist snd-fireworks\nblacklist snd-bebob\nblacklist snd-oxfw\nblacklist snd-dice\nblacklist snd-firewire-digi00x\nblacklist snd-firewire-tascam\nblacklist snd-firewire-lib\nblacklist snd-firewire-transceiver\nblacklist snd-fireface\nblacklist snd-firewire-motu\n```\n\nLa lista de módulos es la más reciente disponible en el momento de escribir en Alsa Firewire mejorar repositorio.\n\nAhora puede descargar sus módulos Firewire cargados o reiniciar.\n\n"
+    },
+    {
+      "title": "Red/audio remoto",
+      "level": 3,
+      "content": "JACK se puede configurar para enviar datos de audio a través de una red a una máquina \"master\", que luego emite el audio a un dispositivo físico. Esto puede ser útil para mezclar audio de una serie de computadoras \"esclavas\" sin necesidad de cables adicionales o mezcladores de hardware, y mantener la ruta de audio digital durante el mayor tiempo posible (ya que los mezcladores de hardware con entradas digitales son muy raros).\n\nLa configuración es muy simple, sin embargo requiere una red que admita el tráfico de multidifusión (es decir, el IGMP Snooping debe estar habilitado en los switches de red administrados), y requiere que todas las máquinas estén ejecutando la misma versión principal de JACK (JACK1 o JACK2) ya que los protocolos son no interoperable entre versiones. Para JACK2, se debe cargar el módulo de la aplicación:\n\n```\nmaster$ jack_load netmanager -i -c\n```\n\nLa opción -i -c le indica al administrador de red que asigne automáticamente las conexiones entrantes al dispositivo de audio predeterminado. Sin esto, cada conexión entrante tendría que asignarse manualmente en cada conexión. En su lugar, puede utilizar -i -h para ver todas las opciones disponibles, sin embargo tenga en cuenta que las opciones se imprimen en la salida del servidor jackd, el comando jack_load no mostrará nada.\n\nEn el cliente, JACK debe iniciarse en modo de red:\n\n```\nslave$ jackd -d net\n```\n\nLas dos máquinas se conectarán y en el maestro la nueva fuente de audio será visible:\n\n```\nmaster$ jack_lsp\nsystem:playback_1\nsystem:playback_2\nremotehost:from_slave_1\nremotehost:from_slave_2\n```\n\nSi ha pasado la opción -c a la anterior jack_load, entonces el sistema remoto ahora será capaz de reproducir audio.\n\n"
+    },
+    {
+      "title": "MIDI",
+      "level": 2,
+      "content": "JACK puede manejar una tarjeta de sonido muy bien y un número arbitrario de dispositivos MIDI (conectados, por ejemplo, a través de USB). Si inicia JACK y desea usar un teclado MIDI o un sintetizador o algún otro dispositivo MIDI puro, debe iniciar JACK con una tarjeta de sonido adecuada (una que realmente emita o ingrese sonido PCM). Tan pronto como lo hayas hecho, puedes conectar el dispositivo MIDI. P.ej. con QjackCtl (qjackctl), haga clic en el botón de conexión y encontrará su dispositivo en la lista de JACK-MIDI o ALSA-MIDI, dependiendo del controlador. Para JACK-MIDI, puede configurar el Controlador MIDI en seq o raw en Configuración> Configuración de QjackCtl . Esto debería hacer que su dispositivo MIDI aparezca en la pestaña MIDI . También puede cambiar el nombre del cliente (de un genérico \"midi_capture_1\" a algo más descriptivo), si habilita \"Configuración> Pantalla> Habilitar alias de puerto/cliente\" y luego \"Permitir la edición de alias de cliente/puerto (renombrar) .\n\nPara ALSA-MIDI, asegúrese de activar 'Habilitar el soporte del secuenciador ALSA' en QjackCtl Configuración> Miscelánea . Esto agregará la pestaña ALSA en la ventana Conectar de QjackCtl donde se mostrará su controlador MIDI.\n\nPara conectar ALSA-MIDI a JACK-MIDI, puede considerar el uso de a2jmidid (a2jmidid). El siguiente comando exportará todos los puertos ALSA MIDI disponibles a los puertos JACK MIDI:\n\n```\n$ a2jmidid -e\n```\n\nSerán visibles en QjackCtl en la pestaña MIDI etiquetada como cliente \"a2j\". Puede automatizar el inicio de a2jmidid agregando a QjackCtl Configuración> Opciones> Ejecutar secuencia de comandos después del inicio : /usr/bin/a2jmidid -e &\n\n- Q: ¿Cuál es la diferencia entre JACK-MIDI y ALSA-MIDI?\n- A: El primero ha mejorado la sincronización y muestra la alineación precisa de eventos MIDI. Extiende o incluso puede reemplazar a este último, pero en este punto ambos coexisten.\n\nPara instalar algunos teclados MIDI M-Audio, necesitará el paquete de firmware midisport-firmwareAUR en AUR. Además, el módulo snd_usb_audio debe estar disponible. Para obtener más información sobre dispositivos USB MIDI específicos, consulte https://alsa.opensrc.org/USBMidiDevices.\n\n"
+    },
+    {
+      "title": "Mensaje de \"No se puede bloquear el área de memoria (No se puede asignar memoria)\" en el inicio",
+      "level": 3,
+      "content": "Consulte Realtime process management#Configuring PAM y asegurarse de que el usuario está en el grupo de usuario realtime.\n\n"
+    },
+    {
+      "title": "Jack2-dbus y qjackctl errores",
+      "level": 3,
+      "content": "¿Aún tiene el error \"No se puede asignar memoria\" y/o \"No se puede conectar con el socket del servidor = No hay tal archivo o directorio\" al presionar el botón de inicio de qjackctl (suponiendo que tiene el paquete jack2-dbus instalado)?\n\nBorre ~/.jackdrc, ~/.config/jack/conf.xml, ~/.config/rncbc.org/QjackCtl.conf. Mate jackdbus y reiniciar desde cero :) (Gracias a nedko)\n\nTambien intenta correr\n\n```\n$ fuser /dev/snd/*\n```\n\ny verifique los PID resultantes con\n\n```\n$ ps ax | grep [PID here]\n```\n\nEsperemos que esto muestre los programas conflictivos.\n\n"
+    },
+    {
+      "title": "Error \"ALSA: no se puede establecer el número de canales en 1 para la captura\" en los registros",
+      "level": 3,
+      "content": "Cambie los canales de entrada y salida de ALSA de 1 a 2.\n\n"
+    },
+    {
+      "title": "Crackling y chasquidos en audio",
+      "level": 3,
+      "content": "Su CPU o tarjeta de sonido es demasiado débil para manejar su configuración para JACK. Baje la tasa de bits, baje el tamaño del cuadro y aumente el período del cuadro en pequeños incrementos hasta que cese el crujido.\n\n"
+    },
+    {
+      "title": "VLC - no hay audio después de iniciar JACK",
+      "level": 4,
+      "content": "Ejecuta VLC y cambia las siguientes opciones de menú:\n\n- Herramientas> Preferencias\n- Mostrar ajustes: Todos\n- Audio> Módulos de salida> Módulo de salida de audio: salida de audio JACK\n- Audio> Módulos de salida> JACK: conectarse automáticamente a clientes grabables (habilitar)\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Diferencias entre JACK 1 y JACK2\n- Preguntas frecuentes de JACK\n\n"
+    }
+  ]
+}

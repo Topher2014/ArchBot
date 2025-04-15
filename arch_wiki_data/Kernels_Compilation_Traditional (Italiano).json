@@ -1,0 +1,101 @@
+{
+  "title": "Kernels/Compilation/Traditional (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Kernels/Compilation/Traditional_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article is an introduction to building custom kernels from kernel.org sources. This method of compiling kernels is the traditional method common to all distributions. It can be, depending on your background, more complicated than using the Kernel/Arch build system. Consider the Arch build system tools are developed and maintained to make repeatable compilation tasks efficient and safe.\n\n"
+    },
+    {
+      "title": "Preparation",
+      "level": 2,
+      "content": "It is not necessary (or recommended) to use the root account or root privileges (i.e. via sudo) for kernel preparation.\n\n"
+    },
+    {
+      "title": "Install the core packages",
+      "level": 3,
+      "content": "Install the base-devel meta package, which pulls in necessary packages such as make and gcc. It is also recommended to install the following packages, as listed in the default Arch kernel PKGBUILD: xmlto, kmod, inetutils, bc, libelf, git, cpio, perl, tar, xz.\n\n"
+    },
+    {
+      "title": "Create a kernel compilation directory",
+      "level": 3,
+      "content": "It is recommended to create a separate build directory for your kernel(s). In this example, the directory kernelbuild will be created in the home directory:\n\n```\n$ mkdir ~/kernelbuild\n```\n\n"
+    },
+    {
+      "title": "Download the kernel source",
+      "level": 3,
+      "content": "Download the kernel source from https://www.kernel.org. This should be the tarball (.tar.xz) file for your chosen kernel.\n\nIt can be downloaded by simply right-clicking the tar.xz link in your browser and selecting Save Link As..., or any other number of ways via alternative graphical or command-line tools that utilise HTTP, TFTP, Rsync, or Git.\n\n- It is a good idea to verify the PGP signature of any downloaded kernel tarball. This ensures that it is legitimate and helps to build the Web of Trust. See kernel.org/signature.\n- For certain releases (e.g. -rc releases), the downloaded archive and resulting directories will not strictly follow the A.B.C naming used in the examples of this page, adjust them to your needs.\n\nIn the following command-line commands, wget has been installed and is used inside the ~/kernelbuild directory to obtain kernel A.B.C:\n\n```\n$ cd ~/kernelbuild\n$ wget https://cdn.kernel.org/pub/linux/kernel/vA.x/linux-A.B.C.tar.xz\n```\n\nYou should also verify the correctness of the download before trusting it. First grab the signature, then use that to grab the fingerprint of the signing key, then use the fingerprint to obtain the actual signing key:\n\n```\n$ wget https://cdn.kernel.org/pub/linux/kernel/vA.x/linux-A.B.C.tar.sign\n$ gpg --list-packets linux-A.B.C.tar.sign | grep -i keyid | awk '{print $NF}' | xargs gpg --recv-keys\n```\n\nNote the signature was generated for the tar archive (i.e. extension .tar), not the compressed .tar.xz file that you have downloaded. You need to decompress the latter without untarring it. Verify that you have xz installed, then you can proceed like so:\n\n```\n$ unxz linux-A.B.C.tar.xz\n$ gpg --verify linux-A.B.C.tar.sign linux-A.B.C.tar\n```\n\nDo not proceed if this does not result in output that includes the string \"Good signature\".\n\nIf wget was not used inside the build directory, it will be necessary to move the tarball into it, e.g.\n\n```\n$ mv /path/to/linux-A.B.C.tar.xz ~/kernelbuild/\n```\n\n"
+    },
+    {
+      "title": "Semi-official kernel mirrors",
+      "level": 4,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nSemi-official mirrors of some of the kernel.org Git repositories are provided by their respective maintainers. These tend to be faster to clone from than kernel.org.\n\n- The mainline branch is mirrored on Linus Torvalds' GitHub account at https://github.com/torvalds/linux.git.\n- The stable branches are mirrored on Greg Kroah-Hartman's GitHub account at https://github.com/gregkh/linux. [1]\n\n"
+    },
+    {
+      "title": "Unpack the kernel source",
+      "level": 3,
+      "content": "Within the build directory, unpack the kernel tarball:\n\n```\n$ tar -xvf linux-A.B.C.tar\n```\n\nTo be absolutely sure that no permission errors occur, chown needs to be run to transfer ownership of the folder to the current user.\n\nTo transfer ownership of a folder with every file in it to our user, run the chown command.\n\n```\n$ chown -R $USER:$USER linux-A.B.C\n```\n\nThis will transfer ownership of every file in the folder to you, so you do not encounter any errors related to permissions.\n\nTo finalise the preparation, ensure that the kernel tree is absolutely clean; do not rely on the source tree being clean after unpacking. To do so, first change into the new kernel source directory created, and then run the make mrproper command:\n\n```\n$ cd linux-A.B.C\n$ make mrproper\n```\n\n"
+    },
+    {
+      "title": "Kernel configuration",
+      "level": 2,
+      "content": "This is the most crucial step in customizing the default kernel to reflect your computer's precise specifications. Kernel configuration is set in its .config file, which includes the use of Kernel modules. By setting the options in .config properly, your kernel and computer will function most efficiently.\n\nYou can do a mixture of two things:\n\n- Use the default Arch settings from an official kernel (recommended)\n- Manually configure the kernel options (optional, advanced and not recommended)\n\n"
+    },
+    {
+      "title": "Default Arch configuration",
+      "level": 3,
+      "content": "This method will create a .config file for the custom kernel using the default Arch kernel settings. If a stock Arch kernel is running, you can use the following command inside the custom kernel source directory:\n\n```\n$ zcat /proc/config.gz > .config\n```\n\nOtherwise, the default configuration can be found online in the official Arch Linux kernel package.\n\n- If you are upgrading kernels, some options may have changed or been removed. In this case, when running make under #Compilation, you will be asked to provide answers to every configuration option that has changed between versions. To accept the defaults without being prompted, run make olddefconfig.\n- modprobed-db can be used to strip unneeded modules from the default Arch .config. Once a properly populated database obtained, run make LSMOD=$HOME/.config/modprobed.db localmodconfig to remove all the modules not present in the modprobed.db database.\n\n"
+    },
+    {
+      "title": "Advanced configuration",
+      "level": 3,
+      "content": "There are several tools available to fine-tune the kernel configuration, which provide an alternative to otherwise spending hours manually configuring each and every one of the options available during compilation.\n\nThose tools are:\n\n- make menuconfig: Command-line ncurses interface superseded by nconfig\n- make nconfig: Newer ncurses interface for the command-line\n- make xconfig: User-friendly graphical interface that requires packagekit-qt5 to be installed as a dependency. This is the recommended method - especially for less experienced users - as it is easier to navigate, and information about each option is also displayed.\n- make gconfig: Graphical configuration similar to xconfig but using GTK. This requires gtk2, glib2 and libgladeAUR.\n\nThe chosen method should be run inside the kernel source directory, and all will either create a new .config file, or overwrite an existing one where present. All optional configurations will be automatically enabled, although any newer configuration options (i.e. with an older kernel .config) may not be automatically selected.\n\nOnce the changes have been made save the .config file. It is a good idea to make a backup copy outside the source directory. You may need to do this multiple times before you get all the options right.\n\nIf unsure, only change a few options between compilations. If you cannot boot your newly built kernel, see the list of necessary items here.\n\nRunning lspci -k # from live media lists names of kernel modules in use. Most importantly, you must maintain cgroups support. This is necessary for systemd. For more detailed information, see Gentoo:Kernel/Gentoo Kernel Configuration Guide and Gentoo:Intel#Kernel or Gentoo:Ryzen#Kernel for Intel or AMD Ryzen processors.\n\n"
+    },
+    {
+      "title": "Compilation",
+      "level": 2,
+      "content": "- Look for CONFIG_MK8,CONFIG_MPSC,CONFIG_MCORE2,CONFIG_MATOM,CONFIG_GENERIC_CPU that you have chosen in Processor type and features > Processor Family\n- Change the call cc-options flag from -march=native to the one that you have selected in Processor Family, e.g. cflags-$(CONFIG_MK8) += $(call cc-option,-march=native). This is probably the best way to compile with -march=native as it works.\n\nCompilation time will vary from as little as fifteen minutes to over an hour, depending on your kernel configuration and processor capability. Once the .config file has been set for the custom kernel, within the source directory run the following command to compile:\n\n```\n$ make\n```\n\n"
+    },
+    {
+      "title": "Install the modules",
+      "level": 3,
+      "content": "Once the kernel has been compiled, the modules for it must follow. First build the modules:\n\n```\n$ make modules\n```\n\nThen install the modules. As root or with root privileges, run the following command to do so:\n\n```\n# make modules_install\n```\n\nThis will copy the compiled modules into /lib/modules/A.B.C/. This keeps the modules for individual kernels used separated.\n\n"
+    },
+    {
+      "title": "Copy the kernel to /boot directory",
+      "level": 3,
+      "content": "The kernel compilation process will generate a compressed bzImage (big zImage) of that kernel, if it does not, you may have to run\n\n```\nmake bzImage\n```\n\nThis file must be copied to the /boot directory and renamed in the process. Provided the name is prefixed with vmlinuz-, you may name the kernel as you wish. In the examples below, the installed and compiled A.B.C kernel has been copied over and renamed to vmlinuz-linuxAB:\n\n```\n# cp -v arch/x86/boot/bzImage /boot/vmlinuz-linuxAB\n```\n\n"
+    },
+    {
+      "title": "Make initial RAM disk",
+      "level": 3,
+      "content": "If you do not know what making an initial RAM disk is, see Initramfs on Wikipedia and mkinitcpio.\n\n"
+    },
+    {
+      "title": "Automated preset method",
+      "level": 4,
+      "content": "An existing mkinitcpio preset can be copied and modified so that the custom kernel initramfs images can be generated in the same way as for an official kernel. This is useful where intending to recompile the kernel (e.g. where updated). In the example below, the preset file for the stock Arch kernel will be copied and modified for kernel A.B.C, installed above.\n\nFirst, copy the existing preset file, renaming it to match the name of the custom kernel specified as a suffix to /boot/vmlinuz- when copying the bzImage:\n\n```\n# cp /etc/mkinitcpio.d/linux.preset /etc/mkinitcpio.d/linuxAB.preset\n```\n\nSecond, edit the file and amend for the custom kernel. Note (again) that the ALL_kver= parameter also matches the name of the custom kernel specified when copying the bzImage:\n\n```\n/etc/mkinitcpio.d/linuxAB.preset\n```\n\n```\n...\nALL_kver=\"/boot/vmlinuz-linuxAB\"\n...\ndefault_image=\"/boot/initramfs-linuxAB.img\"\n...\nfallback_image=\"/boot/initramfs-linuxAB-fallback.img\"\n```\n\nFinally, generate the initramfs images for the custom kernel in the same way as for an official kernel:\n\n```\n# mkinitcpio -p linuxAB\n```\n\n"
+    },
+    {
+      "title": "Manual method",
+      "level": 4,
+      "content": "Rather than use a preset file, mkinitcpio can also be used to generate an initramfs file manually. The syntax of the command is:\n\n```\n# mkinitcpio -k kernel_version -g /boot/initramfs-file_name.img\n```\n\n- -k (--kernel kernel_version): Specifies the modules to use when generating the initramfs image. The kernel_version name will be the same as the name the modules directory for it, located in /usr/lib/modules/ (alternatively, a path to the kernel image can be used).\n- -g (--generate file_name): Specifies the name of the initramfs file to generate in the /boot directory. Again, using the naming convention mentioned above is recommended.\n\nFor example, the command for the A.B.C custom kernel installed above would be:\n\n```\n# mkinitcpio -k A.B.C -g /boot/initramfs-linuxAB.img\n```\n\n"
+    },
+    {
+      "title": "Copy System.map",
+      "level": 3,
+      "content": "The System.map file is not required for booting Linux. It is a type of \"phone directory\" list of functions in a particular build of a kernel. The System.map contains a list of kernel symbols (i.e function names, variable names etc) and their corresponding addresses. This \"symbol-name to address mapping\" is used by:\n\n- Some processes like klogd, ksymoops, etc.\n- By OOPS handler when information has to be dumped to the screen during a kernel crash (i.e info like in which function it has crashed).\n\nIf your /boot is on a filesystem which supports symlinks (i.e. not FAT32), copy System.map to /boot, appending your kernel's name to the destination file. Then create a symlink from /boot/System.map to point to /boot/System.map-linuxAB:\n\n```\n# cp System.map /boot/System.map-linuxAB\n# ln -sf /boot/System.map-linuxAB /boot/System.map\n```\n\nAfter completing all steps above, you should have the following 3 files and 1 soft symlink in your /boot directory along with any other previously existing files:\n\n- Kernel: vmlinuz-linuxAB\n- Initramfs: initramfs-linuxAB.img\n- System Map: System.map-linuxAB\n- System Map kernel symlink: System.map (which symlinks to System.map-linuxAB)\n\n"
+    },
+    {
+      "title": "Boot loader configuration",
+      "level": 2,
+      "content": "Add an entry for your new kernel in your boot loader configuration file. See Arch boot process#Feature comparison for possible boot loaders, their wiki articles and other information.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://cateee.net/lkddb/web-lkddb/ includes a comprehensive list of the kernel configuration strings and accompanying text, sorted alphabetically.\n\n"
+    }
+  ]
+}

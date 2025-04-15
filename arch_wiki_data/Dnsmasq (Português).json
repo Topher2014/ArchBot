@@ -1,0 +1,101 @@
+{
+  "title": "Dnsmasq (Português)",
+  "url": "https://wiki.archlinux.org/title/Dnsmasq_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Resolução de nome de domínio\n\ndnsmasq fornece um servidor DNS, um servidor DHCP com suporte a DHCPv6 e PXE, e um servidor TFTP. Ele é projetado para ser leve e ter um tamanho reduzido, adequado para roteadores e firewalls com recursos restritos. O dnsmasq também pode ser configurado para armazenar em cache as consultas DNS para melhorar as velocidades de pesquisa de DNS nos sites visitados anteriormente.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Instale o pacote dnsmasq.\n\n"
+    },
+    {
+      "title": "Iniciar o daemon",
+      "level": 2,
+      "content": "Inicie/habilite dnsmasq.service.\n\nPara ver se o dnsmasq iniciou adequadamente, verifique o journal do sistema:\n\n```\n# journalctl -u dnsmasq.service\n```\n\nA rede também precisará ser reiniciada de forma que o cliente DHCP possa criar um novo /etc/resolv.conf.\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 2,
+      "content": "Para configurar o dnsmasq, edite /etc/dnsmasq.conf. O arquivo contém comentários explicando as opções. Para todas as opções disponíveis, veja dnsmasq(8).\n\n```\nport=0\n```\n\n```\n$ dnsmasq --test\n```\n\n"
+    },
+    {
+      "title": "Servidor DNS",
+      "level": 3,
+      "content": "Para configurar o dnsmasq como um daemon de cache DNS em um único computador, especifique uma diretiva listen-address, adicionando o endereço IP do host local:\n\n```\nlisten-address=::1,127.0.0.1\n```\n\nPara usar este computador para ouvir em seu endereço IP da LAN para outros computadores na rede. Recomenda-se que você use um IP de LAN estático neste caso. Por exemplo:\n\n```\nlisten-address=::1,127.0.0.1,192.168.1.1\n```\n\nDefina o número de nomes de domínios em cache com cache-size=tamanho (o padrão é 150):\n\n```\ncache-size=1000\n```\n\nPara validar o DNSSEC carregue as âncoras de confiança DNSSEC fornecidas pelo pacote dnsmasq e defina a opção dnssec:\n\n```\nconf-file=/usr/share/dnsmasq/trust-anchors.conf\ndnssec\n```\n\nVeja o dnsmasq(8) para mais opções que você pode querer usar.\n\n"
+    },
+    {
+      "title": "Arquivo de endereços DNS e encaminhamento",
+      "level": 4,
+      "content": "Depois de configurar o dnsmasq, você precisa adicionar os endereços de host local como os únicos servidores de nomes em /etc/resolv.conf. Isso faz com que todas as consultas sejam enviadas para o dnsmasq.\n\nComo o dnsmasq é um stub resolver, isto é, não é um servidor DNS recursivo, você deve configurar o encaminhamento para um servidor DNS externo. Isso pode ser feito automaticamente usando openresolv ou especificando manualmente o endereço do servidor DNS na configuração do dnsmasq.\n\nSe seu gerenciador de rede tiver suporte a resolvconf, em vez de alterar diretamente o /etc/resolv.conf, você pode usar o openresolv para gerenciar arquivos de configuração para o dnsmasq. [1]\n\nEdite /etc/resolvconf.conf e adicione os endereços de loopback como servidores de nomes e configure o openresolv para escrever a configuração do dnsmasq:\n\n```\n/etc/resolvconf.conf\n```\n\n```\n# Usa o servidor de nomes local\nname_servers=\"::1 127.0.0.1\"\n\n# Escreve os arquivos resolv e de configuração estendida do dnsmasq\ndnsmasq_conf=/etc/dnsmasq-conf.conf\ndnsmasq_resolv=/etc/dnsmasq-resolv.conf\n```\n\nExecuta resolvconf -u de forma que os arquivos de configuração sejam criados. Se os arquivos não existirem, dnsmasq.service vai falhar ao iniciar.\n\nEdite o arquivo de configuração do dnsmasq para usar a configuração gerada do openresolv:\n\n```\n# Leia a configuração gerada pelo openresolv\nconf-file=/etc/dnsmasq-conf.conf\nresolv-file=/etc/dnsmasq-resolv.conf\n```\n\nPrimeiro, você deve definir endereços de localhost como os únicos servidores de nomes no /etc/resolv.conf:\n\n```\n/etc/resolv.conf\n```\n\n```\nnameserver ::1\nnameserver 127.0.0.1\n```\n\nCertifique-se de proteger /etc/resolv.conf de modificações conforme descrito em Resolução de nome de domínio#Sobrescrita do /etc/resolv.conf.\n\nOs endereços de servidor DNS upstream devem então ser especificados no arquivo de configuração do dnsmasq como server=endereço_servidor. Também adicione no-resolv para que o dnsmasq não leia desnecessariamente /etc/resolv.conf que contém apenas os endereços de host local de si mesmo.\n\n```\n/etc/dnsmasq.conf\n```\n\n```\n[...]\nno-resolv\n\n# Servidores do Google, por exemplo\nserver=8.8.8.8\nserver=8.8.4.4\n```\n\nAgora, as consultas de DNS serão resolvidas com dnsmasq, verificando somente os servidores externos se não puder responder à consulta de seu cache.\n\n"
+    },
+    {
+      "title": "Adicionando um domínio personalizado",
+      "level": 4,
+      "content": "É possível adicionar um domínio personalizado a hosts em sua rede (local):\n\n```\nlocal=/lan/\ndomain=lan\n```\n\nNeste exemplo é possível pingar um host/dispositivo (p.ex., definido em seu arquivo /etc/hosts) como hostname.lan.\n\nDescomente expand-hosts para adicionar um domínio personalizado a entradas de host:\n\n```\nexpand-hosts\n```\n\nSem essa configuração, você terá que adicionar o domínio às entradas de /etc/hosts.\n\n"
+    },
+    {
+      "title": "Testar",
+      "level": 4,
+      "content": "Para fazer um teste de velocidade de pesquisa, escolha um site que não tenha sido visitado desde que o dnsmasq foi iniciado (o drill faz parte do pacote ldns):\n\n```\n$ drill archlinux.org | grep \"Query time\"\n```\n\nExecutar o comando novamente usará o IP do DNS em cache e resultará em um tempo de pesquisa mais rápido se o dnsmasq estiver configurado corretamente:\n\n```\n$ drill archlinux.org | grep \"Query time\"\n```\n\n```\n;; Query time: 18 msec\n```\n\n```\n$ drill archlinux.org | grep \"Query time\"\n```\n\n```\n;; Query time: 2 msec\n```\n\nPara testar se a validação do DNSSEC está funcionando, veja DNSSEC (Português)#Testando.\n\n"
+    },
+    {
+      "title": "Servidor DHCP",
+      "level": 3,
+      "content": "Por padrão, o dnsmasq tem a funcionalidade de DHCP desativada, se você quiser usá-la, deve ativá-la. Aqui estão as configurações importantes:\n\n```\n# Ouve apenas à placa de rede 'LAN-NIC' dos roteadores. Fazer isso abre\n# a porta 53 tcp/udp para o localhost e a porta 67 udp para o mundo:\ninterface=<LAN-NIC>\n\n# O dnsmasq vai abrir a porta 53 tcp/udp e porta 67 udp para o mundo\n# para ajudar com interfaces dinâmicas (atribuição de IPs dinâmicos).\n# O dnsmasq vai descartar requisições do mundo a elas, mas os paranoicos\n# podem querer fechá-las e deixar o kernel lidar com elas:\nbind-interfaces\n\n# Opcionalmente, defina um nome de domínio\ndomain=example.com\n\n# Defina o gateway padrão\ndhcp-option=3,0.0.0.0\n\n# Defina os servidores DNS para anunciar\ndhcp-option=6,0.0.0.0\n\n# Se seu servidor dnsmasq também fizer o roteamento de sua rede,\n# você pode usar a opção 121 para aplicar uma rota estática.\n# x.x.x.x é a LAN de destino, yy pe a notação CIDR (geralmente /24), \n# e z.z.z.z é o host que vai fazer o roteamento.\ndhcp-option=121,x.x.x.x/yy,z.z.z.z\n\n# Intervalo dinâmico de IPs para disponibilizar ao computador e o tempo\n# de concessão. Idealmente, defina o tempo de concessão para 5m apenas\n# no começo para testar se tudo funciona bem antes de você definir\n# registros duradouros:\ndhcp-range=192.168.111.50,192.168.111.100,12h\n\n# Fornece concessões IPv6 de DHCP por meio de Router Advertisements (RAs)\n# para a sub-rede aaaa:bbbb:cccc:dddd::/64\ndhcp-range=aaaa:bbbb:cccc:dddd::,ra-only,infinite\n\n# Se você quiser ter o dnsmasq atribuindo IPs estáticos para alguns\n# clientes, vincule os endereços MAC da placa de rede dos computadores:\ndhcp-host=aa:bb:cc:dd:ee:ff,192.168.111.50\ndhcp-host=aa:bb:cc:ff:dd:ee,192.168.111.51\n```\n\nVeja dnsmasq(8) para mais opções.\n\n"
+    },
+    {
+      "title": "Testar",
+      "level": 4,
+      "content": "A partir de um computador conectado ao dnsmasq, configure-o para usar o DHCP para atribuição automática de endereço IP e, em seguida, tente efetuar login na rede normalmente.\n\nSe você inspecionar o arquivo /var/lib/misc/dnsmasq.leases no servidor, poderá ver a concessão.\n\n"
+    },
+    {
+      "title": "Servidor TFTP",
+      "level": 3,
+      "content": "O dnsmasq tem um servidor TFTP embutido.\n\nPara usá-lo, crie um diretório para a raiz do TFTP (p.ex., /srv/tftp) para colocar arquivos transferíveis nele.\n\nPara aumentar a segurança, é aconselhável usar o modo seguro de TFTP do dnsmasq. No modo seguro, apenas os arquivos pertencentes ao usuário dnsmasq serão atendidos pelo TFTP. Você precisará fazer chown na raiz do TFTP e todos os arquivos nele para o usuário dnsmasq usar este recurso.\n\nHabilite o TFTP:\n\n```\nenable-tftp\ntftp-root=/srv/tftp\ntftp-secure\n```\n\nVeja dnsmasq(8) para mais opções.\n\n"
+    },
+    {
+      "title": "Servidor PXE",
+      "level": 3,
+      "content": "O PXE requer servidores DHCP e TFTP, ambas as funções podem ser fornecidas pelo dnsmasq.\n\n```\ninterface=enp0s0\nbind-dynamic\ndhcp-range=192.168.0.1,proxy\n```\n\n1. defina #Servidor TFTP e #Servidor DHCP\n1. copie e configure um gerenciador de boot compatível com PXE (p.ex., PXELINUX) na raiz do TFTP\n1. habilite PXE no /etc/dnsmasq.conf:\n\n- caminhos de arquivos são relativos à raiz do TFTP\n- se o arquivo tem um sufixo .0, você deve excluir o sufixo nas opções pxe-service\n\nPara apenas enviar um arquivo:\n\n```\ndhcp-boot=lpxelinux.0\n```\n\nPara enviar um arquivo dependente da arquitetura do cliente:\n\n```\npxe-service=x86PC, \"PXELINUX (BIOS)\", \"bios/lpxelinux\"\npxe-service=X86-64_EFI, \"PXELINUX (EFI)\", \"efi64/syslinux.efi\"\n```\n\n```\ndhcp-match=set:efi-x86_64,option:client-arch,7\ndhcp-match=set:efi-x86_64,option:client-arch,9\ndhcp-match=set:efi-x86,option:client-arch,6\ndhcp-match=set:bios,option:client-arch,0\ndhcp-boot=tag:efi-x86_64,\"efi64/syslinux.efi\"\ndhcp-boot=tag:efi-x86,\"efi32/syslinux.efi\"\ndhcp-boot=tag:bios,\"bios/lpxelinux.0\"\n```\n\nVeja dnsmasq(8) para mais opções.\n\nO resto é por conta do gerenciador de boot.\n\n"
+    },
+    {
+      "title": "Evitar que o OpenDNS redirecione as consultas do Google",
+      "level": 3,
+      "content": "Para evitar que o OpenDNS redirecione todas as consultas do Google para seu próprio servidor de pesquisa, adicione ao /etc/dnsmasq.conf:\n\n```\nserver=/www.google.com/<IP do DNS do provedor>\n```\n\n"
+    },
+    {
+      "title": "Substituir endereços",
+      "level": 3,
+      "content": "Em alguns casos, como ao operar um portal cativo, pode ser útil resolver nomes de domínios específicos para um conjunto de endereços codificados. Isso é feito com a configuração address:\n\n```\naddress=/example.com/1.2.3.4\n```\n\nAlém disso, é possível retornar um endereço específico para todos os nomes de domínio que não são respondidos de /etc/hosts ou DHCP usando um curinga especial:\n\n```\naddress=/#/1.2.3.4\n```\n\n"
+    },
+    {
+      "title": "Mais de uma instância",
+      "level": 3,
+      "content": "Se quisermos que dois ou mais servidores dnsmasq funcionem por interface(s).\n\n"
+    },
+    {
+      "title": "Estático",
+      "level": 4,
+      "content": "Para fazer isso de forma estática, servidor por interface, use as opções interface e bind-interface. Esta execução inicial segundo dnsmasq.\n\n"
+    },
+    {
+      "title": "Dinâmico",
+      "level": 4,
+      "content": "Neste caso, podemos excluir por interface e vincular quaisquer outras:\n\n```\nexcept-interface=lo\nbind-dynamic\n```\n\n"
+    },
+    {
+      "title": "Colocar domínios em lista negra",
+      "level": 3,
+      "content": "Para fazer um blacklist em domínios, ou seja, as respostas a consultas para eles com NXDOMAIN, use a opção address sem especificar o endereço IP:\n\n```\naddress=/blacklisted.example/\naddress=/another.blacklisted.example/\n```\n\nPara facilitar o uso, coloque a lista negra em um arquivo separado, como, por exemplo, /etc/dnsmasq.d/blacklist.conf, e carregue-o a partir de /etc/dnsmasq.conf com conf-file=/etc/dnsmasq.d/blacklist.conf ou conf-dir=/etc/dnsmasq.d/,*.conf.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Fazendo cache de servidor de nome usando dnsmasq e algumas outras dicas e truques.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "title": "Partição de sistema EFI",
+  "url": "https://wiki.archlinux.org/title/Parti%C3%A7%C3%A3o_de_sistema_EFI",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Unified Extensible Firmware Interface\n- Gerenciador de boot\n\nA partição de sistema EFI (em inglês EFI system partition, abreviado como ESP) é uma partição independente do sistema operacional que atua como o local de armazenamento para os gerenciadores de boot, aplicativos e drivers EFI a serem lançados pelo firmware UEFI. É obrigatório para a inicialização do UEFI.\n\nA especificação UEFI determina o suporte para os sistemas de arquivos FAT12, FAT16 e FAT32 (consulte a especificação UEFI versão 2.7, seção 13.3.1.1), mas qualquer fornecedor em conformidade pode, opcionalmente, adicionar suporte para sistemas de arquivos adicionais; por exemplo, o firmware em Macs da Apple possui suporte ao sistema de arquivos HFS+.\n\n"
+    },
+    {
+      "title": "Verificar uma partição existente",
+      "level": 2,
+      "content": "Se você estiver instalando o Arch Linux em um computador compatível com UEFI com um sistema operacional instalado, como Windows 10 por exemplo, é muito provável que você já tenha uma partição do sistema EFI.\n\nPara descobrir o esquema de partição de disco e a partição do sistema, use fdisk como root no disco que você quer inicializar:\n\n```\n# fdisk -l /dev/sdx\n```\n\nO comando retorna:\n\n- A tabela de partições do disco: indica Tipo de rótulo do disco: gpt se a tabela de partições for GPT ou Tipo de rótulo do disco: dos se for MBR.\n- A lista de partições no disco: Procure a partição do sistema EFI na lista, é uma partição pequena (normalmente cerca de 100–550 MiB) com um tipo Sistema EFI ou EFI (FAT-12/16/32). Para confirmar isso é a ESP, monte e verifique se ela contém um diretório chamado EFI, se contiver é definitivamente a ESP.\n\n```\n# minfo -i /dev/sdxY :: | grep 'disk type'\n```\n\nSe você encontrou uma partição do sistema EFI existente, simplesmente prossiga para #Montar a partição. Se você não encontrou uma, você precisará criá-la, vá para #Criar a partição.\n\n"
+    },
+    {
+      "title": "Criar a partição",
+      "level": 2,
+      "content": "As duas seções a seguir mostram como criar uma partição do sistema EFI (ESP).\n\nPara fornecer espaço adequado para armazenar gerenciadores de boot e outros arquivos necessários para inicialização e para evitar problemas de interoperabilidade com outros sistemas operacionais[1][2] a partição deve ter pelo menos 260 MiB. Para implementações de UEFI precoces e/ou com bugs, o tamanho de pelo menos 512 MiB pode ser necessário.[3]\n\n"
+    },
+    {
+      "title": "Discos particionados em GPT",
+      "level": 3,
+      "content": "Partição de sistema EFI em uma Tabela de Partição GUID é identificada pelo GUID de tipo de partição C12A7328-F81F-11D2-BA4B-00A0C93EC93B.\n\nEscolha um dos métodos a seguir para criar uma ESP para um disco particionado em GPT:\n\n- fdisk: Crie uma partição com o tipo de partição EFI System.\n- gdisk: Crie uma partição com o tipo de partição EF00.\n- GNU Parted: Crie uma partição com fat32 como o tipo de sistema de arquivos e defina a opção esp nela.\n\nContinue com a seção #Formatar a partição abaixo.\n\n"
+    },
+    {
+      "title": "Discos particionados em MBR",
+      "level": 3,
+      "content": "A partição do sistema EFI em uma tabela de partição Master Boot Record é identificada pelo ID de tipo de partição EF.\n\nEscolha um dos métodos a seguir para criar uma ESP para um disco particionado em MBR:\n\n- fdisk: Crie uma partição primária com o tipo de partição EFI (FAT-12/16/32).\n- GNU Parted: Crie uma partição primária com fat32 como o tipo de sistema de arquivos e defina a opção esp nela.\n\nContinue com a seção #Formatar a partição abaixo.\n\n"
+    },
+    {
+      "title": "Formatar a partição",
+      "level": 2,
+      "content": "A especificação UEFI determina o suporte para os sistemas de arquivos FAT12, FAT16 e FAT32[4]. Para evitar possíveis problemas com outros sistemas operacionais e também porque a especificação UEFI apenas exige suporte a FAT16 e FAT12 em mídia removível[5], recomenda-se usar o FAT32.\n\nApós criar a partição, formate-a como FAT32. Para usar o utilitário mkfs.fat, instale dosfstools.\n\n```\n# mkfs.fat -F32 /dev/sdxY\n```\n\nSe você receber a mensagem WARNING: Not enough clusters for a 32 bit FAT!, reduza o tamanho do cluster com mkfs.fat -s2 -F32 ... ou -s1; caso contrário, a partição pode ser ilegível pelo UEFI. Veja mkfs.fat(8) para os tamanhos de cluster suportados.\n\n"
+    },
+    {
+      "title": "Montar a partição",
+      "level": 2,
+      "content": "Os kernels, os arquivos initramfs e, na maioria dos casos, o microcódigo do processador, precisam ser acessados pelo gerenciador de boot ou pelo próprio UEFI para inicializar com sucesso o sistema. Portanto, se você quiser manter a configuração simples, sua opção de gerenciador de boot limita os pontos de montagem disponíveis para a partição do sistema EFI.\n\n"
+    },
+    {
+      "title": "Pontos de montagem comuns",
+      "level": 3,
+      "content": "Os cenários mais simples para montar uma partição de sistema EFI são:\n\n- montar a ESP em /efi e usar um gerenciador de boot que é capaz de acessar as imagens do kernel e initramfs que são armazenadas em outro local (normalmente /boot). Consulte Processo de inicialização do Arch#Gerenciador de boot para obter mais informações sobre os requisitos e recursos do gerenciador de boot.\n- montar a ESP em /boot. Esse é o método preferível ao inicializar diretamente um kernel de EFISTUB do UEFI.\n\n- /efi é um substituto[6] para o anterior e popular (e possivelmente ainda usado por outras distribuições) ponto de montagem ESP /boot/efi.\n- O diretório /efi não está disponível por padrão, de forma que você precisará primeiro criá-lo com mkdir(1) antes de montar a ESP nele.\n\n"
+    },
+    {
+      "title": "Pontos de montagem alternativos",
+      "level": 3,
+      "content": "Se você não usar um dos métodos simples de #Montar a partição, você precisará copiar seus arquivos de inicialização para a ESP (referida daqui em diante como esp).\n\n```\n# mkdir -p esp/EFI/arch\n# cp -a /boot/vmlinuz-linux esp/EFI/arch/\n# cp -a /boot/initramfs-linux.img esp/EFI/arch/\n# cp -a /boot/initramfs-linux-fallback.img esp/EFI/arch/\n```\n\nAlém disso, você precisará manter os arquivos na ESP em dia com as atualizações posteriores do kernel. Não fazer isso pode resultar em um sistema não inicializável. As seções a seguir discutem vários mecanismos para automatizá-la.\n\nNote: Alternativamente, carregue antecipadamente os módulos de kernel necessários na inicialização, p.ex.:\n\nAlternativamente, carregue antecipadamente os módulos de kernel necessários na inicialização, p.ex.:\n\n```\n/etc/modules-load.d/vfat.conf\n```\n\n```\nvfat\nnls_cp437\nnls_iso8859-1\n```\n\n"
+    },
+    {
+      "title": "Usando montagem com bind",
+      "level": 4,
+      "content": "Em vez de montar o próprio ESP para /boot, você pode montar um diretório do ESP para /boot usando uma montagem \"bind\" (consulte mount(8)). Isto permite que pacman atualize o kernel diretamente enquanto mantém a ESP organizada ao seu gosto.\n\n- Isso requer um kernel e gerenciador de boot compatível com o FAT32. Este não é um problema para uma instalação comum do Arch, mas pode ser problemático para outras distribuições (ou seja, aquelas que exigem links simbólicos em /boot/). Veja a postagem no fórum arquivo.\n- Você deve usar o parâmetro do kernel root= para inicializar usando este método.\n\nAssim como em #Pontos de montagem alternativos, copie todos os arquivos de inicialização para um diretório em sua ESP, mas monte a ESP fora do /boot. Em seguida, associe o diretório:\n\n```\n# mount --bind esp/EFI/arch /boot\n```\n\nApós confirmar o sucesso, edite seu Fstab para tornar as alterações persistentes:\n\n```\n/etc/fstab\n```\n\n```\nesp/EFI/arch /boot none defaults,bind 0 0\n```\n\n"
+    },
+    {
+      "title": "Usando systemd",
+      "level": 4,
+      "content": "O systemd apresenta tarefas acionadas por eventos. Nesse caso específico, a capacidade de detectar uma alteração no caminho é usada para sincronizar os arquivos kernel EFISTUB e initramfs quando eles são atualizados em /boot/. O arquivo assistido por alterações é o initramfs-linux-fallback.img, pois este é o último arquivo construído pelo mkinitcpio, para garantir que todos os arquivos tenham sido construídos antes de iniciar a cópia. Os arquivos de caminho e serviço systemd a serem criados são:\n\n```\n/etc/systemd/system/efistub-update.path\n```\n\n```\n[Unit]\nDescription=Copy EFISTUB Kernel to EFI system partition\n\n[Path]\nPathChanged=/boot/initramfs-linux-fallback.img\n\n[Install]\nWantedBy=multi-user.target\nWantedBy=system-update.target\n```\n\n```\n/etc/systemd/system/efistub-update.service\n```\n\n```\n[Unit]\nDescription=Copy EFISTUB Kernel to EFI system partition\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/cp -af /boot/vmlinuz-linux esp/EFI/arch/\nExecStart=/usr/bin/cp -af /boot/initramfs-linux.img esp/EFI/arch/\nExecStart=/usr/bin/cp -af /boot/initramfs-linux-fallback.img esp/EFI/arch/\n```\n\nEntão, habilite e inicie efistub-update.path.\n\n```\nExecStart=/usr/bin/sbsign --key /caminho/para/bd.key --cert /caminho/para/bd.crt --output esp/EFI/arch/vmlinuz-linux /boot/vmlinuz-linux\n```\n\n"
+    },
+    {
+      "title": "Usando eventos do sistema de arquivos",
+      "level": 4,
+      "content": "Eventos de sistemas de arquivos podem ser usados para executar um script sincronizando o kernel EFISTUB após atualizações do kernel. Um exemplo com incron a seguir:\n\n```\n/usr/local/bin/efistub-update\n```\n\n```\n#!/bin/sh\ncp -af /boot/vmlinuz-linux esp/EFI/arch/\ncp -af /boot/initramfs-linux.img esp/EFI/arch/\ncp -af /boot/initramfs-linux-fallback.img esp/EFI/arch/\n```\n\n```\n/etc/incron.d/efistub-update.conf\n```\n\n```\n/boot/initramfs-linux-fallback.img IN_CLOSE_WRITE /usr/local/bin/efistub-update\n```\n\nPara usar este método, habilite o incrond.service.\n\n"
+    },
+    {
+      "title": "Usando hook do mkinitcpio",
+      "level": 4,
+      "content": "Mkinitcpio pode gerar um hook que não precisa de um daemon de nível de sistema para funcionar. Ele gera um processo de segundo plano que aguarda a geração de vmlinuz, initramfs-linux.img e initramfs-linux-fallback.img antes de copiar os arquivos.\n\nAdicione efistub-update à lista de hooks em /etc/mkinitcpio.conf.\n\n```\n/etc/initcpio/install/efistub-update\n```\n\n```\n#!/usr/bin/env bash\nbuild() {\n\t/usr/local/bin/efistub-copy $$ &\n}\n\nhelp() {\n\tcat <<HELPEOF\nThis hook waits for mkinitcpio to finish and copies the finished ramdisk and kernel to the ESP\nHELPEOF\n}\n```\n\n```\n/usr/local/bin/efistub-copy\n```\n\n```\n#!/usr/bin/env bash\n\nif [[ $1 -gt 0 ]]\nthen\n\twhile [ -e /proc/$1 ]\n\tdo\n\t\tsleep .5\n\tdone\nfi\n\nrsync -a /boot/ esp/\n\necho \"Synced /boot with ESP\"\n```\n\n"
+    },
+    {
+      "title": "Usando predefinição de mkinitcpio",
+      "level": 4,
+      "content": "Como as predefinições em /etc/mkinitcpio.d/ possuem suporte a script shell, o kernel e initramfs podem ser copiados apenas editando as predefinições.\n\nEdite o arquivo /etc/mkinitcpio.d/linux.preset:\n\n```\n/etc/mkinitcpio.d/linux.preset\n```\n\n```\n# mkinitcpio preset file for the 'linux' package\n\n# Directory to copy the kernel, the initramfs...\nESP_DIR=\"''esp''/EFI/arch\"\n\nALL_config=\"/etc/mkinitcpio.conf\"\nALL_kver=\"${ESP_DIR}/vmlinuz-linux\"\ncp -af /boot/vmlinuz-linux \"${ESP_DIR}/\"\n[[ -e /boot/intel-ucode.img ]] && cp -af /boot/intel-ucode.img \"${ESP_DIR}/\"\n[[ -e /boot/amd-ucode.img ]] && cp -af /boot/amd-ucode.img \"${ESP_DIR}/\"\n\nPRESETS=('default' 'fallback')\n\n#default_config=\"/etc/mkinitcpio.conf\"\ndefault_image=\"${ESP_DIR}/initramfs-linux.img\"\ndefault_options=\"-A esp-update-linux\"\n\n#fallback_config=\"/etc/mkinitcpio.conf\"\nfallback_image=\"${ESP_DIR}/initramfs-linux-fallback.img\"\nfallback_options=\"-S autodetect\"\n```\n\nPara testar isso, basta executar:\n\n```\n# rm /boot/initramfs-linux-fallback.img\n# rm /boot/initramfs-linux.img\n# mkinitcpio -p linux\n```\n\n```\n/etc/mkinitcpio.d/0.preset\n```\n\n```\nESP_DIR=\"esp/EFI/arch\"\ncp -af \"/boot/vmlinuz-linux${suffix}\" \"$ESP_DIR/\"\nALL_config=\"/etc/mkinitcpio.conf\"\nALL_kver=\"$ESP_DIR/vmlinuz-linux${suffix}\"\nPRESETS=('default')\ndefault_config=\"/etc/mkinitcpio.conf\"\ndefault_image=\"$ESP_DIR/initramfs-linux${suffix}.img\"\n```\n\n```\n/etc/mkinitcpio.d/linux.preset\n```\n\n```\nsource /etc/mkinitcpio.d/0.preset\n```\n\n```\n/etc/mkinitcpio.d/linux-zen.preset\n```\n\n```\nsuffix='-zen'\nsource /etc/mkinitcpio.d/0.preset\n```\n\n"
+    },
+    {
+      "title": "Usando hook do pacman",
+      "level": 4,
+      "content": "Uma última opção depende dos hooks do pacman que são executados no final da transação.\n\nO primeiro arquivo é um hook que monitora os arquivos relevantes e é executado se eles foram modificados na transação anterior.\n\n```\n/etc/pacman.d/hooks/999-kernel-efi-copy.hook\n```\n\n```\n[Trigger]\nType = Path\nOperation = Install\nOperation = Upgrade\nTarget = usr/lib/modules/*/vmlinuz\nTarget = usr/lib/initcpio/*\nTarget = boot/*-ucode.img\n\n[Action]\nDescription = Copying linux and initramfs to EFI directory...\nWhen = PostTransaction\nExec = /usr/local/bin/kernel-efi-copy.sh\n```\n\nO segundo arquivo é o próprio script. Crie o arquivo e torne-o executável:\n\n```\n/usr/local/bin/kernel-efi-copy.sh\n```\n\n```\n#!/usr/bin/env bash\n#\n# Copy kernel and initramfs images to EFI directory\n#\n\nESP_DIR=\"esp/EFI/arch\"\n\nfor file in /boot/vmlinuz*\ndo\n        cp -af \"$file\" \"$ESP_DIR/$(basename \"$file\").efi\"\n        [[ $? -ne 0 ]] && exit 1\ndone\n\nfor file in /boot/initramfs*\ndo\n        cp -af \"$file\" \"$ESP_DIR/\"\n        [[ $? -ne 0 ]] && exit 1\ndone\n\n[[ -e /boot/intel-ucode.img ]] && cp -af /boot/intel-ucode.img \"$ESP_DIR/\"\n[[ -e /boot/amd-ucode.img ]] && cp -af /boot/amd-ucode.img \"$ESP_DIR/\"\n\nexit 0\n```\n\n"
+    },
+    {
+      "title": "ESP no RAID",
+      "level": 3,
+      "content": "É possível tornar a ESP parte de uma matriz RAID1, mas isso traz o risco de corrupção de dados, e outras considerações precisam ser feitas ao criar a ESP. Veja [7] e [8] para detalhes e veja Inicialização com UEFI e RAID1 (em inglês) para um guia mais aprofundado com uma solução.\n\nA parte principal é usar --metadata 1.0 para manter os metadados RAID no final da partição, caso contrário o firmware não poderá acessá-los:\n\n```\n# mdadm --create --verbose --level=1 --metadata=1.0 --raid-devices=2 /dev/md/ESP /dev/sdaX /dev/sdbY\n```\n\n"
+    },
+    {
+      "title": "Firmware não vê o diretório EFI",
+      "level": 3,
+      "content": "Se você der ao sistema de arquivos um nome de volume (com a opção -n), certifique-se de nomeá-lo como algo diferente de \"EFI\". Isso pode desencadear um bug em alguns firmwares (devido ao nome do volume que corresponde ao nome do diretório EFI) que fará com que o firmware atue como o diretório EFI não existe.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- A partição de sistema EFI e o comportamento de inicialização padrão\n\n"
+    }
+  ]
+}

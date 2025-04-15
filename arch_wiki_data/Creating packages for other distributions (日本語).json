@@ -1,0 +1,91 @@
+{
+  "title": "Creating packages for other distributions (日本語)",
+  "url": "https://wiki.archlinux.org/title/Creating_packages_for_other_distributions_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- パッケージの作成\n\nArch は最高です。しかしながら、時には他のディストリビューションのパッケージを作成したいと思うときもあるでしょう。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 一般\n- 2 Debian 2.1 Debian に関するヒントとテクニック‎ 2.1.1 依存関係の処理を無視する 2.1.2 chroot をセットアップ 2.2 参照\n- 3 Fedora 3.1 参照\n- 4 openSUSE 4.1 OBS と OSC で Arch パッケージを作成 4.1.1 パッケージの作成 4.1.2 パッケージの管理 4.1.3 openSUSE に関するヒントとテクニック 4.1.4 ca-certificates-utils パッケージの問題 4.1.5 openSUSE についての参照\n- 5 マルチディストリビューション 5.1 Pacur\n- 6 参照\n\n- 2.1 Debian に関するヒントとテクニック‎ 2.1.1 依存関係の処理を無視する 2.1.2 chroot をセットアップ\n- 2.2 参照\n\n- 2.1.1 依存関係の処理を無視する\n- 2.1.2 chroot をセットアップ\n\n- 3.1 参照\n\n- 4.1 OBS と OSC で Arch パッケージを作成 4.1.1 パッケージの作成 4.1.2 パッケージの管理 4.1.3 openSUSE に関するヒントとテクニック 4.1.4 ca-certificates-utils パッケージの問題 4.1.5 openSUSE についての参照\n\n- 4.1.1 パッケージの作成\n- 4.1.2 パッケージの管理\n- 4.1.3 openSUSE に関するヒントとテクニック\n- 4.1.4 ca-certificates-utils パッケージの問題\n- 4.1.5 openSUSE についての参照\n\n- 5.1 Pacur\n\n"
+    },
+    {
+      "title": "一般",
+      "level": 2,
+      "content": "- 仮想化はわかりやすい方法ですが、追加したシステムの管理が必要になります。\n- ディストリビューションごとのパッケージングツールを使う。例: dh-makeAUR, dpkg (Debian), rpm-toolsAUR (Fedora)。あまり複雑ではない作業には dpkg-deb などのショートカットが適しているかもしれません。\n- chroot して Arch の中に (別に) ベースシステムを作成する。例: debootstrap (Debian), dnfAUR (Fedora)。最小限の、クリーンな環境を作れるという利点があります。\n- パッケージングツールによる自動的な方法で chroot を使う。例: pbuilder-ubuntuAUR (Debian), mockAUR (Fedora)。\n- (互換性を失う可能性がある) 依存関係を処理する別の方法として 静的リンク。ほとんどのディストリビューションはこの方法を認めてないので注意してください。\n- 使用するディストリビューションに関係なく一般的な原則は適用されます。例えば、パッケージを root でビルドしてはいけません。\n\n"
+    },
+    {
+      "title": "Debian",
+      "level": 2,
+      "content": "Debian パッケージングチュートリアルに基本的なことが説明されています。チュートリアルでは以下のツールの利用について記述しています:\n\n- cowdancer — pbuilder の copy-on-write ラッパー\n\n- debootstrap — dpkg や apt が利用できない環境でも、スクラッチから Debian ベースシステムを作成するためのツール。\n\n- devscripts — Debian パッケージメンテナの生活を楽にするスクリプト\n\n- dh-autoreconf — autoreconf を実行してビルド後に片付けを行う Debhelper アドオン\n\n- dh-make — ソースアーカイブを Debian パッケージソースに変換するツール\n\n- dpkg — Debian パッケージマネージャ\n\n- dput — Debian パッケージのアップロードツール\n\n- equivs — Debian パッケージの依存関係を回避するツール\n\n- git-buildpackage — Git によるパッケージビルドシステムを統合する Debian のツール\n\n- pbuilder-ubuntu — Debian パッケージを作成するための Chroot 環境\n\n- quilt — パッチによる変更を記録して一連のパッチを管理する\n\n"
+    },
+    {
+      "title": "依存関係の処理を無視する",
+      "level": 4,
+      "content": "dpkg は pacman によってインストールされた依存関係を認識しません。そのため dpkg-buildpackage は以下のようなエラーで失敗することになります:\n\n```\ndpkg-checkbuilddeps: Unmet build dependencies: build-essential:native debhelper (>= 8.0.0)\ndpkg-buildpackage: warning: build dependencies/conflicts unsatisfied; aborting\n```\n\nこれを無視するには、-d フラグを使って下さい:\n\n```\n$ dpkg-buildpackage -d -us -uc\n```\n\nまた、以下の行を debian/rules に追加して dh_shlibdeps を上書きする必要もあります:\n\n```\noverride_dh_shlibdeps:\n   dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info\n```\n\n"
+    },
+    {
+      "title": "chroot をセットアップ",
+      "level": 4,
+      "content": "pbuilder-ubuntu のイントロダクションとして Pbuilder How-To を見て下さい。copy-on-write による著しいパフォーマンスの向上がある cowdancer を合わせて使うことが推奨されています。\n\n- AUR の debian-archive-keyring, ubuntu-keyring, gnupg1AUR が必要です。\n- eatmydata は libeatmydata や lib32-eatmydataAUR で入手できます。LD_PRELOAD エラーが起こらないように、chroot の中と外両方でインストールする必要があります。Arch と Debian ではパスが異なっているため、以下のシンボリックリンクを作成してください:\n\n```\n# ln -s /usr/lib/libeatmydata.so.1.1.1 /usr/lib/libeatmydata/libeatmydata.so\n# ln -s /usr/lib/libeatmydata.so.1.1.1 /usr/lib/libeatmydata/libeatmydata.so.1\n```\n\n- サンプル pbuilderrc\n- pbuilder で処理するソースパッケージを作成するには:\n\n```\n$ dpkg-buildpackage -d -us -uc -S\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 3,
+      "content": "- Debian ポリシー\n- 新メンテナーガイド\n- Quilt in Debian packaging\n\n"
+    },
+    {
+      "title": "Fedora",
+      "level": 2,
+      "content": "How to create an RPM package\n\n- rpm-tools — RPM.org のフォーク、主要な RPM ディストロで使用されています\n\n- mock — ソース RPM を取得して chroot で RPM をビルド\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 3,
+      "content": "- Copr\n\n"
+    },
+    {
+      "title": "openSUSE",
+      "level": 2,
+      "content": "Open Build Service は自動的な、一貫した、再現性のある方法でソースからパッケージを作成・配布するための総合システムです。.deb, .rpm そして Arch パッケージをサポートしています。\n\n"
+    },
+    {
+      "title": "パッケージの作成",
+      "level": 4,
+      "content": "1. [1] でアカウントを作成。\n1. oscAUR パッケージをインストール。上流のドキュメントは こちら。\n1. サンプルプロジェクト home:foo を作成。\n1. サンプルサブプロジェクト home:foo:bar を作成 (任意、ただし推奨)。\n1. osc meta pkg -e home:foo:bar ham で新しいサンプルパッケージ ham を作成。作成された XML ファイルを保存して終了。\n1. 新しい作業ディレクトリに切り替えてから作成したプロジェクトをチェックアウト: osc co home:foo:bar/ham。\n1. 次のディレクトリに cd: cd home:foo:bar/ham。\n\n"
+    },
+    {
+      "title": "パッケージの管理",
+      "level": 4,
+      "content": "プロジェクトを管理する方法を決めて下さい。2つの方法が存在します:\n\n1. PKGBUILD とヘルパーファイル (*.install スクリプトなど) をバージョン管理システム (git や hg など) で管理して OBS にそれを追跡させる。\n1. OBS だけでパッケージを全て管理する。\n\n前者の方法のほうが柔軟性があり動的です。設定するには:\n\n- プロジェクトディレクトリから、以下の内容の _service ファイルを作成してください:\n\n```\n<services>\n  <service name=\"tar_scm\">\n    <param name=\"scm\">git</param>\n    <param name=\"url\">git://<your_repo_here></param>\n    <param name=\"versionformat\">git%cd~%h</param>\n    <param name=\"versionprefix\"><your_version_here></param>\n    <param name=\"filename\"><name_of_your_package></param>\n  </service>\n  <service name=\"recompress\">\n    <param name=\"file\">*.tar</param>\n    <param name=\"compression\">xz</param>\n  </service>\n  <service name=\"set_version\"/>\n</services>\n```\n\ngimp-gitAUR の例:\n\n```\n<services>\n  <service name=\"tar_scm\">\n    <param name=\"scm\">git</param>\n    <param name=\"url\">git://git.gnome.org/gimp.git</param>\n    <param name=\"versionformat\">git%cd~%h</param>\n    <param name=\"versionprefix\">2.9.1</param>\n    <param name=\"filename\">gimp-git</param>\n  </service>\n  <service name=\"recompress\">\n    <param name=\"file\">*.tar</param>\n    <param name=\"compression\">xz</param>\n  </service>\n  <service name=\"set_version\"/>\n</services>\n```\n\n- OBS に追跡させます: osc add _service\n- リポジトリに含めたい他のファイルが存在する場合、同じように追加してください: プロジェクトディレクトリにファイルを追加して、OBS にファイルを追跡させてください (OBS は基幹の SCM として subversion を使っているため、手順は簡単です)。\n- ファイルをリポジトリにチェックイン (アップロード): osc ci -m \"commit message (e.g. bumped package xxx to version yyy\"。\n\nしばらくすると、OBS はパッケージのビルドを開始します。\n\n"
+    },
+    {
+      "title": "openSUSE に関するヒントとテクニック",
+      "level": 4,
+      "content": "- パッケージのビルドの進捗を確認するには、作業ディレクトリに cd してから次を実行: osc results。\n- Arch:Core と Arch:Extra および Arch:Community リポジトリが存在します。[community] can be appended as a \"repository path\" after adding the main Arch repository to the project.\n\n"
+    },
+    {
+      "title": "ca-certificates-utils パッケージの問題",
+      "level": 4,
+      "content": "OBS のビルドが ca-certificates-utils パッケージのせいで失敗する場合、プロジェクトの設定に以下の行を追加してください (プロジェクトのページから、Advanced -> Project Config を開く):\n\n```\nPrefer: ca-certificates-utils ca-certificates\n```\n\n"
+    },
+    {
+      "title": "openSUSE についての参照",
+      "level": 4,
+      "content": "- サンプルリポジトリ: arch-cpu-x-git\n- openSUSE のパッケージングガイドライン\n- Portal:Packaging from openSUSE wiki\n\n"
+    },
+    {
+      "title": "Pacur",
+      "level": 3,
+      "content": "Pacur のようなツールは、一貫したパッケージ仕様形式で複数の Linux ディストリビューション用のパッケージをビルドすることができます。 パッケージ形式は PKGBUILD に非常に似ているので、既存の PKGBUILD を再利用し、debian や rpm パッケージを容易にビルドできるように、いくつかのディストリビューション固有の変数を追加するのが簡単です。 素早く PKGBUILD を適応することで、Amazon Linux、Centos、Debian、Oracle Linux、Fedora、およびUbuntu用のパッケージをビルドすることができます。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- BBS - PKGBUILD equivalents for other distros\n- BBS - Original discussion\n\n"
+    }
+  ]
+}

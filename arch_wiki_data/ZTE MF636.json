@@ -1,0 +1,41 @@
+{
+  "title": "ZTE MF636",
+  "url": "https://wiki.archlinux.org/title/ZTE_MF636",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- USB 3G Modem\n\nThe ZTE MF626 / MF636 is a USB modem which combines 3G+/3G with EDGE/GPRS in one compact device. It has an integrated micro-SD card reader. It can send data at speeds up to 4.5 Mbps on 3G+ networks and receive data at speeds of up to 7.2 Mbps. It is also known as the Rogers (Canadian cellular carrier) red stick USB dongle.\n\n"
+    },
+    {
+      "title": "Disable CD mode on the device",
+      "level": 3,
+      "content": "Using a Windows machine, plug in the USB device and go through the short install wizard. Once done, close the Rogers app that starts up, then head into the Device Manager (Control Panel > System > Hardware > Device Manager). Under the Ports section, find the COM port that's connected to the USB modem (ignore the Diagnostics mode). Connect to that COM port through Hyperterminal, found in the Accessories area of the Start Menu. Connection parameters are:\n\n```\nBits per Second: 115200\nData bits: 8\nParity: None\nStop bits: 1\nFlow Control: None\n```\n\nOnce connected, type the following commands:\n\n```\nAT+ZOPRT=5\nAT+ZCDRUN=8\n```\n\nThis tells the modem not to use CD mode when it is first plugged into a computer. Now exit Hyperterminal and remove the USB modem. You are done with Windows.\n\n"
+    },
+    {
+      "title": "Disable CD mode on the device with wvdial",
+      "level": 3,
+      "content": "First, remove the module usb-storage then load the usbserial module:\n\n```\n# rmmod usb_storage\n# modprobe usbserial\n```\n\nEdit /etc/wvdial.conf:\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB0\nModem Type = Analog Modem\nISDN = 0\nInit1 = AT+ZOPRT=5\nInit2 = AT+ZCDRUN=8\n```\n\nExecute wvdial, it should use those commands and fail to connect. Once it exits, unplug the stick and plug it back in and it should be recognized as a modem.\n\n"
+    },
+    {
+      "title": "Setup udev rules",
+      "level": 3,
+      "content": "Create the following udev rule:\n\n```\n/etc/udev/rules.d/90-zte.conf.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"19d2\", ATTRS{idProduct}==\"0031\", RUN+=\"/sbin/modprobe usbserial vendor=0x19d2 product=0x0031\", MODE=\"660\", GROUP=\"network\"\n```\n\n"
+    },
+    {
+      "title": "Create a wvdial configuration",
+      "level": 3,
+      "content": "Wvdial is an easy-to-use frontend to PPPd. Make sure you replace the /dev/ttyUSB0 line with the node that your USB modem is connected to, you can see that with dmesg. Save as /etc/wvdial.conf.\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB0\nISDN = off\nModem Type = USB Modem\nBaud = 7200000\nInit = ATZ\nInit2 =\nInit3 =\nInit4 =\nInit5 =\nInit6 =\nInit7 =\nInit8 =\nInit9 =\nPhone = *99#\nPhone1 =\nPhone2 =\nPhone3 =\nPhone4 =\nDial Prefix =\nDial Attempts = 1\nDial Command = ATM1L3DT\nAsk Password = off\nPassword = off\nUsername = na\nAuto Reconnect = off\nAbort on Busy = off\nCarrier Check = off\nCheck Def Route = off\nAbort on No Dialtone = off\nStupid Mode = on\nIdle Seconds = 0\nAuto DNS = on\n```\n\nIf the above does not work, try the following (extracted from sakis3g):\n\nThis is for Etisalat Misr, but should work for all the other networks that use the same device.\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB2\nModem Type = Analog Modem\nISDN = 0\nBaud = 7200000\nDial Attempts = 3\nUsername = apn\nPassword = apn\nPhone = *99#\nAuto Reconnect = off\nStupid Mode = 1\nInit1 = ATZ\nInit6 = AT+CGEQMIN=1,4,64,640,64,640\nInit7 = AT+CGEQREQ=1,4,64,640,64,640\n```\n\n"
+    },
+    {
+      "title": "Connect to the internet",
+      "level": 2,
+      "content": "Now just run wvdial to connect\n\n```\n# wvdial\n```\n\nIf you see output reporting your PPP local and endpoint IP addresses, then it worked.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Ubuntu forum post 1 - further details\n- Ubuntu forum post 2 - further details\n\n"
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "title": "MariaDB (Français)",
+  "url": "https://wiki.archlinux.org/title/MariaDB_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- phpMyAdmin (Français)\n- Adminer\n- JDBC and MySQL\n- Open Database Connectivity\n\nMariaDB est un serveur de base de données fiable, performant et complet qui se veut être un remplacement de MySQL \"toujours libre, rétrocompatible et prêt à l'emploi\". Depuis 2013, MariaDB est l'implémentation par défaut de MySQL sur Arch Linux. [1]\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "MariaDB est l'implémentation par défaut de MySQL dans Arch Linux, fournie par le paquet mariadb.\n\nInstallez mariadb, et exécutez la commande suivante avant de démarrer le mariadb.service :\n\n```\n# mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql\n```\n\nMaintenant, démarrez et/ou activez mariadb.service.\n\nPour simplifier l'administration, vous pouvez installer un front-end.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nUne fois que vous avez démarré le serveur MySQL et ajouté un compte root, vous pouvez souhaiter modifier la configuration par défaut.\n\nPour vous connecter en tant que root sur le serveur MySQL, utilisez la commande suivante :\n\n```\n# mysql -u root -p\n```\n\n"
+    },
+    {
+      "title": "Ajouter un utilisateur",
+      "level": 3,
+      "content": "La création d'un nouvel utilisateur se fait en deux étapes : créer l'utilisateur ; accorder des privilèges. Dans l'exemple ci-dessous, on crée l'utilisateur monty avec some_pass comme mot de passe, puis on lui accorde toutes les permissions sur la base de données mydb :\n\n```\n# mysql -u root -p\n```\n\n```\nMariaDB> CREATE USER 'monty'@'localhost' IDENTIFIED BY 'some_pass';\nMariaDB> GRANT ALL PRIVILEGES ON mydb.* TO 'monty'@'localhost';\nMariaDB> FLUSH PRIVILEGES;\nMariaDB> quit\n```\n\n"
+    },
+    {
+      "title": "Fichiers de configuration",
+      "level": 3,
+      "content": "Les options de configuration de MariaDB sont lues dans les fichiers suivants dans l'ordre donné (selon la sortie mysqld --help --verbose | tail -20) :\n\n```\n/etc/my.cnf /etc/my.cnf.d/ ~/.my.cnf\n```\n\nEn fonction de l'étendue des modifications que vous souhaitez effectuer (système, utilisateur seulement...), utilisez le fichier correspondant. Consultez cette partie de la base de connaissances pour plus d'informations.\n\n"
+    },
+    {
+      "title": "Activer l'autocomplétion",
+      "level": 3,
+      "content": "La fonction de complétion du client MySQL est désactivée par défaut. Pour l'activer dans tout le système, éditez /etc/my.cnf.d/mysql-clients.cnf, et ajoutez auto-rehash sous mysql. Notez que cela ne doit pas être indiqué dans mysqld. L'autocomplétion sera activé la prochaine fois que vous exécuterez le client MySQL.\n\n"
+    },
+    {
+      "title": "Utiliser UTF8MB4",
+      "level": 3,
+      "content": "- Le paquet mariadb utilise déjà utf8mb4 comme jeu de caractères et utf8mb4_unicode_ci comme collation. Les utilisateurs qui utilisent les paramètres par défaut (pour les caractères) peuvent vouloir sauter cette section.\n- UTF8MB4 est recommandé par rapport à UTF-8 car il permet une prise en charge Unicode complet [2] [3].\n\nAjoutez les valeurs suivantes au fichier de configuration principal situé à /etc/my.cnf.d/my.cnf :\n\n```\n[client]\ndefault-character-set = utf8mb4\n\n[mysqld]\ncollation_server = utf8mb4_unicode_ci\ncharacter_set_server = utf8mb4\n\n[mysql]\ndefault-character-set = utf8mb4\n```\n\nRedémarrez mariadb.service pour appliquer les changements.\n\nConsultez #Maintenance pour optimiser et vérifier la santé de la base de données.\n\n"
+    },
+    {
+      "title": "Augmenter la limite de caractères",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nPour InnoDB, exécutez les commandes suivantes pour prendre en charge une limite de caractères plus élevée :\n\n```\nmysql> set global innodb_file_format = BARRACUDA;\nQuery OK, 0 rows affected (0.00 sec)\n```\n\n```\nmysql> set global innodb_file_per_table = ON;\nQuery OK, 0 rows affected (0.00 sec)\n```\n\n```\nmysql> set global innodb_large_prefix = ON;\nQuery OK, 0 rows affected (0.00 sec)\n```\n\nAjoutez les lignes suivantes dans /etc/mysql/my.cnf pour toujours utiliser une limite de caractères plus élevée :\n\n```\n[mysqld]\ninnodb_file_format = barracuda\ninnodb_file_per_table = 1\ninnodb_large_prefix = 1\n```\n\nRedémarrez mariadb.service pour appliquer les changements.\n\nLors de la création de la table, ajoutez le ROW_FORMAT comme consulté dans l'exemple :\n\n```\nmysql> create table if not exists products (\n   ->   day date not null,\n   ->   product_id int not null,\n   ->   dimension1 varchar(500) not null,\n   ->   dimension2 varchar(500) not null,\n   ->   unique index unique_index (day, product_id, dimension1, dimension2)\n   -> ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC;\nQuery OK, 0 rows affected (0.02 sec)\n```\n\n"
+    },
+    {
+      "title": "Utiliser un tmpfs pour tmpdir",
+      "level": 3,
+      "content": "Le répertoire utilisé par MySQL pour stocker les fichiers temporaires est nommé tmpdir. Il est utilisé, par exemple, pour effectuer des tris importants sur disque, ainsi que pour les tables temporaires internes et explicites.\n\nCréez le répertoire avec les permissions appropriées :\n\n```\n# mkdir -pv /var/lib/mysqltmp\n# chown mysql:mysql /var/lib/mysqltmp\n```\n\nAjoutez le montage tmpfs suivant à votre fichier /etc/fstab :\n\n```\ntmpfs /var/lib/mysqltmp tmpfs rw,gid=mysql,uid=mysql,size=100M,mode=0750,noatime 0 0\n```\n\nAjoutez à votre fichier /etc/my.cnf.d/server.cnf sous le groupe mysqld :\n\n```\ntmpdir = /var/lib/mysqltmp\n```\n\nStoppez mariadb.service, montez /var/lib/mysqltmp/ et démarrez mariadb.service.\n\n"
+    },
+    {
+      "title": "Tables de fuseaux horaires",
+      "level": 3,
+      "content": "Bien que les tables de fuseaux horaires soient créées pendant l'installation, elles ne sont pas automatiquement remplies. Elles doivent être remplies si vous prévoyez d'utiliser CONVERT_TZ() dans des requêtes SQL.\n\nPour remplir les tables de fuseaux horaires avec tous les fuseaux horaires :\n\n```\n$ mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p mysql\n```\n\nEn option, vous pouvez remplir la table avec des fichiers de fuseaux horaires spécifiques :\n\n```\n$ mysql_tzinfo_to_sql fichier_de_fuseau_horaire nom_de_fuseau_horaire. | mysql -u root -p mysql\n```\n\n"
+    },
+    {
+      "title": "Améliorer la sécurité initiale",
+      "level": 3,
+      "content": "La commande mysql_secure_installation vous guidera de manière interactive à travers un certain nombre de mesures de sécurité recommandées, comme la suppression des comptes anonymes et la suppression de la base de données de test :\n\n```\n# mysql_secure_installation\n```\n\n"
+    },
+    {
+      "title": "Écouter uniquement sur l'adresse de bouclage",
+      "level": 3,
+      "content": "Par défaut, MySQL écoutera sur l'adresse 0.0.0.0, qui inclut toutes les interfaces réseau. Afin de limiter l'écoute de MySQL à l'adresse de bouclage («loopback»), ajoutez la ligne suivante dans /etc/my.cnf.d/server.cnf :\n\n```\n[mysqld]\nbind-address = localhost\n```\n\nCela permettra le lien à la fois vers 127.0.0.1 et ::1, et permettra à MariaDB de recevoir des connexions en IPv4 et en IPv6.\n\n"
+    },
+    {
+      "title": "Restreindre l'accès local uniquement via les sockets Unix",
+      "level": 3,
+      "content": "Par défaut, MySQL est accessible à la fois via les sockets Unix et le réseau. Si MySQL n'est nécessaire que pour l'hôte local, vous pouvez améliorer la sécurité en n'écoutant pas le port TCP 3306, et en écoutant uniquement les sockets Unix à la place. Pour ce faire, ajoutez la ligne suivante dans /etc/my.cnf.d/server.cnf :\n\n```\n[mysqld]\nskip-networking\n```\n\nVous pourrez toujours vous connecter localement comme avant, mais uniquement en utilisant les sockets Unix.\n\n"
+    },
+    {
+      "title": "Accorder l'accès à distance",
+      "level": 3,
+      "content": "Pour autoriser l'accès à distance au serveur MySQL, assurez-vous que MySQL a un accès réseau activé et est à l'écoute sur l'interface appropriée.\n\nAccordez à n'importe quel utilisateur de MySQL un accès distant (exemple pour root) :\n\n```\n# mysql -u root -p\n```\n\nVérifiez les utilisateurs actuels ayant un accès à distance privilégié :\n\n```\nSELECT User, Host FROM mysql.user WHERE Host <> 'localhost';\n```\n\nMaintenant, accordez l'accès à distance à votre utilisateur (ici root) :\n\n```\nGRANT ALL PRIVILEGES ON *.* TO 'root'@'192.168.1.%' IDENTIFIED BY 'my_optional_remote_password' WITH GRANT OPTION;\n```\n\nVous pouvez remplacer le caractère générique '%' par un hôte spécifique si vous le souhaitez. Le mot de passe peut être différent du mot de passe principal de l'utilisateur.\n\n"
+    },
+    {
+      "title": "Configurer l'accès aux répertoires personnels",
+      "level": 3,
+      "content": "Pour des raisons de sécurité, le fichier de service systemd contient ProtectHome=true, qui empêche MariaDB d'accéder aux fichiers sous les hiérarchies /home, /root et /run/user. Le datadir doit être dans un emplacement accessible et appartenir à l'utilisateur et au groupe mysql.\n\nVous pouvez modifier ce comportement en créant un fichier de service supplémentaire comme décrit ici.\n\n"
+    },
+    {
+      "title": "Mise à jour des bases de données lors des versions majeures",
+      "level": 3,
+      "content": "Lors de la sortie d'une version majeure de mariadb (par exemple mariadb-10.1.10-1 à mariadb-10.1.18-1), il est prudent de mettre à jour les bases de données :\n\n```\n# mysql_upgrade -u root -p\n```\n\nPour mettre à jour de 10.1.x à 10.3.x. :\n\n- garder le daemon de base de données 10.1.x en fonctionnement\n- mettez à jour le paquet\n- Exécutez mysql_upgrade. (à partir de la nouvelle version du paquet) avec l'ancien daemon encore en fonctionnement. Cela produira quelques messages d'erreur ; cependant, la mise à jour réussira.\n- Redémarrez le daemon, afin que le daemon 10.3.x fonctionne.\n\nSinon, arrêtez le (vieux) daemon, exécutez le (nouveau) daemon en mode sans échec, exécutez mysql_upgrade par rapport à celui-ci, puis démarrez le (nouveau) daemon comme décrit dans #Impossible d'exécuter mysql_upgrade car MySQL ne peut pas démarrer.\n\n"
+    },
+    {
+      "title": "Vérification, optimisation et réparation des bases de données",
+      "level": 3,
+      "content": "mariadb est livré avec mysqlcheck qui peut être utilisé pour vérifier, réparer et optimiser les tables des bases de données à partir du shell. Consultez la page de manuel mysqlcheck pour en savoir plus. Plusieurs tâches de commande sont présentées :\n\nPour vérifier toutes les tables de toutes les bases de données :\n\n```\n$ mysqlcheck --all-databases -u root -p -c\n```\n\nPour analyser toutes les tables de toutes les bases de données :\n\n```\n$ mysqlcheck --all-databases -u root -p -a\n```\n\nPour réparer toutes les tables de toutes les bases de données :\n\n```\n$ mysqlcheck --all-databases -u root -p -r\n```\n\nPour optimiser toutes les tables de toutes les bases de données :\n\n```\n$ mysqlcheck --all-databases -u root -p -o\n```\n\n"
+    },
+    {
+      "title": "Sauvegarde",
+      "level": 2,
+      "content": "Il existe plusieurs outils et stratégies pour sauvegarder vos bases de données.\n\nSi vous utilisez le moteur de stockage InnoDB par défaut, une façon suggérée de sauvegarder toutes vos bases en ligne tout en prévoyant une récupération ponctuelle (également connue sous le nom de \"roll-forward\", lorsque vous devez restaurer une ancienne sauvegarde et rejouer les changements survenus depuis cette sauvegarde) consiste à exécuter la commande suivante :\n\n```\n$ mysqldump --single-transaction --flush-logs --master-data=2 --all-databases -u root -p > all_databases.sql\n```\n\nCette commande vous demandera le mot de passe de l'utilisateur root de MariaDB, qui a été défini lors de la #Configuration de la base de données.\n\nLa spécification du mot de passe en ligne de commande est fortement déconseillée, car elle l'expose à la découverte par d'autres utilisateurs via l'utilisation de ps aux ou d'autres techniques. Au lieu de cela, la commande susmentionnée demandera le mot de passe de l'utilisateur spécifié, le dissimulant ainsi.\n\n"
+    },
+    {
+      "title": "Compression",
+      "level": 3,
+      "content": "Comme les tables SQL peuvent être assez volumineuses, il est recommandé d'acheminer la sortie de la commande susmentionnée dans un utilitaire de compression comme gzip :\n\n```\n$ mysqldump --single-transaction --flush-logs --master-data=2 --all-databases -u root -p | gzip > all_databases.sql.gz\n```\n\nDécompresser la sauvegarde ainsi créée et la recharger dans le serveur s'effectue en faisant :\n\n```\n$ zcat all_databases.sql.gz | mysql -u root -p\n```\n\nCeci recréera et repeuplera toutes les bases de données précédemment sauvegardées (consultez ce lien ou celui-ci).\n\n"
+    },
+    {
+      "title": "Non-interactif",
+      "level": 3,
+      "content": "Si vous souhaitez configurer un script de sauvegarde non interactif à utiliser dans des tâches cron ou des timers systemd, consultez option files et cette illustration pour mysqldump.\n\nEn gros, vous devez ajouter la section suivante au fichier de configuration concerné :\n\n```\n[mysqldump]\nuser=mysqluser\npassword=secret\n```\n\nMentionner un utilisateur ici est facultatif, mais cela vous évitera d'avoir à le mentionner sur la ligne de commande. Si vous souhaitez définir cette option pour tous les outils, y compris mysql, utilisez le groupe [client].\n\n"
+    },
+    {
+      "title": "Script d'exemple",
+      "level": 4,
+      "content": "La base de données peut être vidée dans un fichier pour faciliter la sauvegarde. Le script shell suivant le fera pour vous, en créant un fichier db_backup.gz dans le même répertoire que le script, contenant votre vidage de base de données :\n\n```\n#!/bin/sh\n\nTHISDIR=$(dirname $(readlink -f \"$0\"))\n\nmysqldump --single-transaction --flush-logs --master-data=2 --all-databases \\\n | gzip > $THISDIR/db_backup.gz\necho 'purge master logs before date_sub(now(), interval 7 day);' | mysql\n```\n\nConsultez également la page officielle mysqldump dans les manuels MySQL et MariaDB.\n\n"
+    },
+    {
+      "title": "Holland Backup",
+      "level": 3,
+      "content": "Un logiciel basé sur python nommé Holland Backup est disponible dans AUR pour automatiser tout le travail de sauvegarde. Il prend en charge les méthodes suivantes : mysqldump direct, instantanés LVM vers des fichiers tar (mysqllvm), instantanés LVM avec mysqldump (mysqldump-lvm), et xtrabackup pour extraire les données. Le framework Holland prend en charge une multitude d'options et est hautement configurable pour répondre à presque toutes les situations de sauvegarde.\n\nLes paquets principaux hollandAUR et holland-commonAUR fournissent le cadre de base ; l'un des sous-paquets (holland-mysqldumpAUR, holland-mysqllvmAUR et/ou holland-xtrabackupAUR doit être installé pour un fonctionnement complet. Des exemples de configurations pour chaque méthode se trouvent dans le répertoire /usr/share/doc/holland/examples/ et peuvent être copiés dans /etc/holland/backupsets/, ainsi qu'en utilisant la commande holland mk-config pour générer une configuration de base pour un fournisseur nommé.\n\n"
+    },
+    {
+      "title": "Impossible d'exécuter mysql_upgrade car MySQL ne peut pas démarrer",
+      "level": 3,
+      "content": "Essayez d'exécuter MySQL en mode sécurisé :\n\n```\n# mysqld_safe --datadir=/var/lib/mysql/\n```\n\nEt ensuite exécutez :\n\n```\n# mysql_upgrade -u root -p\n```\n\n"
+    },
+    {
+      "title": "Réinitialiser le mot de passe root",
+      "level": 3,
+      "content": "1. Arrêtez mariadb.service.\n1. Démarrez le serveur mysqld avec les fonctions de sécurité : # mysqld_safe --skip-grant-tables --skip-networking &\n1. Connectez-vous au serveur : # mysql -u root\n1. Changez le mot de passe root : MariaDB [(none)]> use mysql MariaDB [mysql]> flush privileges; MariaDB [mysql]> ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password'; MariaDB [mysql]> exit\n1. Tuez les processus mysqld* en cours d'exécution : # kill $(cat /var/lib/mysql/$HOSTNAME.pid)\n1. Démarrez mariadb.service.\n\n```\n# mysqld_safe --skip-grant-tables --skip-networking &\n```\n\n```\n# mysql -u root\n```\n\n```\nMariaDB [(none)]> use mysql\nMariaDB [mysql]> flush privileges;\nMariaDB [mysql]> ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';\nMariaDB [mysql]> exit\n```\n\n```\n# kill $(cat /var/lib/mysql/$HOSTNAME.pid)\n```\n\n"
+    },
+    {
+      "title": "Vérifier et réparer toutes les tables",
+      "level": 3,
+      "content": "Vérifier et réparer automatiquement toutes les tables dans toutes les bases de données, consultez la suite :\n\n```\n# mysqlcheck -A --auto-repair -u root -p\n```\n\n"
+    },
+    {
+      "title": "Optimiser toutes les tables",
+      "level": 3,
+      "content": "Optimisez de force toutes les tables, en réparant automatiquement les erreurs de table qui peuvent survenir.\n\n```\n# mysqlcheck -A --auto-repair -f -o -u root -p\n```\n\n"
+    },
+    {
+      "title": "Erreur OS 22 lors de l'exécution sur ZFS",
+      "level": 3,
+      "content": "Si vous utilisez des bases de données MySQL sur ZFS, l'erreur InnoDB : Operating system error number 22 in a file operation peut se produire.\n\nUne solution de contournement consiste à désactiver aio_writes dans /etc/my.cnf.d/my.cnf :\n\n```\n/etc/my.cnf.d/my.cnf\n```\n\n```\n[mysqld]\ninnodb_use_native_aio = 0\n```\n\n"
+    },
+    {
+      "title": "Impossible de se connecter via CLI, mais phpmyadmin fonctionne bien",
+      "level": 3,
+      "content": "Cela peut se produire si vous utilisez un mot de passe long (>70-75). En ce qui concerne la version 5.5.36, pour une raison quelconque, mysql CLI ne peut pas gérer un tel nombre de caractères en mode lecture. Donc, si vous envisagez d'utiliser le mode de saisie de mot de passe recommandé :\n\n```\n$ mysql -u user -p\n```\n\n```\nMot de passe :\n```\n\nPensez à changer le mot de passe pour un plus petit.\n\n```\n$ mysql -u user -p \"some-very-strong-password\"\n```\n\n"
+    },
+    {
+      "title": "Les journaux binaires de MySQL prennent beaucoup d'espace disque",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nPar défaut, mysqld crée des fichiers journaux binaires dans /var/lib/mysql. Ceci est utile pour la réplication du serveur maître ou la récupération des données. Mais ces journaux binaires peuvent consommer votre espace disque. Si vous ne prévoyez pas d'utiliser les fonctionnalités de réplication ou de récupération de données, vous pouvez désactiver la journalisation binaire en commentant ces lignes dans /etc/mysql/my.cnf :\n\n```\n#log-bin=mysql-bin\n#binlog_format=mixed\n```\n\nOu vous pouvez limiter la taille du fichier journal comme ceci :\n\n```\nexpire_logs_days = 10\nmax_binlog_size = 100M\n```\n\nVous pouvez également purger certains journaux binaires dans /var/lib/mysql pour libérer de l'espace disque avec cette commande :\n\n```\n# mysql -u root -p \"PASSWORD\" -e \"PURGE BINARY LOGS TO 'mysql-bin.0000xx' ;\"\n```\n\n"
+    },
+    {
+      "title": "OpenRC ne parvient pas à lancer MySQL",
+      "level": 3,
+      "content": "Pour utiliser MySQL avec OpenRC, vous devez ajouter les lignes suivantes à la section [mysqld] du fichier de configuration MySQL, situé à /etc/my.cnf.d/my.cnf.\n\n```\nuser = mysql\nbasedir = /usr\ndatadir = /var/lib/mysql\npid-file = /run/mysqld/mysql.pid\n```\n\nVous devrez maintenant être capable de démarrer MySQL en utilisant :\n\n```\n# rc-service mysql start\n```\n\n"
+    },
+    {
+      "title": "La clé spécifiée était trop longue",
+      "level": 3,
+      "content": "Consultez #Augmenter la limite de caractères.\n\n"
+    },
+    {
+      "title": "Changement des limites d'avertissement sur max_open_files/table_open_cache",
+      "level": 3,
+      "content": "Augmentez le nombre de descripteurs de fichiers en créant un fichiers de substitution de systemd, par ex :\n\n```\n/etc/systemd/system/mysqld.service.d/limit_nofile.conf\n```\n\n```\n[Service]\nLimitNOFILE=8192\n```\n\n"
+    },
+    {
+      "title": "Crash de la mise à jour de 10.4 vers 10.5 : \"InnoDB: Upgrade after a crash is not supported. The redo log was created with MariaDB 10.4.x\"",
+      "level": 3,
+      "content": "Avant MariaDB 10.5, le redo log était inutilement divisé en plusieurs fichiers. [7]\n\nDéplacez les anciens journaux binaires /var/lib/mysql/ib_logfile* hors du chemin, laissant ainsi MariaDB 10.5 en créer de nouveaux. Puis redémarrez mariadb.service et mettez à jour vos tables avec mysql_upgrade.\n\n"
+    },
+    {
+      "title": "La table 'mysql.xxx' n'existe pas dans le moteur",
+      "level": 3,
+      "content": "Symptôme : Lorsque vous exécutez mysql_upgrade ou mysqlcheck, il retourne une ou plusieurs erreurs comme celles-ci :\n\n```\nTable 'mysql.xxx' doesn't exist in engine\n```\n\nOù \"xxx\" est généralement la table système de la base de données mysql.\n\nEtapes à suivre pour résoudre ce problème,\n\n1. Créez un répertoire de sauvegarde en dehors de MariaDB ${DATADIR}</nowiki>, par exemple dans $HOME/mysql_backup.\n1. Copiez les fichiers incriminés de ${DATADIR}/mysql/xxx.{frm,ibd}</nowiki> dans le répertoire de sauvegarde. Le fichier xxx.ibd peut ne pas exister.\n1. Supprimez les fichiers incriminés (.frm, .ibd) de ${DATADIR}/mysql/.\n1. Exécutez le mysqlcheck. En cas de succès, les fichiers xxx.frm et xxx.ibd devraient être créés à nouveau.\n1. Ré-exécutez mysql_upgrade si nécessaire.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Site officiel de MariaDB\n- Base de connaissances MariaDB\n- Scripts et connaissances pour l'optimisation des performances de MySQL (en anglais)\n\n"
+    }
+  ]
+}

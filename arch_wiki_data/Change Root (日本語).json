@@ -1,0 +1,106 @@
+{
+  "title": "Change Root (日本語)",
+  "url": "https://wiki.archlinux.org/title/Change_Root_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- PRoot\n- Linux Containers\n- systemd-nspawn\n\nChroot は見かけのルートディレクトリ(と動いているプロセスとその子プロセス群)を別のディレクトリに変更する操作です。ルートディレクトリを変更している間はディレクトリ外のファイルやコマンドにアクセスできなくなります。この変更された環境は chroot監獄 と呼ばれます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 理由\n- 2 要件\n- 3 新しいルートの場所を準備する\n- 4 使い方 4.1 arch-chroot を使う 4.1.1 chroot に入る 4.1.2 chroot を終了する 4.1.3 1つのコマンドを実行して終了する 4.2 Btrfs での実行 4.3 chroot を使う\n- 5 グラフィカルアプリケーションを動かす\n- 6 root 権限を使わない 6.1 PRoot 6.2 Fakechroot 6.3 Unshare\n- 7 ヒントとテクニック 7.1 chroot 検出\n- 8 トラブルシューティング 8.1 arch-chroot: /location/of/new/root is not a mountpoint. This may have undesirable side effects.\n- 9 参照\n\n- 4.1 arch-chroot を使う 4.1.1 chroot に入る 4.1.2 chroot を終了する 4.1.3 1つのコマンドを実行して終了する\n- 4.2 Btrfs での実行\n- 4.3 chroot を使う\n\n- 4.1.1 chroot に入る\n- 4.1.2 chroot を終了する\n- 4.1.3 1つのコマンドを実行して終了する\n\n- 6.1 PRoot\n- 6.2 Fakechroot\n- 6.3 Unshare\n\n- 7.1 chroot 検出\n\n- 8.1 arch-chroot: /location/of/new/root is not a mountpoint. This may have undesirable side effects.\n\n"
+    },
+    {
+      "title": "理由",
+      "level": 2,
+      "content": "Chroot を行う主な理由は起動やログインができなくなった時のシステムメンテナンスです。例えば:\n\n- ブートローダーの再インストール。\n- initramfs イメージのリビルド。\n- パッケージのアップグレードもしくはダウングレード。\n- パスワードの再設定。\n- chroot でパッケージをビルドDeveloperWiki:クリーンな chroot 内でビルドするを参照。\n\nWikipedia:ja:Chroot#制限 も参照。\n\n"
+    },
+    {
+      "title": "要件",
+      "level": 2,
+      "content": "- chroot を行うには root 権限が必要です。\n- 他の Linux 環境からブートする必要があります (LiveCD や USB メディア、別にインストールされたディストリビューションなど)。\n- ブートした Linux 環境のアーキテクチャが、chroot しようとしているルートディレクトリのアーキテクチャと一致しているか確認してください (つまり i686 なのか x86_64 なのか)。アーキテクチャの確認は次のコマンドで行えます: # uname -m。\n- chroot 環境でカーネルモジュールのロードをしたい場合、chroot する前にロードしてください。\n- 必要であればスワップを有効にしてください: # swapon /dev/sdxY\n- 必要であればインターネットに接続してください。\n\n```\n# swapon /dev/sdxY\n```\n\n"
+    },
+    {
+      "title": "新しいルートの場所を準備する",
+      "level": 2,
+      "content": "chroot ターゲットは、ファイルシステム階層を含むディレクトリである必要があります。\n\nインストールガイド では、このディレクトリは /mnt になります。既存のインストールの場合は、既存のパーティションを自分で /mnt にマウントする必要があります。\n\nlsblk を実行し、インストールのパーティションレイアウトをメモします。通常は、/dev/sdXY のようなものになります。NVMe ドライブの場合は /dev/nvme0nXpY になります。\n\nファイルシステムをマウントします。\n\n```\n# mount /dev/sdXY /mnt\n```\n\nEFI システムパーティション があり、それに変更を加える必要がある場合 (vmlinuz または initramfs イメージの更新など):\n\n```\n# mount /dev/sdXZ /mnt/esp\n```\n\n個別パーティション がある場合は、それらもマウントします。\n\n次の例では、/path/to/new/root は新しいルートが存在するディレクトリです (例: /mnt)\n\n"
+    },
+    {
+      "title": "使い方",
+      "level": 2,
+      "content": "- hostnamectl、localectl や timedatectl などの systemd のツールは D-Bus の接続が必要なため chroot の中では動作しません [1]。\n- chroot の新しいルート (/) となるファイルシステムは、アクセス可能でなければなりません(復号化、マウント済み)\n\nchroot を使用するには、以下の 2 つの主要なオプションがあります。\n\n"
+    },
+    {
+      "title": "arch-chroot を使う",
+      "level": 3,
+      "content": "Bash スクリプト arch-chroot は arch-install-scripts パッケージに含まれています。/usr/bin/chroot を実行する前にこのスクリプトは /proc などの api ファイルシステムをマウントして、chroot から使える /etc/resolv.conf を作成します。\n\n"
+    },
+    {
+      "title": "chroot に入る",
+      "level": 4,
+      "content": "最初の引数として新しいルートディレクトリを指定して arch-chroot を実行します:\n\n```\n# arch-chroot /path/to/new/root\n```\n\nこれで、既存のインストールで利用できるほとんどの操作を実行できるようになります。D-Bus を必要とする一部のタスクは、使い方 に記載されているように機能しません。\n\n"
+    },
+    {
+      "title": "chroot を終了する",
+      "level": 4,
+      "content": "chroot を終了するには、次を使用します:\n\n```\n# exit\n```\n\n"
+    },
+    {
+      "title": "1つのコマンドを実行して終了する",
+      "level": 4,
+      "content": "chroot からコマンドを実行して終了するには、次のように、末尾にコマンドを追加します:\n\n```\n# arch-chroot /path/to/new/root mycommand\n```\n\nたとえば、/mnt/arch にある chroot に対して mkinitcpio -p linux を実行するには、次のようにします:\n\n```\n# arch-chroot /mnt/arch mkinitcpio -p linux\n```\n\n"
+    },
+    {
+      "title": "Btrfs での実行",
+      "level": 3,
+      "content": "サブボリュームのある Btrfs ルートファイルシステムでは、chroot に入る前に、すべてのサブボリュームが fstab で指定されたとおりに正しくマウントされていることを確認する必要があります。\n\narchinstall の Btrfs デフォルト設定の例:\n\n```\n# mount -o subvol=@ /dev/sdXY /mnt\n# mount -o subvol=@home /dev/sdXY /mnt/home\n# mount -o subvol=@pkg /dev/sdXY /mnt/var/cache/pacman/pkg\n# mount -o subvol=@log /dev/sdXY /mnt/var/log\n# mount -o subvol=@snapshots /dev/sdXY /mnt/.snapshots\n# mount /dev/sdXZ /mnt/boot\n# arch-chroot /mnt\n```\n\n"
+    },
+    {
+      "title": "chroot を使う",
+      "level": 3,
+      "content": "chroot を直接実行する場合は、実際の chroot の前に以下の手順が必要です。\n\nまず、一時 API ファイルシステムをマウントします。\n\n```\n# cd /path/to/new/root\n# mount -t proc /proc proc/\n# mount -t sysfs /sys sys/\n# mount --rbind /dev dev/\n```\n\nまた、任意で次のコマンドを実行:\n\n```\n# mount --rbind /run run/\n```\n\nUEFI システムを実行している場合は、EFI 変数にもアクセスする必要があります。それ以外の場合、GRUBをインストールすると、次のようなメッセージが表示されます: UEFI variables not supported on this machine:\n\n```\n# mount --rbind /sys/firmware/efi/efivars sys/firmware/efi/efivars/\n```\n\n次に、chroot 環境でインターネット接続を使用するには、DNS の詳細をコピーします:\n\n```\n# cp /etc/resolv.conf etc/resolv.conf\n```\n\n最後に、/location/of/new/root に chroot し、Bash シェルを使用するように変更するには:\n\n```\n# chroot /location/of/new/root /bin/bash\n```\n\n- chroot: cannot run command '/usr/bin/bash': Exec format error というエラーが表示される場合、ホスト環境と chroot 環境のアーキテクチャが一致していません。\n- chroot: '/usr/bin/bash': permission denied というエラーが表示される場合、exec パーミッションを使ってマウントしなおして下さい: mount -o remount,exec /location/of/new/root。 もしこれをチェックしても解決しない場合は、新しい環境のベースコンポーネントが無傷であることを 確認してください (Arch root の場合は pacutils から paccheck --root=/location/of/new/root --files --file-properties --md5sum glibc filesystem を試してみてください。)\n\n- もしこれをチェックしても解決しない場合は、新しい環境のベースコンポーネントが無傷であることを 確認してください (Arch root の場合は pacutils から paccheck --root=/location/of/new/root --files --file-properties --md5sum glibc filesystem を試してみてください。)\n\nchroot した後は bash のローカル設定をロードします:\n\n```\n# source /etc/profile\n# source ~/.bashrc\n```\n\nchroot の使用が終了したら、次の方法で終了できます。\n\n```\n# exit\n```\n\n次に、一時ファイルシステムをアンマウントします。\n\n```\n# cd /\n# umount --recursive /location/of/new/root\n```\n\n"
+    },
+    {
+      "title": "グラフィカルアプリケーションを動かす",
+      "level": 2,
+      "content": "システムで X を動かしているならば、GUI アプリケーションを chroot 環境から起動できます。\n\nchroot 環境を X サーバーに接続するには、X サーバーの中で (つまりログインしているデスクトップから) 端末を開き、xhost コマンドを実行してください、ユーザーの X サーバーに接続する許可を与えます (Xhost を参照):\n\n```\n$ xhost +local:\n```\n\n次に、アプリケーションに X サーバーを指定するために、chroot の中で DISPLAY 環境変数を X サーバーを動かしているユーザーの DISPLAY 変数と一致するように指定してください。例えば X サーバーを実行しているユーザーで以下を実行することで DISPLAY の値を見ることができます:\n\n```\n$ echo $DISPLAY\n```\n\n値が (例えば) \":0\" の場合、chroot 環境で DISPLAY 環境変数を \":0\" に設定するには:\n\n```\n# export DISPLAY=:0\n```\n\n"
+    },
+    {
+      "title": "root 権限を使わない",
+      "level": 2,
+      "content": "Chroot は root 権限を必要しますが、場合によっては root 権限が使えないということもありえます。そのようなときは、他の実装によって chroot をシミュレートする方法があります。\n\n"
+    },
+    {
+      "title": "PRoot",
+      "level": 3,
+      "content": "PRoot を使うことで見せかけの root ディレクトリを変更して root 権限を使わずに mount --bind を使用できます。アプリケーションをディレクトリに閉じ込めたり、別の CPU アーキテクチャでビルドされたプログラムを実行したいときに有用です。ただし、全てのファイルはホスト環境のユーザーによって所有されるため制限が存在します。Proot には --root-id 引数があり、fakeroot と同じような方法で制限を回避することができます。\n\n"
+    },
+    {
+      "title": "Fakechroot",
+      "level": 3,
+      "content": "fakechroot は chroot コールを傍受して結果を偽装するライブラリです。通常ユーザーで chroot をシミュレートすることができます。\n\n```\n# fakechroot fakeroot chroot ~/my-chroot bash\n```\n\n"
+    },
+    {
+      "title": "Unshare",
+      "level": 3,
+      "content": "util-linux の一部である Unshare を使用して、新しいカーネル名前空間を作成できます。これは通常の chroot コマンドで機能します。 例えば:\n\n```\n$ unshare --map-root-user chroot ~/namespace /bin/sh\n```\n\n"
+    },
+    {
+      "title": "chroot 検出",
+      "level": 3,
+      "content": "systemd-detect-virt --chroot chroot 環境で呼び出されたかどうかを検出します。他の仮想化環境の検出については、systemd-detect-virt(1) を参照してください。より広範な議論と従来のツールの使用法については、how-do-i-tell-im-running-in-a-chroot を参照してください。\n\n"
+    },
+    {
+      "title": "arch-chroot: /location/of/new/root is not a mountpoint. This may have undesirable side effects.",
+      "level": 3,
+      "content": "arch-chroot /location/of/new/root を実行すると、警告が発行されます。\n\n```\n==> WARNING: /location/of/new/root is not a mountpoint. This may have undesirable side effects.\n```\n\nバインドマウントを使用して chroot ディレクトリをマウントポイントにする説明と例については、arch-chroot(8) を参照してください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Chroot の基本\n\n"
+    }
+  ]
+}

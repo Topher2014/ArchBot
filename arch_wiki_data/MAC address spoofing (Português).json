@@ -1,0 +1,76 @@
+{
+  "title": "MAC address spoofing (Português)",
+  "url": "https://wiki.archlinux.org/title/MAC_address_spoofing_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Este artigo apresenta vários métodos para realizar o spoofing do endereço MAC (Media Access Control), ou seja, alterá-lo para dificultar a identificação de um dispositivo.\n\n"
+    },
+    {
+      "title": "Manualmente",
+      "level": 2,
+      "content": "Há dois métodos para mascarar um endereço MAC: instalar e configurar iproute2 ou macchanger. Ambos os são descritos abaixo.\n\n"
+    },
+    {
+      "title": "iproute2",
+      "level": 3,
+      "content": "Primeiro, você pode verificar o seu endereço MAC atual com o comando:\n\n```\n# ip link show interface\n```\n\nonde interface é o nome da sua interface de rede.\n\nA secção que nos interessa neste momento é a que tem \"link/ether\" seguido por um número de 6 bytes. Será provavelmente algo parecido com isto:\n\n```\nlink/ether 00:1d:98:5a:d1:3a\n```\n\nO primeiro passo para mascarar o endereço MAC é desativar a interface de rede. Pode ser realizado com o comando:\n\n```\n# ip link set dev interface down\n```\n\nEm seguida vamos de fato mascarar nosso MAC. Qualquer valor hexadecimal serve, mas algumas redes podem ser configuradas para recusar a atribuição de endereços IP a um cliente cujo MAC não corresponda a nenhum dos vendors conhecidos. Portanto, a menos que controle a(s) rede(s) a que se conecta, utilize o prefixo MAC de qualquer vendor real (basicamente, os três primeiros bytes), e utilize valores aleatórios para os três bytes seguintes. Para mais informações, por favor leia Wikipedia:Organizationally unique identifier.\n\nPara alterar o MAC, precisamos rodar o comando:\n\n```\n# ip link set dev interface address XX:XX:XX:XX:XX:XX\n```\n\nOnde qualquer valor de 6 bytes será suficiente para XX:XX:XX:XX:XX:XX:XX.\n\nO passo final é reativar a interface de rede. Isto pode ser feito através da execução do comando:\n\n```\n# ip link set dev interface up\n```\n\nSe quiser verificar se o seu MAC foi mascarado, basta executar novamente ip link show interface e verificar o valor para 'link/ether'. Se funcionou, 'link/ether' deve estar com o novo endereço que você definiu.\n\n"
+    },
+    {
+      "title": "macchanger",
+      "level": 3,
+      "content": "Outro método utiliza macchanger (também conhecido como GNU MAC Changer). Fornece uma variedade de funções, como alterar o endereço para corresponder a um determinado vendor ou randomizá-lo completamente.\n\nInstalar o pacote macchanger}.\n\nA alteração é feita por interface, especificar o nome da interface de rede ao invés de interface em cada um dos seguintes comandos.\n\nO endereço MAC pode ser mascarado com um endereço totalmente aleatório:\n\n```\n# macchanger -r interface\n```\n\nPara randomizar apenas bytes do endereço MAC atual específicos do dispositivo (ou seja, de forma que se o endereço MAC fosse verificado ainda se mostraria como sendo do mesmo vendor), você roda o comando:\n\n```\n# macchanger -e interface\n```\n\nPara alterar o endereço MAC para um valor específico, você executaria:\n\n```\n# macchanger --mac=XX:XX:XX:XX:XX:XX interface\n```\n\nOnde XX:XX:XX:XX:XX:XX é o MAC para o qual se deseja mudar.\n\nFinalmente, para devolver o endereço MAC ao seu valor de hardware, original e permanente:\n\n```\n# macchanger -p interface\n```\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "systemd-networkd suporta spoofing de endereço MAC através de link files (ver systemd.link(5) para detalhes).\n\nPara definir um endereço MAC mascarado estático:\n\n```\n/etc/systemd/network/01-mac.link\n```\n\n```\n[Match]\nPermanentMACAddress=original MAC\n\n[Link]\nMACAddress=spoofed MAC\n```\n\nPara randomizar o endereço MAC a cada boot, defina MACAddressPolicy=random ao invés de MACAddress=spoofed MAC.\n\n"
+    },
+    {
+      "title": "systemd-udevd",
+      "level": 3,
+      "content": "O Udev permite realizar o spoofing de endereços MAC através da criação de regras udev. Utilize o atributo address para encontrar o dispositivo correto pelo seu endereço MAC original, e altere-o utilizando o comando ip:\n\n```\n/etc/udev/rules.d/81-mac-spoof.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"net\", ATTR{address}==\"XX:XX:XX:XX:XX:XX\", RUN+=\"/usr/bin/ip link set dev $name address YY:YY:YY:YY:YY:YY\"\n```\n\nonde XX:XX:XX:XX:XX:XX é o endereço MAC original e YY:YY:YY:YY:YY:YY é o novo, utilizar letra minúscula para o endereço MAC.\n\n"
+    },
+    {
+      "title": "Criando um unit",
+      "level": 4,
+      "content": "Abaixo você encontra dois exemplos de unidades systemd para alterar um endereço MAC no boot, um deles configura um MAC estático usando ip e outro usa macchanger para atribuir um endereço MAC aleatório. O serviço systemd network-pre.target é utilizado para assegurar que o MAC é alterado antes de um gerenciador de rede como Netctl ou NetworkManager, systemd-networkd ou dhcpcd iniciar o serviço.\n\nUnidade systemd que configura um MAC pré-definido:\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=MAC Address Change %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ip link set dev %i address 36:aa:88:c8:75:3a\nExecStart=/usr/bin/ip link set dev %i up\n\n[Install]\nWantedBy=multi-user.target\n```\n\nUnidade systemd que configura um endereço aleatório, preservando os bytes de vendor originais da placa de rede (NIC). Confira se o macchanger está instalado:\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=macchanger on %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nExecStart=/usr/bin/macchanger -e %I\nType=oneshot\n\n[Install]\nWantedBy=multi-user.target\n```\n\nUm endereço completamente aleatório pode ser definido utilizando a opção -r, ver #macchanger.\n\n"
+    },
+    {
+      "title": "Habilitando o serviço",
+      "level": 4,
+      "content": "Adicione a interface de rede desejada ao nome do serviço (por exemplo, eth0) e habilite o serviço (por exemplo, macspoof@eth0.service).\n\nReinicie, ou pare e inicie, os serviços pré-requeridos e requeridos na ordem correta. Se estiver no controle da sua rede, verifique se o MAC alterado foi aceito pelo seu roteador, examinando as tabelas de endereços estáticos, ou DHCP, do roteador.\n\n"
+    },
+    {
+      "title": "Interfaces netctl",
+      "level": 3,
+      "content": "Você pode usar um netctl hook para executar um comando cada vez que um perfil netctl é reiniciado para uma interface de rede específica. Substitua interface pela sua interface:\n\n```\n/etc/netctl/interfaces/interface\n```\n\n```\n#!/usr/bin/env sh\n/usr/bin/macchanger -r interface\n```\n\nTorne o script executável.\n\nFonte: akendo.eu (archive)\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "Veja NetworkManager (Português)#Configurando aleatorização de endereço MAC.\n\n"
+    },
+    {
+      "title": "wpa_supplicant",
+      "level": 3,
+      "content": "wpa_supplicant pode usar um MAC aleatório para cada conexão ESS(AP) (ver [1] para detalhes).\n\nAdicione o seguinte na sua configuração:\n\n```\n/etc/wpa_supplicant/wpa_supplicant-wlan0.conf\n```\n\n```\nmac_addr=1\npreassoc_mac_addr=1\ngas_rand_mac_addr=1\n```\n\n"
+    },
+    {
+      "title": "iwd",
+      "level": 3,
+      "content": "Para randomizar o endereço MAC quando o iwd iniciar (ver iwd.config(5)} para detalhes):\n\n```\n/etc/iwd/main.conf\n```\n\n```\n[General]\nAddressRandomization=once\nAddressRandomizationRange=nic\n```\n\nEspecificar AddressRandomizationRange permite controlar qual a parte do endereço que é randomizada. Se definido para nic, apenas os octetos específicos da placa de rede (últimos três octetos) são randomizados. O endereço mac permanente da interface de rede é utilizado para os 3 octetos iniciais. Se colocado em full, todos os seis octetos do endereço são randomizados.\n\n"
+    },
+    {
+      "title": "Falha de conexão a rede DHCPv4",
+      "level": 3,
+      "content": "Se não conseguir conectar a uma rede DHCPv4 e estiver utilizando dhcpcd, que é o padrão para o NetworkManager, poderá ter que modificar a configuração dhcpcd para obter um IP.\n\n"
+    },
+    {
+      "title": "Ver também",
+      "level": 2,
+      "content": "- Wikipedia:MAC spoofing\n- Macchanger GitHub page\n- Article on DebianAdmin with more macchanger options\n\n"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "title": "MediaWiki (Português)",
+  "url": "https://wiki.archlinux.org/title/MediaWiki_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "MediaWiki é um software wiki de código aberto e livre escrito em PHP, originalmente desenvolvido para a Wikipédia. Ele também alimenta este wiki (consulte Special:Version e o repositório do GitHub).\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Para executar o MediaWiki, você precisa de três coisas:\n\n- o pacote mediawiki, o qual obtém PHP\n- um servidor web – Apache, Nginx or Lighttpd\n- um sistema de banco de dados – MySQL, PostgreSQL or SQLite\n\nPara instalar o MediaWiki no XAMPP, veja mw:Manual:Installing MediaWiki on XAMPP\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 2,
+      "content": "As etapas para obter uma configuração funcional do MediaWiki envolvem a edição das configurações do PHP e a adição dos trechos de configuração do MediaWiki.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "MediaWiki precisa da extensão iconv, então você precisa descomentar extension=iconv em /etc/php/php.ini.\n\nDependências opcionais:\n\n- Para renderização de miniaturas, instale ImageMagick ou php-gd. Se você escolher o último, você também precisa descomentar extension=gd.\n- Para mais uma normalização Unicode eficiente, descomente extension=intl.\n\nHabilite a API para seu SGBD:\n\n- Se você usa MariaDB, descomente extension=mysqli.\n- Se você usa PostgreSQL, instale php-pgsql e descomente extension=pgsql.\n- Se você usa SQLite, instale php-sqlite e descomente extension=pdo_sqlite.\n\nEm segunda, ajuste a manipulação da sessão ou você pode receber um erro fatal (PHP Fatal error: session_start(): Failed to initialize storage module[...]) localizando o caminho session.save_path. Uma boa opção pode ser /var/lib/php/sessions ou /tmp/.\n\n```\n/etc/php/php.ini\n```\n\n```\nsession.save_path = \"/var/lib/php/sessions\"\n```\n\nVocê precisará criar o diretório se ele não existir e depois restringir suas permissões:\n\n```\n# mkdir -p /var/lib/php/sessions/\n# chown http:http /var/lib/php/sessions\n# chmod go-rwx /var/lib/php/sessions\n```\n\nSe você usa open_basedir do PHP e deseja permitir uploads de arquivos, é necessário incluir /var/lib/media/wiki/ (mediawiki faz links simbólicos de images/ para /var/lib/mediawiki/).\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 4,
+      "content": "Siga Apache HTTP Server#PHP.\n\nCopie /etc/webapps/mediawiki/apache.example.conf para /etc/httpd/conf/extra/mediawiki.conf e edite-o conforme necessário.\n\nAdicione a seguinte linha a /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/mediawiki.conf\n```\n\nReinicie o daemon httpd.service.\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 4,
+      "content": "Para que o MediaWiki trabalhe com Nginx, crie o seguinte arquivo:\n\n```\n/etc/nginx/mediawiki.conf\n```\n\n```\nlocation / {\n   index index.php;\n   try_files $uri $uri/ @mediawiki;\n}\nlocation @mediawiki {\n   rewrite ^/(.*)$ /index.php;\n}\nlocation ~ \\.php5?$ {\n   include /etc/nginx/fastcgi_params;\n   fastcgi_pass unix:/var/run/php-fpm/php-fpm.sock;\n   fastcgi_index index.php5;\n   fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;\n   try_files $uri @mediawiki;\n}\nlocation ~* \\.(js|css|png|jpg|jpeg|gif|ico)$ {\n   try_files $uri /index.php;\n   expires max;\n   log_not_found off;\n}\n# Restrictions based on the .htaccess files\nlocation ^~ ^/(cache|includes|maintenance|languages|serialized|tests|images/deleted)/ {\n   deny all;\n}\nlocation ^~ ^/(bin|docs|extensions|includes|maintenance|mw-config|resources|serialized|tests)/ {\n   internal;\n}\nlocation ^~ /images/ {\n   try_files $uri /index.php;\n}\nlocation ~ /\\. {\n   access_log off;\n   log_not_found off; \n   deny all;\n}\n```\n\nCertifique-se que php-fpm está instalado em iniciado.\n\nInclua uma diretiva de servidor, semelhante a esta\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nserver {\n  listen 80;\n  server_name mediawiki;\n  root /usr/share/webapps/mediawiki;\n  index index.php;\n  charset utf-8;\n# For correct file uploads\n  client_max_body_size    100m; # Equal or more than upload_max_filesize in /etc/php/php.ini\n  client_body_timeout     60;\n  include mediawiki.conf;\n\n}\n```\n\nAo final, reinicie os daemons nginx.service e php-fpm.service.\n\n"
+    },
+    {
+      "title": "Lighttpd",
+      "level": 4,
+      "content": "Você deve ter o Lighttpd instalado e configurado. \"mod_alias\" e \"mod_rewrite\" na matriz server.modules do lighttpd são necessários. Anexe ao arquivo de configuração lighttpd as seguintes linhas\n\n```\n/etc/lighttpd/lighttpd.conf\n```\n\n```\nalias.url += (\"/mediawiki\" => \"/usr/share/webapps/mediawiki/\")\nurl.rewrite-once += (\n                \"^/mediawiki/wiki/upload/(.+)\" => \"/mediawiki/wiki/upload/$1\",\n                \"^/mediawiki/wiki/$\" => \"/mediawiki/index.php\",\n                \"^/mediawiki/wiki/([^?]*)(?:\\?(.*))?\" => \"/mediawiki/index.php?title=$1&$2\"\n)\n```\n\nReinicie o daemon lighttpd.service.\n\n"
+    },
+    {
+      "title": "Banco de dados",
+      "level": 3,
+      "content": "Configure um servidor de banco de dados conforme explicado no artigo do seu SGBD: MySQL, PostgreSQL ou SQLite.\n\nO MediaWiki pode criar automaticamente o banco de dados, se você fornecer a senha de root do banco de dados, durante a próxima etapa. Caso contrário, o banco de dados precisa ser criado manualmente, consulte as instruções do upstream.\n\n"
+    },
+    {
+      "title": "LocalSettings.php",
+      "level": 3,
+      "content": "Abra a url do wiki (geralmente http://seu_servidor/mediawiki/) em um navegador e faça a configuração inicial. Siga as instruções do upstream.\n\nO arquivo LocalSettings.php gerado é oferecido para download, salve-o em /usr/share/webapps/mediawiki/LocalSettings.php. Este arquivo define as configurações específicas do seu wiki. Sempre que você atualiza o pacote mediawiki, ele não é substituído.\n\n"
+    },
+    {
+      "title": "Matemática (texvc)",
+      "level": 3,
+      "content": "Geralmente, instalar texvc[link quebrado: package not found] e habilitá-lo na configuração é o suficiente:\n\n```\n$wgUseTeX = true;\n```\n\nSe você tiver problemas, tente aumentar os limites para comandos shell:\n\n```\n$wgMaxShellMemory = 8000000;\n$wgMaxShellFileSize = 1000000;\n$wgMaxShellTime = 300;\n```\n\n"
+    },
+    {
+      "title": "Unicode",
+      "level": 3,
+      "content": "Verifique se php, apache e mysql usam UTF-8. Caso contrário, você poderá enfrentar erros estranhos devido à incompatibilidade de codificação.\n\n"
+    },
+    {
+      "title": "VisualEditor",
+      "level": 3,
+      "content": "A extensão VisualEditor MediaWiki fornece um editor de texto rico para o MediaWiki. Siga mw:Extension:VisualEditor para instalá-lo.\n\nVocê também precisará do backend Node.js Parsoid, o qual está disponível por meio de parsoid-gitAUR[link quebrado: package not found].\n\nAjuste o caminho do MediaWiki em /usr/share/webapps/parsoid/api/localsettings.js:\n\n```\nparsoidConfig.setInterwiki( 'localhost', 'http://localhost/mediawiki/api.php' );\n```\n\nApós isso, habilite e inicie parsoid.service.\n\nComo alternativa, também é possível usar o pacote parsoidAUR[link quebrado: package not found] e configurar o serviço através do arquivo yaml, onde as seguintes linhas devem estar presentes:\n\n```\n/usr/share/webapps/parsoid/config.yaml\n```\n\n```\nuri: `'http://localhost/mediawiki/api.php'`\ndomain: 'localhost'\n```\n\nA parte correspondente nas configurações do mediawiki:\n\n```\n/usr/share/webapps/mediawiki/LocalSettings.php\n```\n\n```\n$wgVirtualRestConfig['modules']['parsoid'] = array(\n  // URL to the Parsoid instance - use port 8142 if you use the Debian package - the parameter 'URL' was first used but is now deprecated (string)\n  'url' => 'http://localhost:8000/',\n  // Parsoid \"domain\" (string, optional) - MediaWiki >= 1.26\n  'domain' => 'localhost',\n  // Parsoid \"prefix\" (string, optional) - deprecated since MediaWiki 1.26, use 'domain'\n  'prefix' => 'localhost',\n  // Forward cookies in the case of private wikis (string or false, optional)\n  'forwardCookies' => false,\n  // request timeout in seconds (integer or null, optional)\n  'timeout' => null,\n  // Parsoid HTTP proxy (string or null, optional)\n  'HTTPProxy' => null,\n  // whether to parse URL as if they were meant for RESTBase (boolean or null, optional)\n  'restbaseCompat' => null,\n);\n```\n\nApós a configuração, o serviço parsoid pode ser iniciado (reiniciado) e (se ainda não tiver sido feito) habilitado.\n\n"
+    }
+  ]
+}

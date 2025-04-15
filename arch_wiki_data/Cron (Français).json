@@ -1,0 +1,126 @@
+{
+  "title": "Cron (Français)",
+  "url": "https://wiki.archlinux.org/title/Cron_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- systemd/Timers\n\nSelon Wikipedia :\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Il existe de nombreuses implémentations de cron, mais aucune d'entre elles n'est installée par défaut car le système de base utilise systemd (Français)/Timers (Français) à la place. Consultez le guide de cron de Gentoo, qui propose des comparaisons.\n\nPaquets disponibles :\n\n- cronie\n- fcron\n- dcronAUR\n- vixie-cronAUR\n- fcron-devAUR[broken link: package not found]\n- scron-gitAUR\n\n"
+    },
+    {
+      "title": "Activation et démarrage automatique",
+      "level": 3,
+      "content": "Après l'installation, le daemon ne sera pas activé par défaut. Le paquet installé fournit probablement un service, qui peut être contrôlé par systemctl. Par exemple, cronie utilise cronie.service.\n\nConsultez /etc/cron.daily/ et les répertoires similaires pour consulter les tâches présentes. L'activation du service de cron les déclenchera tous.\n\n"
+    },
+    {
+      "title": "Gestion des erreurs des tâches",
+      "level": 3,
+      "content": "cron enregistre la sortie de stdout et stderr et tente de l'envoyer par courriel aux boites des utilisateurs via la commande sendmail. Cronie désactive la sortie du courrier si /usr/bin/sendmail n'est pas trouvé. Pour que le courrier soit écrit dans la boite d'un utilisateur, un daemon smtp doit tourner sur le système, par exemple opensmtpd. Sinon, vous pouvez installer un paquet qui fournit la commande sendmail et le configurer pour envoyer du courrier à un serveur de courrier distant. Vous pouvez également enregistrer les messages en utilisant l'option -m et en écrivant un script personnalisé.\n\n1. Éditez l'unité cronie.service.\n1. Installez esmtpAUR, msmtp, opensmtpd, sSMTP, ou écrire un script personnalisé.\n\n"
+    },
+    {
+      "title": "Exemple avec sSMTP",
+      "level": 4,
+      "content": "sSMTP est un émulateur de sendmail qui envoie des courriels d'un ordinateur local vers un serveur smtp. Bien qu'il n'y ait actuellement aucun mainteneur actif, il reste de loin le moyen le plus simple de transférer du courrier vers un mailhub configuré. Il n'y a pas de daemons à exécuter et la configuration peut être aussi simple que l'édition de 3 lignes dans un seul fichier de configuration (si votre hôte est autorisé à relayer des courriels non authentifiés par le biais de votre mailhub). sSMTP ne reçoit pas de courriel, ne développe pas d'alias et ne gère pas de file d'attente.\n\nInstallez ssmtpAUR, qui crée un lien symbolique de /usr/bin/sendmail vers /usr/bin/ssmtp. Vous devez ensuite éditer /etc/ssmtp/ssmtp.conf. Consultez sSMTP pour plus de détails. La création d'un lien symbolique vers /usr/bin/sendmail garantit que les programmes comme S-nail (ou tout autre paquets qui fournit /usr/bin/mail) fonctionneront sans modification.\n\nRedémarrez cronie pour vous assurer qu'il détecte que vous avez maintenant un /usr/bin/sendmail installé.\n\n"
+    },
+    {
+      "title": "Exemple avec msmtp",
+      "level": 4,
+      "content": "Installez msmtp-mta, qui crée un lien symbolique de /usr/bin/sendmail vers /usr/bin/msmtp. Redémarrez cronie pour vous assurer qu'elle détecte la nouvelle commande sendmail. Vous devez ensuite fournir un moyen pour msmtp de convertir votre nom d'utilisateur en adresse courriel.\n\nEnsuite, soit vous ajoutez la ligne MAILTO à votre crontab, comme ceci :\n\n```\nMAILTO=your@email.com\n```\n\nou créez /etc/msmtprc et ajoutez cette ligne :\n\n```\nalias /etc/aliases\n```\n\net créez /etc/aliases :\n\n```\nyour_username: your@email.com\n# Optional:\ndefault: your@email.com\n```\n\nPuis modifier la configuration du daemon cronie en remplaçant la commande ExecStart par :\n\n```\nExecStart=/usr/bin/crond -n -m'/usr/bin/msmtp -t'\n```\n\n"
+    },
+    {
+      "title": "Exemple avec esmtp",
+      "level": 4,
+      "content": "Installez esmtpAUR et procmailAUR.\n\nAprès l'installation, configurez le routage :\n\n```\n/etc/esmtprc\n```\n\n```\nidentity myself@myisp.com\n       hostname mail.myisp.com:25\n       username \"myself\"\n       password \"secret\"\n       starttls enabled\n       default\nmda \"/usr/bin/procmail -d %T\"\n```\n\nProcmail a besoin des privilèges root pour fonctionner en mode livraison mais ce n'est pas un problème si vous exécutez les tâches de cron en root de toute façon.\n\nPour tester que tout fonctionne correctement, créez un fichier message.txt avec \"message de test\" dedans.\n\nDepuis le même répertoire, exécutez :\n\n```\n$ sendmail nom_utilisateur < message.txt\n```\n\npuis :\n\n```\n$ cat /var/spool/mail/nom_d_utilisateur\n```\n\nVous devriez maintenant consulter le message de test ainsi que l'heure et la date de son envoi.\n\nLa sortie d'erreur de tous les tâches sera maintenant redirigée vers /var/spool/mail/user_name.\n\nEn raison du problème de privilège, il est difficile de créer et d'envoyer des courriels à root (par exemple, su -c \"\"). Vous pouvez demander à esmtp de transférer tous les courriels de root à un utilisateur ordinaire avec :\n\n```\n/etc/esmtprc\n```\n\n```\nforce_mda=\"user-name\"\n```\n\nNote: Exécutez la commande suivante pour vous assurer qu'elle dispose de la bonne permission :\n\nExécutez la commande suivante pour vous assurer qu'elle dispose de la bonne permission :\n\n```\n$ chmod 710 ~/.esmtprc\n```\n\n"
+    },
+    {
+      "title": "Exemple avec opensmtpd",
+      "level": 4,
+      "content": "Installez opensmtpd.\n\nEditez /etc/smtpd/smtpd.conf. La configuration suivante permet la livraison locale :\n\n```\nlisten on localhost\naction \"local\" mbox alias <aliases>\nmatch for local action \"local\"\n```\n\nVous pouvez procéder à un test. Tout d'abord démarrez smtpd.service. Puis faites :\n\n```\n$ echo test | sendmail user\n```\n\nVotre user peut consulter son courriel avec n'importe quel client mail capable de gérer le format mbox, ou simplement jeter un coup d'oeil au fichier /var/spool/mail/user. Si tout se passe comme prévu, activez opensmtpd pour les démarrages futurs.\n\nCette approche a l'avantage de ne pas envoyer de notifications cron locales à un serveur distant. L'inconvénient est que vous devez faire tourner un nouveau daemon.\n\n- Au moment de l'écriture, le paquet Arch opensmtpd ne crée pas tous les répertoires nécessaires sous /var/spool/smtpd, mais le daemon vous en avertira en spécifiant les propriétaires et les permissions nécessaires. Créez-les simplement comme suggéré.\n- Même si la configuration suggérée n'accepte pas les connexions distantes, il est prudent d'ajouter une couche supplémentaire de sécurité en bloquant le port 25 avec iptables (Français) ou similaire.\n\n"
+    },
+    {
+      "title": "Tâche cron longue",
+      "level": 4,
+      "content": "Supposons que ce programme soit invoqué par cron :\n\n```\n#!/bin/sh\necho \"J'ai eu une erreur récupérable !\"\nsleep 1h\n```\n\nVoici ce qui se passe :\n\n1. cron exécute le script\n1. dès que cron consulte une sortie, il lance votre MTA, et lui fournit les en-têtes. Il laisse le tube ouvert, parce que la tâche n'est pas terminé et qu'il peut y avoir d'autres sorties.\n1. le MTA ouvre la connexion à postfix et laisse cette connexion ouverte pendant qu'il attend le reste du corps.\n1. postfix ferme la connexion inactive après moins d'une heure et vous obtenez une erreur comme celle-ci : smtpmsg='421 … Error: timeout exceeded' errormsg='the server did not accept the mail'\n\n```\nsmtpmsg='421 … Error: timeout exceeded' errormsg='the server did not accept the mail'\n```\n\nPour résoudre ce problème, vous pouvez utiliser la commande chronic ou sponge de moreutils. Depuis leur page de manuel respective :\n\nChronic aussi met en mémoire tampon la sortie de la commande avant d'ouvrir sa sortie standard.\n\n"
+    },
+    {
+      "title": "Format de la crontab",
+      "level": 2,
+      "content": "Le format de base d'une crontab est :\n\n```\nminute heure jour_du_mois mois jour_de_la_semaine commande\n```\n\n- Les valeurs de minute peuvent être comprises entre 0 et 59.\n- Les valeurs des heures peuvent être comprises entre 0 et 23.\n- Les valeurs de jour_du_mois peuvent aller de 1 à 31.\n- Les valeurs de mois peuvent aller de 1 à 12.\n- Les valeurs de jour_de_la_semaine peuvent aller de 0 à 6, avec 0 pour le dimanche.\n\nLes espaces sont utilisés pour séparer les champs. Pour affiner votre organisation, vous pouvez également utiliser l'un des symboles suivants :\n\nTable content:\nSymbole | Description\n* | Caractère générique, spécifie tous les intervalles de temps possibles\n, | Liste de plusieurs valeurs séparées par une virgule.\n- | Spécifie un intervalle entre deux nombres, séparés par un trait d'union\n/ | Spécifier une périodicité/fréquence à l'aide d'une barre oblique\n\nPar exemple, la ligne :\n\n```\n*/5 9-16 * 1-5,9-12 1-5 ~/bin/j_adore_cron.sh\n```\n\nexécutera le script j_adore_cron.sh à intervalles de cinq minutes de 9 h à 16 h 55 les jours de semaine, sauf pendant les mois de juin, juillet et août.\n\nDe plus, crontab possède quelques mots-clés spéciaux :\n\nTable content:\nKeyword | Description\n@reboot | au démarrage\n@yearly | une fois par an\n@annually | identique à @yearly\n@monthly | une fois par mois\n@weekly | une fois par semaine\n@daily | une fois par jour\n@midnight | identique @daily\n@hourly | une fois par heure\n\nPar exemple :\n\n```\n@reboot ~/bin/j_adore_cron.sh\n```\n\nexécutera le script j_adore_cron.sh au démarrage.\n\nPour en savoir plus, consultez : https://www.adminschoice.com/crontab-quick-reference\n\nVous trouverez ci-dessous d'autres exemples et des techniques de configuration avancées.\n\n"
+    },
+    {
+      "title": "Commandes de base",
+      "level": 2,
+      "content": "Les crontabs ne doivent jamais être modifiés directement ; les utilisateurs doivent plutôt utiliser le programme crontab pour travailler avec leurs crontabs. Pour avoir accès à cette commande, l'utilisateur doit être membre du groupe users (consultez la commande gpasswd).\n\nPour visualiser leurs crontabs, les utilisateurs doivent lancer la commande :\n\n```\n$ crontab -l\n```\n\nPour modifier leurs crontabs, ils peuvent utiliser :\n\n```\n$ crontab -e\n```\n\nPour supprimer leurs crontabs, ils doivent utiliser :\n\n```\n$ crontab -r\n```\n\nSi un utilisateur possède une crontab enregistrée et qu'il souhaite écraser complètement son ancienne crontab, il doit utiliser :\n\n```\n$ crontab saved_crontab_filename.\n```\n\nPour écraser une crontab à partir de la ligne de commande (Wikipedia:fr:Flux standard#Entrée standard), utilisez\n\n```\n$ crontab -\n```\n\nPour modifier la crontab de quelqu'un d'autre, lancez la commande suivante en tant que root :\n\n```\n# crontab -u nom d'utilisateur -e\n```\n\nCe même format (ajouter -u nom d'utilisateur à une commande) fonctionne également pour lister et supprimer les crontabs.\n\n"
+    },
+    {
+      "title": "Exemples",
+      "level": 2,
+      "content": "L'entrée :\n\n```\n01 * * * * /bin/echo Hello, world !\n```\n\nexécute la commande /bin/echo Hello, world! à la première minute de chaque heure de chaque jour de chaque mois (c'est-à-dire à 12:01, 1:01, 2:01, etc.).\n\nDe même :\n\n```\n*/5 * * jan mon-fri /bin/echo Hello, world !\n```\n\nexécute le même travail toutes les cinq minutes les jours de la semaine pendant le mois de janvier (c'est-à-dire à 12:00, 12:05, 12:10, etc.).\n\nLa ligne (comme indiqué dans crontab(5)) :\n\n```\n*0,*5 9-16 * 1-5,9-12 1-5 /home/user/bin/j_adore_cron.sh\n```\n\nexécutera le script j_adore_cron.sh à intervalles de cinq minutes de 9 h à 17 h (à l'exception de 17 h) tous les jours de la semaine (du lundi au vendredi) de chaque mois, sauf en été (juin, juillet et août).\n\nLes paramètres périodiques peuvent également être saisis comme dans ce modèle crontab :\n\n```\n# Chronological table of program loadings                                       \n# Edit with \"crontab\" for proper functionality, \"man 5 crontab\" for formatting\n# User: johndoe\n\n# mm  hh  DD  MM  W /path/progam [--option]...  ( W = weekday: 0-6 [Sun=0] )\n  21  01  *   *   * /usr/bin/systemctl hibernate\n  @weekly           $HOME/.local/bin/trash-empty\n```\n\nVoici quelques exemples explicites de syntaxe crontab :\n\n```\n30 4 echo \"It is now 4:30 am.\"\n0 22 echo \"It is now 10 pm.\"\n30 15 25 12 echo \"It is 3:30pm on Christmas Day.\"\n30 3 * * * echo \"Remind me that it's 3:30am every day.\"\n0 * * * * echo \"It is the start of a new hour.\"\n0 6 1,15 * * echo \"At 6am on the 1st and 15th of every month.\"\n0 6 * * 2,3,5 echo \"At 6am on Tuesday, Wednesday and Thursdays.\"\n59 23 * * 1-5 echo \"Just before midnight on weekdays.\"\n0 */2 * * * echo \"Every two hours.\"\n0 20 * * 4 echo \"8pm on a Thursday.\"\n0 20 * * Thu echo \"8pm on a Thursday.\"\n*/15 9-17 * * 2-5 echo \"Every 15 minutes from 9am-5pm on weekdays.\"\n@yearly echo \"Happy New Year!\"\n```\n\n"
+    },
+    {
+      "title": "Éditeur par défaut",
+      "level": 2,
+      "content": "Pour utiliser un autre éditeur par défaut, définissez la variable d'environnement EDITOR dans un script d'initialisation du shell comme décrit dans les variables d'environnement.\n\nEn tant qu'utilisateur normal, su devra être utilisé au lieu de sudo pour que la variable d'environnement soit tirée correctement :\n\n```\n$ su -c \"crontab -e\"\n```\n\nPour avoir un alias à cette printf est nécessaire pour porter la chaîne arbitraire car su se lance dans un nouveau shell :\n\n```\nalias scron=\"su -c $(printf \"%q \" \"crontab -e\")\"\n```\n\n"
+    },
+    {
+      "title": "Exécution d'applications basées sur le serveur X.org",
+      "level": 2,
+      "content": "Cron ne s'exécute pas sous le serveur X.org ; il ne peut donc pas connaître les variables d'environnement nécessaires pour pouvoir lancer une application serveur X.org ; il faudra donc les définir. On peut utiliser un programme comme xuserrun-gitAUR pour le faire :\n\n```\n17 02 * ... /usr/bin/xuserrun /usr/bin/xclock\n```\n\nOu bien ils peuvent être définis manuellement (echo $DISPLAY donnera la valeur actuelle de DISPLAY) :\n\n```\n17 02 * ... env DISPLAY=:0 /usr/bin/xclock\n```\n\nSi vous exécutez notify-send pour les notifications de bureau dans cron, notify-send envoie des valeurs à dbus. Il doit donc dire à dbus de se connecter au bon bus. L'adresse peut être trouvée en examinant la variable d'environnement DBUS_SESSION_BUS_ADDRESS et en lui donnant la même valeur. Donc :\n\n```\n17 02 * ... env DBUS_SESSION_BUS_ADDRESS=votre-adresse notify-send 'Machin truc'\n```\n\nSi cela est fait par SSH, par exemple, la permission devra être donnée :\n\n```\n# xhost +si:localuser:$(whoami)\n```\n\n"
+    },
+    {
+      "title": "Traitement asynchrone des tâches",
+      "level": 2,
+      "content": "Si vous éteignez régulièrement votre ordinateur mais que vous ne voulez pas manquer les travaux, il existe quelques solutions (de la plus simple à la plus difficile) :\n\n"
+    },
+    {
+      "title": "Cronie",
+      "level": 3,
+      "content": "cronie est livré avec anacron inclus. La page d'accueil du projet dit :\n\nCronie contient le daemon UNIX standard crond qui exécute des programmes spécifiés à des heures programmées et les outils associés. Il est basé sur le cron original et possède des améliorations de sécurité et de configuration comme la possibilité d'utiliser pam et SELinux.\n\n"
+    },
+    {
+      "title": "Dcron",
+      "level": 3,
+      "content": "dcronAUR prend en charge de base le traitement asynchrone des tâches. Il suffit de le mettre avec @hourly, @daily, @weekly ou @monthly avec un nom de tâche, comme ceci :\n\n```\n@hourly ID=meilleure_tache echo Cete tâche est très utile.\n```\n\n"
+    },
+    {
+      "title": "Cronwhip",
+      "level": 3,
+      "content": "cronwhipAUR est un script pour exécuter automatiquement les tâches cron manquées ; il fonctionne avec l'ancienne implémentation cron par défaut, dcron. Consultez également le fil de discussion du forum [1].\n\n"
+    },
+    {
+      "title": "Anacron",
+      "level": 3,
+      "content": "Anacron est un remplacement complet de dcron qui traite les tâches de manière asynchrone.\n\nIl est fourni par cronie. Le fichier de configuration est /etc/anacrontab. Des informations sur le format peuvent être trouvées dans anacrontab(5). L'exécution de anacron -T testera la validité de /etc/anacrontab.\n\n"
+    },
+    {
+      "title": "Fcron",
+      "level": 3,
+      "content": "Comme anacron, fcron suppose que l'ordinateur n'est pas toujours en marche et, contrairement à anacron, il peut programmer des événements à des intervalles plus courts qu'une journée, ce qui peut être utile pour les systèmes qui suspendent/hibernent régulièrement (comme un ordinateur portable). Comme cronwhip, fcron peut exécuter des tâches qui auraient dû être exécutées pendant le temps d'arrêt de l'ordinateur.\n\nSi vous remplacez cronie par fcron, sachez que le répertoire de spool est /var/spool/fcron et que la commande fcrontab est utilisée à la place de crontab pour modifier les crontabs de l'utilisateur. Ces crontabs sont stockés dans un format binaire avec la version texte à côté sous le nom de foo.orig dans le répertoire spool. Tous les scripts qui modifient manuellement les crontabs des utilisateurs peuvent avoir besoin d'être ajustés en raison de cette différence de comportement.\n\nUn script rapide qui peut aider à convertir les crontabs utilisateurs traditionnels au format fcron :\n\n```\ncd /var/spool/cron && (\n for ctab in * ; do\n  fcrontab ${ctab} -u ${ctab}\n done\n)\n```\n\nConsultez également le fil de discussion du forum [2].\n\n"
+    },
+    {
+      "title": "Assurer l'exclusivité",
+      "level": 2,
+      "content": "Si vous exécutez des tâches qui peuvent durer longtemps (par exemple, une sauvegarde peut soudainement durer longtemps, en raison de nombreux changements ou d'une connexion réseau particulièrement lente), flock (util-linux) peut garantir que la tâche cron ne démarrera pas une deuxième fois. (util-linux) peut garantir que la tâche cron ne démarrera pas une seconde fois.\n\n```\n5,35 * * * * /usr/bin/flock -n /tmp/lock.backup /root/make-backup.sh\n```\n\n"
+    },
+    {
+      "title": "Cronie",
+      "level": 2,
+      "content": "La hiérarchie des fichiers pertinents pour cronie est la suivante :\n\n```\n/etc/\n     |----- cron.d/\n              | ----- 0hourly\n     |----- cron.minutely/\n     |----- cron.hourly/\n              | ----- 0anacron\n     |----- anacrontab\n     |----- cron.daily/\n     |----- cron.monthly/\n     |----- cron.weekly/\n     |----- crontab\n     |----- cron.deny\n```\n\nCronie fournit à la fois les fonctionnalités cron et anacron : cron exécute des tâches à intervalles réguliers (jusqu'à une granularité d'une minute) tant que le système est disponible à l'heure spécifiée, tandis que anacron exécute des commandes à des intervalles spécifiés en jours. Contrairement à cron, il ne suppose pas que le système fonctionne en permanence. Chaque fois que le système est en marche, anacron vérifie s'il y a des travaux qui auraient dû être exécutés et les traite en conséquence.\n\nUne tâche cron peut être définie dans un fichier de type crontab dans le répertoire /etc/cron.d ou ajoutée dans le fichier /etc/crontab. Notez que ce dernier n'est pas présent par défaut mais est utilisé s'il existe. Selon les instructions de /etc/cron.d/0hourly, tout fichier exécutable dans /etc/cron.hourly sera lancé toutes les heures (par défaut à la minute 1 de l'heure). Les fichiers dans /etc/cron.minutely sont exécutés toutes les minutes si cela est indiqué dans /etc/cron.d/0hourly. Les exécutables sont généralement des scripts shell, des liens symboliques vers des fichiers exécutables peuvent également être utilisés. Le fichier /etc/cron.deny inclut la liste des utilisateurs non autorisés à utiliser crontab, sans ce fichier, seuls les utilisateurs listés dans /etc/cron.allow peuvent l'utiliser.\n\nAnacron fonctionne de manière similaire, en exécutant les fichiers des répertoires /etc/cron.daily, /etc/cron.weekly et /etc/cron.monthly, placés là en fonction de la fréquence de travail souhaitée. Le travail cron /etc/cron.hourly/0anacron s'assure que anacron est lancé une fois par jour pour effectuer ses tâches en attente.\n\n- Cronie utilise run-parts pour exécuter les scripts dans les différents répertoires. Les noms de fichiers ne doivent pas inclure de point (.) car run-parts, dans son mode par défaut, les ignorera silencieusement (consultez run-parts(8)). Les noms doivent être composés uniquement de lettres majuscules et minuscules, de chiffres, de traits de soulignement et de traits d'union en moins.\n- La sortie de systemctl status cronie peut afficher un message tel que CAN'T OPEN (/etc/crontab) : No such file or directory. Cependant, ceci peut être ignoré puisque cronie n'en a pas besoin.\n- Cronie est particulier quant aux permissions pour /etc/cron.d/0hourly. Aucune des tâches de /etc/cron.d/{hourly,weekly,daily} ... etc ne sera exécutée (y compris le lanceur anacron) si /etc/cron.d/0hourly est endommagé ou a des permissions incorrectes. pacman -Qkk cronie peut montrer si vous avez de tels problèmes.\n\n```\n0 1 5 10 * /path/to/script.sh >/dev/null 2>&1\n```\n\n"
+    },
+    {
+      "title": "Dcron",
+      "level": 2,
+      "content": "Le daemon cron analyse un fichier de configuration appelé crontab. Chaque utilisateur du système peut maintenir un fichier crontab distinct pour programmer des commandes individuellement. Le crontab de l'utilisateur root est utilisé pour planifier les tâches de l'ensemble du système (bien que les utilisateurs puissent choisir d'utiliser /etc/crontab ou le répertoire /etc/cron.d, selon l'implémentation de cron qu'ils choisissent).\n\n```\n/var/spool/cron/root\n```\n\n```\n# Exécuter la commande à un moment programmé\n# Modifier avec 'crontab -e' pour vérifier les erreurs, man 1 crontab pour un format acceptable.\n\n# <@freq> <balises et commande>\n@hourly ID=sys-hourly /usr/sbin/run-cron /etc/cron.hourly\n@daily ID=sys-daily /usr/sbin/run-cron /etc/cron.daily\n@weekly ID=sys-weekly /usr/sbin/run-cron /etc/cron.weekly\n@monthly ID=sys-monthly /usr/sbin/run-cron /etc/cron.monthly\n\n# mm hh DD MM W /path/command (ou tags) # W = semaine : 0-6, Sun=0\n  21 01 * * * /usr/bin/systemctl suspend\n```\n\nCes lignes illustrent l'un des formats que peuvent avoir les entrées crontab, à savoir des champs séparés par des espaces blancs spécifiant :\n\n1. @period\n1. ID=jobname (cette balise est spécifique à dcron)\n1. commande\n\nL'autre format standard pour les entrées crontab est :\n\n1. minute\n1. heure\n1. jour\n1. mois\n1. Jour de la semaine\n1. commande\n\nLes fichiers crontab eux-mêmes sont généralement stockés dans /var/spool/cron/username. Par exemple, le crontab de root se trouve dans /var/spool/cron/root.\n\nConsultez la page de manuel de crontab pour plus d'informations et des exemples de configuration.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Guide du Cron de Gentoo Linux\n- crontab.guru - éditeur en ligne pour les expressions de cronjob.\n\n"
+    }
+  ]
+}

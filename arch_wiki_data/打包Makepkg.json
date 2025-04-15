@@ -1,0 +1,171 @@
+{
+  "title": "打包Makepkg",
+  "url": "https://wiki.archlinux.org/title/%E6%89%93%E5%8C%85Makepkg",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Arch build system\n- Arch User Repository\n- Creating packages\n- GnuPG\n- Official repositories\n- OpenPGP\n- pacman\n- .SRCINFO\n\nmakepkg is a script to automate the building of packages. The requirements for using the script are a build-capable Unix platform and a PKGBUILD.\n\nmakepkg is provided by the pacman package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The system configuration is available in /etc/makepkg.conf, but user-specific changes can be made in $XDG_CONFIG_HOME/pacman/makepkg.conf or ~/.makepkg.conf. Also, system wide changes can be made with a drop-in file /etc/makepkg.conf.d/makepkg.conf. It is recommended to review the configuration prior to building packages.\n\nSee makepkg.conf(5) for more information.\n\n"
+    },
+    {
+      "title": "Packager information",
+      "level": 3,
+      "content": "Each package is tagged with metadata identifying amongst others also the packager. By default, user-compiled packages are marked with Unknown Packager. If multiple users will be compiling packages on a system, or if one is otherwise distributing packages to other users, it is convenient to provide real contact. This can be done by setting the PACKAGER variable in makepkg.conf.\n\nTo check this on an installed package:\n\n```\n$ pacman -Qi package\n```\n\n```\n...\nPackager       : John Doe <john@doe.com>\n...\n```\n\nTo automatically produce signed packages, also set the GPGKEY variable in makepkg.conf.\n\n"
+    },
+    {
+      "title": "Package output",
+      "level": 3,
+      "content": "By default, makepkg creates the package tarballs in the working directory and downloads source data directly to the src/ directory. Custom paths can be configured, for example to keep all built packages in ~/build/packages/ and all sources in ~/build/sources/.\n\nConfigure the following makepkg.conf variables if needed:\n\n- PKGDEST — directory for storing resulting packages\n- SRCDEST — directory for storing source data (symbolic links will be placed to src/ if it points elsewhere)\n- SRCPKGDEST — directory for storing resulting source packages (built with makepkg -S)\n\nYou can also use relative paths inside each package directory.\n\n"
+    },
+    {
+      "title": "Signature checking",
+      "level": 3,
+      "content": "If a signature file in the form of .sig or .asc is part of the PKGBUILD source array, makepkg automatically attempts to verify it. In case the user's keyring does not contain the needed public key for signature verification, makepkg will abort the installation with a message that the PGP key could not be verified.\n\nIf a needed public key for a package is missing, the PKGBUILD will most likely contain a validpgpkeys entry with the required key IDs. Import it manually, or find it on a keyserver and import it from there. To temporarily disable signature checking, run makepkg with the --skippgpcheck option.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Before continuing, install the base-devel meta package. Dependencies of this package are not required to be listed as build-time dependencies (makedepends) in PKGBUILD files.\n\n- Make sure sudo is configured properly for commands passed to pacman. Alternatively a different authorization command can be specified with PACMAN_AUTH in the makepkg.conf(5) configuration file.\n- Running makepkg itself as root is disallowed.[2] Besides how a PKGBUILD may contain arbitrary commands, building as root is generally considered unsafe.[3] Users who have no access to a regular user account should run makepkg as the nobody user, e.g. using the command runuser -u nobody makepkg.\n\nTo build a package, one must first create a PKGBUILD, or build script, as described in Creating packages. Existing scripts are available from the Arch build system (ABS) tree or the AUR. Once in possession of a PKGBUILD, change to the directory where it is saved and run the following command to build the package:\n\n```\n$ makepkg\n```\n\nIf required dependencies are missing, makepkg will issue a warning before failing. To build the package and install needed dependencies, add the flag -s/--syncdeps:\n\n```\n$ makepkg --syncdeps\n```\n\nAdding the -r/--rmdeps flag causes makepkg to remove the make dependencies later, which are no longer needed. If constantly building packages, consider using Pacman/Tips and tricks#Removing unused packages (orphans) once in a while instead.\n\n- These dependencies must be available in the configured repositories; see pacman#Repositories and mirrors for details. Alternatively, one can manually install dependencies prior to building (pacman -S --asdeps dep1 dep2).\n- Only global values are used when installing dependencies, i.e any override done in a split package's packaging function will not be used.\n\nOnce all dependencies are satisfied and the package builds successfully, a package file (pkgname-pkgver.pkg.tar.zst) will be created in the working directory. To install, use -i/--install (same as pacman -U pkgname-pkgver.pkg.tar.zst):\n\n```\n$ makepkg --install\n```\n\nTo clean up leftover files and directories, such as files extracted to the $srcdir, add the option -c/--clean. This is useful for multiple builds of the same package or updating the package version, while using the same build directory. It prevents obsolete and remnant files from carrying over to the new builds:\n\n```\n$ makepkg --clean\n```\n\nFor more, see makepkg(8).\n\n"
+    },
+    {
+      "title": "Optimization",
+      "level": 2,
+      "content": "The default options match the options devtools uses to build packages for the official repositories.[4] As such, end users may realize more or less significant gains by tweaking the following options to match their local environment.\n\n"
+    },
+    {
+      "title": "Building optimized binaries",
+      "level": 3,
+      "content": "A performance improvement of the packaged software can be achieved by enabling compiler optimizations for the host machine. The downside is that binaries compiled for a specific processor architecture will not run correctly on other machines. On x86_64 machines, there are rarely significant enough real world performance gains that would warrant investing the time to rebuild official packages.\n\nHowever, it is very easy to reduce performance by using \"nonstandard\" compiler flags. Many compiler optimizations are only useful in certain situations and should not be indiscriminately applied to every package. Unless benchmark data are available to prove that something is faster, there is a very good chance it is not! The Gentoo GCC optimization and Safe CFLAGS wiki articles provide more in-depth information about compiler optimization.\n\nThe options passed to a C/C++ compiler (e.g. gcc or clang) are controlled by the CFLAGS, CXXFLAGS, and CPPFLAGS environment variables. For use in the Arch build system, makepkg exposes these environment variables as configuration options in makepkg.conf. The default values are configured to produce generic binaries that can be installed on a wide range of machines.\n\n- Keep in mind that not all build systems use the variables configured in makepkg.conf. For example, cmake disregards the preprocessor options environment variable, CPPFLAGS. Consequently, many PKGBUILDs contain workarounds with options specific to the build system used by the packaged software.\n- The configuration provided with the source code in the Makefile or a specific argument in the compilation command line takes precedence and can potentially override the one in makepkg.conf.\n\nGCC can automatically detect and enable safe architecture-specific optimizations. To use this feature, first remove any -march and -mtune flags, then add -march=native. For example:\n\n```\n/etc/makepkg.conf\n```\n\n```\nCFLAGS=\"-march=native -O2 -pipe ...\"\nCXXFLAGS=\"${CFLAGS} ...\"\n```\n\nTo see what flags this enables, run:\n\n```\n$ gcc -march=native -v -Q --help=target\n```\n\nNote: **will not** \n\nStarting in pacman version 5.2.2, makepkg.conf also includes overrides for the RUSTFLAGS environment variable, for flags given to the Rust compiler. The Rust compiler can also detect and enable architecture-specific optimizations by adding -C target-cpu=native to the given RUSTFLAGS value:\n\n```\n/etc/makepkg.conf.d/rust.conf\n```\n\n```\nRUSTFLAGS=\"-C opt-level=2 -C target-cpu=native\"\n```\n\nTo see which CPU features this will enable, run:\n\n```\n$ rustc -C target-cpu=native --print cfg\n```\n\nRunning --print cfg without -C target-cpu=native will print the default configuration. The opt-level parameter can be changed to 3, s, or z as desired. See The Rust compiler's documentation for details.\n\n"
+    },
+    {
+      "title": "Parallel compilation",
+      "level": 4,
+      "content": "The make build system uses the MAKEFLAGS environment variable to specify additional options for make. The variable can also be set in the makepkg.conf file.\n\nUsers with multi-core/multi-processor systems can specify the number of jobs to run simultaneously. This can be accomplished with the use of nproc(1) to determine the number of available processors, e.g. MAKEFLAGS=\"--jobs=$(nproc)\".\n\nSome PKGBUILDs specifically override this with -j1, because of race conditions in certain versions or simply because it is not supported in the first place. Packages that fail to build because of this should be reported on the bug tracker (or in the case of AUR packages, to the package maintainer) after making sure that the error is indeed being caused by MAKEFLAGS.\n\nSee make(1) for a complete list of available options.\n\n"
+    },
+    {
+      "title": "Building from files in memory",
+      "level": 4,
+      "content": "As compiling requires many I/O operations and handling of small files, moving the working directory to a tmpfs may bring improvements in build times.\n\nThe BUILDDIR variable can be temporarily exported to makepkg to set the build directory to an existing tmpfs. For example:\n\n```\n$ BUILDDIR=/tmp/makepkg makepkg\n```\n\nPersistent configuration can be done in makepkg.conf by uncommenting the BUILDDIR option, which is found at the end of the BUILD ENVIRONMENT section in the default /etc/makepkg.conf file. Setting its value to e.g. BUILDDIR=/tmp/makepkg will make use of the Arch's default /tmp temporary file system.\n\n- Avoid compiling larger packages in tmpfs to prevent running out of memory.\n- The tmpfs directory must be mounted without the noexec option, otherwise it will prevent built binaries from being executed.\n- Keep in mind that packages compiled in tmpfs will not persist across reboot. Consider setting the PKGDEST option appropriately to move the built package automatically to a persistent directory.\n\n"
+    },
+    {
+      "title": "Using a compilation cache",
+      "level": 4,
+      "content": "The use of ccache can improve build times by caching the results of compilations for successive use.\n\n"
+    },
+    {
+      "title": "Using mold linker",
+      "level": 4,
+      "content": "mold is a drop-in replacement for ld/lld linkers, which claims to be significantly faster.\n\nTo use mold, append -fuse-ld=mold to LDFLAGS. For example:\n\n```\n/etc/makepkg.conf\n```\n\n```\nLDFLAGS=\"... -fuse-ld=mold\"\n```\n\nTo pass extra options to mold, additionally add those to LDFLAGS. For example:\n\n```\n/etc/makepkg.conf\n```\n\n```\nLDFLAGS=\"... -fuse-ld=mold -Wl,--separate-debug-file\"\n```\n\nTo use mold for Rust packages, append -C link-arg=-fuse-ld=mold to RUSTFLAGS. For example:\n\n```\n/etc/makepkg.conf.d/rust.conf\n```\n\n```\nRUSTFLAGS=\"... -C link-arg=-fuse-ld=mold\"\n```\n\n"
+    },
+    {
+      "title": "Disable debug packages and LTO",
+      "level": 4,
+      "content": "Commit 90bf367e included in pacman 6.0.2-9 from Feburary 2024 enabled the debug and lto options by default.\n\nBuilding debug packages enables the official repositories to provide more tools to troubleshoot issues for users (archlinux/packaging/packages/pacman#23#note_173528), but it is not required when building packages on your own and slows down the build process. See archlinux/packaging/packages/pacman#23#note_173782.\n\nLink-time optimization produces more optimized binaries but greatly lengthens the build process (archlinux/packaging/packages/pacman#23#note_173678), which might not be a desired tradeoff.\n\nTo disable those options, add a ! character directly in front of them in the OPTIONS=() array, e.g. OPTIONS=(...!debug !lto...).\n\n"
+    },
+    {
+      "title": "Use other compression algorithms",
+      "level": 4,
+      "content": "To speed up both packaging and installation, with the tradeoff of having larger package archives, change PKGEXT.\n\nFor example, the following skips compression of the package file, which will in turn have no need to be decompressed on install:\n\n```\n$ PKGEXT='.pkg.tar' makepkg\n```\n\nAs another example, the following uses the LZ4 algorithm, which is focused on speed:\n\n```\n$ PKGEXT='.pkg.tar.lz4' makepkg\n```\n\nTo make one of these settings permanent, set PKGEXT in /etc/makepkg.conf.\n\n"
+    },
+    {
+      "title": "Utilizing multiple cores on compression",
+      "level": 4,
+      "content": "zstd supports symmetric multiprocessing (SMP) via the -T/--threads flag to speed up compression. The -T0 flag is included by default in the COMPRESSZST array in /etc/makepkg.conf, which lets zstd use as many threads as there are physical CPU cores to compress packages. The number of used threads can be further increased by instructing zstd to base it on the logical CPU count using the --auto-threads=logical flag:\n\n```\nCOMPRESSZST=(zstd -c -T0 --auto-threads=logical -)\n```\n\nlz4 and xz are multithreaded by default, so nothing needs to be changed in /etc/makepkg.conf.\n\npigz is a drop-in, parallel implementation for gzip which by default uses all available CPU cores (the -p/--processes flag can be used to employ less cores):\n\n```\nCOMPRESSGZ=(pigz -c -f -n)\n```\n\npbzip2 is a drop-in, parallel implementation for bzip2 which also uses all available CPU cores by default. The -p# flag can be used to employ less cores (note: no space between the -p and number of cores).\n\n```\nCOMPRESSBZ2=(pbzip2 -c -f)\n```\n\nlbzip2 is another drop-in, parallel implementation for bzip2 which also uses all available CPU cores by default. The -n flag can be used to employ less cores.\n\n```\nCOMPRESSBZ2=(lbzip2 -c -f)\n```\n\nplzipAUR is a multithreaded implementation for lzip which also uses all available CPU cores by default. The -n/--threads flag can be used to employ less cores.\n\n```\nCOMPRESSLZ=(plzip -c -f)\n```\n\n"
+    },
+    {
+      "title": "Changing compression level",
+      "level": 4,
+      "content": "Several compression algorithms (including zstd and xz) support setting a compression level which defines a tradeoff between speed, memory and compression efficiency.\n\n"
+    },
+    {
+      "title": "Defining the sources location",
+      "level": 4,
+      "content": "Make use of SRCDEST, especially when building VCS packages, to save time acquiring and unpacking sources in subsequent rebuilds.\n\n"
+    },
+    {
+      "title": "Generate new checksums",
+      "level": 3,
+      "content": "Install pacman-contrib and run the following command in the same directory as the PKGBUILD file to generate new checksums:\n\n```\n$ updpkgsums\n```\n\nupdpkgsums uses makepkg --geninteg to generate the checksums. See this forum discussion for more details.\n\nThe checksums can also be obtained with e.g sha256sum and added to the sha256sums array by hand.\n\n"
+    },
+    {
+      "title": "Build from local source files",
+      "level": 3,
+      "content": "If you want to make changes to the source code you can download the source code without building the package by using the -o, --nobuild Download and extract files only option.\n\n```\n$ makepkg -o\n```\n\nYou can now make changes to the sources and then build the package by using the -e, --noextract Do not extract source files (use existing $srcdir/ dir) option. Use the -f option to overwrite already built and existing packages.\n\n```\n$ makepkg -ef\n```\n\n"
+    },
+    {
+      "title": "Show packages with specific packager",
+      "level": 3,
+      "content": "expac is a pacman database extraction utility. This command shows all packages installed on the system with the packager named packagername:\n\n```\n$ expac \"%n %p\" | grep \"packagername\" | column -t\n```\n\nThis shows all packages installed on the system with the packager set in the /etc/makepkg variable PACKAGER. This shows only packages that are in a repository defined in /etc/pacman.conf.\n\n```\n$ . /etc/makepkg.conf; grep -xvFf <(pacman -Qqm) <(expac \"%n\\t%p\" | grep \"$PACKAGER$\" | cut -f1)\n```\n\n"
+    },
+    {
+      "title": "Build 32-bit packages on a 64-bit system",
+      "level": 3,
+      "content": "See 32-bit package guidelines.\n\n"
+    },
+    {
+      "title": "Unattended package signing",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with GnuPG#Unattended_passphrase.** This article or section is a candidate for merging with GnuPG#Unattended_passphrase.\n\nThis article or section is a candidate for merging with GnuPG#Unattended_passphrase.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nA person may not be available to provide the passphrase for the gpg private key used to sign with in automated build environments such as Jenkins. It is ill-advised to store a private gpg key on a system without a passphrase.\n\nA resulting zst package made with makepkg can still be signed after creation:\n\n```\n$ gpg --detach-sign --pinentry-mode loopback --passphrase --passphrase-fd 0 --output NewlyBuilt.pkg.tar.zst.sig --sign NewlyBuilt.pkg.tar.zst\n```\n\nwhere the GPG passphrase is securely provided and obscured by your automation suite of choice.\n\nThe resulting zst and sig file can be referenced by pacman clients expecting a valid signature and repositories created with repo-add --sign when hosting your own repo.\n\n"
+    },
+    {
+      "title": "Magnet URIs",
+      "level": 3,
+      "content": "Support for magnet URIs resources (with magnet:// prefix) in the source field can be added using the transmission-dlagentAUR download agent.\n\n"
+    },
+    {
+      "title": "Running makepkg in a systemd control group",
+      "level": 3,
+      "content": "If the package you are building takes too many resources to build with your default make flags, which are otherwise set properly for most packages, you can try running it in its own control group. makepkg-cgAUR is a wrapper for makepkg that achieved this via systemd control groups (see systemd.resource-control(5)).\n\n"
+    },
+    {
+      "title": "Running with idle scheduling policy",
+      "level": 3,
+      "content": "Package build process can lead to high CPU utilization, especially in case of #Parallel compilation. Under heavy CPU load, the system can issue a significant slowdown up to becoming unusable, even with the highest nice(1) value. User interface and foreground applications may stutter or even became unresponsive.\n\nThis can be worked around by changing the scheduling policy to SCHED_IDLE before running makepkg. It ensures that package building process does not interfere with regular tasks and only utilizes remaining unused CPU time.\n\nFrom sched(7) § SCHED_IDLE: Scheduling very low priority jobs:\n\nThe SCHED_IDLE policy can be set by running chrt(1) command with the -i flag, specifying priority 0 (the only valid option for SCHED_IDLE) and specifying the PID of the current shell.\n\nFor most shells:\n\n```\n$ chrt -iap 0 $$\n```\n\nFor the fish shell, where $$ is not set:\n\n```\n$ chrt -iap 0 %self\n```\n\n"
+    },
+    {
+      "title": "Relative paths inside each package directory",
+      "level": 3,
+      "content": "Instead of using absolute paths for the package output options, you can also configure relative paths inside each package directory.\n\nFor example, you can define target paths in your makepkg.conf file as follows. The $startdir variable refers to the directory where a PKGBUILD is located when you build a package.\n\n```\nPKGDEST=\"$startdir/build/packages/\"\nSRCDEST=\"$startdir/build/sources/\"\nSRCPKGDEST=\"$startdir/build/srcpackages/\"\nLOGDEST=\"$startdir/logs/\"\n```\n\nThis will result in:\n\n- Built packages will be stored in: \"package directory\"/build/packages/\n- All downloaded source files will be stored in: \"package directory\"/build/sources/\n- Built source packages will be stored in: \"package directory\"/build/srcpackages/\n- All logs will be stored in: \"package directory\"/logs/\n\nmakepkg will still create src/ and pkg/ directories as usual, so this is expected behaviour.\n\n"
+    },
+    {
+      "title": "Specifying install directory for QMAKE based packages",
+      "level": 3,
+      "content": "The makefile generated by qmake uses the environment variable INSTALL_ROOT to specify where the program should be installed. Thus this package function should work:\n\n```\nPKGBUILD\n```\n\n```\n...\npackage() {\n\tcd \"$srcdir/${pkgname%-git}\"\n\tmake INSTALL_ROOT=\"$pkgdir\" install\n}\n...\n```\n\nNote, that qmake also has to be configured appropriately. For example put this in the corresponding .pro file:\n\n```\nYourProject.pro\n```\n\n```\n...\ntarget.path = /usr/local/bin\nINSTALLS += target\n...\n```\n\n"
+    },
+    {
+      "title": "WARNING: Package contains reference to $srcdir",
+      "level": 3,
+      "content": "Somehow, the literal strings contained in the variables $srcdir or $pkgdir ended up in one of the installed files in the package. [6]\n\nTo identify which files, run the following from the makepkg build directory:\n\n```\n$ grep -R \"$PWD/src\" pkg/\n```\n\nOne possible cause would be from the usage of __FILE__ macro in C/C++ code with full path passed to compiler.\n\n"
+    },
+    {
+      "title": "Makepkg fails to download dependencies when behind proxy",
+      "level": 3,
+      "content": "When makepkg calls dependencies, it calls pacman to install the packages, which requires administrative privileges via sudo. However, sudo does not pass any environment variables to the privileged environment, and includes the proxy-related variables ftp_proxy, http_proxy, https_proxy, and no_proxy.\n\nIn order to have makepkg working behind a proxy, invoke one of the following methods.\n\n"
+    },
+    {
+      "title": "Enable proxy by setting its URL in XferCommand",
+      "level": 4,
+      "content": "The XferCommand can be set to use the desired proxy URL in /etc/pacman.conf. Add or uncomment the following line in pacman.conf:\n\n```\n/etc/pacman.conf\n```\n\n```\n...\nXferCommand = /usr/bin/curl --proxy http://username:password@proxy.proxyhost.com:80 --location --continue-at - --fail --output %o %u\n...\n```\n\n"
+    },
+    {
+      "title": "Enable proxy via sudoer's env_keep",
+      "level": 4,
+      "content": "Alternatively, one may want to use sudoer's env_keep option, which enables preserving given variables the privileged environment. See Pacman#Pacman does not honor proxy settings for more details.\n\n"
+    },
+    {
+      "title": "Makepkg fails, but make succeeds",
+      "level": 3,
+      "content": "If something successfully compiles using make, but fails through makepkg, it is almost certainly because /etc/makepkg.conf sets an incompatible compilation variable. Try adding these flags to the PKGBUILD options array:\n\n!buildflags, to prevent its default CPPFLAGS, CFLAGS, CXXFLAGS, and LDFLAGS.\n\n!makeflags, to prevent its default MAKEFLAGS.\n\n!debug, to prevent its default DEBUG_CFLAGS, and DEBUG_CXXFLAGS, in case the PKGBUILD is a debug build.\n\nIf any of these fix the problem, this could warrant an upstream bug report assuming the offending flag has been identified.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- makepkg(8)\n- makepkg.conf(5)\n- A Brief Tour of the Makepkg Process\n- makepkg source code\n\n"
+    }
+  ]
+}

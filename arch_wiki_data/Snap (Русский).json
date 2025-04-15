@@ -1,0 +1,76 @@
+{
+  "title": "Snap (Русский)",
+  "url": "https://wiki.archlinux.org/title/Snap_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Flatpak\n- AppArmor\n\nSnap — это система развёртывания программного обеспечения и управления пакетами. Пакеты называются «snaps», а инструмент для их использования — «snapd», который работает в различных дистрибутивах Linux и, следовательно, позволяет развёртывать программное обеспечение, не зависящее от дистрибутива. Изначально система Snap была разработана и создана компанией Canonical.\n\nsnapd — это REST API демон для управления snap-пакетами. Пользователи могут взаимодействовать с ним с помощью клиента snap, входящего в состав этого же пакета.\n\nSnap-пакеты могут быть ограничены с помощью AppArmor, который по умолчанию доступен в официальных ядрах. Шаги по включению AppArmor в системе описаны в соответствующих вики-статьях.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет snapdAUR.\n\nЕсли вы используете AppArmor, запустите и включите службы apparmor.service и snapd.apparmor.service.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Чтобы демон snapd автоматически запускался, когда snap обращается к нему, запустите и/или включите юнит snapd.socket.\n\n"
+    },
+    {
+      "title": "Использование",
+      "level": 2,
+      "content": "Для управления пакетами используется утилита snap.\n\n"
+    },
+    {
+      "title": "Поиск",
+      "level": 3,
+      "content": "Для поиска пакетов, доступных для установки используйте команду find:\n\n```\n$ snap find критерий_поиска\n```\n\n"
+    },
+    {
+      "title": "Установка пакетов",
+      "level": 3,
+      "content": "Установить snap-пакет можно с помощью команды:\n\n```\n# snap install имя_пакета\n```\n\nУстановка требует root привилегий. Установка с правами пользователя на данный момент невозможна. При установке snap загружается в /var/lib/snapd/snaps и монтируется в /var/lib/snapd/snap/имя_пакета.\n\nКроме того, создаются также юнит-файлы для каждого snap-пакета и добавляются в /etc/systemd/system/multi-user.target.wants/, для того чтобы snap-пакеты монтировались при каждом запуске системы. Вы можете просмотреть список установленных пакетов командой:\n\n```\n$ snap list\n```\n\nВы также можете устанавливать snap-пакеты локально, с жесткого диска:\n\n```\n# snap install --dangerous /путь/к/пакету/snap\n```\n\n"
+    },
+    {
+      "title": "Обновление пакетов",
+      "level": 3,
+      "content": "Для того чтобы обновить snap-пакеты выполните:\n\n```\n# snap refresh\n```\n\nПакеты обновляются автоматически в соответствии с настройкой refresh.timer.\n\nПосмотреть время последнего/следующего обновления можно с помощью команды:\n\n```\n# snap refresh --time\n```\n\nИзменение времени обновления, например, дважды в день:\n\n```\n# snap set core refresh.timer=0:00~24:00/2\n```\n\nПодробнее в документации: system options documentation page.\n\n"
+    },
+    {
+      "title": "Удаление пакетов",
+      "level": 3,
+      "content": "Для того чтобы удалить пакет выполните:\n\n```\n# snap remove snapname\n```\n\n"
+    },
+    {
+      "title": "Классические snap-пакеты",
+      "level": 3,
+      "content": "Некоторые пакеты (например, Skype и Pycharm) используют классический уровень ограничения (classic confinement). Однако он требует наличия каталога /snap, который не соответствует FHS. Пакет snapd не поставляет этот каталог, но на его месте можно создать символическую ссылку на /var/lib/snapd/snap, чтобы установка классических snap-пакетов стала возможна:\n\n```\n# ln -s /var/lib/snapd/snap /snap\n```\n\n"
+    },
+    {
+      "title": "Ограничение доступа",
+      "level": 3,
+      "content": "При использовании AppArmor snapd сгенерирует такие же профили для snap-пакетов, что и на Ubuntu. Парсер AppArmor достаточно умён, чтобы отбросить правила, которые ещё не поддерживаются основным ядром.\n\nЧтобы проверить, что базовое ограничение доступа работает, установите snap-пакет hello-world. Затем выполните следующее:\n\n```\n$ hello-world.evil\n```\n\n```\nHello Evil World!\nThis example demonstrates the app confinement\nYou should see a permission denied error next\n/snap/hello-world/27/bin/evil: 9: /snap/hello-world/27/bin/evil: cannot create /var/tmp/myevil.txt: Permission denied\n```\n\nAppArmor должен отказать в доступе и записать событие в журнал:\n\n```\n# dmesg\n```\n\n```\n...\n[  +0.000003] audit: type=1327 audit(1540469583.966:257): proctitle=2F62696E2F7368002F736E61702F68656C6C6F2D776F726C642F32372F62696E2F6576696C\n[ +12.268939] audit: type=1400 audit(1540469596.236:258): apparmor=\"DENIED\" operation=\"open\" profile=\"snap.hello-world.evil\" name=\"/var/tmp/myevil.txt\" pid=10835 comm=\"evil\" requested_mask=\"wc\" denied_mask=\"wc\" fsuid=1000 ouid=1000\n[  +0.000006] audit: type=1300 audit(1540469596.236:258): arch=c000003e syscall=2 success=no exit=-13 a0=55d991ba6bc8 a1=241 a2=1b6 a3=55d991ba6be0 items=0 ppid=31349 pid=10835 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts2 ses=3 comm=\"evil\" exe=\"/bin/dash\" subj==snap.hello-world.evil (enforce)\n...\n```\n\nЕсли отказа не видно, проверьте, что профили загружены:\n\n```\n# aa-status | grep snap.hello-world\n```\n\n```\nsnap.hello-world.env\n   snap.hello-world.evil\n   snap.hello-world.hello-world\n   snap.hello-world.sh\n```\n\nТакже можно проверить, какие функции песочницы доступны в системе согласно snapd:\n\n```\n$ snap debug sandbox-features\n```\n\n```\napparmor:             kernel:caps kernel:domain kernel:file kernel:mount kernel:namespaces kernel:network_v8 kernel:policy kernel:ptrace kernel:query kernel:rlimit kernel:signal parser:unsafe policy:default support-level:partial\nconfinement-options:  devmode\ndbus:                 mediated-bus-access\nkmod:                 mediated-modprobe\nmount:                freezer-cgroup-v1 layouts mount-namespace per-snap-persistency per-snap-profiles per-snap-updates per-snap-user-profiles stale-base-invalidation\nseccomp:              bpf-argument-filtering kernel:allow kernel:errno kernel:kill_process kernel:kill_thread kernel:log kernel:trace kernel:trap\n```\n\n"
+    },
+    {
+      "title": "Нечитабельный текст",
+      "level": 3,
+      "content": "Если вместо нормальных символов отображаются квадратики, попробуйте очистить кэш шрифтов:\n\n```\n# rm -f /var/cache/fontconfig/*\n$ rm -f ~/.cache/fontconfig/*\n# fc-cache -r -v\n```\n\nSnapctl также хранит внутренние кэши для каждого snap-пакета отдельно, которые тоже нужно очищать. Сначала найдите их с помощью команды:\n\n```\n$ find ~/snap/ -wholename '*/.cache/fontconfig'\n```\n\n```\n... /home/darth_vader/snap/mailspring/common/.cache/fontconfig\n... /home/darth_vader/snap/authy/common/.cache/fontconfig\n... /home/darth_vader/snap/icedrive/common/.cache/fontconfig\n... /home/darth_vader/snap/discord/common/.cache/fontconfig\n... /home/darth_vader/snap/bitwarden/common/.cache/fontconfig\n```\n\nЗатем либо удалите их по отдельности, либо используйте этот простой цикл.\n\nНаконец, перезапустите сеанс.\n\n"
+    },
+    {
+      "title": "Error: cannot mount squashfs",
+      "level": 3,
+      "content": "Snap-пакеты используют файловую систему SquashFS. Если случается подобная ошибка:\n\n```\nerror: system does not fully support snapd: cannot mount squashfs image using \"squashfs\"\n```\n\nпроверьте, загружен ли модуль ядра SquashFS:\n\n```\n$ lsmod\n```\n\n```\nModule                  Size  Used by\nsquashfs               xxxxx  x\n...\n```\n\n"
+    },
+    {
+      "title": "Помощь",
+      "level": 2,
+      "content": "Почтовая рассылка Arch Linux и другие официальные каналы поддержки Arch Linux не являются подходящим местом для запроса помощи по snap-пакетам на Arch Linux. Подходящим местом для запроса поддержки является Snapcraft forum.\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Официальный сайт\n- Репозиторий на GitHub\n- Статья на Ars Technica (2016-06) о том, что \"Ubuntu snaps\" становятся доступными для Arch и других дистрибутивов\n\n"
+    }
+  ]
+}

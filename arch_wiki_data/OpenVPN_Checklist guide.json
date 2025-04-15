@@ -1,0 +1,41 @@
+{
+  "title": "OpenVPN/Checklist guide",
+  "url": "https://wiki.archlinux.org/title/OpenVPN/Checklist_guide",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article summarizes the install process required for OpenVPN. See OpenVPN instead for a walkthrough.\n\n"
+    },
+    {
+      "title": "Install",
+      "level": 2,
+      "content": "Install the packages openvpn and easy-rsa.\n\n"
+    },
+    {
+      "title": "Prepare data",
+      "level": 2,
+      "content": "- Copy /etc/easy-rsa to /etc/openvpn/easy-rsa and cd there\n- Edit the vars file with the information you want. Read Create a Public Key Infrastructure Using the easy-rsa Scripts for details.\n- Clean up any previous keys:\n\n```\n# easyrsa clean-all\n```\n\n"
+    },
+    {
+      "title": "Generate the certificates",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n- Create a seed for the CA creation\n\n```\n# dd if=/dev/urandom of=pki/.rnd bs=256 count=1 iflag=fullblock\n```\n\n- Create the \"certificate authority\" key\n\n```\n# easyrsa build-ca nopass\n```\n\n- Create certificate and private key for the server\n\n```\n# easyrsa build-server-full <server-name> nopass\n```\n\n- Create the Diffie-Hellman pem file for the server.\n\n```\n# easyrsa gen-dh\n```\n\n- Create a certificate for each client.\n\n```\n# easyrsa build-client-full <client-name> nopass\n```\n\nAll certificates are stored in pki directory. If you mess up, you can start all over by doing a easyrsa clean-all\n\nCopy to each client the ca.crt, and their respective crt and key files.\n\n"
+    },
+    {
+      "title": "Setting up the server",
+      "level": 2,
+      "content": "Create /etc/openvpn/server/myvpnserver.conf with a content like this:\n\n```\n/etc/openvpn/server/myvpnserver.conf\n```\n\n```\nport <port>\nproto tcp\ndev tun0\n\nca /etc/openvpn/easy-rsa/pki/ca.crt\ncert /etc/openvpn/easy-rsa/pki/issued/<server-name>.crt\nkey /etc/openvpn/easy-rsa/pki/private/<server-name>.key\ndh /etc/openvpn/easy-rsa/pki/<your pem file>\n\nserver <desired base ip> 255.255.255.0\nifconfig-pool-persist ipp.txt\nkeepalive 10 120\ncomp-lzo\nuser nobody\ngroup nobody\npersist-key\npersist-tun\nstatus /var/log/openvpn-status.log\nverb 3\n\nlog-append /var/log/openvpn\nstatus /tmp/vpn.status 10\n```\n\nStart and optionally enable the service. In this example, it is openvpn-server@myvpnserver.service.\n\n"
+    },
+    {
+      "title": "Setting up the clients",
+      "level": 2,
+      "content": "Create a .conf file for each client like this:\n\n```\n/etc/openvpn/client/a-client-conf-file.conf\n```\n\n```\nclient\nremote <server> <port>\ndev tun0\nproto tcp\nresolv-retry infinite\nnobind\npersist-key\npersist-tun\nverb 2\nca ca.crt\ncert <client crt file with full path>\nkey <client key file with full path>\ncomp-lzo\n```\n\nStart and optionally enable the service. In this example the unit is openvpn-client@a-client-conf-file.service.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If the openvpn server can be started manually as root but not using systemd, you can try fixing the permissions:\n\n```\n# chown -R openvpn:network /etc/openvpn/*\n```\n\n"
+    }
+  ]
+}

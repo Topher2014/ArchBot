@@ -1,0 +1,91 @@
+{
+  "title": "Sshguard (Español)",
+  "url": "https://wiki.archlinux.org/title/Sshguard_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-09-03** \n\nArtículos relacionados\n\n- fail2ban\n- Secure Shell (Español)\n\nsshguard es un demonio que protege a SSH y otros servicios contra los ataques de fuerza bruta, similar a fail2ban.\n\nsshguard es diferente de este último en cuanto que está escrito en C, es más ligero y más simple de usar y con menos características, mientras realiza la función que se espera de él igual de bien.\n\nsshguard no es vulnerable a la mayoría (o, tal vez, a ninguno) de los análisis de registros, vulnerabilidades que han causado problemas para aplicaciones similares.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete sshguard.\n\n"
+    },
+    {
+      "title": "Ajustes",
+      "level": 2,
+      "content": "sshguard funciona monitorizando /var/log/auth.log, syslog-ng o el journal de systemd para intentos fallidos de inicio de sesión. Para cada intento fallido, el servidor infractor tiene prohibido continuar comunicándose con nuestro equipo durante un tiempo limitado. La cantidad de tiempo predeterminada que el atacante está baneado comienza en 120 segundos, y se incrementa en un factor de 1,5 cada vez que falla en otro intento de iniciar sesión. sshguard se puede configurar para prohibir permanentemente un servidor del que se tienen registrados demasiados intentos fallidos.\n\nLas prohibiciones temporales y permanentes se realizan añadiendo una entrada en la cadena («chain») «sshguard» en iptables que descarta todos los paquetes del atacante. La prohibición se registra en syslog y termina en /var/log/auth.log, o en el journal de systemd, si se está utilizando este último.\n\nDebe configurar uno de los siguientes cortafuegos para usarlo con sshguard para que funcione el bloqueo.\n\n"
+    },
+    {
+      "title": "FirewallD",
+      "level": 3,
+      "content": "sshguard puede funcionar con Firewalld. Asegúrese, primero, de activar y configurar Firewalld. Para hacer que sshguard escriba en su zona de preferencia, emita las siguientes órdenes:\n\n```\n# firewallctl zone \"<nombre_de_la_zona>\" --permanent add rich-rule \"rule source ipset=sshguard4 drop\"\n```\n\nSi usa ipv6, puede emitir la misma orden pero sustituyendo sshguard4 con sshguard6. Se terminaría con:\n\n```\n# firewall-cmd --reload\n```\n\nPuede verificar lo anterior con:\n\n```\n# firewall-cmd --info-ipset=sshguard4\n```\n\nFinalmente, en /etc/sshguard.conf, busque la línea para BACKEND y cámbiela de la siguiente manera\n\n```\nBACKEND=\"/usr/lib/sshguard/sshg-fw-firewalld\"\n```\n\n"
+    },
+    {
+      "title": "UFW",
+      "level": 3,
+      "content": "Si UFW está instalado y activado, se le debe dar la capacidad de pasar el control de DROP a sshguard. Esto se logra modificando /etc/ufw/before.rules para que contenga las líneas de abajo, que se deben insertar justo después de la sección para los dispositivos loopback.\n\n```\n/etc/ufw/before.rules\n```\n\n```\n# permitir todo en loopback\n-A ufw-before-input -i lo -j ACCEPT\n-A ufw-before-output -o lo -j ACCEPT\n\n# entregar el control de sshd a sshguard\n-N sshguard\n-A ufw-before-input -p tcp --dport 22 -j sshguard\n```\n\nReinicie ufw después de hacer esta modificación.\n\n"
+    },
+    {
+      "title": "iptables",
+      "level": 3,
+      "content": "Lo principal que requiere la configuración es crear una cadena llamada sshguard, donde sshguard inserta automáticamente reglas para descartar paquetes de red provenientes de servidores peligrosos:\n\n```\n# iptables -N sshguard\n```\n\nA continuación, hay que agregar una regla para saltar desde la cadena INPUT a la cadena sshguard. Esta regla debe añadirse antes de cualquier otra regla que procese los puertos que sshguard protege. Utilice la siguiente línea para proteger FTP y SSH, o vea esta documentación para más ejemplos.\n\n```\n# iptables -A INPUT -m multiport -p tcp --destination-ports 21,22 -j sshguard\n```\n\nPara guardar las reglas:\n\n```\n# iptables-save > /etc/iptables/iptables.rules\n```\n\n"
+    },
+    {
+      "title": "nftables",
+      "level": 3,
+      "content": "Edite /etc/sshguard.conf y cambie el valor de BACKEND como sigue:\n\n```\n/etc/sshguard.conf\n```\n\n```\nBACKEND=\"/usr/lib/sshguard/sshg-fw-nft-sets\"\n```\n\nAdemás, necesitará editar el servicio sshguard.service para que iptables no se ejecute:\n\n```\n[Service]\nExecStartPre=\n```\n\nCuando inicie/active el servicio sshguard.service, se agregararán dos nuevas tablas llamadas sshguard en las familias de direcciones ip y ip6, que filtran el tráfico entrante a través de la lista de direcciones IP de sshguard. Las cadenas en la tabla sshguard tienen una prioridad de -10 y, por tanto, se procesarán antes que otras reglas de menor prioridad. Consulte 7 sshguard-setup( 7) y nftables para obtener más información.\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 3,
+      "content": "Active e inicie sshguard.service.\n\n"
+    },
+    {
+      "title": "syslog-ng",
+      "level": 3,
+      "content": "Si tiene syslog-ng instalado, puede iniciar sshguard directamente desde la línea de órdenes.\n\n```\n/usr/sbin/sshguard -l /var/log/auth.log -b /var/db/sshguard/blacklist.db\n```\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "La configuración se realiza en el archivo /etc/sshguard.conf, necesario para que sshguard se inicie. Un ejemplo comentado se encuentra en /usr/share/doc/sshguard/sshguard.conf.sample.\n\n"
+    },
+    {
+      "title": "Umbral de la lista negra",
+      "level": 3,
+      "content": "De forma predeterminada, en el archivo de configuración proporcionado por Arch, los atacantes quedan permanentemente prohibidos una vez que alcanzan un nivel de «peligro» de 120 (o 12 intentos de inicios de sesión fallidos —consulte attack dangerousness para más detalles—). Este comportamiento puede modificarse anteponiendo un nivel de peligro distinto en el archivo de la lista negra.\n\n```\nBLACKLIST_FILE=200:/var/db/sshguard/blacklist.db\n```\n\nEl nivel 200: en este ejemplo, le dice a sshguard que bloquee permanentemente un servidor después de alcanzar un nivel de peligro de 200.\n\nFinalmente reinicie sshguard.service.\n\n"
+    },
+    {
+      "title": "Ejemplo moderado de baneado",
+      "level": 3,
+      "content": "He aquí una regla de prohibición ligeramente más agresiva que la predefinida, para ilustrar otras opciones. Fiscalizamos sshd y vsftpd a través de los registros del journal de systemd. Bloqueamos a los atacantes después de 2 intentos durante 180 segundos y el tiempo de bloqueo posterior aumentará en un factor de 1,5. Tenga en cuenta que esta función de retraso multiplicativo es interna y no está controlada por la configuración siguiente. Los atacantes son recordados durante 3600 segundos y permanecen en la lista negra después de 10 intentos (10 intentos con un costo de 10 cada uno, lo que explica el parámetro «100» en la configuración de la lista negra). Bloqueamos no solo la IP del atacante, sino también toda la subred IPv4 24 (notación CIDR).\n\n```\nBACKEND=\"/usr/lib/sshguard/sshg-fw-iptables\"\nLOGREADER=\"LANG=C /usr/bin/journalctl -afb -p info -n1 -t sshd -t vsftpd -o cat\"\nTHRESHOLD=20\nBLOCK_TIME=180\nDETECTION_TIME=3600\nBLACKLIST_FILE=100:/var/db/sshguard/blacklist.db\nIPV4_SUBNET=24\n```\n\n"
+    },
+    {
+      "title": "Baneado agresivo",
+      "level": 3,
+      "content": "Para algunos usuarios sometidos a ataques constantes, se puede adoptar una política de prohibición más agresiva. Si está seguro de que los intentos de inicios de sesión fallidos son poco probables que sean accidentales, puede indicar a SSHGuard que prohíba permanentemente los servidores después de un solo intento de inicio de sesión fallido. Modifique los parámetros en el archivo de configuración de la siguiente manera:\n\n```\nTHRESHOLD=10\nBLACKLIST_FILE=10:/var/db/sshguard/blacklist.db\n```\n\nFinalmente reinicie sshguard.service.\n\nAdemás, para evitar múltiples intentos de autenticación durante una sola conexión, es posible que desee cambiar /etc/ssh/sshd_config definiendo:\n\n```\nMaxAuthTries 1\n```\n\nReinicie sshd.service para que este cambio surta efecto.\n\n"
+    },
+    {
+      "title": "Desbloquear",
+      "level": 3,
+      "content": "Si la prohibición de una IP la realiza usted mismo, puede esperar a que se desbloquee automáticamente o puede utilizar iptables o nftables para destrabarla.\n\n"
+    },
+    {
+      "title": "iptables",
+      "level": 4,
+      "content": "Primero compruebe si la IP está baneada por sshguard:\n\n```\n# iptables --list sshguard --line-numbers --numeric\n```\n\nA continuación, utilice la siguiente orden para desbloquearla, con el número de línea obtenido de la orden anterior:\n\n```\n# iptables --delete sshguard line-number\n```\n\nTambién deberá eliminar la dirección IP de /var/db/sshguard/blacklist.db para que el desbloqueo sea persistente.\n\n"
+    },
+    {
+      "title": "nftables",
+      "level": 4,
+      "content": "Elimine la dirección IP del conjunto de attackers:\n\n```\n# nft delete element family sshguard attackers { ip_address }\n```\n\ndonde family es ip o ip6.\n\n"
+    },
+    {
+      "title": "Registro",
+      "level": 3,
+      "content": "Para ver qué se pasa a través de sshguard, examine el script en /usr/lib/systemd/scripts/sshguard-journalctl y el servicio de systemd sshguard.service. Puede utilizar una orden equivalente para ver los registros en el terminal:\n\n```\n# journalctl -afb -p info SYSLOG_FACILITY=4 SYSLOG_FACILITY=10\n```\n\n"
+    }
+  ]
+}

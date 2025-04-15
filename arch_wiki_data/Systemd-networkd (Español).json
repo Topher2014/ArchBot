@@ -1,0 +1,191 @@
+{
+  "title": "Systemd-networkd (Español)",
+  "url": "https://wiki.archlinux.org/title/Systemd-networkd_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-10-27** \n\nArtículos relacionados\n\n- systemd\n- systemd-resolved\n- systemd-nspawn\n- Network bridge\n- Network configuration\n- Wireless network configuration\n- :Category:Network configuration\n\nsystemd-networkd es un demonio del sistema que gestiona las configuraciones de red. Detecta y configura los dispositivos de red a medida que aparecen; también puede crear dispositivos de red virtuales. Este servicio puede ser especialmente útil para establecer configuraciones complejas de red para un contenedor gestionado por systemd-nspawn (Español) o por maquinas virtuales. Además trabaja bien en conexiones simples.\n\n"
+    },
+    {
+      "title": "Utilización básica",
+      "level": 2,
+      "content": "El paquete systemd es parte de la instalación de Arch por defecto y contiene todos los archivos necesarios para operar con redes cableadas. Los adaptadores inalámbricos pueden configurarse por otros servicios, como wpa_supplicant o iwd, los cuales serán vistos más adelante en este articulo.\n\n"
+    },
+    {
+      "title": "Servicios requeridos y configuración",
+      "level": 3,
+      "content": "Para usar systemd-networkd, inicie/active systemd-networkd.service.\n\nEs opcional también iniciar/activar systemd-resolved.service, que es un servicio de resolución de nombres de red para aplicaciones locales, considerando los siguientes puntos:\n\n- el servicio systemd-resolved es necesario si las entradas DNS se especifican en archivos .network;\n- se puede usar para obtener automáticamente direcciones DNS del cliente de red DHCP;\n- es importante entender cómo resolv.conf y systemd-resolved interactúan para configurar correctamente el DNS que se utilizará, algunas explicaciones se proporcionan en el artículo systemd-resolved;\n- advierta que systemd-resolved también se puede usar sin systemd-networkd.\n\n"
+    },
+    {
+      "title": "Ejemplos de configuración",
+      "level": 3,
+      "content": "Todas las configuraciones estan almacenadas como foo.network en /etc/systemd/network. Para una lista completa de opciones y orden de procesamiento, consulte los #Archivos de configuración y systemd.network(5).\n\nSystemd/udev asigna automaticamente nombres previsibles, nombres de intefaces de red estables para todo las interfaces de Ethernet local, WLAN y WWAN. Utilice networkctl list para listar los dispositivos presentes en el sistema.\n\nDespués de realizar cambios en los archivos de configuración, reinicie systemd-networkd.service.\n\nNote: **y** \n\n- Las opciones especificadas en los archivos de configuración distinguen entre mayúsculas y minúsculas.\n- En los ejemplos de abajo, enp1s0 es el adaptador de cable y wlp2s0 es el adaptador inalámbrico. Estos nombres pueden ser diferentes en sistemas distintos. También es posible usar un comodín, por ejemplo, Name=en*.\n- Si desea desactivar IPv6, consulte IPv6#systemd-networkd.\n- Establezca DHCP=yes en la sección [Network] para aceptar una solicitud IPv4 y IPv6 de DHCP.\n\n"
+    },
+    {
+      "title": "Adaptador cableado utilizando DHCP",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nDHCP=ipv4\n```\n\n"
+    },
+    {
+      "title": "Adaptador cableado utilizando una IP estática",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/20-wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nAddress=10.1.10.9/24\nGateway=10.1.10.1\nDNS=10.1.10.1\n#DNS=8.8.8.8\n```\n\nAddress= se puede usar más de una vez para configurar múltiples direcciones IPv4 o IPv6. Consulte #Archivos network o systemd.network(5) para obtener más opciones.\n\n"
+    },
+    {
+      "title": "Adaptador inalámbrico",
+      "level": 4,
+      "content": "A fin de conectarse a una red inalámbrica con systemd-networkd, es necesario un adaptador inalámbrico configurado con otro servicio como wpa_supplicant o Iwd\n\n```\n/etc/systemd/network/25-wireless.network\n```\n\n```\n[Match]\nName=wlp2s0\n\n[Network]\nDHCP=ipv4\n```\n\nSi el adaptador inalámbrico tiene una dirección IP estática, la configuración es la misma (excepto por el nombre de la interfaz) como con la de un adaptador cableado.\n\n"
+    },
+    {
+      "title": "Adaptadores cableados e inalámbricos en la misma máquina",
+      "level": 4,
+      "content": "Esta instalación activará una IP con el cliente DHCP para ambas conexiones haciendo uso de la directiva métrica que permite al kernel la desición sobre cúal conexión utilizar sobre la marcha. De esta forma, no se observará ningún salto de desconexión cuando la conexión cableada se desconecte.\n\nLa métrica de ruta del kernel (misma que la configurada con ip) decide qué ruta utilizar para los paquetes salientes, en casos de muchas coincidencias. Esto se dará en el caso de que ambos adaptadores del sistema, cableados e inalámbricos, tengan conexiones activas. Para romper la cola, el kernel usa la métrica. Si una de las conexiones se apaga, la otra automaticamente se conecta sin que sea necesario un filtro con algo configurado (las transferencias en curso pueden aún no lidiar con esto apropiadamente, pero para eso hay otra capa diferente del OSI).\n\n```\n/etc/systemd/network/20-wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nDHCP=ipv4\n\n[DHCP]\nRouteMetric=10\n```\n\n```\n/etc/systemd/network/25-wireless.network\n```\n\n```\n[Match]\nName=wlp2s0\n\n[Network]\nDHCP=ipv4\n\n[DHCP]\nRouteMetric=20\n```\n\n"
+    },
+    {
+      "title": "Renombrar una interfaz",
+      "level": 4,
+      "content": "En lugar de editar reglas udev, se puede usar un archivo .link para cambiar el nombre de una interfaz. Un ejemplo útil es establecer un nombre de interfaz predecible para un adaptador USB de Ethernet en función de su dirección MAC, ya que a esos adaptadores, generalmente, obtienen diferentes nombres según el puerto USB en el que estén conectados.\n\n```\n/etc/systemd/network/10-ethusb0.link\n```\n\n```\n[Match]\nMACAddress=12:34:56:78:90:ab\n\n[Link]\nDescription=Adaptador USB a Ethernet\nName=ethusb0\n```\n\nNote: **debe** \n\n"
+    },
+    {
+      "title": "Archivos de configuración",
+      "level": 2,
+      "content": "Los archivos de configuración se encuentran en /usr/lib/systemd/network, el volátil directorio de red /run/systemd/network y el directorio de red de administración local /etc/systemd/network. Los archivos en /etc/systemd/network tienen la máxima prioridad.\n\nHay tres tipos de archivos de configuración. Todos usan un formato similar a los archivos de unidad de systemd.\n\n- Archivos .network. Aplicarán una configuración de red para un dispositivo coincidente\n- Archivos .netdev. Crearán un «dispositivo de red virtual» para un entorno coincidente\n- Archivos .link. Cuando aparece un dispositivo de red, udev buscará el primer archivo .link coincidente\n\nTodos siguen las mismas reglas:\n\n- si todas las condiciones en la sección [Match] coinciden, el perfil se activará;\n- una sección vacía [Match] significa que el perfil se aplicará en cualquier caso (se puede comparar al comodín *);\n- todos los archivos de configuración se ordenan y procesan colectivamente en orden léxico, independientemente del directorio en el que se alojen;\n- los archivos con el mismo nombre se reemplazan entre sí.\n\nNote: **networkd** \n\n- Para anular un archivo proporcionado por el sistema en /usr/lib/systemd/network de forma permanente (es decir, incluso después de la actualización), coloque un archivo con el mismo nombre en /etc/systemd/network y cree un enlace simbólico a /dev/null\n- El comodín * se puede usar en VALUE (por ejemplo, en* coincidirá con cualquier dispositivo Ethernet), una función booleana puede escribirse simplemente como yes o no.\n- Siguiendo este hilo de Arch-general, la mejor práctica es establecer configuraciones de red de contenedor específicas dentro del contenedor con archivos de configuración networkd.\n- Systemd acepta los valores 1, true, yes, on para indicar una función booleana verdadera, y los valores 0, false, no, off para un booleano falso.\n\n"
+    },
+    {
+      "title": "Archivos network",
+      "level": 3,
+      "content": "Estos archivos están destinados a establecer variables de configuración de red, especialmente para servidores y contenedores.\n\nLos archivos .network tienen las siguientes secciones: [Match], [Link], [Network], [Address], [Route], y [DHCP]. A continuación se muestran las claves configuradas comúnmente para cada sección. Consulte systemd.network(5) para obtener más información y ejemplos.\n\n"
+    },
+    {
+      "title": "[Match]",
+      "level": 4,
+      "content": "Table content:\nParámetros | Descripción | Valores aceptados | Valores predeterminados\nName= | Hacer coincidir los nombres de los dispositivos, por ejemplo en*. Al anteponer el prefijo !, la lista se invierte. | nombres de dispositivos separados por espacios en blanco con patrones globs, negación lógica (!) | \nMACAddress= | Hacer coincidir las direcciones MAC, por ejemplo MACAddress=01:23:45:67:89:ab 00-11-22-33-44-55 AABB.CCDD.EEFF | direcciones MAC separadas por espacios en blanco en formato hexadecimal delimitado por dos puntos, guiones o puntos | \nHost= | Hacer coincidir el nombre del equipo o la ID de máquina del sistema. | cadena de nombre del equipo con globs, machine-id(5) | \nVirtualization= | Comprobar si el sistema se ejecuta en un entorno virtualizado. Virtualization=false solo coincidirá con su máquina del equipo, mientras que Virtualization=true coincide con cualquier contenedor o máquina virtual. Es posible verificar un tipo o implementación de virtualización específica. | booleano, negación lógica (!), tipo (vm, container), implementación (qemu, kvm, zvm, vmware, microsoft, oracle, xen, bochs, uml, bhyve, qnx, openvz, lxc, lxc-libvirt, systemd-nspawn, docker, podman, rkt, wsl, acrn) | \n\n"
+    },
+    {
+      "title": "[Link]",
+      "level": 4,
+      "content": "- MACAddress= útil para suplantación de direcciones MAC.\n- MTUBytes= establecer un valor de MTU mayor (por ejemplo, cuando se usa tramas jumbo) puede acelerar significativamente sus transferencias de red.\n- Multicast permite el uso de multidifusión en interfaz(ces).\n\n"
+    },
+    {
+      "title": "[Network]",
+      "level": 4,
+      "content": "Table content:\nParámetros | Descripción | Valores aceptados | Valores predeterminados\nDHCP= | Controla el soporte de cliente DHCPv4 y/o DHCPv6. | booleano, ipv4, ipv6 | false\nDHCPServer= | Si está activado, se iniciará un servidor DHCPv4. | booleano | false\nMulticastDNS= | Activa el soporte DNS multidifusión. Cuando se establece en resolve, solo se activa la resolución, pero no el registro y anuncio del equipo o servicio. | booleano, resolve | false\nDNSSEC= | Controla el soporte de validación DNSSEC DNS en el enlace. Cuando se establece en allow-downgrade, la compatibilidad con redes que no son compatibles con DNSSEC aumenta, al desactivar automáticamente DNSSEC en este caso. | booleano, allow-downgrade | false\nDNS= | Configura las direcciones DNS estáticas. Se puede especificar más de una vez. | inet_pton(3) | \nDomains= | Una lista de dominios que deben resolverse utilizando los servidores DNS sobre este enlace. systemd.network(5) § [NETWORK] SECTION OPTIONS | nombre de dominio, opcionalmente prefijado con un signo (~) | \nIPForward= | Si está activado, los paquetes entrantes en cualquier interfaz de red se enviarán a cualquier otra interfaz de acuerdo con la tabla de enrutamiento. | booleano, ipv4, ipv6 | false\nIPv6PrivacyExtensions= | Configura el uso de direcciones temporales sin estado que cambian con el tiempo (consulte RFC 4941). Cuando se fija prefer-public, activa las extensiones de privacidad, pero prefiere las direcciones públicas sobre las direcciones temporales. Cuando se fija kernel, la configuración predeterminada del kernel se mantendrá en su lugar. | booleano, prefer-public, kernel | false\n\n"
+    },
+    {
+      "title": "[Address]",
+      "level": 4,
+      "content": "- Address= esta opción es obligatoria a menos que se use DHCP.\n\n"
+    },
+    {
+      "title": "[Route]",
+      "level": 4,
+      "content": "- Gateway= esta opción es obligatoria a menos que se utilice DHCP.\n- Destination= el prefijo de destino de la ruta, posiblemente seguido de una barra diagonal y la longitud del prefijo.\n\nSi Destination no está presente en la sección [Route], esta sección se trata como una ruta predeterminada.\n\n"
+    },
+    {
+      "title": "[DHCP]",
+      "level": 4,
+      "content": "Table content:\nParámetros | Descripción | Valores aceptados | Valores predeterminados\nUseDNS= | controla si se utilizan los servidores DNS anunciados por el servidor DHCP | booleano | true\nAnonymize= | cuando es verdadero, las opciones enviadas al servidor DHCP seguirán el RFC7844 (perfiles de anonimato para clientes DHCP) para minimizar la divulgación de información de identificación | booleano | false\nUseDomains= | controla si el nombre de dominio recibido del servidor DHCP se usará como dominio de búsqueda DNS. Si se establece en route, el nombre de dominio recibido del servidor DHCP se usará solo para enrutar consultas DNS, pero no para buscar. Esta opción a veces puede arreglar la resolución de nombres locales cuando se utiliza systemd-resolved | booleano, route | false\n\n"
+    },
+    {
+      "title": "Archivos netdev",
+      "level": 3,
+      "content": "Estos archivos crearán dispositivos de red virtuales. Tienen dos secciones: [Match] y [NetDev]. A continuación se muestran las claves configuradas comúnmente para cada sección. Consulte systemd.netdev(5) para obtener más información y ejemplos.\n\n"
+    },
+    {
+      "title": "Sección [Match]",
+      "level": 4,
+      "content": "- Host= el nombre del equipo.\n- Virtualization= comprueba si se ejecuta en una máquina virtual.\n\n"
+    },
+    {
+      "title": "Sección [NetDev]",
+      "level": 4,
+      "content": "Las claves más comunes son:\n\n- Name= el nombre de la interfaz. Obligatorio.\n- Kind= por ejemplo, bridge, bond, vlan, veth, sit, etc. Obligatorio.\n\n"
+    },
+    {
+      "title": "Archivos link",
+      "level": 3,
+      "content": "Estos archivos son una alternativa a las reglas de udev personalizadas y serán aplicados por udev a medida que aparezca el dispositivo. Tienen dos secciones: [Match] y [Link]. A continuación se encuentran las claves configuradas comúnmente para cada sección. Consulte systemd.link(5) para obtener más información y ejemplos.\n\n"
+    },
+    {
+      "title": "Sección [Match]",
+      "level": 4,
+      "content": "- MACAddress= la dirección MAC.\n- Host= el nombre del equipo.\n- Virtualization=\n- Type= el tipo de dispositivo, por ejemplo, vlan.\n\n"
+    },
+    {
+      "title": "Sección [Link]",
+      "level": 4,
+      "content": "- MACAddressPolicy= direcciones persistentes o aleatorias, o,\n- MACAddress= una dirección específica.\n\n"
+    },
+    {
+      "title": "Utilización de contenedores",
+      "level": 2,
+      "content": "El servicio está disponible con systemd. Querrá activar e iniciar la unidad systemd-networkd.service tanto en el equipo como en el contenedor.\n\nPara fines de depuración, se recomienda encarecidamente instalar los paquetes bridge-utils, net-tools y iproute2.\n\nSi está utilizando systemd-nspawn, es posible que deba modificar systemd-nspawn@.service y añadir opciones de arranque a la línea ExecStart. Remítase a systemd-nspawn(1) para obtener una lista exhaustiva de opciones.\n\nTenga en cuenta que si desea aprovechar la configuración automática de DNS desde DHCP, debe activar systemd-resolved y crear el enlace simbólico /run/systemd/resolve/resolv.conf a /etc/resolv.conf. Consulte systemd-resolved.service(8) para obtener más detalles.\n\nAntes de comenzar a configurar su red de contenedores, es útil:\n\n- desactivar todos sus servicios netctl (en equipo y contenedor), dhcpcd (en equipo y contenedor), systemd-networkd (solo en contenedor) y systemd-nspawn@.service (solo en equipo) para evitar posibles conflictos y facilitar la depuración;\n- asegurarse de que el reenvío de paquetes esté activado si desea permitir que los contenedores accedan a Internet. Asegúrese de que su archivo .network no desactive accidentalmente el reenvío, porque si no tiene una configuración IPForward=1 en él, systemd-networkd desactivará el reenvío en esa interfaz, incluso si la tiene activada globalmente;\n- asegurarse de no tener ninguna regla iptables que pueda bloquear el tráfico;\n- cuando el demonio está iniciado, la orden networkctl de systemd mostrará el estado de las interfaces de red.\n\nPara completar la configuración que se describe a continuación:\n\n- limitaremos la salida de la orden ip a a las interfaces correspondientes;\n- asumiremos que el «equipo» es su sistema operativo principal en el que está arrancando y el «contenedor» es su máquina virtual invitada;\n- todos los nombres de interfaces y direcciones IP son solo ejemplos.\n\n"
+    },
+    {
+      "title": "Red básica con DHCP",
+      "level": 3,
+      "content": "Esta configuración activará una IP obtenida con DHCP para el equipo y el contenedor. En este caso, ambos sistemas compartirán tanto la misma IP como las mismas interfaces.\n\n```\n/etc/systemd/network/MyDhcp.network\n```\n\n```\n[Match]\nName=en*\n\n[Network]\nDHCP=ipv4\n```\n\nLuego, active e inicie systemd-networkd.service en su contenedor.\n\nPor supuesto, puede reemplazar en* por el nombre completo de su dispositivo Ethernet dado por la salida de la orden ip link.\n\n- en el equipo y en el contenedor:\n\n```\n$ ip a\n```\n\n```\n2: enp7s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000\n    link/ether 14:da:e9:b5:7a:88 brd ff:ff:ff:ff:ff:ff\n    inet 192.168.1.72/24 brd 192.168.1.255 scope global enp7s0\n       valid_lft forever preferred_lft forever\n    inet6 fe80::16da:e9ff:feb5:7a88/64 scope link \n       valid_lft forever preferred_lft forever\n```\n\nPor defecto, el nombre del equipo recibido del servidor DHCP se utilizará como nombre de equipo transitorio.\n\nPara cambiarlo, añada UseHostname=false en la sección [DHCPv4]\n\n```\n/etc/systemd/network/MyDhcp.network\n```\n\n```\n[DHCPv4]\nUseHostname=false\n```\n\nSi no desea configurar un DNS en /etc/resolv.conf y desea confiar en DHCP para definirlo, debe activar systemd-resolved.service y crear el enlace simbólico /run/systemd/resolve/resolv.conf a /etc/resolv.conf\n\n```\n# ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf\n```\n\nConsulte systemd-resolved.service(8) para obtener más detalles.\n\n"
+    },
+    {
+      "title": "Interfaz del puente de red",
+      "level": 4,
+      "content": "Primero, cree una interfaz del puente de red virtual. Le decimos a systemd que cree un dispositivo llamado br0 que funcione como un puente de ethernet.\n\n```\n/etc/systemd/network/MyBridge.netdev\n```\n\n```\n[NetDev]\nName=br0\nKind=bridge\n```\n\nReinicie systemd-networkd.service para que systemd puede tener conocimiento del puente de red creado.\n\nEn el equipo y en el contenedor:\n\n```\n$ ip a\n```\n\n```\n3: br0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default \n    link/ether ae:bd:35:ea:0c:c9 brd ff:ff:ff:ff:ff:ff\n```\n\nAdvierta que la interfaz br0 esté en la lista, pero está «DOWN» en esta etapa.\n\n"
+    },
+    {
+      "title": "Vincular ethernet al puente de red",
+      "level": 4,
+      "content": "El siguiente paso es añadir al puente de red recién creado una interfaz de red. En el siguiente ejemplo, añadimos cualquier interfaz que coincida con el nombre en* en el puente de red br0.\n\n```\n/etc/systemd/network/bind.network\n```\n\n```\n[Match]\nName=en*\n\n[Network]\nBridge=br0\n```\n\nLa interfaz de ethernet no debe tener servicio DHCP o una dirección IP asociada, ya que el puente de red requiere una interfaz a la que se pueda vincular sin IP: modifique el archivo /etc/systemd/network/MyEth.network correspondiente para eliminar el direccionamiento.\n\n"
+    },
+    {
+      "title": "Conectar el puente de red",
+      "level": 4,
+      "content": "Ahora que se ha creado el puente de red y se ha vinculado a una interfaz de red existente, se debe especificar la configuración IP de la interfaz del puente. Esto se define en un tercer archivo .network, el siguiente ejemplo utiliza DHCP.\n\n```\n/etc/systemd/network/mybridge.network\n```\n\n```\n[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n```\n\n"
+    },
+    {
+      "title": "Añadir opción para arrancar el contenedor",
+      "level": 4,
+      "content": "Como queremos dar una IP separada para el equipo y otra para el contenedor, necesitamos «Desconectar» la red del contenedor de la del equipo. Para hacer esto, añada esta opción --network-bridge=br0 a la orden de arranque del contenedor.\n\n```\n# systemd-nspawn --network-bridge=br0 -bD /path_to/my_container\n```\n\n"
+    },
+    {
+      "title": "Resultado",
+      "level": 4,
+      "content": "- en el equipo:\n\n```\n$ ip a\n```\n\n```\n3: br0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default \n    link/ether 14:da:e9:b5:7a:88 brd ff:ff:ff:ff:ff:ff\n    inet 192.168.1.87/24 brd 192.168.1.255 scope global br0\n       valid_lft forever preferred_lft forever\n    inet6 fe80::16da:e9ff:feb5:7a88/64 scope link \n       valid_lft forever preferred_lft forever\n6: vb-MyContainer: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast master br0 state UP group default qlen 1000\n    link/ether d2:7c:97:97:37:25 brd ff:ff:ff:ff:ff:ff\n    inet6 fe80::d07c:97ff:fe97:3725/64 scope link \n       valid_lft forever preferred_lft forever\n```\n\n- en el contenedor:\n\n```\n$ ip a\n```\n\n```\n2: host0: <BROADCAST,MULTICAST,ALLMULTI,AUTOMEDIA,NOTRAILERS,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000\n    link/ether 5e:96:85:83:a8:5d brd ff:ff:ff:ff:ff:ff\n    inet 192.168.1.73/24 brd 192.168.1.255 scope global host0\n       valid_lft forever preferred_lft forever\n    inet6 fe80::5c96:85ff:fe83:a85d/64 scope link \n       valid_lft forever preferred_lft forever\n```\n\n"
+    },
+    {
+      "title": "Aviso",
+      "level": 4,
+      "content": "- ahora tenemos una dirección IP para br0 en el equipo, y otra para host0 en el contenedor;\n- han aparecido dos nuevas interfaces: vb-MyContainer en el equipo y host0 en el contenedor. Esto viene como resultado de la opción --network-bridge=br0. Esta opción implica otra opción, --network-veth. Esto significa que se ha creado un enlace virtual de Ethernet entre el equipo y el contenedor;\n- la dirección DHCP en host0 proviene del archivo del sistema /usr/lib/systemd/network/80-container-host0.network.\n\n- en el equipo:\n\n```\n$ brctl show\n```\n\n```\nbridge name\tbridge id\t\tSTP enabled\tinterfaces\nbr0\t\t8000.14dae9b57a88\tno\t\tenp7s0\n\t\t\t\t\t\t\tvb-MyContainer\n```\n\nLa salida de la orden anterior confirma que tenemos un puente de red con dos interfaces vinculadas.\n\n- en el equipo:\n\n```\n$ ip route\n```\n\n```\ndefault via 192.168.1.254 dev br0 \n192.168.1.0/24 dev br0  proto kernel  scope link  src 192.168.1.87\n```\n\n- en el contenedor:\n\n```\n$ ip route\n```\n\n```\ndefault via 192.168.1.254 dev host0 \n192.168.1.0/24 dev host0  proto kernel  scope link  src 192.168.1.73\n```\n\nLas salidas de las órdenes anteriores confirman que hemos activado las interfaces br0 y host0 con una dirección IP y puerta de enlace 192.168.1.254. La dirección de la puerta de enlace ha sido tomada automáticamente por systemd-networkd.\n\n```\n$ cat /run/systemd/resolve/resolv.conf\n```\n\n```\nnameserver 192.168.1.254\n```\n\n"
+    },
+    {
+      "title": "Red IP estática",
+      "level": 3,
+      "content": "Establecer una IP estática para cada dispositivo puede ser útil en caso de servicios web implementados (por ejemplo, FTP, http, SSH). Cada dispositivo mantendrá la misma dirección MAC en todos los reinicios si su archivo del sistema /usr/lib/systemd/network/99-default.link tiene la opción MACAddressPolicy=persistent (que viene por defecto). Por lo tanto, enrutará fácilmente cualquier servicio en su puerta de enlace al dispositivo deseado.\n\nLa siguiente configuración debe hacerse para esta:\n\n- en el equipo:\n\nLa configuración es muy similar a la de #DHCP con dos IP distintas. Primero, se debe crear una interfaz del puente de red virtual y la interfaz física principal debe estar vinculada a ella. Esta tarea se puede lograr con los siguientes dos archivos, con contenidos iguales a los disponibles en la sección DHCP.\n\n```\n/etc/systemd/network/MyBridge.netdev\n/etc/systemd/network/MyEth.network\n```\n\nA continuación, debe configurar la IP y el DNS de la interfaz del puente de red virtual recién creada. El siguiente archivo MyBridge.network proporciona un ejemplo de configuración:\n\n```\n/etc/systemd/network/MyBridge.network\n```\n\n```\n[Match]\nName=br0\n\n[Network]\nDNS=192.168.1.254\nAddress=192.168.1.87/24\nGateway=192.168.1.254\n```\n\n- en el contenedor:\n\nPrimero, eliminaremos el archivo del sistema /usr/lib/systemd/network/80-container-host0.network que proporciona una configuración DHCP para la interfaz de red predeterminada del contenedor. Para hacerlo de forma permanente (por ejemplo, incluso después de las actualizaciones de systemd), haga lo siguiente en el contenedor. Esto enmascarará el archivo /usr/lib/systemd/network/80-container-host0.network ya que los archivos con el mismo nombre en /etc/systemd/network tienen prioridad sobre /usr/lib/systemd/network. Tenga en cuenta que este archivo puede mantenerse solo si desea una IP estática en el equipo y desea que la dirección IP de sus contenedores se asigne a través de DHCP.\n\n```\n# ln -sf /dev/null /etc/systemd/network/80-container-host0.network\n```\n\nLuego, configure una IP estática para la interfaz de red predeterminada host0 y active e inicie systemd-networkd.service en su contenedor. Seguidamente se proporciona una configuración de ejemplo:\n\n```\n/etc/systemd/network/MyVeth.network\n```\n\n```\n[Match]\nName=host0\n\n[Network]\nDNS=192.168.1.254\nAddress=192.168.1.94/24\nGateway=192.168.1.254\n```\n\n"
+    },
+    {
+      "title": "Integración de interfaz y escritorio",
+      "level": 2,
+      "content": "systemd-networkd no tiene una interfaz de gestión interactiva adecuada ni a través de línea de órdenes ni gráfica. Aún así, algunas herramientas están disponibles para mostrar el estado actual de la red, recibir notificaciones o interactuar con la configuración inalámbrica:\n\n- networkctl (a través de CLI) ofrece un simple volcado de los estados de la interfaz de red.\n\n- Cuando networkd está configurado con wpa_supplicant, tanto wpa_cli como wpa_gui ofrecen la posibilidad de asociar y configurar interfaces WLAN dinámicamente.\n\n- networkd-notify-gitAUR puede generar notificaciones simples en respuesta a los cambios de estado de la interfaz de red (como conexión/desconexión y nueva asociación).\n\n- El demonio networkd-dispatcherAUR permite ejecutar scripts en respuesta a cambios en el estado de la interfaz de red, similar a NetworkManager-dispatcher.\n\n- En cuanto a la resolución de DNS de systemd-resolved, la información sobre los servidores DNS actuales se puede visualizar con resolvectl status.\n\n"
+    },
+    {
+      "title": "Los servicios de montaje fallan al arranque",
+      "level": 3,
+      "content": "Si ejecuta servicios como Samba/NFS que fallan si se inician antes de que la red esté activa, puede activar el servicio systemd-networkd-wait-online.service. Sin embargo, esto rara vez es necesario porque la mayoría de los demonios de red comienzan bien, incluso si la red aún no se ha configurado.\n\n"
+    },
+    {
+      "title": "systemd-resolve no busca en el dominio local",
+      "level": 3,
+      "content": "systemd-resolved puede no buscar el dominio local cuando se le da solo el nombre del equipo, incluso cuando UseDomains=yes o Domains=[domain-list] está presente en el archivo .network apropiadamente, y ese archivo produce la esperada search [domain-list] en resolv.conf. Puede ejecutar networkctl status o resolvectl status para verificar si la búsqueda de dominios se está recogiendo bien.\n\nPosibles soluciones:\n\n- Desactive LLMNR para permitir que systemd-resolved continúe inmediatamente agregando los sufijos DNS.\n- Recorte la base de datos de hosts para /etc/nsswitch.conf (por ejemplo, eliminando la opción [!UNAVAIL=return] después del servicio resolve).\n- Alterne con el uso de nombres de dominio totalmente calificados.\n- Utilice /etc/hosts para resolver nombres de equipo.\n- Recurra al uso de dns de glibc en lugar de utilizar resolve de systemd.\n\n"
+    },
+    {
+      "title": "El segundo ordenador conectado no puede usar la LAN puenteada",
+      "level": 3,
+      "content": "El primer ordenador tiene dos LAN. El segundo tiene una LAN y está conectado al primero. Vayamos al segundo ordenador para dar acceso completo a la LAN después de superar la interfaz puenteada:\n\n```\n# sysctl net.bridge.bridge-nf-filter-pppoe-tagged=0\n# sysctl net.bridge.bridge-nf-filter-vlan-tagged=0\n# sysctl net.bridge.bridge-nf-call-ip6tables=0\n# sysctl net.bridge.bridge-nf-call-iptables=0\n# sysctl net.bridge.bridge-nf-call-arptables=0\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- systemd-networkd(8)\n- Tom Gundersen, main systemd-networkd developer, G+ home page\n- Tom Gundersen posts on Core OS blog\n- How to set up systemd-networkd with wpa_supplicant (WonderWoofy's walkthrough on Arch forums)\n\n"
+    }
+  ]
+}

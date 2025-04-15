@@ -1,0 +1,76 @@
+{
+  "title": "WebDAV (日本語)",
+  "url": "https://wiki.archlinux.org/title/WebDAV_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Davfs2\n\nWebDAV (Web Distributed Authoring and Versioning) は HTTP 1.1の拡張でありプロトコルとも言えます。WebDAV は HTTP 1.1 プロトコルを用いて読み書きできる方法の拡張からなります。NFS や SMB の代わりに、WebDAV は HTTP によるファイル転送を提供します。\n\nこの記事ではウェブサーバーを使ってシンプルな WebDAV を設定します。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 サーバー 1.1 Apache 1.2 Nginx 1.3 rclone 1.4 Caddy\n- 2 クライアント 2.1 Cadaver 2.2 Dolphin 2.3 Nautilus 2.4 rclone 2.5 Thunar\n- 3 認証 3.1 Apache\n- 4 トラブルシューティング 4.1 一部のファイルエクスプローラーで nginx WebDAV のディレクトリを編集できない\n\n- 1.1 Apache\n- 1.2 Nginx\n- 1.3 rclone\n- 1.4 Caddy\n\n- 2.1 Cadaver\n- 2.2 Dolphin\n- 2.3 Nautilus\n- 2.4 rclone\n- 2.5 Thunar\n\n- 3.1 Apache\n\n- 4.1 一部のファイルエクスプローラーで nginx WebDAV のディレクトリを編集できない\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "Apache HTTP Server をインストールしてください。\n\nそして WebDAV を有効化します。DAV のモジュールをアンコメント:\n\n```\nLoadModule dav_module modules/mod_dav.so\nLoadModule dav_fs_module modules/mod_dav_fs.so\nLoadModule dav_lock_module modules/mod_dav_lock.so\n```\n\n以下の行を /etc/httpd/conf/httpd.conf に追加:\n\n```\nDAVLockDB /home/httpd/DAV/DAVLock\n```\n\n他のディレクティブ (例えば DocumentRoot 定義のすぐ下など) の外に追加するようにしてください。\n\n次に、以下を追加 (これもディレクティブの外に):\n\n```\nAlias /dav \"/home/httpd/html/dav\"\n\n<Directory \"/home/httpd/html/dav\">\n  DAV On\n  AllowOverride None\n  Options Indexes FollowSymLinks\n  Require all granted\n</Directory>\n```\n\nディレクトリを作成:\n\n```\n# mkdir -p /home/httpd/DAV\n```\n\nDavLockDB のディレクトリのパーミッションを変更し、http ユーザーにより書き込みができるようにします:\n\n```\n# chown -R http:http /home/httpd/DAV\n# mkdir -p /home/httpd/html/dav\n# chown -R http:http /home/httpd/html/dav\n```\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 3,
+      "content": "メインライン版の nginx と nginx-mainline-mod-dav-extAUR をインストールしてください。\n\n/etc/nginx/nginx.conf のブロックの外側に、以下を追加:\n\n```\nload_module /usr/lib/nginx/modules/ngx_http_dav_ext_module.so;\n```\n\nserver ブロックに WebDAV の新しい location を追加:\n\n```\nlocation /dav {\n    root   /srv/http;\n\n    dav_methods PUT DELETE MKCOL COPY MOVE;\n    dav_ext_methods PROPFIND OPTIONS;\n\n    # Adjust as desired:\n    dav_access all:rw;\n    client_max_body_size 0;\n    create_full_put_path on;\n    client_body_temp_path /srv/client-temp;\n    autoindex on;\n\n    allow 192.168.178.0/24;\n    deny all;\n}\n```\n\n上記の例では /srv/http/dav と /srv/client-temp ディレクトリが必要です。\n\nバインドマウントを使って WebDAV で他のディレクトリにアクセスできるようにすることもできます。\n\n"
+    },
+    {
+      "title": "rclone",
+      "level": 3,
+      "content": "rclone パッケージを インストール します。リモートまたはローカルディレクトリのエクスポートをサポートしています WebDAV を使う\n\n認証なしで /srv/http のコンテンツを提供するには:\n\n```\n$ rclone serve webdav /srv/http\n```\n\n"
+    },
+    {
+      "title": "Caddy",
+      "level": 3,
+      "content": "caddy-webdav-gitAUR パッケージを インストール するか、xcaddy-binAUR を使用して WebDAV モジュールで Caddy をビルドします。\n\n```\n$ xcaddy build --with github.com/mholt/caddy-webdav\n```\n\nポート 80 を使用してパス dav 上の /srv/webdav のコンテンツを提供するには、次を Caddyfile に追加します。\n\n```\n:80 {\n    rewrite /dav /dav/\n    webdav /dav/* {\n       root /srv/webdav\n       prefix /dav\n    }\n    file_server\n}\n```\n\n次に Caddy を実行:\n\n```\n$ caddy run\n```\n\n"
+    },
+    {
+      "title": "Cadaver",
+      "level": 3,
+      "content": "Cadaver は WebDAV 用のコマンドラインクライアントです。cadaver パッケージでインストールすることができます。\n\nインストールしたら、WebDAV サーバーをテスト:\n\n```\n# cadaver http://localhost/dav\ndav:/dav/> mkcol test\nCreating `test': succeeded.\ndav:/dav/> ls\nListing collection `/dav/': succeeded.\nColl: test\n```\n\n"
+    },
+    {
+      "title": "Dolphin",
+      "level": 3,
+      "content": "Dolphin に永続的な WebDAV フォルダーを作成するには、場所サイドバーの リモート セクションで ネットワーク を選択し、ネットワークフォルダーの追加 ボタンを押します。ネットワークフォルダーウィザードが表示されます。WebFolder (webdav) を選択し、次のフォームに入力します。\n\nまたは、パスバーをクリックして、webdav:// プロトコル指定子を含む URL を入力します。\n\n"
+    },
+    {
+      "title": "Nautilus",
+      "level": 3,
+      "content": "Nautilus では、サーバーに接続 を選択し、dav:// または davs:// プロトコルを指定してアドレスを入力するだけです。\n\n```\ndav://127.0.0.1/dav\n```\n\n"
+    },
+    {
+      "title": "rclone",
+      "level": 3,
+      "content": "rclone は、WebDAV を含むリモートファイルシステムとの同期、または mount (多くのキャッシュ オプション付き) を可能にするコマンドラインツールです。\n\n"
+    },
+    {
+      "title": "Thunar",
+      "level": 3,
+      "content": "Thunar の中で Ctrl+l を押して dav あるいは davs プロトコルのアドレスを入力してください:\n\n```\ndavs://webdav.yandex.ru\n```\n\n"
+    },
+    {
+      "title": "認証",
+      "level": 2,
+      "content": "使用することができるプロトコルは以下の通りです:\n\n- plain\n- digest\n- others\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "htdigest(1) を使用します (ファイルが存在する場合は、-c オプションを削除します):\n\n```\n# htdigest -c /etc/httpd/conf/passwd WebDAV username\n```\n\nプレーンな htpasswd(1) を使用します (ファイルが存在する場合は、-c オプションを削除します。)\n\n```\n# htpasswd -c /etc/httpd/conf/passwd username\n```\n\n次に、認証を有効にするために httpd.conf を編集する必要があります。1 つの方法は、すべての操作にユーザー foo を要求することです。\n\n```\n<Directory \"/home/httpd/html/dav\">\n  DAV On\n  AllowOverride None\n  Options Indexes FollowSymLinks\n  AuthType Digest # substitute \"Basic\" for \"Digest\" if you used htpasswd above\n  AuthName \"WebDAV\"\n  AuthUserFile /etc/httpd/conf/passwd\n  Require user foo\n</Directory>\n```\n\n全員に読み取りを許可したい場合は、httpd.conf でこれを使用できます。\n\n```\n<Directory \"/home/httpd/html/dav\">\n  DAV On\n  AllowOverride None\n  Options Indexes FollowSymLinks\n  AuthType Digest # substitute \"Basic\" for \"Digest\" if you used htpasswd above\n  AuthName \"WebDAV\"\n  AuthUserFile /etc/httpd/conf/passwd\n  Require all granted\n  <LimitExcept GET HEAD OPTIONS PROPFIND>\n    Require user foo\n  </LimitExcept>\n</Directory>\n```\n\n変更を加えた後は、httpd.service を 再起動 することを忘れないでください。\n\n"
+    },
+    {
+      "title": "一部のファイルエクスプローラーで nginx WebDAV のディレクトリを編集できない",
+      "level": 3,
+      "content": "nginx WebDAV では、ディレクトリパスがスラッシュ (/) で終わる必要がありますが、一部のファイルエクスプローラーはパスの最後に / を追加しません。\n\nこれは、対応するチェック コード を削除して再コンパイルするか、次のコードを追加することで回避できます。必要に応じて、nginx server ブロックにコードを記述して、リクエストの最後に / を追加します。\n\n```\n# The configuration was based on: https://nworm.icu/post/nginx-webdav-dolphin-deken/\n# if the request method is MKCOL or is to a directory, add / at the end of the request if it was missing \nif ($request_method = MKCOL) {\n    rewrite ^(.*[^/])$ $1/ break; \n}\nif (-d $request_filename) { \n    rewrite ^(.*[^/])$ $1/ break; \n}\n\n# if the request method is copy or move a directory, add / at the end of the request if it was missing\nset $is_copy_or_move 0;\nset $is_dir 0;\nif (-d $request_filename) { \n    set $is_dir 1; \n}\nif ($request_method = COPY) {\n    set $is_copy_or_move 1;\n}\nif ($request_method = MOVE) {\n    set $is_copy_or_move 1;\n}\nset $is_rewrite \"${is_dir}${is_copy_or_move}\";\nif ($is_rewrite = 11) {\n    rewrite ^(.*[^/])$ $1/ break;\n}\n```\n\n"
+    }
+  ]
+}

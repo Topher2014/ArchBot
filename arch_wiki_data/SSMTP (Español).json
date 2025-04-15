@@ -1,0 +1,46 @@
+{
+  "title": "SSMTP (Español)",
+  "url": "https://wiki.archlinux.org/title/SSMTP_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-07** \n\nArtículos relacionados\n\n- OpenSMTPD\n- msmtp\n- S-nail\n\nsSMTP es un programa que entrega correo electrónico desde un ordenador local a un servidor de correo configurado (mailhub). No es un servidor de correo (como si lo es el servidor de correo rico en funciones sendmail) y no recibe correo, ni expande alias, ni administra una cola. Uno de sus usos principales es reenviar el correo electrónico automatizado (como las alertas del sistema) desde su equipo a una dirección de correo electrónico externa.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete ssmtpAUR.\n\n"
+    },
+    {
+      "title": "Reenviar a un servidor de correo de Gmail",
+      "level": 2,
+      "content": "Para configurar sSMTP, deberá editar su archivo de configuración (/etc/ssmtp/ssmtp.conf) e ingresar la configuración de su cuenta.\n\n- Si su cuenta de Gmail está protegida con autenticación de dos factores, debe generar una App Password única para usar en ssmtp.conf. Puede hacerlo en su página App Passwords de Google. Use su nombre de usuario de Gmail (no el nombre de la aplicación) en la línea AuthUser y use la contraseña de 16 caracteres generada en la línea AuthPass (se pueden omitir espacios en la contraseña).\n- Si no usa la autenticación de dos factores, debe permitir el acceso a aplicaciones no seguras. Puede hacerlo en su página Less Secure Apps de Google.\n\n```\n/etc/ssmtp/ssmtp.conf\n```\n\n```\n# El usuario que recibe todos los correos (UID <1000, generalmente el administrador)\nroot=username@gmail.com\n\n# El servidor de correo (donde se envía el correo), tanto el puerto 465 como el 587 deberían ser aceptables\n# Véase también https://support.google.com/mail/answer/78799\nmailhub=smtp.gmail.com:587\n\n# La dirección de donde proviene el correo para la autenticación del usuario\nrewriteDomain=gmail.com\n\n# El nombre de equipo completo. Debe estar formado correctamente el nombre de dominio completo o GMail rechazará la conexión.\nhostname=yourlocalhost.yourlocaldomain.tld\n\n# Utilice SSL/TLS antes de comenzar la negociación\nTLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt\nUseTLS=Yes\nUseSTARTTLS=Yes\n\n# Usuario/Contraseña\nAuthUser=username\nAuthPass=password\nAuthMethod=LOGIN\n\n# 'From header' del correo electrónico, ¿puede sobrescribir el dominio predeterminado?\nFromLineOverride=yes\n```\n\nCrear alias para nombres de usuario locales (opcional):\n\n```\n/etc/ssmtp/revaliases\n```\n\n```\nroot:username@gmail.com:smtp.gmail.com:587\nmainuser:username@gmail.com:smtp.gmail.com:587\n```\n\nPara probar si el servidor de Gmail reenviará correctamente su correo electrónico:\n\n```\n$ echo -e 'Subject: prueba\\n\\nProbando los ajustes' | sendmail -v tousername@example.com\n```\n\nCambie el texto de 'From' editando /etc/passwd para recibir correo de 'root at myhost' en lugar de solo 'root'.\n\n```\n# chfn -f 'root at myhost' root\n# chfn -f 'mainuser at myhost' mainuser\n```\n\nQue cambia /etc/passwd a:\n\n```\n$ grep myhost /etc/passwd\n```\n\n```\nroot:x:0:0:root at myhost,,,:/root:/bin/bash\nmainuser:x:1000:1000:mainuser at myhost,,,:/home/mainuser:/bin/bash\n```\n\n"
+    },
+    {
+      "title": "Seguridad",
+      "level": 2,
+      "content": "Debido a que su contraseña de correo electrónico se almacena como texto sin formato en /etc/ssmtp/ssmtp.conf, es importante que este archivo sea seguro. Por defecto, todo el directorio /etc/ssmtp es accesible solo por root y el grupo mail. El binario /usr/bin/ssmtp se ejecuta como el grupo mail y puede leer este archivo. No hay ninguna razón para agregarse usted u otros usuarios al grupo mail.\n\n"
+    },
+    {
+      "title": "Enviar correo electrónico",
+      "level": 2,
+      "content": "Para enviar correos electrónicos desde el terminal, haga lo siguiente:\n\n```\n$ echo -e \"Subject: this is the subject\\n\\nthis is the body\" | mail user@example.com\n```\n\no interactivamente como:\n\n```\n$ sendmail username@example.com\nSubject: este es mi asunto\nCC: opcional@ejemplo.com\n\n(Ahora puede escribir el texto aquí)\n```\n\nUn método alternativo para enviar correos electrónicos es crear un archivo de texto y enviarlo con ssmtp o mail\n\n```\ntest-mail.txt\n```\n\n```\nTo:nombreusuario@ejemplo.com\nFrom:sucuenta@gmail.com\nSubject: Prueba\n\nEste es un correo de prueba.\n```\n\nEnvíe el archivo test-mail.txt:\n\n```\n$ sendmail -t < test-mail.txt\n```\n\nAlgunos usuarios pueden preferir la sintaxis de mail con s-nail, mailutils, u otros proveedores de mailx en su lugar. Por ejemplo, mail tiene opciones para proporcionar el «subject» como un argumento. mail requiere sendmail y puede usar ssmtpAUR como sendmail.\n\n"
+    },
+    {
+      "title": "Archivos adjuntos",
+      "level": 3,
+      "content": "Si necesita agregar archivos adjuntos, instale y configure Mutt y Msmtp y luego vea la sugerencia en nixcraft.\n\nAlternativamente, puede adjuntar usando uuencode de sharutils. Para adjuntar 'file.txt' como 'myfile.txt':\n\n```\n$ uuencode file.txt myfile.txt | sendmail user@example.com\n```\n\n"
+    },
+    {
+      "title": "Correo a usuarios locales",
+      "level": 3,
+      "content": "Los mensajes enviados a usuarios locales (o cualquier otra dirección que no termine en @fqdn se tratan de una de estas dos maneras:\n\n- el usuario de destino tiene UID < 1000 — la dirección se reemplaza por la dirección definida por root=user@fqdn en /etc/ssmtp/ssmtp.conf;\n- el usuario de destino tiene UID ≥ 1000 o el usuario es desconocido — el valor de rewriteDomain= en /etc/ssmtp/ssmtp.conf se agrega al final del identificador del usuario.\n\nEsto puede generar problemas si los usuarios locales en su sistema no son también usuarios válidos en su rewriteDomain, pero están recibiendo correo de los servicios del sistema, especialmente si su dominio de reescritura es un servicio público comogmail.com.\n\nPara evitar esto, puede usar mail desde s-nail. La orden mail puede leer los alias definidos en /etc/mail.rc. Ejemplo:\n\n```\n$ grep alias /etc/mail.rc\n```\n\n```\nalias git git<username@example.com>\nalias archuser 'My Name'<someone@example.com>\n```\n\nLuego puede canalizar mensajes en mail en lugar de sendmail:\n\n```\n$ echo -e \"Hey archuser.\" | mail archuser\n```\n\n"
+    },
+    {
+      "title": "Referencias",
+      "level": 2,
+      "content": "- SSMTP y Gmail en los foros de Arch\n- Enviar correo electrónico desde su sistema con sSMTP\n- La guía Qnd para ssmtp\n- Soporte de GMail — Configuración de otros clientes de correo\n\n"
+    }
+  ]
+}

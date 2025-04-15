@@ -1,0 +1,71 @@
+{
+  "title": "Meson package guidelines (Português)",
+  "url": "https://wiki.archlinux.org/title/Meson_package_guidelines_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nDo site oficial do Meson:\n\nEscrito em Python, o Meson oferece suporte a várias plataformas, suporta várias linguagens de programação, compilação cruzada e muito mais.\n\nMeson não compila softwares diretamente, mas configura um sistema de compilação de back-end. Embora seja comumente usado com o ninja, outros sistemas de compilação podem ser usados. É comumente usado para substituir Sistema de Compilação do GNU.\n\nEste documento cobre padrões e diretrizes para escrever PKGBUILDs para softwares eu usam Meson.\n\n"
+    },
+    {
+      "title": "Requisitos",
+      "level": 3,
+      "content": "meson deve ser incluído ao vetor makedepends do PKGBUILD.\n\n"
+    },
+    {
+      "title": "prepare()",
+      "level": 3,
+      "content": "O Meson inclui uma utilidade para gerir subprojects, permitindo fazer download dos subprojects antes da configuração. Correr esta utilidade em prepare() permite que build() e as etapas seguintes possam correr inteiramente offline.\n\nExemplo:\n\n```\nprepare() {\n  meson subprojects download --sourcedir=source\n}\n```\n\n"
+    },
+    {
+      "title": "build()",
+      "level": 3,
+      "content": "A configuração e compilação é normalmente feita usando o binário meson, mas também pode ser feita usando o script wrapper arch-meson do Arch Linux.\n\nOs comandos meson e arch-meson incluem na sintaxe de uso opções, diretório de fontes e diretório de compilação:\n\n- opções: deve incluir pelo menos --prefix /usr, mas certifique-se de verificar outras opções com meson configure --help; também verifique opções de compilação específicas do software.\n- diretório de fontes (ou \"sourcedir\"): onde o código-fonte do projeto está armazenado como, por exemplo, em ., $pkgname ou $pkgname-$pkgver.\n- diretório de compilação (ou \"builddir\"): onde os arquivos de compilação serão armazenados pelo Meson; comumente chamado de build ou _build, mas é discricionário.\n\n"
+    },
+    {
+      "title": "Usando o binário meson diretamente",
+      "level": 4,
+      "content": "Observe que --prefix=/usr sempre precisa ser passado para o binário meson porque os pacotes do Arch Linux não devem instalar arquivos em /usr/local, de acordo com Diretrizes de pacotes do Arch#Etiqueta de pacotes. A opção embutida --buildtype=plain pode ser definida com outro valor, se você sabe o que está fazendo.\n\nExemplo:\n\n```\nbuild() {\n  meson --prefix=/usr --buildtype=plain source build\n  meson compile -C build\n}\n```\n\nmeson compile é um wrapper para os sistemas de compilação de back-end suportados, o que geralmente tem como padrão o ninja[1]\n\n"
+    },
+    {
+      "title": "Usando o script wrapper arch-meson",
+      "level": 4,
+      "content": "arch-meson é um script wrapper incluído no pacote meson que fornece a vantagem de definir algumas as opções embutidas do Meson que provavelmente seriam usadas em um pacote do Arch, economizando em código no PKGBUILD e tempo de empacotamento. Parafraseando a descrição escrita no arch-meson, ele é um \"Wrapper altamente opinativo para empacotamento do Arch Linux\" (traduzido).\n\nExemplo:\n\n```\nbuild() {\n  arch-meson source build\n  meson compile -C build\n}\n```\n\n"
+    },
+    {
+      "title": "Definindo opções de compilação específicas do software",
+      "level": 4,
+      "content": "Enquanto o Meson tem algumas opções de compilação embutidas (por exemplo, --prefix), o software sendo empacotado pode ter outras opções de compilação que o empacotador deve considerar. As opções de compilação válidas para o software são normalmente encontradas em um arquivo chamado meson_options.txt (se houver) e no meson.build. Procure por option(configurações) nestes arquivos, e leia as configurações.\n\nPara usar uma opção de compilação específica do software, use a notação -D chave=valor, sendo chave o nome da opção de compilação definida no projeto e valor um valor válido, como, por exemplo, true.\n\nPor exemplo, o gtranslator tem as seguintes opções de compilação:\n\n```\nmeson_options.txt\n```\n\n```\noption('gtk_doc', type: 'boolean', value: false, description: 'use gtk-doc to build documentation')\n```\n\nEntão, para compilar sua documentação, deve-se executar o Meson anexando a opção de compilação -D gtk_doc=true, resultando em uma linha de comando como, por exemplo:\n\n```\narch-meson $pkgname-$pkgver build -Dgtk_doc=true\n```\n\n"
+    },
+    {
+      "title": "check()",
+      "level": 3,
+      "content": "Se o software que está sendo empacotado possui conjunto de testes, considere executá-lo na função check() do PKGBUILD. Isso pode ser realizado com o comando meson test.\n\nExemplo:\n\n```\ncheck() {\n  meson test -C build\n}\n```\n\nsendo build o mesmo nome de diretório de compilação usado na etapa #build() acima.\n\n- ninja test -C build poderia ser usado diretamente.\n- O parâmetro --print-errorlogs pode ser adicionado ao meson test para relatar a saída produzida pelos testes que falharam junto com outras informações úteis como as variáveis de ambiente.\n\nConsulte meson test --help e \"Unit tests\" na documentação do Meson para mais informações.\n\n"
+    },
+    {
+      "title": "package()",
+      "level": 3,
+      "content": "O empacotamento normalmente requer a execução apenas de meson install, mas verifique se é necessário outro comando de instalação (por exemplo, uma licença incomum). Use o mesmo diretório de compilação acima e configure o sinalizador --destdir:\n\n```\npackage() {\n  meson install -C build --destdir \"$pkgdir\"\n}\n```\n\n"
+    },
+    {
+      "title": "ERROR: Function does not take positional arguments",
+      "level": 3,
+      "content": "Exemplo de saíde de erro:\n\n```\ndata/meson.build:21:5: ERROR: Function does not take positional arguments.\n```\n\nErro presente desde o Meson 0.60, que promoveu de aviso para erro o uso de argumentos posicionais. Um exemplo muito comum desse erro é adicionar argumentos inválidos a i18n.merge_file(). Por exemplo, aisleriot tinha:\n\n```\ni18n.merge_file(\n  'sol.metainfo.xml',\n  input: desktop_in,\n  output: '@BASENAME@',\n  type: 'desktop',\n  po_dir: po_dir,\n  install: true,\n  install_dir: desktopdatadir,\n)\n```\n\nsendo 'sol.metainfo.xml' agora um argumento inválido que deve ser removido. Para a correção aplicada no upstream, veja este commit.\n\nMedidas a serem tomadas neste caso:\n\n1. Aplique um patch no meson.build relatado no erro para corrigir a compilação e publique o PKGBUILD atualizado (se for o caso)\n1. Contribua para o repositório upstream com seu patch, para corrigir para todo mundo e evitar ter patches no array de fontes nas próximas versões.\n\n"
+    },
+    {
+      "title": "Modelo",
+      "level": 2,
+      "content": "Para resumir as instruções acima e fornecer um único ponto de \"copiar e colar\", consulte o modelo abaixo:\n\n```\nmakedepends=(meson)\n\nbuild() {\n  arch-meson $pkgname-$pkgver build\n  meson compile -C build\n}\n\ncheck() {\n  meson test -C build --print-errorlogs\n}\n\npackage() {\n  meson install -C build --destdir \"$pkgdir\"\n}\n```\n\n"
+    },
+    {
+      "title": "Exemplos de pacotes",
+      "level": 2,
+      "content": "Esta é uma pequena lista de pacotes que usam o Meson. Veja outros pacotes na lista \"Required by\" na página do pacote meson.\n\n- gstreamer\n- gnome-desktop\n- switchboard\n- cinnamon-desktop\n- networkmanager\n- xorg-server\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Site oficial do Meson\n- Lista de opções embutidas do Meson\n- Repositório de código-fonte do Meson no GitHub\n- Artigo do Meson no Wikipedia\n- meson(1)\n\n"
+    }
+  ]
+}

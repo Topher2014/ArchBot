@@ -1,0 +1,81 @@
+{
+  "title": "Включение Numlock При Загрузке",
+  "url": "https://wiki.archlinux.org/title/%D0%92%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D0%B5_Numlock_%D0%9F%D1%80%D0%B8_%D0%97%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B5",
+  "sections": [
+    {
+      "title": "Отдельная служба",
+      "level": 3,
+      "content": "Для начала создайте скрипт включения Num Lock в необходимых TTY:\n\n```\n/usr/local/bin/numlock\n```\n\n```\n#!/bin/bash\n\nfor tty in /dev/tty{1..6}\ndo\n    /usr/bin/setleds -D +num < \"$tty\";\ndone\n```\n\nЗатем создайте и включите службу systemd:\n\n```\n/etc/systemd/system/numlock.service\n```\n\n```\n[Unit]\nDescription=numlock\n\n[Service]\nExecStart=/usr/local/bin/numlock\nStandardInput=tty\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "Расширение getty@.service",
+      "level": 3,
+      "content": "Это более простой способ, так как в нём не используется отдельная служба и не привязываются номера определённых виртуальных терминалов. Создайте drop-in сниппет для getty@.service, который будет применяться поверх оригинальной службы:\n\n```\n/etc/systemd/system/getty@.service.d/activate-numlock.conf\n```\n\n```\n[Service]\nExecStartPre=/bin/sh -c 'setleds -D +num < /dev/%I'\n```\n\nЧтобы отключить подсказку активации Num Lock на экране входа, отредактируйте getty@tty1.service и добавьте --nohints к аргументам agetty:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty '-p -- \\\\u' --nohints --noclear %I $TERM\n```\n\n"
+    },
+    {
+      "title": "Bash",
+      "level": 3,
+      "content": "Добавьте setleds -D +num в ~/.bash_profile. Заметьте, что в отличие от других методов, изменения не вступят в силу до входа в аккаунт.\n\n"
+    },
+    {
+      "title": "startx",
+      "level": 3,
+      "content": "Установите пакет numlockx и добавьте его в файл ~/.xinitrc перед exec:\n\n```\n#!/bin/sh\n#\n# ~/.xinitrc\n#\n# Executed by startx (run your window manager from here)\n#\n\nnumlockx &\n\nexec оконный_менеджер\n```\n\n"
+    },
+    {
+      "title": "MATE",
+      "level": 3,
+      "content": "По умолчанию MATE сохраняет последнее состояние перед выходом и восстанавливает его при следующем входе. Чтобы включать Num Lock при каждом входе, измените следующие значения DCONF:\n\n```\ndconf write org.mate.peripherals-keyboard remember-numlock-state false\ndconf write org.mate.peripherals-keyboard numlock-state 'on'\n```\n\n"
+    },
+    {
+      "title": "KDE Plasma",
+      "level": 3,
+      "content": "Перейдите в Параметры системы > Устройства ввода > Клавиатура и выберите необходимое поведение Num Lock в секции Режим NumLock при запуске Plasma.\n\n"
+    },
+    {
+      "title": "GDM",
+      "level": 3,
+      "content": "Убедитесь, что пакет numlockx установлен, а затем добавьте следующий код в файл ~/.xprofile:\n\n```\nif [ -x /usr/bin/numlockx ]; then\n      /usr/bin/numlockx on\nfi\n```\n\n"
+    },
+    {
+      "title": "GNOME",
+      "level": 3,
+      "content": "Если вы не используете экранный менеджер GDM, numlockx можно запускать при загрузке GNOME.\n\nУстановите пакет numlockx, а затем добавьте команду запуска numlockx.\n\n```\n$ gnome-session-properties\n```\n\nДанная команда откроет приложение Startup Applications Preferences. Нажмите на Add и введите следующее:\n\nTable content:\nName: | Numlockx\nCommand: | /usr/bin/numlockx on\nComment: | Turns on numlock.\n\n"
+    },
+    {
+      "title": "Xfce",
+      "level": 3,
+      "content": "Убедитесь, что следующим параметрам задано значение true в файле ~/.config/xfce4/xfconf/xfce-perchannel-xml/keyboards.xml:\n\n```\n<property name=\"Numlock\" type=\"bool\" value=\"true\"/>\n<property name=\"RestoreNumlock\" type=\"bool\" value=\"true\"/>\n```\n\n"
+    },
+    {
+      "title": "SDDM",
+      "level": 3,
+      "content": "Задайте параметру Numlock значение on в секции [General] файла /etc/sddm.conf:\n\n```\n[General]\n...\nNumlock=on\n```\n\n"
+    },
+    {
+      "title": "SLiM",
+      "level": 3,
+      "content": "Найдите следующую строку в файле /etc/slim.conf и раскомментируйте её (уберите символ #):\n\n```\n#numlock             on\n```\n\n"
+    },
+    {
+      "title": "OpenBox",
+      "level": 3,
+      "content": "Добавьте следующую строку в файл ~/.config/openbox/autostart:\n\n```\nnumlockx &\n```\n\nА затем сохраните файл.\n\n"
+    },
+    {
+      "title": "LightDM",
+      "level": 3,
+      "content": "См. раздел LightDM (Русский)#NumLock включен по умолчанию.\n\n"
+    },
+    {
+      "title": "LXDM",
+      "level": 3,
+      "content": "Задайте следующий параметр в файле /etc/lxdm/lxdm.conf:\n\n```\nnumlock=1\n```\n\n"
+    },
+    {
+      "title": "LXQt",
+      "level": 3,
+      "content": "Задайте следующий параметр в файле ~/.config/lxqt/session.conf:\n\n```\n[Keyboard]\nnumlock=true\n```\n\n"
+    }
+  ]
+}

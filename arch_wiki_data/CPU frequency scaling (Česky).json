@@ -1,0 +1,171 @@
+{
+  "title": "CPU frequency scaling (Česky)",
+  "url": "https://wiki.archlinux.org/title/CPU_frequency_scaling_(%C4%8Cesky)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Power saving\n- Laptop Mode Tools\n- Undervolting CPU\n\nCPU performance scaling enables the operating system to scale the CPU frequency up or down in order to save power or improve performance. Scaling can be done automatically in response to system load, adjust itself in response to ACPI events, or be manually changed by user space programs.\n\nThe Linux kernel offers CPU performance scaling via the CPUFreq subsystem, which defines two layers of abstraction:\n\n- Scaling governors implement the algorithms to compute the desired CPU frequency, potentially based off of the system's needs.\n- Scaling drivers interact with the CPU directly, enacting the desired frequencies that the current governor is requesting.\n\nA default scaling driver and governor are selected automatically, but userspace tools like cpupower, acpid, Laptop Mode Tools, or GUI tools provided for your desktop environment, may still be used for advanced configuration.\n\n"
+    },
+    {
+      "title": "i7z",
+      "level": 3,
+      "content": "i7z is an i7 (and now i3, i5, i7, i9) CPU reporting tool for Linux. It can be launched from a Terminal with the command i7z or as GUI with i7z-gui.\n\n"
+    },
+    {
+      "title": "turbostat",
+      "level": 3,
+      "content": "turbostat can display the frequency, power consumption, idle status and other statistics of the modern Intel and AMD CPUs.\n\n"
+    },
+    {
+      "title": "cpupower",
+      "level": 3,
+      "content": "cpupower is a set of userspace utilities designed to assist with CPU frequency scaling. The package is not required to use scaling, but is highly recommended because it provides useful command-line utilities and a systemd service to change the governor at boot.\n\nThe configuration file for cpupower is located in /etc/default/cpupower. This configuration file is read by a bash script in /usr/lib/systemd/scripts/cpupower which is activated by systemd with cpupower.service. You may want to enable cpupower.service to start at boot.\n\n"
+    },
+    {
+      "title": "thermald",
+      "level": 3,
+      "content": "thermald is a Linux daemon used to prevent the overheating of Intel CPUs. This daemon proactively controls thermal parameters using P-states, T-states, and the Intel power clamp driver. thermald can also be used for older Intel CPUs. If the latest drivers are not available, then the daemon will revert to x86 model specific registers and the Linux \"cpufreq subsystem\" to control system cooling.\n\nBy default, it monitors CPU temperature using available CPU digital temperature sensors and maintains CPU temperature under control, before hardware takes aggressive correction action. If there is a skin temperature sensor in thermal sysfs, then it tries to keep skin temperature under 45C.\n\nOn Tiger Lake laptops (e.g. Dell Latitude 3420), this daemon has been reported as unlocking more performance than what would be otherwise available.\n\nThe associated systemd unit is thermald.service, which should be started and enabled. See thermald(8) for more information.\n\n"
+    },
+    {
+      "title": "power-profiles-daemon",
+      "level": 3,
+      "content": "The powerprofilesctl command-line tool from power-profiles-daemon handles power profiles (e.g. balanced, power-saver, performance) through the power-profiles-daemon service. GNOME and KDE also provide graphical interfaces for profile switching; see the following:\n\n- GNOME#Power modes\n- KDE#Power management\n\nSee the project's README for more information on usage, use cases, and comparisons with similar projects.\n\nStart/enable the power-profiles-daemon service. Note that when powerprofilesctl is launched, it also attempts to start the service (see the unit status of dbus.service).\n\n- power-profiles-daemon conflicts with other power management services such as TLP, tuned and system76-powerAUR. To use one of the aforementioned services instead without uninstalling power-profiles-daemon (due to its potential status as a dependency), disable the power-profiles-daemon service by masking it (see also [1], [2]).\n- tuned now offers a tuned-ppd service compatibility layer for power-profiles-daemon since version 2.23.0.\n\n"
+    },
+    {
+      "title": "tuned",
+      "level": 3,
+      "content": "tuned is a daemon for monitoring and adaptive tuning of system devices. It can configure GPU power modes, PCIe power management, set sysctl settings, adjust kernel scheduling and more; a daemon that also configures out aspects of power management in the system.\n\nAs of release 2.23.0, the project ships with tuned-ppd, a compatibility layer for programs written for power-profiles-daemon, such as the following:\n\n- GNOME#Power modes\n- KDE#Power management\n\nFor reasons why tuned should be used instead of power-profiles-daemon, see Fedora's proposal to replace it with tuned. For opposite arguments, see [3].\n\nStart/enable the tuned daemon service. For power-profiles-daemon compatibility, also start/enable the tuned-ppd service. To control tuned from the command line, use tuned-adm to view, set, and recommend profiles.\n\n"
+    },
+    {
+      "title": "cpupower-gui",
+      "level": 3,
+      "content": "cpupower-gui-gitAUR is a graphical utility designed to assist with CPU frequency scaling. The GUI is based on GTK and is meant to provide the same options as cpupower. cpupower-gui can enable or disable cores and change the maximum/minimum CPU frequency and governor for each core. The application handles privilege granting through polkit and allows any logged-in user in the wheel user group to change the frequency and governor. See cpupower-gui systemd units for more information on cpupower-gui.service and cpupower-gui-user.service.\n\n"
+    },
+    {
+      "title": "gnome-shell-extension-cpupower",
+      "level": 3,
+      "content": "gnome-shell-extension-cpupower-gitAUR is a GNOME shell extension that can alter minimum/maximum CPU frequencies and enable/disable frequency boosting.\n\n"
+    },
+    {
+      "title": "auto-cpufreq",
+      "level": 3,
+      "content": "auto-cpufreqAUR is an automatic CPU speed and power optimizer for Linux based on active monitoring of laptop's battery state, CPU usage, CPU temperature and system load.\n\n"
+    },
+    {
+      "title": "Scaling drivers",
+      "level": 2,
+      "content": "Scaling drivers implement the CPU-specific details of setting frequencies specified by the governor. Strictly speaking, the ACPI standard requires power-performance states (P-states) that start at P0, and becoming decreasingly performant. This functionality is called SpeedStep on Intel, and PowerNow! on AMD.\n\nIn practice, though, processors provide methods for specifying specific frequencies rather than being restricted to fixed P-states, which the scaling drivers handle.\n\ncpupower requires drivers to know the limits of the native CPU:\n\nTable content:\nDriver | Description\nacpi_cpufreq | CPUFreq driver which utilizes the ACPI Processor Performance States. This driver also supports the Intel Enhanced SpeedStep (previously supported by the deprecated speedstep_centrino module). For AMD Ryzen it only provides 3 frequency states.\namd_pstate | This driver has three modes corresponding to different degrees of autonomy from the CPU hardware: active, passive, and guided. The amd_pstate CPU power scaling driver is used automatically in \"active mode\" on supported CPUs (Zen 2 and newer) since kernel version 6.5. See #amd_pstate for details.\namd_pstate_epp | This driver implements a scaling driver selected by amd_pstate=active with an internal governor for AMD Ryzen (some Zen 2 and newer) processors.\ncppc_cpufreq | CPUFreq driver based on ACPI CPPC system (see #Collaborative processor performance control). Common default on AArch64 systems. Works on modern x86 too, but the intel_pstate and amd_pstate drivers are better.\nintel_cpufreq | Starting with kernel 5.7, the intel_pstate scaling driver selects \"passive mode\" aka intel_cpufreq for CPUs that do not support hardware-managed P-states (HWP), i.e. Intel Core i 5th generation or older. This \"passive\" driver acts similar to the ACPI driver on Intel CPUs, except that it does not have the 16-pstate limit of ACPI.\nintel_pstate | This driver implements a scaling driver with an internal governor for Intel Core (Sandy Bridge and newer) processors. It is used automatically for these processors instead of the other drivers below. This driver takes priority over other drivers and is built-in as opposed to being a module. intel_pstate may run in \"passive mode\" via the intel_cpufreq driver for older CPUs. If you encounter a problem while using this driver, add intel_pstate=disable to your kernel line in order to revert to using the acpi_cpufreq driver.\np4_clockmod | CPUFreq driver for Intel Pentium 4/Xeon/Celeron processors which lowers the CPU temperature by skipping clocks. (You probably want to use speedstep_lib instead.)\npcc_cpufreq | This driver supports Processor Clocking Control interface by Hewlett-Packard and Microsoft Corporation which is useful on some ProLiant servers.\npowernow_k8 | CPUFreq driver for K8/K10 Athlon 64/Opteron/Phenom processors. Since Linux 3.7, 'acpi_cpufreq' will automatically be used for more modern AMD CPUs.\nspeedstep_lib | CPUFreq driver for Intel SpeedStep-enabled processors (mostly Atoms and older Pentiums)\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nTo see a full list of available modules, run:\n\n```\n$ ls /usr/lib/modules/$(uname -r)/kernel/drivers/cpufreq/\n```\n\nLoad the appropriate module (see Kernel modules for details). Once the appropriate cpufreq driver is loaded, detailed information about the CPU(s) can be displayed by running\n\n```\n$ cpupower frequency-info\n```\n\n"
+    },
+    {
+      "title": "Setting maximum and minimum frequencies",
+      "level": 3,
+      "content": "In some cases, it may be necessary to manually set maximum and minimum frequencies.\n\nTo set the maximum clock frequency (clock_freq is a clock frequency with units: GHz, MHz):\n\n```\n# cpupower frequency-set -u clock_freq\n```\n\nTo set the minimum clock frequency:\n\n```\n# cpupower frequency-set -d clock_freq\n```\n\nTo set the CPU to run at a specified frequency:\n\n```\n# cpupower frequency-set -f clock_freq\n```\n\n- To adjust for only a single CPU core, append -c core_number.\n- The governor, maximum and minimum frequencies can be set in /etc/default/cpupower.\n\nAlternatively, you can set the frequency manually:\n\n```\n# echo value | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq\n```\n\nThe available values can be found in /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies or similar. [4]\n\n"
+    },
+    {
+      "title": "Configuring frequency boosting",
+      "level": 3,
+      "content": "Some processors support raising their frequency above the normal maximum for a short burst of time, under appropriate thermal conditions. On Intel processors, this is called Turbo Boost, and on AMD processors this is called Turbo-Core.\n\n"
+    },
+    {
+      "title": "Setting via sysfs (intel_pstate)",
+      "level": 4,
+      "content": "intel_pstate has a driver-specific interface for prohibiting the processor from entering turbo P-States:\n\n```\n# echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo\n```\n\n"
+    },
+    {
+      "title": "Setting via sysfs (other scaling drivers)",
+      "level": 4,
+      "content": "For scaling drivers other than intel_pstate, if the driver supports boosting, the /sys/devices/system/cpu/cpufreq/boost attribute will be present, and can be used to disable/enable boosting.\n\nTo disable boosting, run:\n\n```\n# echo 0 > /sys/devices/system/cpu/cpufreq/boost\n```\n\nTo enable boosting, run:\n\n```\n# echo 1 > /sys/devices/system/cpu/cpufreq/boost\n```\n\n"
+    },
+    {
+      "title": "Setting via x86_energy_perf_policy",
+      "level": 4,
+      "content": "On Intel processors, x86_energy_perf_policy can also be used to configure Turbo Boost:\n\n```\n# x86_energy_perf_policy --turbo-enable 0\n```\n\n"
+    },
+    {
+      "title": "amd_pstate",
+      "level": 3,
+      "content": "amd_pstate has three operation modes: CPPC autonomous (active) mode, CPPC non-autonomous (passive) mode and CPPC guided autonomous (guided) mode. Officially supported kernels are built with CONFIG_X86_AMD_PSTATE_DEFAULT_MODE=3 which means the default for them is the active mode. This can be changed with the kernel parameter amd_pstate=active, amd_pstate=passive or amd_pstate=guided. To revert to the acpi_cpufreq driver, set amd_pstate=disable instead.\n\n"
+    },
+    {
+      "title": "Scaling governors",
+      "level": 2,
+      "content": "Scaling governors are power schemes determining the desired frequency for the CPU. Some request a constant frequency, others implement algorithms to dynamically adjust according to the system load. The governors included in the kernel are:\n\nTable content:\nGovernor | Description\nperformance | Run the CPU at the maximum frequency, obtained from /sys/devices/system/cpu/cpuX/cpufreq/scaling_max_freq.\npowersave | Run the CPU at the minimum frequency, obtained from /sys/devices/system/cpu/cpuX/cpufreq/scaling_min_freq.\nuserspace | Run the CPU at user specified frequencies, configurable via /sys/devices/system/cpu/cpuX/cpufreq/scaling_setspeed.\nondemand | Scales the frequency dynamically according to current load. Jumps to the highest frequency and then possibly back off as the idle time increases.\nconservative | Scales the frequency dynamically according to current load. Scales the frequency more gradually than ondemand.\nschedutil | Scheduler-driven CPU frequency selection [5], [6].\n\nDepending on the scaling driver, one of these governors will be loaded by default:\n\n- schedutil since Linux 4.9.5\n- the internal powersave governor for Intel and AMD CPUs using the intel_pstate and amd_pstate driver respectively (see the note above, it is equivalent to schedutil).\n\nTo activate a particular governor, run:\n\n```\n# cpupower frequency-set -g governor\n```\n\n- To adjust for only a single CPU core, append -c core_number to the command above.\n- Activating a governor requires that specific kernel module (named cpufreq_governor) is loaded. As of kernel 3.4, these modules are loaded automatically.\n\nAlternatively, you can activate a governor on every available CPU manually:\n\n```\n# echo governor | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\n```\n\n```\n$ watch cat /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq\n```\n\n"
+    },
+    {
+      "title": "Tuning the ondemand governor",
+      "level": 3,
+      "content": "See the kernel documentation for details.\n\n"
+    },
+    {
+      "title": "Switching threshold",
+      "level": 4,
+      "content": "To set the threshold for stepping up to another frequency:\n\n```\n# echo -n percent > /sys/devices/system/cpu/cpufreq/governor/up_threshold\n```\n\nTo set the threshold for stepping down to another frequency:\n\n```\n# echo -n percent > /sys/devices/system/cpu/cpufreq/governor/down_threshold\n```\n\n"
+    },
+    {
+      "title": "Sampling rate",
+      "level": 4,
+      "content": "The sampling rate determines how frequently the governor checks to tune the CPU. sampling_down_factor is a tunable that multiplies the sampling rate when the CPU is at its highest clock frequency, thereby delaying load evaluation and improving performance. Allowed values for sampling_down_factor are 1 to 100000. This tunable has no effect on behavior at lower CPU frequencies/loads.\n\nTo read the value (default = 1), run:\n\n```\n$ cat /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor\n```\n\nTo set the value, run:\n\n```\n# echo -n value > /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor\n```\n\n"
+    },
+    {
+      "title": "Make changes permanent",
+      "level": 4,
+      "content": "Since Linux 5.9, it is possible to set the cpufreq.default_governor kernel option.[7] To set the desired scaling parameters at boot, configure the cpupower utility and enable its systemd service. Alternatively, systemd-tmpfiles or udev rules can be used.\n\n"
+    },
+    {
+      "title": "Autonomous frequency scaling",
+      "level": 2,
+      "content": "Both Intel and AMD define a way to have the CPU decide its own speed based on (1) a performance range from the system and (2) a performance/power hint specifying the preference. The fully-autonomous mode is activated when:\n\n- amd_pstate is set to \"active\"—requires CPPC support in both the CPU and BIOS,\n- intel_pstate is set to \"active\" and hardware P-state (HWP) is available (i.e. Sandy Bridge and newer)—works out-of-the-box.\n\nThe most important feature of active governing is that only two governors appear available, powersave and performance. They do not work at all like their normal counterpart, however: these levels are translated into an Energy Performance Preference hint for the CPU's internal governor. As a result, they both provide dynamic scaling, similar to the schedutil or ondemand generic governors respectively, differing mostly in latency. The performance algorithm should give better power saving functionality than the old ondemand governor for Intel HWP.\n\n"
+    },
+    {
+      "title": "Intel active, non-HWP",
+      "level": 3,
+      "content": "The intel-pstate driver has, confusingly, an \"active\" mode that works without the CPU's active decision. This mode turns on when kernel cmdline forces an \"active\" mode but HWP is unavailable or disabled. It will still only provide powersave and performance, but the driver itself does the governing in a way similar to schedutil and performance (i.e. it stays at the maximum P-state). There is no real benefit to this mode compared to passive intel-pstate.\n\n"
+    },
+    {
+      "title": "Setting the EPP",
+      "level": 3,
+      "content": "It is possible to select in-between hints with the sysfs interfaces available. The interface is identical between AMD and Intel, where the files /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference describe the current preference and /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_available_preferences providing a list of available preferences. One can also pass a number between 0 (favor performance) and 255 (favor power). A fallback implementation is provided for Intel CPUs without EPP, translating strings to EPB levels (described in next section) but failing on numbers.\n\nx86_energy_perf_policy supports configuration of EPP hints via the --hwp-epp switch on Intel CPUs only. It works via direct access of machine-specific registers (MSRs) which differ between Intel and AMD. The program can also restrict the range of HWP frequencies using a range of frequency multipliers.\n\nTo enable hardware P-States with x86_energy_perf_policy(8):\n\n```\n# x86_energy_perf_policy -H 1\n# x86_energy_perf_policy -U 1\n```\n\n"
+    },
+    {
+      "title": "Collaborative processor performance control",
+      "level": 2,
+      "content": "The power consumption of modern CPUs is no longer simply dependent on the frequency or voltage setting, as there are modules that can be switched on as needed. Collaborative processor performance control (CPPC) is the P-state replacement provided by ACPI 5.0. Instead of defining a table of static frequency levels, the processor provides many abstract performance levels and the operating system selects from these levels. There are two advantages:\n\n- There is no longer a limit of 16 P-state entries; a typical CPU provides hundreds of levels to choose from.\n- The CPU can provide a higher frequency (e.g. boost) for a performance level when certain parts (e.g. vector FPU) is not used.\n\nOn the other hand, the flexible frequency breaks frequency-invariant utilization tracking, which is important for fast frequency changes by schedutil. A number of vendor-specific methods have been used to make the frequency static under CPPC, with most successes coming from arm64.\n\ncppc_cpufreq is the generic CPPC scaling driver. amd_pstate also uses ACPI CPPC to manage the CPU frequency when the Zen 3 MSR is unavailable – this method, also called \"shared memory\", has higher latency than MSR.\n\n"
+    },
+    {
+      "title": "Intel performance and energy bias hint",
+      "level": 2,
+      "content": "The Intel performance and energy bias hint (EPB) is an interface provided by Intel CPUs to allow for user space to specify the desired power-performance tradeoff, on a scale of 0 (highest performance) to 15 (highest energy savings). The EPB register is another layer of performance management functioning independently from frequency scaling. It influences how aggressive P-state and C-state selection will be, and informs internal model-specific decision making that affects energy consumption.\n\nCommon values and their aliases, as recognized by sysfs and x86_energy_perf_policy(8) are:\n\nTable content:\nEPB value | String\n0 | performance\n4 | balance-performance\n6 | normal, default\n8 | balance-power\n15 | power\n\n"
+    },
+    {
+      "title": "Setting via sysfs",
+      "level": 3,
+      "content": "The EPB can be set using a sysfs attribute:\n\n```\n# echo epb | tee /sys/devices/system/cpu/cpu*/power/energy_perf_bias\n```\n\n"
+    },
+    {
+      "title": "Setting via x86_energy_perf_policy",
+      "level": 3,
+      "content": "With x86_energy_perf_policy:\n\n```\n# x86_energy_perf_policy --epb epb\n```\n\n"
+    },
+    {
+      "title": "Setting via cpupower",
+      "level": 3,
+      "content": "With cpupower:\n\n```\n# cpupower set -b epb_value\n```\n\n"
+    },
+    {
+      "title": "Interaction with ACPI events",
+      "level": 2,
+      "content": "Users may configure scaling governors to switch automatically based on different ACPI events such as connecting the AC adapter or closing a laptop lid. A quick example is given below; however, it may be worth reading full article on acpid.\n\nEvents are defined in /etc/acpi/handler.sh. If the acpid package is installed, the file should already exist and be executable. For example, to change the scaling governor from performance to conservative when the AC adapter is disconnected and change it back if reconnected:\n\n```\n/etc/acpi/handler.sh\n```\n\n```\n[...]\n\nac_adapter)\n    case \"$2\" in\n        AC*)\n            case \"$4\" in\n                00000000)\n                    echo \"conservative\" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor    \n                    echo -n $minspeed >$setspeed\n                    #/etc/laptop-mode/laptop-mode start\n                ;;\n                00000001)\n                    echo \"performance\" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor\n                    echo -n $maxspeed >$setspeed\n                    #/etc/laptop-mode/laptop-mode stop\n                ;;\n            esac\n        ;;\n        *) logger \"ACPI action undefined: $2\" ;;\n    esac\n;;\n\n[...]\n```\n\n"
+    },
+    {
+      "title": "BIOS frequency limitation",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nSome CPU/BIOS configurations may have difficulties to scale to the maximum frequency or scale to higher frequencies at all. This is most likely caused by BIOS events telling the OS to limit the frequency resulting in /sys/devices/system/cpu/cpu0/cpufreq/bios_limit set to a lower value.\n\nEither you just made a specific Setting in the BIOS Setup Utility, (Frequency, Thermal Management, etc.) you can blame a buggy/outdated BIOS or the BIOS might have a serious reason for throttling the CPU on its own.\n\nReasons like that can be (assuming your machine's a notebook) that the battery is removed (or near death) so you are on AC-power only. In this case, a weak AC-source might not supply enough electricity to fulfill extreme peak demands by the overall system and as there is no battery to assist this could lead to data loss, data corruption or in worst case even hardware damage!\n\nNot all BIOS'es limit the CPU-Frequency in this case, but, for example, most IBM/Lenovo Thinkpads do. Refer to thinkwiki for more thinkpad related info on this topic.\n\nIf you checked there is not just an odd BIOS setting and you know what you are doing, you can make the Kernel ignore these BIOS-limitations.\n\nNote: **not** \n\n- Make sure you read and understood the section above. CPU frequency limitation is a safety feature of your BIOS and you should not need to work around it.\n- This is not recommended and can seriously damage your hardware: use at your own risk. [8]\n\nSet the processor.ignore_ppc=1 kernel parameter. For trying this temporarily, change the value in /sys/module/processor/parameters/ignore_ppc from 0 to 1.\n\nSome systems use another mechanism to limit the CPU frequency, e.g., when running without battery or an unofficial power adapter. See Lenovo ThinkPad T480#CPU stuck at minimum frequency for a way to manipulate the BD PROCHOT bit in Intel CPUs and Dell XPS 15 (9560)#General slowness & stuttering for alternative fixes. It does not only apply to the Lenovo ThinkPad T480, but is a common problem in Dell XPS models like the XPS15 9550 and XPS15 9560, too. The bit also is what makes at least some Intel-based MacBooks run with minimum CPU frequency when no battery is connected.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Linux CPUFreq - kernel documentation\n- Reddit post talking about pstate\n- Processor boosting control\n- intel_pstate kernel documentation\n- amd_pstate kernel documentation\n- intel_pstate/intel_cpufreq documentation kernel 5.7+\n\n"
+    }
+  ]
+}

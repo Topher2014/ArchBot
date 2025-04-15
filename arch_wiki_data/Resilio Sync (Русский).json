@@ -1,0 +1,51 @@
+{
+  "title": "Resilio Sync (Русский)",
+  "url": "https://wiki.archlinux.org/title/Resilio_Sync_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Syncthing\n- Synchronization and backup programs\n\nResilio Sync (formerly: BitTorrent Sync or BTSync) is a proprietary file sharing system that relies on the BitTorrent Peer-to-peer (P2P) protocol.\n\nInstead of having a central server which archives every file, it uses peer-to-peer connections between the devices themselves therefore there is no limit on data storage and/or transfer speed. The user's data is exclusively stored on the devices with which the user chose to be in sync with, hence it is required to have at least two user devices, or \"nodes\" to be online. If many devices are connected simultaneously, files are shared between them in a mesh networking topology.\n\nAll traffic between devices is encrypted with AES-128 in counter mode, using a unique session key. This key is derived from a 'secret' which itself is a random 21 Byte key Base32-encoded. By handing over the 'secret', files and folders can be shared with other users. When a device adds a folder for synchronization, a secret is generated. From now on, every device that wants to synchronize that folder must know the secret key. The synchronization has no speed or size limits, as long as both devices have enough disk space.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the rslsyncAUR package, which includes systemd service definitions for managing the rslsync daemon. This package creates a default /etc/rslsync.conf for system/root operation. Make the desired changes (e.g. login id and password) to those files prior to enabling rslsync.service.\n\nAlternatively, the bare .tar.gz packaged executable can be downloaded from the official website. The rest of this guide assumes that you are using the rslsyncAUR package.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "The Linux client of Resilio Sync does not use a typical GUI, instead it sets up a WebUI server accessible at localhost:8888. Shared folders can also be configured statically in a configuration file, but doing so disables the WebGUI.\n\nOnce installed, you will first need to create a configuration file at ~/.config/rslsync/rslsync.conf, see #Configuration. You will also need to create the storage_path directory. When that is done, start and (if you want it to start on boot) start/enable the user service rslsync (i.e., with the --user flag).\n\nThe service will run as the user invoking the command. Note that the above command is not run as root: doing so may lead to a cryptic error stating that D-Bus has refused the connection.\n\n- It is important to make sure that when rslsync is run as the user, the rslsync.conf file and directory where the rslsync.pid file will be located have the correct user permissions, i.e. are owned by the user invoking the command. Failure to do so will prevent the service from running. If the user permissions are correct but rslsync still fails to run after being enabled, restart your system.\n- If running rslsync on a headless server, enable lingering to start rslsync and keep it running outside user sessions: Systemd/User#Automatic start-up of systemd user instances.\n\nYou can also run it as the rslsync.service system user (without the --user flag).\n\nConfiguration for this user is located at /etc/rslsync.conf, and metadata is saved in /var/lib/rslsync/ by default. You should review the configuration settings especially user and password, see below.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "A sample configuration file can be created using:\n\n```\n# rslsync --dump-sample-config > ~/.config/rslsync/rslsync.conf\n```\n\nYou will probably want to change some of the settings, including:\n\n- device_name\n- storage_path\n- webui/login\n- webui/password\n\nNote: **not** \n\n- The rslsync executable does not create the storage_path directory if it does not exist, you will have to do this manually or use #Automatic configuration file creation.\n- The storage_path setting defines where metadata will be saved, not the synced files themselves. Where synced files are saved is configured on a per-folder basis in the WebGUI.\n- The configuration option webui/password_hash_unified is calculated with webui/password_hash_salt_unified prepended, if any salt is used at all.\n\n"
+    },
+    {
+      "title": "Automatic configuration file creation",
+      "level": 3,
+      "content": "The rslsyncAUR package provides a systemd user service called rslsync.service which, if enabled, triggers when a user's rslsync_user.service starts. Then a configuration file with default values will be created if it does not already exist.\n\nThe install script enables the service for all users by default. Although defeating most of its purpose, rslsync.service can be disabled.\n\nIndividual users can then enable the rslsync_user.service user unit.\n\nrslsync_user.service creates ~/.config/rslsync/rslsync.conf if it does not exist, and guesses some default values of the settings:\n\n- device_name: $USER@$HOSTNAME\n- storage_path: ~/.rlsync\n- webui/login: $USER/password\n\nThe script also creates the storage_path directory set in the configuration file if it does not exist. This is done independently from the creation of the configuration file.\n\n"
+    },
+    {
+      "title": "Missing storage path",
+      "level": 3,
+      "content": "If you start the service but cannot reach the WebUI, check the unit status for the system-wide instance or the user unit.\n\nA common error is Storage path specified in config file does not exist.. This is easily fixed by mkdir ~/.rslsync, or whatever your storage_path is set to.\n\n"
+    },
+    {
+      "title": "Ignore some files/folders synchronization",
+      "level": 3,
+      "content": "If you don’t want Resilio Sync to track some files in your sync folder, please use IgnoreList. IgnoreList is located in hidden .sync folder.\n\nIgnoreList is a UTF-8 encoded .txt file that allows you to specify single files, paths or rules for ignoring during the synchronization job. Each line of the IgnoreList file represents a separate rule. All the files that fall under the ignore filter are not indexed and not counted in the \"Size\" column in Sync main view.\n\nIt supports '?' and '*' wildcard symbols.\n\nNote that IgnoreList is applied only to the folder where it is contained and will not work with the files that have already been synced. If you add indexed files to IgnoreList, they will be deleted on other syncing devices. In order to avoid this:\n\n- Remove the folder from sync on all the devices.\n- Modify IgnoreList file on all of them so that it contains same info.\n- Re-add the modified folders.\n\nFor further details, please refer to Ignoring files in Sync (IgnoreList)\n\n"
+    },
+    {
+      "title": "Error while loading shared libraries: libcrypt.so.1",
+      "level": 3,
+      "content": "If you receive the error message error while loading shared libraries: libcrypt.so.1 starting rslsync with the binary or as a service, install the package libxcrypt-compat.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official Resilio Sync Help\n- Official Resilio Sync FAQ\n\n"
+    }
+  ]
+}

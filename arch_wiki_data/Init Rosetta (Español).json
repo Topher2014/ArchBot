@@ -1,0 +1,66 @@
+{
+  "title": "Init Rosetta (Español)",
+  "url": "https://wiki.archlinux.org/title/Init_Rosetta_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-11-03** \n\nArtículos relacionados\n\n- Arch boot process (Español)\n- ConsoleKit\n\nInit (abreviatura del término inglés initialization) es el primer proceso que se inicia durante el arranque del sistema. Es un demonio cuyo proceso continúa ejecutándose hasta que se apaga el sistema. Init es el ancestro directo o indirecto de todos los demás procesos, y adopta automáticamente todos los procesos huérfanos. El kernel lo inicia utilizando un nombre de archivo codificado. Si el kernel no puede iniciarlo, se producirá un «kernel panic». A init generalmente se le asigna el identificador de proceso (PID) 1.\n\nLos scripts de init (o rc) son lanzados para garantizar la funcionalidad básica en el inicio y apagado del sistema. Esto incluye el (des)montaje del sistemas de archivos y el lanzamiento de los daemons. Un gestor de servicios va un paso más allá al proporcionar un control activo sobre los procesos ejecutados, o la supervisión de procesos. Un ejemplo es monitorear los bloqueos y reiniciar los procesos en consecuencia.\n\nEstos componentes se combinan con el sistema init. Algunos inits incluyen el administrador de servicios en el proceso de inicio, o tienen scripts de inicio en estrecha relación con ellos. A estas entradas se hace referencia como «integradas», aunque las entradas en diferentes categorías pueden depender explícitamente entre sí.\n\n"
+    },
+    {
+      "title": "Inits (integrados)",
+      "level": 2,
+      "content": "- anopa — Sistema de inicialización construido alrededor del conjunto de supervisión s6\n\n- GNU Shepherd — Sistema de inicialización escrito en Guile.\n\n- OpenRC — Sistema de inicialización basado en dependencias.\n\n- systemd — Sistema de inicialización basado en dependencias con una notable paralelización, supervisión de procesos mediante cgroups y capacidad de depender de un punto de montaje dado o servicio dbus.\n\n"
+    },
+    {
+      "title": "Inits",
+      "level": 2,
+      "content": "- BusyBox — Utilidades para sistemas de rescate e incrustados.\n\n- ninit — Fork de minit\n\n- sinit — Init simple inicialmente basado en la inicialización mínima de Rich Felker.\n\n- SysVinit — Sistema tradicional V de init.\n\n"
+    },
+    {
+      "title": "Scripts de init",
+      "level": 2,
+      "content": "- initscripts-fork — Fork de los scripts de SysVinit mantenido en Arch Linux.\n\n- minirc — Script de inicialización mínimo diseñado para BusyBox.\n\n"
+    },
+    {
+      "title": "Gestores de servicios",
+      "level": 2,
+      "content": "- daemontools — Colección de herramientas para gestionar servicios UNIX.\n\n- Monit — Monit es una herramienta de supervisión de procesos para Unix y Linux. Con monit, el estado del sistema se puede ver directamente desde la línea de órdenes o mediante el servidor web HTTP(S) nativo.\n\n- perp — Supervisor de proceso persistente (servicio) y marco de administración para UNIX.\n\n- runit — Esquema de inicialización de UNIX con supervisión de servicio, un reemplazo para SysVinit y otros esquemas de init.\n\n- s6 — Pequeño conjunto de programas para UNIX, diseñado para permitir la supervisión del servicio en la línea de daemontools y runit.\n\n"
+    },
+    {
+      "title": "Migrar servicios en ejecución",
+      "level": 3,
+      "content": "Para ejecutar demonios bajo el nuevo init, guarde una lista de demonios en ejecución:\n\n```\n$ systemctl list-units --state=running \"*.service\" > daemons.list\n```\n\ny configure los #Scripts de init en consecuencia. Vea también [2].\n\n"
+    },
+    {
+      "title": "logind",
+      "level": 3,
+      "content": "logind requiere que systemd sea el proceso de inicio. [3] Como tal, las sesiones locales y otras funciones no estarán disponibles.\n\nAñada usuarios a los grupos de usuarios respectivos para acceder al dispositivo y reiniciarlo. La pertencia actual al grupo debe verificarse primero con id user.\n\n```\n# usermod -a -G video,audio,power,disk,storage,optical,lp,scanner user\n```\n\nConsulte también Users and groups#Pre-systemd groups. Para crear reglas de grupo para usar con Polkit, vea Polkit#Bypass password prompt.\n\nComo Xorg.wrap no verifica si logind está activo [5], los derechos de root para Xorg deben activarse manualmente:\n\n```\n/etc/X11/Xwrapper.config\n```\n\n```\nneeds_root_rights = yes\n```\n\nConsulte pm-utilsAUR y acpid para reemplazar la administración de energía con systemd.\n\n"
+    },
+    {
+      "title": "Tareas programadas",
+      "level": 3,
+      "content": "Arch utiliza los archivos timer en lugar de cron por defecto. Vea archlinux-cronjobs para conocer trabajos cron básicos.\n\n"
+    },
+    {
+      "title": "Dbus",
+      "level": 3,
+      "content": "Las instancias de usuario de dbus-daemon son lanzadas por systemd/User [6]. Cuando requiera IPC (del inglés «comunicación inter procesos) entre aplicaciones de escritorio, restaure 30-dbus.sh:\n\n```\n/etc/X11/xinit/xinitrc.d/30-dbus.sh\n```\n\n```\n#!/bin/bash\n\n# launches a session dbus instance\nif [ -z \"${DBUS_SESSION_BUS_ADDRESS-}\" ] && type dbus-launch >/dev/null; then\n  eval $(dbus-launch --sh-syntax --exit-with-session)\nfi\n```\n\n"
+    },
+    {
+      "title": "systemd-nspawn",
+      "level": 3,
+      "content": "systemd-nspawn es una herramienta para sistemas systemd. Sin embargo, desde Linux 2.6.19 es posible ejecutar systemd en un sistema no systemd utilizando el espacio de nombres PID. Para ello, el kernel debe configurarse con CONFIG_PID_NS y CONFIG_NAMESPACES).\n\nEl espacio de nombres PID crea una nueva jerarquía de procesos que comienzan con PID 1. Además de esto, systemd requiere que se monte un sistema de archivos raíz enjaulado (chrooteado). Por lo tanto, debe al menos realizar un montaje de «bind», porque de lo contrario algunos servicios fallarán con:\n\n```\n\"Failed at step NAMESPACE spawning\" due to \"Invalid operation\"\n```\n\ndado que systemd intentará volver a montar la raíz con la opción private.\n\nPara configurar un entorno enjaulado (chroot) con un nuevo espacio de nombre PID puede usar jchroot.[7] [8]. Asegúrese de no montar /proc dentro de la nueva raíz antes de realizar chroot, de lo contrario, systemd detectará el entorno chroot. Puede montarlo más tarde una vez que se esté ejecutando systemd.\n\n"
+    },
+    {
+      "title": "Reemplazar udev",
+      "level": 3,
+      "content": "Note: **antes** \n\n- eudev — eudev es un fork de udev iniciado por el proyecto Gentoo. Está diseñado y probado principalmente con OpenRC.\n\n- mdev — Administrador de dispositivos para su utilización en sistemas integrados.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Debian init system debate\n- How to run s6-svscan as process 1\n- Replace systemd with busybox + minirc\n- Experiments of Manjaro\n- Init vs. runsv\n- Demystifying the init system\n- A history of modern init systems (1992-2015)[enlace roto 2024-10-12]\n- Comparison of init systems (gentoo wiki)\n\n"
+    }
+  ]
+}

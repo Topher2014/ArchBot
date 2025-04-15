@@ -1,0 +1,71 @@
+{
+  "title": "Lighttpd (Čeština)",
+  "url": "https://wiki.archlinux.org/title/Lighttpd_(%C4%8Ce%C5%A1tina)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "\"lighttpd (pronounced /lighty/) is a secure, fast, standards compliant, and very flexible web server that has been optimized for high-performance environments. lighttpd supports a wide variety of features while using memory and CPU efficiently, making lighttpd an ideal web server for all systems, small and large.\"\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the lighttpd package.\n\n"
+    },
+    {
+      "title": "Basic setup",
+      "level": 3,
+      "content": "The lighttpd configuration file is: /etc/lighttpd/lighttpd.conf. By default it should produce a working test page.\n\nTo check your lighttpd.conf for bugs you can use this command (helps finding misconfigurations very quickly):\n\n```\n$ lighttpd -tt -f /etc/lighttpd/lighttpd.conf\n```\n\nThe default configuration file specifies /srv/http/ as the document directory served. To test the installation, create a dummy file:\n\n```\n/srv/http/index.html\n```\n\n```\nHello world!\n```\n\nThen start/enable the lighttpd.service and point your browser to localhost, where you should see the test page.\n\nExample configuration files are available in /usr/share/doc/lighttpd/.\n\n"
+    },
+    {
+      "title": "Basic logging",
+      "level": 4,
+      "content": "lighttpd can write out both errors and access to log files. The error log is enabled by default (controlled by the server.errorlog option). To enable the access log, edit /etc/lighttpd/lighttpd.conf as follows:\n\n```\nserver.modules += (\n   \"mod_accesslog\",\n)\n\naccesslog.filename = \"/var/log/lighttpd/access.log\"\n```\n\n"
+    },
+    {
+      "title": "Enabling https via SSL",
+      "level": 4,
+      "content": "- Mozilla has an SSL configuration generator that can be used with lighttpd.\n- After setting up SSL, you can use Qualys SSL Labs SSL Server Check to check your configuration.\n\nSelf-signed SSL Certificates can be generated assuming openssl is installed on the system as follows:\n\n```\n# mkdir /etc/lighttpd/certs\n# openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -sha256 -keyout /etc/lighttpd/certs/server.pem -out /etc/lighttpd/certs/server.pem\n# chmod 600 /etc/lighttpd/certs/server.pem\n```\n\nModify /etc/lighttpd/lighttpd.conf adding the following lines to enable https:\n\n```\nserver.modules += ( \"mod_openssl\" )\n\n$SERVER[\"socket\"] == \":443\" {\n   ssl.engine                  = \"enable\" \n   ssl.pemfile                 = \"/etc/lighttpd/certs/server.pem\" \n}\n```\n\nSee lighttpd TLS configuration for details.\n\nAlternatively, generate a certificate signed by Let's Encrypt.\n\nEdit /etc/lighttpd/lighttpd.conf by adding the following lines:\n\n```\n$SERVER[\"socket\"] == \":443\" {\n    ssl.engine                  = \"enable\"\n    ssl.privkey                 = \"/etc/letsencrypt/live/domain/privkey.pem\" \n    ssl.pemfile                 = \"/etc/letsencrypt/live/domain/fullchain.pem\"  \n}\n```\n\nSee bootstrap Let's Encrypt in the lighttpd documentation for details.\n\n"
+    },
+    {
+      "title": "Redirect http requests to https",
+      "level": 4,
+      "content": "You should add \"mod_redirect\" in server.modules array in /etc/lighttpd/lighttpd.conf:\n\n```\nserver.modules += ( \"mod_redirect\" )\n\n$HTTP[\"scheme\"] == \"http\" {\n  url.redirect = (\"\" => \"https://${url.authority}${url.path}${qsa}\")\n}\n\n$SERVER[\"socket\"] == \":443\" {\n  ssl.engine = \"enable\" \n  ssl.pemfile = \"/etc/lighttpd/certs/server.pem\" \n  server.document-root = \"...\" \n}\n```\n\nTo redirect all hosts for part of the site (e.g. secure or phpmyadmin):\n\n```\n$HTTP[\"url\"] =~ \"^/secure\" {\n  $HTTP[\"scheme\"] == \"http\" {\n    url.redirect = (\"\" => \"https://${url.authority}${url.path}${qsa}\")\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Password protecting a directory",
+      "level": 4,
+      "content": "A passwd file which is lighttpd's equivalent to the system's /etc/passwd is needed for user authentication. The setup requires a specific format and md5sum hashed password but users can quickly and easily create an entry using the following as an example:\n\n```\n$ user=foo\n$ password=b@R102\n$ realm='Password Required'\n$ hash=`echo -n \"$user:$realm:$password\" | md5sum | cut -b -32`\n\n# echo \"$user:$realm:$hash\" >> /etc/lighttpd/lighttpd.user\n```\n\nModify /etc/lighttpd/lighttpd.conf adding the following lines to enable the directory protection:\n\n```\nserver.modules += ( \"mod_auth\", \"mod_authn_file\" )\n\nauth.backend = \"htdigest\"\nauth.backend.htdigest.userfile = \"/etc/lighttpd/lighttpd.user\"\n\n# note this entry is relative to the server.document-root\nauth.require = ( \"/secret\" =>\n   (\n    \"method\" => \"basic\",\n    \"realm\" => \"Password Required\",\n    \"require\" => \"valid-user\"\n   )\n)\n```\n\n"
+    },
+    {
+      "title": "CGI",
+      "level": 3,
+      "content": "Common Gateway Interface (CGI) scripts just need to enable the CGI module; include the configuration file and make sure your chosen programming language interpreter is installed. (i.e. for python you would install python)\n\nCreate the file /etc/lighttpd/conf.d/cgi.conf and add the following to it:\n\n```\nserver.modules += ( \"mod_cgi\" )\n\ncgi.assign                 = ( \".pl\"  => \"/usr/bin/perl\",\n                               \".cgi\" => \"/usr/bin/perl\",\n                               \".rb\"  => \"/usr/bin/ruby\",\n                               \".erb\" => \"/usr/bin/eruby\",\n                               \".py\"  => \"/usr/bin/python\",\n                               \".php\" => \"/usr/bin/php-cgi\" )\n\nindex-file.names           +=( \"index.pl\",   \"default.pl\",\n                               \"index.rb\",   \"default.rb\",\n                               \"index.erb\",  \"default.erb\",\n                               \"index.py\",   \"default.py\",\n                               \"index.php\",  \"default.php\" )\n```\n\nFor PHP scripts, you will need to make sure the following is set in /etc/php/php.ini\n\n```\ncgi.fix_pathinfo = 1\n```\n\nIn your lighttpd configuration file, /etc/lighttpd/lighttpd.conf add:\n\n```\ninclude \"conf.d/cgi.conf\"\n```\n\n"
+    },
+    {
+      "title": "FastCGI",
+      "level": 3,
+      "content": "Install fcgi. Now you have lighttpd with fcgi support. If that was what you wanted, you are all set. People that want Ruby on Rails, PHP or Python should continue.\n\nFirst, copy the example configuration file from /usr/share/doc/lighttpd/config/conf.d/fastcgi.conf to /etc/lighttpd/conf.d\n\nThe following needs adding to the configuration file, /etc/lighttpd/conf.d/fastcgi.conf\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\nindex-file.names += ( \"dispatch.fcgi\" ) #dispatch.fcgi if rails specified\n\nserver.error-handler-404   = \"/dispatch.fcgi\" #too\nfastcgi.server = (\n    \".fcgi\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/lighttpd/rails-fastcgi.sock\",\n        \"bin-path\" => \"/path/to/rails/application/public/dispatch.fcgi\"\n      )\n    )\n)\n```\n\nThen in /etc/lighttpd/lighttpd.conf:\n\n```\ninclude \"conf.d/fastcgi.conf\"\n```\n\nFor PHP or Ruby on Rails, see the next sections.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 4,
+      "content": "Install php and php-cgi (see also PHP and LAMP).\n\nCheck that php-cgi is working php-cgi --version\n\n```\nPHP 5.4.3 (cgi-fcgi) (built: May  8 2012 17:10:17)\nCopyright (c) 1997-2012 The PHP Group\nZend Engine v2.4.0, Copyright (c) 1998-2012 Zend Technologies\n```\n\nIf you get a similar output, php is installed correctly.\n\nCreate a new configuration file:\n\n```\n/etc/lighttpd/conf.d/fastcgi.conf\n```\n\n```\n# Make sure to install php and php-cgi. See:                                                             \n# https://wiki.archlinux.org/index.php/Fastcgi_and_lighttpd#PHP\n\nserver.modules += (\"mod_fastcgi\")\n\n# FCGI server\n# ===========\n#\n# Configure a FastCGI server which handles PHP requests.\n#\nindex-file.names += (\"index.php\")\nfastcgi.server = ( \n    # Load-balance requests for this path...\n    \".php\" => (\n        # ... among the following FastCGI servers. The string naming each\n        # server is just a label used in the logs to identify the server.\n        \"localhost\" => ( \n            \"bin-path\" => \"/usr/bin/php-cgi\",\n            \"socket\" => \"/tmp/php-fastcgi.sock\",\n            # breaks SCRIPT_FILENAME in a way that PHP can extract PATH_INFO\n            # from it \n            \"broken-scriptfilename\" => \"enable\",\n            # Launch (max-procs + (max-procs * PHP_FCGI_CHILDREN)) procs, where\n            # max-procs are \"watchers\" and the rest are \"workers\". See:\n            # https://wiki.lighttpd.net/frequentlyaskedquestions#How-many-php-CGI-processes-will-lighttpd-spawn \n            \"max-procs\" => \"4\", # default value\n            \"bin-environment\" => (\n                \"PHP_FCGI_CHILDREN\" => \"1\" # default value\n            )\n        )\n    )   \n)\n```\n\nMake lighttpd use the new configuration file by appending the following line to your lighttpd configuration file:\n\n```\n/etc/lighttpd/lighttpd.conf\n```\n\n```\ninclude = \"conf.d/fastcgi.conf\"\n```\n\nReload lighttpd.\n\n- If you receive errors like No input file found when attempting to access php files, there are several possible explanations. See this FAQ for more information.\n- Make sure that no other module (e.g. mod_cgi) will try to handle the .php extension.\n\nFor dynamic management of PHP processes, you can install php-fpm and then start and enable php-fpm.service.\n\nIn /etc/lighttpd/conf.d/fastcgi.conf add:\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\nindex-file.names += ( \"index.php\" ) \n\nfastcgi.server = (\n    \".php\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/php-fpm/php-fpm.sock\",\n        \"broken-scriptfilename\" => \"enable\"\n      ))\n)\n```\n\n"
+    },
+    {
+      "title": "uWSGI",
+      "level": 3,
+      "content": "In /etc/lighttpd/lighttpd.conf add\n\n```\nserver.modules += (\"mod_scgi\")\n\n$HTTP[\"url\"] =~ \"^/uwsgi/\" {\n    scgi.protocol = \"uwsgi\"\n    scgi.server   = (\n        \"/uwsgi/foo\" => ((\n            \"socket\"            => \"/path/to/socket\",\n            \"check-local\"       => \"disable\"\n        )),\n        \"/uwsgi/bar\" => ((\n            \"host\"              => \"127.0.0.1\",\n            \"port\"              => \"8080\",\n            \"check-local\"       => \"disable\"\n        ))\n    )\n}\n```\n\nYou can than start the uwsgi application either as a systemd unit or direct. Here is a neat guide from digitalocean on how to setup a flask application from the scratch.\n\n"
+    },
+    {
+      "title": "Output compression",
+      "level": 3,
+      "content": "Copy example configuration file:\n\n```\n# mkdir /etc/lighttpd/conf.d\n# cp /usr/share/doc/lighttpd/config/conf.d/deflate.conf /etc/lighttpd/conf.d/\n```\n\nAdd following in /etc/lighttpd/lighttpd.conf:\n\n```\ninclude \"conf.d/deflate.conf\"\n```\n\nFinally, reload lighttpd.service, and it will dynamically compress plain text and html content.\n\nIt is also possible to select the type of content that should be compressed. Modify /etc/lighttpd/conf.d/deflate.conf on the parameter deflate.mimetypes:\n\n```\ndeflate.mimetypes = (\"text/plain\", \"text/html\", \"text/javascript\", \"text/css\", \"text/xml\")\n```\n\nYou can also create a cache directory to store compressed files:\n\n```\n# mkdir /var/cache/lighttpd/compress\n# chown http:http /var/cache/lighttpd/compress\n```\n\nThen uncomment and modify the deflate.cache-dir option in /etc/lighttpd/conf.d/deflate.conf:\n\n```\ndeflate.cache-dir = \"/var/cache/lighttpd/compress\"\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- lighttpd wiki\n\n"
+    }
+  ]
+}

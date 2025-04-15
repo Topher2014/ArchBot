@@ -1,0 +1,131 @@
+{
+  "title": "XFS (Português)",
+  "url": "https://wiki.archlinux.org/title/XFS_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Sistema de arquivos\n\nXFS é um sistema de arquivos de alto desempenho com journal criado pela Silicon Graphics, Inc. XFS é particularmente proficiente em paralelizar E/S devido ao seu modelo baseado em alocação de grupo. Isto permite escalabilidade extrema de processamento de E/S, largura de banda do sistema de arquivos, arquivo e tamanho do sistema de arquivos quando abrange múltiplos dispositivos de armazenamento.\n\n"
+    },
+    {
+      "title": "Preparação",
+      "level": 2,
+      "content": "Para utilitários em espaço de usuário, instale o pacote xfsprogs. Ele contém as ferramentas necessárias para gerenciar um sistema de arquivos XFS.\n\n"
+    },
+    {
+      "title": "Criação",
+      "level": 2,
+      "content": "Para criar um novo sistema de arquivos em dispositivo, use:\n\n```\n# mkfs.xfs dispositivo\n```\n\nNo geral, as opções padrões são otimizadas para uso comum. [1] (conteúdo em inglês) [2] (conteúdo em inglês).\n\nAmostra de saída:\n\n```\nmeta-data=/dev/device            isize=256    agcount=4, agsize=3277258 blks\n         =                       sectsz=512   attr=2\ndata     =                       bsize=4096   blocks=13109032, imaxpct=25\n         =                       sunit=0      swidth=0 blks\nnaming   =version 2              bsize=4096   ascii-ci=0\nlog      =internal log           bsize=4096   blocks=6400, version=2\n         =                       sectsz=512   sunit=0 blks, lazy-count=1\nrealtime =none                   extsz=4096   blocks=0, rtextents=0\n```\n\nNote: **Esta opção destruirá todos os dados contidos no sistema de arquivos anterior.** \n\n"
+    },
+    {
+      "title": "Soma de verificação",
+      "level": 3,
+      "content": "xfsprogs 3.2.0 introduziu um novo formato em disco (v5) que inclui um esquema de soma de verificação de metadados chamado Metadados auto-descritivos[link inativo 2024-03-03 ⓘ] (conteúdo em inglês). Baseado no CRC32, fornece por exemplo, proteção adicional contra corrupção de metadados durante perda de energia inesperada. Soma de verificação é habilitada por padrão ao usar xfsprogs 3.2.3 ou posterior. Se você precisa de um XFS montável com leitura e escrita em um kernel mais antigo, é possível facilmente desabilitar usando a opção -m crc=0 ao chamar mkfs.xfs(8):\n\n```\n# mkfs.xfs -m crc=0 /dev/partição_alvo\n```\n\nO formato v5 de XFS em disco é considerado estável para cargas de produção á partir do Kernel Linux 3.15.\n\n"
+    },
+    {
+      "title": "Árvore b de inodes livres",
+      "level": 3,
+      "content": "Começando na versão do Linux 3.16, XFS adicionou uma árvore b que rastreia inodes livres. É equivalente à alocação de inodes existente na árvore b, com a exceção que a árvore b de inodes livres rastreia pedaços com pelo menos um inode livre. O propósito é melhorar consultas por grupos de inodes que contenha um inode livre para ser alocado. Isto melhora o desempenho em sistemas de arquivos mais XFS usados a mais tempo, ex: usado por meses ou anos, quando você já adicionou/removeu milhões de arquivos no/do sistema de arquivos. Usar esta opção não impacta no geral no nível de confiabilidade ou capacidade de recuperação do sistema.\n\nEste recurso depende do novo formato em disco v5 que foi considerado estável para cargas de trabalho de produção a partir do Linux Kernel 3.15. Ele não muda as estruturas em disco, mas adiciona uma nova que deve permanecer consistente com a árvore b de alocação de inodes; por esta razão, os kernels mais antigos só serão capazes de montar sistemas de arquivos como somente-leitura com o recurso da árvore b de inodes livres.\n\nA opção é habilitada por padrão ao usar xfsprogs 3.2.3 ou posterior. Se você precisa de um sistema de arquivo com capacidade de escrita em um kernel mais antigo, é possível desabilitar com a opção finobt=0 ao formatar uma partição com XFS. Você também precisará usar crc=0 junto:\n\n```\n# mkfs.xfs -m crc=0,finobt=0 /dev/partição_alvo\n```\n\nOu de uma maneira mais curta (pois finobt depende de crc).\n\n```\n# mkfs.xfs -m crc=0 /dev/partição_alvo\n```\n\n"
+    },
+    {
+      "title": "Árvore b inversa de mapeamento",
+      "level": 3,
+      "content": "A árvore b inversa de mapeamento é, em seu núcleo, um índice secundário de use de espaço de armazenamento que efetivamente fornece uma cópia redundante dos metadados de uso de espaço. Isto adiciona uma sobrecarga em operações no sistema de arquivos, mas esta inclusão em um sistema de arquivos faz com que referências cruzadas sejam bem rápidas. É um recurso essencial para consertar sistemas de arquivo durante o uso pois é possível reconstruir metadados primários danificados a partir da cópia secundária. [5] (conteúdo em inglês).\n\nO recurso passou do status EXPERIMENTAL no Linux 4.16 e está pronto para produção. No entanto, verificação e conserto do sistema de arquivo durante o uso é (até o momento) o único caso de uso para este recurso, então a pessoa poderá optar por usar pelo menos até que a verificação durante o uso esteja pronta para uso em produção.\n\nDo mkfs.xfs(8) § OPTIONS:\n\nA árvore b inversa de mapeamento mapeia blocos do sistema de arquivo para o dono do bloco do sistema de arquivos. A maioria dos mapeamentos será para um número de inode e um deslocamento, embora também haja mapeamentos para metadados do sistema de arquivos. Este metadado secundário pode ser usado para validar o metadado primário ou para localizar exatamente qual dado foi perdido quando um erro no disco ocorrer.\n\nVeja também [6] (conteúdo em inglês) e [7] (conteúdo em inglês) para mais informação.\n\nPara testar esta opção ou testar o futuro do sistema de arquivos, passe a opção -m rmapbt=1 durante a criação do sistema de arquivos.\n\n```\n# mkfs.xfs -m rmapbt=1 dispositivo\n```\n\n"
+    },
+    {
+      "title": "Carimbos de data/hora grandes",
+      "level": 3,
+      "content": "Começando na versão do Linux 5.10, XFS suporta com seu refatoramento, funções de carimbo de data/hora e codificação de inode para lidar com carimbos de data e hora como um contador de nanossegundos de 64 bits e deslocamento de bits para aumentar o tamanho efetivo. Isto agora permite ao XFS rodar muito além do Problema do Ano 2038 (armazenar o tempo desde 1970 em segundos não mais caberia em um inteiro positivo de 32 bits e então, começaria a contagem novamente) até o Ano 2486. Criar um novo sistema de arquivos XFS com bigtime habilitado permite carimbos de data e hora que vão de Dezembro de 1901 até Julho de 2486, em vez de Dezembro de 1901 até Janeiro de 2038. Para preservar a compatibilidade com versões anteriores, o recurso não está habilitado por padrão [8] (conteúdo em inglês).\n\nO recurso também permitirá expirações de cronômetro de cota de Janeiro de 1970 a Julho de 2486, em vez de Janeiro de 1970 a Fevereiro de 2106.\n\nPara testar esta opção ou testar o futuro do sistema de arquivos, passe a opção -m bigtime=1 durante a criação do sistema de arquivos.\n\n```\n# mkfs.xfs -m bigtime=1 dispositivo\n```\n\nA partir da versão 5.11 do XFS, isto também pode ser desabilitado em sistema de arquivos existentes (não montados) com:\n\n```\n# xfs_admin -O bigtime=1 dispositivo\n```\n\n"
+    },
+    {
+      "title": "Desempenho",
+      "level": 2,
+      "content": "Da página de perguntas frequentes do XFS (conteúdo em inglês):\n\nOs valores padrões já usados são otimizados para melhor desempenho em primeiro lugar. mkfs.xfs detectará a diferença entre as configurações de disco único e RAID MD/DM e mudará os valores padrão que usa para configurar o sistema de arquivos apropriadamente.\n\nNa maioria dos casos, a única coisa que você precisa considerar para mkfs.xfs é especificar a unidade e largura da faixa para dispositivos em RAID. (veja #Tamanho e largura de faixa (stripe)).\n\n- https://www.beegfs.io/wiki/StorageServerTuning\n- https://help.marklogic.com/Knowledgebase/Article/View/505/0/recommended-xfs-settings-for-marklogic-server\n\nPara opções de montagem, a única coisa que irá mudar o desempenho de metadados consideravelmente são as opções de montagem logbsize e delaylog. Aumentar logbsize reduz o número de E/S do journal para uma determinada carga, e delaylog reduzirá ainda mais. A troca para este aumento no desempenho de metadados é que mais operações podem estar incompletas depois de uma recuperação se o sistema travar enquanto fazendo modificações ativamente.\n\nA partir do kernel 3.2.12, o agendador de E/S padrão, CFQ, derrotará grande parte da paralelização no XFS.\n\nPortanto, para desempenho otimizado, na maioria dos casos você pode seguir o que está em #Criação.\n\n"
+    },
+    {
+      "title": "Tamanho e largura de faixa (stripe)",
+      "level": 3,
+      "content": "Se o sistema de arquivos for usado em um RAID com faixas, você pode ganhar melhorias de velocidade significativas especificando o tamanho da faixa no comando mkfs.xfs(8).\n\nAs vezes, o XFS pode detectar a geometria do RAID por software, mas caso você mude a forma ou utilize RAID por hardware, veja Como calcular os valores sunit e swidth para melhor desempenho (conteúdo em inglês).\n\n"
+    },
+    {
+      "title": "Tempo de acesso",
+      "level": 3,
+      "content": "Em alguns sistemas de arquivo, você pode aumentar o desempenho adicionando a opção de montagem noatime no arquivo /etc/fstab. Para sistemas de arquivo XFS o comportamento padrão de atime é relatime, que quase não possui sobrecarga comparado com noatime mas ainda mantém valores de atime sãos. Todos os sistemas de arquivos do Linux usam isto como padrão agora (desde aproximadamente 2.6.30), mas o XFS usou comportamento similar ao relatime desde 2006, então ninguém deve precisar usar noatime no XFS por questões de desempenho. [9] (conteúdo em inglês).\n\nVeja opções atime para mais detalhes neste tópico.\n\n"
+    },
+    {
+      "title": "Descarte",
+      "level": 3,
+      "content": "Mesmo com o XFS suportando descarte assíncrono [10] (conteúdo em inglês) desde o kernel 4.7 [11] (conteúdo em inglês) [12] (conteúdo em inglês), o xfs(5) ainda recomenda que você use a aplicação fstrim para descartar blocos não utilizados em vez da opção de montagem discard pois o impacto no desempenho desta opção é bem severo.\n\nVeja Solid state drive#Periodic TRIM.\n\n"
+    },
+    {
+      "title": "Desfragmentação",
+      "level": 3,
+      "content": "Apesar da natureza baseada em extensões do XFS e a estratégia de alocação utilizada significativamente melhorarem a resistência do sistema de arquivo contra problemas de fragmentação, XFS fornece um utilitário para desfragmentação do sistema de arquivos (xfs_fsr, abreviação de XFS FileSystem Reorganizer - reorganizador de sistema de arquivos do XFS) que pode desfragmentar os arquivos em um sistema de arquivos montado e ativo. Pode ser útil ver a fragmentação do XFS periodicamente.\n\nxfs_fsr(8) melhora a organização de sistemas de arquivos montados. O algoritmo de reorganização opera em um arquivo por vez, compactando ou de alguma outra maneira melhorando o leiaute de extensões (blocos de dados de arquivos contíguos) de arquivos.\n\n"
+    },
+    {
+      "title": "Inspecionar níveis de fragmentação",
+      "level": 4,
+      "content": "Para ver quanta fragmentação seu sistema de arquivos atualmente tem:\n\n```\n# xfs_db -c frag -r /dev/partição\n```\n\n"
+    },
+    {
+      "title": "Rodar a desfragmentação",
+      "level": 4,
+      "content": "Para iniciar a desfragmentação, use o comando xfs_fsr(8):\n\n```\n# xfs_fsr /dev/partição\n```\n\n"
+    },
+    {
+      "title": "Deduplicação",
+      "level": 3,
+      "content": "O recurso reflink, disponível desde a versão do kernel 4.9 e habilitada por padrão desde a versão do mkfs.xfs 5.1.0, permite criar cópias rápidas com reflink, assim como a deduplicação após o fato, da mesma forma que o BTRFS:\n\n"
+    },
+    {
+      "title": "Cópias com reflink",
+      "level": 4,
+      "content": "Cópias com reflink inicialmente não utilizam espaço adicional:\n\n```\n$ cp --reflink arquivo-grande-1 arquivo-grande-2\n```\n\nAté que um dos arquivos seja editado, então uma cópia-durante-escrita ocorre. Isto pode ser muito útil para criar um snapshot de arquivos (grandes).\n\n"
+    },
+    {
+      "title": "Deduplicação",
+      "level": 4,
+      "content": "Sistemas de arquivos podem ser deduplicados usando ferramentas como duperemove.\n\n"
+    },
+    {
+      "title": "Journal externo do XFS",
+      "level": 3,
+      "content": "Usando um log externo (journal de metadados) em por exemplo um SSD pode ser útil para melhorar o desempenho [13] (conteúdo em inglês). Veja mkfs.xfs(8) para mais detalhes no parâmetro logdev.\n\nPara reservar um journal externo com um tamanho específico quando você cria um sistema de arquivos XFS, especifique as opções -l logdev=dispositivo,size=tamanho no comando mkfs.xfs. Se você omitir o parâmetro size, um journal é usado baseado no tamanho do sistema de arquivos. Para montar o sistema de arquivos XFS para que use o journal externo, especifique a opção logdev=dispositivo no comando mount.\n\n"
+    },
+    {
+      "title": "Intervalo de sincronização",
+      "level": 3,
+      "content": "XFS possui uma variável dedicada de sysctl para definir o \"Intervalo de writeback e tamanho do buffer\". Arch possui o valor padrão de 3000, é possível definir valores maiores, mas esteja ciente que valores muito altos podem resultar em perda de dados em alguns casos:\n\n```\n/etc/sysctl.d/20-xfs-sync-interval.conf\n```\n\n```\nfs.xfs.xfssyncd_centisecs = 10000\n```\n\n"
+    },
+    {
+      "title": "Redimensionamento",
+      "level": 3,
+      "content": "XFS pode ser redimensionado durante o uso, depois que a partição foi alterada. Apenas rode xfs_growfs com o ponto de montagem como primeiro parâmetro para crescer o sistema de arquivos para o máximo tamanho possível.\n\n```\n# xfs_growfs /caminho/pro/ponto/de/montagem\n```\n\n"
+    },
+    {
+      "title": "Verificação online de metadados (varredura)",
+      "level": 3,
+      "content": "Note: **experimental** \n\nxfs_scrub pede ao kernel para varrer todos os objetos de metadados do sistema de arquivos XFS. Os logs de metadados são verificados busca de valores obviamente inválidos e, em seguida, fazem referência cruzada com outros metadados. O objetivo é estabelecer uma confiança razoável sobre a consistência do sistema de arquivos em geral examinando a consistência de logs individuais de metadados em relação a outros metadados no sistema de arquivos. Metadados danificados podem ser reconstruídos à partir de outros metadados se existirem estruturas de dados redundantes intactas.\n\nHabilite/Inicie xfs_scrub_all.timer para periodicamente verificar metadados para todos os sistemas de arquivos XFS durante o uso.\n\n"
+    },
+    {
+      "title": "Conserto",
+      "level": 3,
+      "content": "De Verificando e consertando um sistema de arquivos XFS (conteúdo em inglês):\n\nSe você não pode montar um sistema de arquivos XFS, você pode usar o comando xfs_repair -n para verificar sua consistência. Geralmente, você apenas precisa rodar este comando no arquivo de dispositivo de um sistema de arquivos que você acredita que tem um problema. O comando xfs_repair -n mostra a saída para indicar mudanças que seriam feitas no sistema de arquivos caso fosse necessária realizar uma operação de conserto completa, mas não iria modificar o sistema de arquivos diretamente.\n\nSe você pode montar o sistema de arquivos e você não possui um backup adequado, você pode usar xfsdump para tentar fazer backup dos dados do sistema de arquivos existentes, No entanto, o comando pode falhar se os metadados do sistema de arquivos estiverem muito corrompidos.\n\nVocê pode usar o comando xfs_repair para tentar consertar um sistema de arquivos XFS especificando seu arquivo de dispositivo. O comando reproduz o log do journal para consertar quaisquer inconsistências que podem ter resultado do sistema de arquivos não ter sido desmontado de maneira limpa. A não ser que o sistema de arquivos tenha uma inconsistência geralmente não é necessário usar o comando, pois o journal é reproduzido cada vez que você monta o sistema de arquivos.\n\nPrimeiro desmonte o sistema de arquivos, então, execute a ferramente xfs_repair(8):\n\n```\n# xfs_repair dispositivo\n```\n\nSe o log no journal foi corrompido, você pode reiniciar o log especificando a opção -L no xfs_repair.\n\nNote: **xfs_db** \n\nSe você não puder montar o sistema de arquivos ou não tiver um backup adequado, executar xfs_repair é a única opção viável, a menos que você tenha experiência no uso de xfs_db.\n\nxfs_db fornece um conjunto de comandos interno que permite depurar e consertar um sistema de arquivos XFS manualmente. Os comandos permitem que você execute varreduras no sistema de arquivos e navegue e exiba suas estruturas de dados. Se você especificar a opção -x para habilitar o modo especialista, você pode modificar as estruturas de dados.\n\n```\n# xfs_db [-x] dispositivo\n```\n\nPara mais informações, veja xfs_db(8), xfs_repair(8), e o comando help do xfs_db.\n\nVeja também Quais fatores influenciam o uso de memória do xfs_repair? (conteúdo em inglês) e Conserto de XFS (conteúdo em inglês).\n\n"
+    },
+    {
+      "title": "Cota no sistema de arquivos raiz",
+      "level": 3,
+      "content": "As opções de montagem de cota XFS (uquota, gquota, prjquota, etc.) falham durante a remontagem do sistema de arquivos. Para habilitar a cota para o sistema de arquivos raiz, a opção de montagem deve ser passada ao initramfs como um parâmetro do kernel rootflags=. Subsequentemente, ele não deve ser listado entre as opções de montagem em /etc/fstab para o sistema de arquivos raiz /.\n\n"
+    },
+    {
+      "title": "xfs_scrub_all falha se o usuário \"nobody\" não pode acessar o ponto de montagem",
+      "level": 3,
+      "content": "Ao executar xfs_scrub_all, será lançado xfs_scrub@.service para cada sistema de arquivos XFS montado. O serviço roda com o usuário nobody, então, se nobody não puder navegar até o diretório, haverá uma falha com o erro:\n\n```\nxfs_scrub@ponto de montagem.service: Changing to the requested working directory failed: Permission denied\nxfs_scrub@ponto de montagem.service: Failed at step CHDIR spawning /usr/bin/xfs_scrub: Permission denied\nxfs_scrub@ponto de montagem.service: Main process exited, code=exited, status=200/CHDIR\n```\n\nPara permitir que o serviço ocorra, mude as permissões do ponto de montagem para que o usuário nobody tenha permissões de execução.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Perguntas frequentes do XFS (conteúdo em inglês).\n- Melhorando desempenho de metadados ao reduzir sobrecarga no journal (conteúdo em inglês).\n- Página sobre XFS da Wikipedia.\n- Guia de usuário do XFS (conteúdo em inglês).\n\n"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "title": "Working with the serial console (Français)",
+  "url": "https://wiki.archlinux.org/title/Working_with_the_serial_console_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Une machine sous Arch Linux peut être configurée pour des connexions via le port de console série, ce qui permet d'administrer une machine même si aucun clavier, souris, moniteur ou réseau ne lui est attaché.\n\nL'installation d'Arch Linux est également possible via la console série.\n\nUn environnement de base pour ce scénario est constitué de deux machines connectées à l'aide d'un câble série (câble de connexion à 9 broches). La machine administratrice peut être n'importe quelle machine Unix/Linux ou Windows avec un programme émulateur de terminal (PuTTY ou Minicom, par exemple).\n\nLes instructions de configuration ci-dessous permettront de sélectionner le menu du chargeur d'amorçage, les messages de démarrage et le transfert de terminal vers la console série.\n\n"
+    },
+    {
+      "title": "GRUB",
+      "level": 4,
+      "content": "Lorsque vous utilisez GRUB avec un grub.cfg généré, éditez /etc/default/grub et activez la prise en charge des entrées et sorties série :\n\n```\n/etc/default/grub\n```\n\n```\n...\nGRUB_TERMINAL_INPUT=\"console serial\"\n...\nGRUB_TERMINAL_OUTPUT=\"gfxterm serial\" ...\n...\n```\n\nAjoutez ensuite la variable GRUB_SERIAL_COMMAND et définissez les options pour la connexion série. Pour COM1 (/dev/ttyS0) avec une vitesse de transmission de 115200 bit/s :\n\n```\n/etc/default/grub\n```\n\n```\n...\nGRUB_SERIAL_COMMAND=\"serial --unit=0 --speed=115200\"\n```\n\nLisez le manuel de GRUB sur Utilisation de GRUB via un port série et la commande série pour une explication détaillée des options disponibles.\n\n"
+    },
+    {
+      "title": "GRUB Legacy",
+      "level": 4,
+      "content": "Editez le fichier de configuration GRUB Legacy /boot/grub/menu.lst et ajoutez ces lignes dans la zone générale de la configuration :\n\n```\nserial --unit=0 --speed=9600\nterminal --timeout=5 serial console\n```\n\n"
+    },
+    {
+      "title": "rEFInd",
+      "level": 4,
+      "content": "rEFInd prend en charge la console série uniquement en mode texte. Editez refind.conf et décommentez textonly.\n\n"
+    },
+    {
+      "title": "Syslinux",
+      "level": 4,
+      "content": "Pour activer la console série dans Syslinux (Français), éditez syslinux.cfg et ajoutez SERIAL comme première directive dans le fichier de configuration.\n\nPour COM1 (/dev/ttyS0) avec un débit en bauds de 115200 bit/s :\n\n```\nSERIAL 0 115200\n```\n\nLes paramètres série sont codés en dur à 8 bits, sans parité et 1 bit d'arrêt [1]. Lisez Wiki Syslinux:Config#SERIAL pour les options.\n\n"
+    },
+    {
+      "title": "Kernel",
+      "level": 3,
+      "content": "La sortie du noyau peut être envoyée à la console série en définissant le console= paramètre du noyau. Le dernier console= spécifié sera défini comme /dev/console.\n\n```\nconsole=tty0 console=ttyS0,115200\n```\n\nConsultez https://docs.kernel.org/admin-guide/serial-console.html.\n\n"
+    },
+    {
+      "title": "getty",
+      "level": 3,
+      "content": "Au démarrage, systemd-getty-generator(8) démarre une instance getty pour chaque console spécifiée dans la ligne de commande du noyau.\n\nSi vous n'avez pas configuré console= dans la ligne de commande du noyau démarrez serial-getty@device.service. Pour /dev/ttyS0 (COM1), ce serait serial-getty@ttyS0.service. Activez le service pour le démarrer au démarrage.\n\nSauf indication contraire dans la ligne de commande du noyau, getty attendra un débit en bauds de 38400 bit/s, 8 bits de données, pas de parité et un bit d'arrêt.\n\n"
+    },
+    {
+      "title": "Connexion à l'aide d'un programme émulateur de terminal",
+      "level": 3,
+      "content": "```\n# gpasswd -a username uucp\n```\n\nEffectuez ces étapes sur la machine utilisée pour connecter la console distante.\n\n"
+    },
+    {
+      "title": "dterm",
+      "level": 4,
+      "content": "dtermAUR[broken link: package not found] est un petit programme de communication série. Si vous l'invoquez sans paramètres, il se connectera à /dev/ttyS0 à 9600 bauds par défaut. L'exemple suivant se connecte à /dev/ttyS0 à 115200 bauds, avec 8 bits de données, aucun bit de parité et 1 bit d'arrêt :\n\n```\n$ dterm 115200 8 n 1\n```\n\nConsultez sa page d'accueil [2][dead link 2023-05-06 ⓘ] pour plus d'exemples.\n\n"
+    },
+    {
+      "title": "Minicom",
+      "level": 4,
+      "content": "minicom peut être obtenu à partir des dépôts officiels. Démarrez Minicom en mode configuration :\n\n```\n$ minicom -s\n```\n\nEn utilisant le menu de navigation textuel, modifiez les paramètres du port série comme suit :\n\n```\nSerial Device : /dev/ttyS0\nBps/Par/Bits : 9600 8N1\n```\n\nAppuyez sur Entrée pour quitter les menus (l'appui sur Echap n'enregistrera pas les changements). Supprimez les chaînes Init et Reset du modem, car nous ne nous connectons pas à un modem. Pour ce faire, dans le menu Modem and Dialing, supprimez les chaînes Init et Reset. Vous pouvez également sauvegarder la configuration en choisissant save setup as dfl dans le menu principal. Redémarrez minicom avec le câble série connecté à la machine cible. Pour terminer la session, appuyez sur Ctrl+A suivi de Ctrl+X.\n\n"
+    },
+    {
+      "title": "picocom",
+      "level": 4,
+      "content": "picocom est un petit programme d'émulation de terminaux muets qui ressemble beaucoup à minicom, mais au lieu de mini, c'est pico. L'exemple suivant se connecte à ttyS0 à 9600 bps :\n\n```\n$ picocom -b 9600 /dev/ttyS0\n```\n\nConsultez son manuel pour une utilisation détaillée.\n\n"
+    },
+    {
+      "title": "Screen",
+      "level": 4,
+      "content": "GNU Screen est capable de se connecter à un port série. Il se connectera à 9600 bauds par défaut :\n\n```\n$ screen /dev/ttyS0\n```\n\nUne vitesse de transmission différente (par exemple 115200) peut être spécifiée sur la ligne de commande.\n\n```\n$ screen /dev/ttyS0 115200\n```\n\nPour terminer la session, appuyez sur Ctrl+a suivi de K. Vous pouvez également appuyer sur Ctrl+a, taper :quit et confirmer en appuyant sur Enter.\n\n"
+    },
+    {
+      "title": "Serialclient",
+      "level": 4,
+      "content": "Serialclient [3] est un client CLI pour la connexion série écrit en ruby. Installez le paquet ruby, puis installez-le avec ce qui suit :\n\n```\n# gem install serialclient\n```\n\nEnsuite, vous pouvez l'utiliser comme ceci :\n\n```\n$ serialclient -p /dev/ttyS0\n```\n\n"
+    },
+    {
+      "title": "Interfaces graphiques",
+      "level": 3,
+      "content": "- cutecom — Un moniteur série avec interface graphique.\n\n- PuTTY — Un client SSH/Telnet avec un terminal intégré.\n\n- moserial — Un terminal série basé sur GTK, principalement destiné aux utilisateurs techniques et aux bricoleurs informatiques qui ont besoin de communiquer avec des systèmes embarqués, des équipements de test et des consoles série.\n\n"
+    },
+    {
+      "title": "Clients Windows",
+      "level": 3,
+      "content": "Sur les machines Windows, connectez-vous au port série à l'aide de programmes comme PuTTY [4] ou Terminalbpp [5].\n\n"
+    },
+    {
+      "title": "Installation d'Arch Linux à l'aide de la console série",
+      "level": 2,
+      "content": "1. Connectez-vous à la machine cible en utilisant la méthode décrite ci-dessus.\n1. Démarrez la machine cible en utilisant le medium d'installation d'Arch Linux.\n1. Lorsque le chargeur d'amorçage s'affiche, sélectionnez Boot Arch Linux (<arch>) et appuyez sur Tab pour éditer.\n1. Ajoutez console=ttyS0,115200 et appuyez sur Enter.\n1. Maintenant systemd devrait détecter ttyS0 et lancer un getty en série dessus. Connectez-vous en tant que root et démarrez l'installation comme d'habitude.\n\n- Une fois l'installation terminée, les paramètres de la console ne seront pas sauvegardés sur la machine cible ; afin d'éviter d'avoir à connecter un clavier et un moniteur, configurez l'accès à la console sur la machine cible avant de redémarrer.\n- Bien qu'une vitesse de port de 9600 soit utilisée dans la plupart des exemples de ce document, il est recommandé de travailler avec des valeurs plus élevées (la liste des vitesses disponibles est affichée dans Minicom en appuyant sur Ctrl+a puis p)\n\n"
+    },
+    {
+      "title": "Déboguer une machine qui ne répond pas en utilisant une console série",
+      "level": 2,
+      "content": "Bien que [7] ne contienne que des instructions brutes et laconiques, il présente un bon résumé. Il est important de noter qu'ici, la machine testée a perdu sa réactivité de manière reproductible. Et que cela s'est produit pendant un fonctionnement normal. On pouvait donc y accéder normalement avant de devoir la déboguer. Cependant, en général, la console série est également utile pour déboguer les problèmes de démarrage. Peut-être en configurant le chargeur d'amorçage à la main au moment du démarrage de la machine. Notez également la mention netconsole dans le paragraphe P.S. du lien externe de cette section.\n\n"
+    },
+    {
+      "title": "Ctrl+c et Minicom",
+      "level": 3,
+      "content": "Si vous avez des difficultés à envoyer une commande Ctrl+c via minicom, vous devez désactiver le contrôle de flux matériel dans les paramètres du périphérique (minicom -s), ce qui active alors l'interruption.\n\n"
+    },
+    {
+      "title": "Redimensionnement d'un terminal",
+      "level": 3,
+      "content": "Contrairement à ssh, les connexions série n'ont pas de mécanisme pour transférer quelque chose comme SIGWINCH lorsqu'un terminal est redimensionné. Cela peut causer des problèmes étranges avec certains programmes plein écran (par exemple, less) lorsque vous redimensionnez la fenêtre de votre émulateur de terminal.\n\nLe redimensionnement du terminal via stty est une solution de contournement :\n\n```\n$ stty rows lignes cols colonnes.\n```\n\nCependant, cela vous oblige à saisir manuellement la géométrie appropriée. Les méthodes suivantes devraient être plus simples.\n\n1. Il existe un utilitaire moins connu appelé resize, fourni avec xterm, qui peut résoudre ce problème. Appelez-le sans paramètres après avoir redimensionné la fenêtre de l'émulateur de terminal :\n\n```\n$ resize\n```\n\n2. Si vous ne souhaitez pas installer xterm, il est possible d'effectuer le même travail via une fonction shell. Placez la fonction suivante dans votre zshrc et invoquez-la sans paramètres après avoir redimensionné la fenêtre de l'émulateur de terminal :\n\n```\nrsz() {\n\tif [[ -t 0 && $# -eq 0 ]];then\n\t\tlocal IFS='[;' escape geometry x y\n\t\tprint -n '\\e7\\e[r\\e[999;999H\\e[6n\\e8''.\n\t\tread -sd R escape geometry\n\t\tx=${geometry##*;} y=${geometry%%;*}\n\t\tif [[ ${COLUMNS} -eq ${x} && ${LINES} -eq ${y} ]];then\n\t\t\tprint \"${TERM} ${x}x${y}\"\n\t\telse\n\t\t\tprint \"${COLUMNS}x${LINES} -> ${x}x${y}\"\n\t\t\tstty cols ${x} lignes ${y}\n\t\tfi\n\telse\n\t\t[[ -n ${commandes[repo-elephant]} ]] && repo-elephant || print 'Usage : rsz' ## oeuf de Pâques ici :)\n\tfi\n}\n```\n\n"
+    },
+    {
+      "title": "Ports manquants sur les cartes d'extension multi-ports",
+      "level": 3,
+      "content": "Le nombre de ports série utilisant le pilote générique 8250 dans la configuration par défaut du noyau est fixé à 4 au moment de l'exécution avec un maximum de 32. Cela empêchera la création de /dev/ttyS4 et plus. En comptant le port série intégré typique sur la carte mère, cela empêche l'utilisation du 4ème port série sur une carte d'extension à 4 ports.\n\nCeci peut être annulé par le paramètre du noyau 8250.nr_uarts. Par exemple\n\n```\n8250.nr_uarts=5\n```\n\n"
+    }
+  ]
+}

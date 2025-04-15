@@ -1,0 +1,201 @@
+{
+  "title": "Systemd-nspawn (日本語)",
+  "url": "https://wiki.archlinux.org/title/Systemd-nspawn_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- systemd\n- Linux コンテナ\n- systemd-networkd\n- Docker\n\nsystemd-nspawn は chroot コマンドに似ていますが、chroot を強化したものです。\n\nsystemd-nspawn を使えば軽量な名前空間コンテナでコマンドや OS を実行することができます。ファイルシステム階層だけでなく、プロセスツリーや様々な IPC サブシステム、ホスト・ドメイン名も完全に仮想化するため chroot よりも強力です。\n\nsystemd-nspawn は /sys, /proc/sys, /sys/fs/selinux などのコンテナの様々なカーネルインターフェイスへのアクセスを読み取り専用に制限します。コンテナの中からネットワークインターフェイスやシステムクロックを変更することはできません。デバイスノードの作成はできません。コンテナの中からホスト環境を再起動することはできず、カーネルモジュールのロードもできません。\n\nsystemd-nspawn は Linux コンテナや Libvirt よりも設定が簡単なツールです。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 サンプル 2.1 コンテナに最小限の Arch Linux を作成して起動 2.2 Debian や Ubuntu 環境の作成 2.3 Fedora または AlmaLinux 環境の作成 2.4 パッケージのビルドおよびテスト\n- 3 管理 3.1 systemd-nspawn オプションのデフォルト値 3.2 machinectl 3.3 systemd ツールチェイン\n- 4 設定 4.1 コンテナ毎の設定 4.2 PC起動時にコンテナを自動で開始する 4.3 リソース制御 4.4 ネットワーキング 4.4.1 ホストネットワークを使う 4.4.2 仮想イーサネットリンクを使用する 4.4.3 ネットワークブリッジを使用する 4.4.4 「macvlan」または「ipvlan」インターフェースを使用する 4.4.5 既存のインターフェイスを使用する 4.5 ポートマッピング 4.6 ドメイン名前解決\n- 5 ヒントとテクニック 5.1 シェル/init 以外のコマンドを実行する 5.2 非特権コンテナ 5.3 X 環境 5.3.1 xhost の回避 5.3.2 X nesting/Xephyr を使用 5.3.3 Firefox を起動する 5.3.4 3D グラフィックスアクセラレーション 5.3.4.1 NVIDIA GPUs 5.4 ホストのファイルシステムにアクセス 5.5 systemd を使っていない環境で動作させる 5.6 Btrfs のサブボリュームをコンテナのルートとして使う 5.7 コンテナの一時的な Btrfs スナップショットを使う 5.8 system-nspawn で docker を実行\n- 6 トラブルシューティング 6.1 root ログインが失敗する 6.2 execv(...) failed: Permission denied 6.3 TERM の端末タイプが間違っている (色が壊れている) 6.4 コンテナ内へのNFS共有のマウント\n- 7 参照\n\n- 2.1 コンテナに最小限の Arch Linux を作成して起動\n- 2.2 Debian や Ubuntu 環境の作成\n- 2.3 Fedora または AlmaLinux 環境の作成\n- 2.4 パッケージのビルドおよびテスト\n\n- 3.1 systemd-nspawn オプションのデフォルト値\n- 3.2 machinectl\n- 3.3 systemd ツールチェイン\n\n- 4.1 コンテナ毎の設定\n- 4.2 PC起動時にコンテナを自動で開始する\n- 4.3 リソース制御\n- 4.4 ネットワーキング 4.4.1 ホストネットワークを使う 4.4.2 仮想イーサネットリンクを使用する 4.4.3 ネットワークブリッジを使用する 4.4.4 「macvlan」または「ipvlan」インターフェースを使用する 4.4.5 既存のインターフェイスを使用する\n- 4.5 ポートマッピング\n- 4.6 ドメイン名前解決\n\n- 4.4.1 ホストネットワークを使う\n- 4.4.2 仮想イーサネットリンクを使用する\n- 4.4.3 ネットワークブリッジを使用する\n- 4.4.4 「macvlan」または「ipvlan」インターフェースを使用する\n- 4.4.5 既存のインターフェイスを使用する\n\n- 5.1 シェル/init 以外のコマンドを実行する\n- 5.2 非特権コンテナ\n- 5.3 X 環境 5.3.1 xhost の回避 5.3.2 X nesting/Xephyr を使用 5.3.3 Firefox を起動する 5.3.4 3D グラフィックスアクセラレーション 5.3.4.1 NVIDIA GPUs\n- 5.4 ホストのファイルシステムにアクセス\n- 5.5 systemd を使っていない環境で動作させる\n- 5.6 Btrfs のサブボリュームをコンテナのルートとして使う\n- 5.7 コンテナの一時的な Btrfs スナップショットを使う\n- 5.8 system-nspawn で docker を実行\n\n- 5.3.1 xhost の回避\n- 5.3.2 X nesting/Xephyr を使用\n- 5.3.3 Firefox を起動する\n- 5.3.4 3D グラフィックスアクセラレーション 5.3.4.1 NVIDIA GPUs\n\n- 5.3.4.1 NVIDIA GPUs\n\n- 6.1 root ログインが失敗する\n- 6.2 execv(...) failed: Permission denied\n- 6.3 TERM の端末タイプが間違っている (色が壊れている)\n- 6.4 コンテナ内へのNFS共有のマウント\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "systemd-nspawn は systemd の一部であり、systemd に含まれています。\n\n"
+    },
+    {
+      "title": "コンテナに最小限の Arch Linux を作成して起動",
+      "level": 3,
+      "content": "まず arch-install-scripts パッケージをインストールしてください。\n\n次に、コンテナを置くためのディレクトリを作成してください。この例では、~/MyContainer を使用します。\n\nそして、pacstrap を使って最小限の arch システムをコンテナにインストールします。最低限でも base パッケージはインストールする必要があります。\n\n```\n# pacstrap -K -c ~/MyContainer base [additional pkgs/groups]\n```\n\nインストールが完了したら、コンテナに chroot し、root パスワードを設定します。\n\n```\n# systemd-nspawn -D ~/MyContainer\n# passwd\n# logout\n```\n\n最後に、コンテナを起動します。\n\n```\n# systemd-nspawn -b -D ~/MyContainer\n```\n\n-b オプションはシェルを実行する代わりにコンテナを起動します (つまり PID=1 として systemd を実行)。-D にはコンテナのルートディレクトリにするディレクトリを指定します。\n\nコンテナが開始したら、設定したパスワードを使って \"root\" でログインしてください。\n\nコンテナの電源を切りたいときはコンテナの中から poweroff を実行することでできます。ホストからは、machinectl ツールでコンテナを制御できます。\n\n"
+    },
+    {
+      "title": "Debian や Ubuntu 環境の作成",
+      "level": 3,
+      "content": "debootstrap と debian-archive-keyring か ubuntu-keyring のどちらか (インストールしたい方のディストリのキーリング) をインストールしてください。\n\n後は簡単に Debian や Ubuntu 環境をセットアップできます:\n\n```\n# cd /var/lib/machines\n# debootstrap --include=dbus-broker,systemd-container --components=main,universe codename container-name repository-url\n```\n\nDebian の場合、コードネームとして指定するのは \"stable\" や \"testing\" などのローリングの名前か \"stretch\" や \"sid\" などのリリース名になります。Ubuntu の場合、\"xenial\" や \"zesty\" などのコードネームを使ってください。コードネームの完全なリストは /usr/share/debootstrap/scripts にあります。Debian イメージの場合は \"repository-url\" には https://deb.debian.org/debian/ などを指定します。Ubuntu のイメージの場合は \"repository-url\" は http://archive.ubuntu.com/ubuntu/ などとなります。\n\nArch と同様に、Debian や Ubuntu ではパスワードなしでログインすることはできません。root のパスワードを設定するために、'-b' オプションを付けずにログインしてからパスワードを設定してください:\n\n```\n# cd /var/lib/machines\n# systemd-nspawn -D myContainer\n# passwd\n# logout\n```\n\n"
+    },
+    {
+      "title": "Fedora または AlmaLinux 環境の作成",
+      "level": 3,
+      "content": "dnf をインストールし、必要な Fedora リポジトリを追加するために /etc/dnf/dnf.conf ファイルを編集します。\n\n```\n/etc/dnf/dnf.conf\n```\n\n```\n[fedora]                                                                                            \nname=Fedora $releasever - $basearch\nmetalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch\ngpgkey=https://getfedora.org/static/fedora.gpg\n\n[updates]                                                                                           \nname=Fedora $releasever - $basearch - Updates\nmetalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch\ngpgkey=https://getfedora.org/static/fedora.gpg\n```\n\nfedora.gpg ファイルには最新の Fedora リリース用の gpg キーが含まれています https://getfedora.org/security/ 。Fedora 37 の最小コンテナを設定するには：\n\n```\n# cd /var/lib/machines\n# mkdir container-name\n# dnf --releasever=37 --best --setopt=install_weak_deps=False --repo=fedora --repo=updates --installroot=/var/lib/machines/container-name install dhcp-client dnf fedora-release glibc glibc-langpack-en iputils less ncurses passwd systemd systemd-networkd systemd-resolved util-linux vim-default-editor\n```\n\nbtrfs ファイルシステムを使用している場合は、ディレクトリを作成する代わりにサブボリュームを作成してください。\n\nAlmaLinux のようなエンタープライズ Linux 派生物は、デフォルトで三つのリポジトリが有効になっています。BaseOS は、すべてのインストールの基盤となるコアセットを含み、AppStream は追加アプリケーション、言語パッケージなどを含み、Extras は RHEL に含まれないパッケージを含んでいます。したがって、最小限のコンテナには /etc/dnf/dnf.conf に BaseOS リポジトリのみを追加する必要があります。\n\n```\n/etc/dnf/dnf.conf\n```\n\n```\n[baseos]                                                                                            \nname=AlmaLinux $releasever - BaseOS                                          \nmirrorlist=https://mirrors.almalinux.org/mirrorlist/$releasever/baseos       \ngpgkey=https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-$releasever\n```\n\nAlmaLinux 9 の最小コンテナを作成するには：\n\n```\n# dnf --repo=baseos --releasever=9 --best --installroot=/var/lib/machines/container-name --setopt=install_weak_deps=False install almalinux-release dhcp-client dnf glibc-langpack-en iproute iputils less passwd systemd vim-minimal\n```\n\nこれにより、AlmaLinux 9 の最新マイナーバージョンがインストールされますが、特定のポイントリリースをインストールすることもできますが、その場合は gpgpkey エントリを手動で RPM-GPG-KEY-AlmaLinux-9 を指すように変更する必要があります。\n\nArch、Fedora、AlmaLinux のように、root パスワードを設定しない限り、root としてログインすることは許可されません。root パスワードを設定するには、-b オプションなしで systemd-nspawn を実行してください：\n\n```\n# systemd-nspawn -D /var/lib/machines/container-name passwd\n```\n\n"
+    },
+    {
+      "title": "パッケージのビルドおよびテスト",
+      "level": 3,
+      "content": "使用例については、他のディストリビューションのパッケージの作成 を参照してください。\n\n"
+    },
+    {
+      "title": "管理",
+      "level": 2,
+      "content": "/var/lib/machines/ にあるコンテナは、machinectl コマンドによって制御することができます。内部的には systemd-nspawn@.service ユニットのインスタンスを制御しています。/var/lib/machines/ のサブディレクトリはコンテナ名に対応しています。\n\n"
+    },
+    {
+      "title": "systemd-nspawn オプションのデフォルト値",
+      "level": 3,
+      "content": "machinectl や systemd-nspawn@.service 経由で起動されたコンテナは systemd-nspawn コマンドで起動されたコンテナとはオプションの既定値が異なることを理解することが重要です。サービスが使用する追加オプションは以下の通りです。\n\n- -b/--boot – マネージドコンテナは自動的に init プログラムを検索し、PID 1 として起動します。\n- --network-veth つまり --private-network – マネージドコンテナは仮想ネットワークインターフェースを取得し、ホストネットワークから切り離されます。詳細は、#ネットワーキング を参照してください。\n- -U – カーネルがサポートしている場合、マネージドコンテナはデフォルトで user_namespaces(7) 機能を使用します。詳細は、#非特権コンテナ を参照してください。\n- --link-journal=try-guest\n\nこの動作は、コンテナごとの設定ファイルでオーバーライドすることができます。 詳細は、#設定 を参照してください。\n\n"
+    },
+    {
+      "title": "machinectl",
+      "level": 3,
+      "content": "コンテナはコマンドで管理できます。例えば、コンテナを起動するには、次のようにします。\n\n```\n$ machinectl start container-name\n```\n\n同様に、poweroff, reboot, status, show などのサブコマンドがあります。詳細な説明については、machinectl(1) § Machine Commands を参照してください。\n\nその他の一般的なコマンドは以下の通りです:\n\n- machinectl list – 現在実行中のコンテナの一覧を表示する\n- machinectl login container-name - 実行中のコンテナに新しいシェルを起動\n- machinectl shell [username@]container-name – コンテナで対話的なシェルセッションを開きます(コンテナ内のログインプロセスを経ずにユーザープロセスが即座に呼びだす)。\n- machinectl enable container-name または machinectl disable container-name - コンテナを有効または無効にして、起動時に開始します。詳細については、#PC起動時にコンテナを自動で開始する を参照してください。\n\nmachinectl にはコンテナ(または仮想マシン)イメージとイメージ転送を管理するためのサブコマンドもあります。詳細については、machinectl(1) § Image Commands および、machinectl(1) § Image Transfer Commands を参照してください。2023Q1 時点で、machinectl(1) § EXAMPLES にある最初の 3 つの例はイメージ転送コマンドを示しています。machinectl(1) § FILES AND DIRECTORIES では、適切なイメージをどこで見つけるかについて説明しています。\n\n"
+    },
+    {
+      "title": "systemd ツールチェイン",
+      "level": 3,
+      "content": "systemd のコアツールチェインは多くがコンテナでも使えるようにアップデートされています。コンテナの名前を引数とする -M, --machine= オプションをツールに付けるだけです。\n\n例:\n\n- 特定のマシンの journal ログを表示: $ journalctl -M MyContainer\n- control group の中身を表示: $ systemd-cgls -M MyContainer\n- コンテナの起動時間を表示: $ systemd-analyze -M MyContainer\n- リソース利用状況を表示: $ systemd-cgtop\n\n```\n$ journalctl -M MyContainer\n```\n\n```\n$ systemd-cgls -M MyContainer\n```\n\n```\n$ systemd-analyze -M MyContainer\n```\n\n```\n$ systemd-cgtop\n```\n\n"
+    },
+    {
+      "title": "コンテナ毎の設定",
+      "level": 3,
+      "content": "グローバル設定のオーバーライドではなく、コンテナ毎の設定を指定するには、.nspawn ファイルを使用できます。詳細については、 systemd.nspawn(5) を参照してください。\n\n- .nspawn ファイルは、machinectl remove を実行した時に、/etc/systemd/nspawn/ から予期せずに削除される場合があります。\n- systemd-nspawn@.service ファイルで指定されている、--settings=override がある場合、.nspawn ファイルで指定されているネットワークオプションとコマンドラインオプションの相互作用で正しく動作しません。回避策としてサービスが --network-veth を指定している場合でも、VirtualEthernet=on オプションを含める必要があります。\n\n"
+    },
+    {
+      "title": "PC起動時にコンテナを自動で開始する",
+      "level": 3,
+      "content": "コンテナを頻繁に使用する場合は、PC起動時に開始することをおすすめします。\n\nまず、machines.target が有効になっている事を確認します。 machinectl で検出可能なコンテナは、有効または無効にできます:\n\n```\n$ machinectl enable container-name\n```\n\n- まず systemd-nspawn@container-name.service ユニットを有効にする効果があります。\n- #systemd-nspawn オプションのデフォルト値 で説明されているように、machinectl と入力し開始されたコンテナは仮想 Ethernet インタフェースを取得します。プライベートネットワークを無効にするには、 #ホストネットワークを使う を参照してください。\n\n"
+    },
+    {
+      "title": "リソース制御",
+      "level": 3,
+      "content": "systemctl set-property でコンテナの制限やリソース管理を実装するために、コントロールグループを利用することができます。systemd.resource-control(5) を参照してください。例えば、メモリ容量やCPU使用率を制限できます。コンテナのメモリ消費を2GiBに制限するには:\n\n```\n# systemctl set-property systemd-nspawn@container-name.service MemoryMax=2G\n```\n\nまたは、CPU時間の使用量をだいたい2コア分に制限したい場合:\n\n```\n# systemctl set-property systemd-nspawn@container-name.service CPUQuota=200%\n```\n\nこれにより以下の永続ファイルが作成されます。 /etc/systemd/system.control/systemd-nspawn@container-name.service.d/.\n\nドキュメントによると、MemoryHigh はメモリ消費をチェックするための推奨される方法ですが、MemoryMax のように厳密に制限されることはありません。MemoryMax を最終防衛戦として残して、両方のオプションを使用できます。また、コンテナが認識できるCPUの数を制限しないことも考慮に入れてください。ただし、CPU時間合計に対して、コンテナが最大で取得する時間を制限することで、同様の結果が得られます。\n\n"
+    },
+    {
+      "title": "ネットワーキング",
+      "level": 3,
+      "content": "systemd-nspawn コンテナは、ホストネットワーク または プライベートネットワークのいずれかを使用できます。\n\n- ホストネットワークモードでは、コンテナはホストネットワークへのフルアクセスが可能です。これは、コンテナがホスト上のすべてのネットワークサービスにアクセスできるようになり、コンテナからのパケットがホストのパケットとして外部ネットワークに表示される事を意味します(つまり、同じIPアドレスを共有します)。\n- プライベートネットワークモードでは、コンテナはホストのネットワークから切断されています。これにより、ループバックデバイスとコンテナに明示的に割り当てられたものを除いて、すべてのネットワークインターフェイスがコンテナを使用できなくなります。コンテナのネットワークインターフェイスを設定するには、いくつかの方法があります。 既存のインターフェイスをコンテナに割り当てることができます(たとえば、複数のイーサネットデバイスがある場合)。 既存のインターフェース（つまり、VLANインターフェース）に関連付けられた仮想ネットワークインターフェースを作成して、コンテナーに割り当てることができます。 ホストとコンテナの間に仮想イーサネットリンクを作成できます。\n\n- 既存のインターフェイスをコンテナに割り当てることができます(たとえば、複数のイーサネットデバイスがある場合)。\n- 既存のインターフェース（つまり、VLANインターフェース）に関連付けられた仮想ネットワークインターフェースを作成して、コンテナーに割り当てることができます。\n- ホストとコンテナの間に仮想イーサネットリンクを作成できます。\n\nホストネットワーキングモードは、コンテナに割り当てられたインターフェースを構成するネットワーキングソフトウェアを実行しない アプリケーションコンテナ に適しています。ホストネットワーキングは、シェルから systemd-nspawn を実行するときのデフォルトのモードです。\n\n一方、プライベート・ネットワーキング・モードは、ホスト・システムから隔離されている必要がある システムコンテナ に適しています。仮想イーサネットリンクの作成は、複雑な仮想ネットワークの作成を可能にする非常に柔軟なツールです。これは machinectl や systemd-nspawn@.service によって起動されたコンテナのデフォルトモードです。\n\n次のサブセクションでは、一般的なシナリオについて説明します。使用可能な systemd-nspawn のオプションの詳細については、systemd-nspawn(1) § Networking Options を参照してください。\n\n"
+    },
+    {
+      "title": "ホストネットワークを使う",
+      "level": 4,
+      "content": "プライベートネットワークを無効にし、machinectl で開始されたコンテナで使用される仮想イーサネットリンクを作成するには、次のオプションを指定して、.nspawn ファイルを追加します:\n\n```\n/etc/systemd/nspawn/container-name.nspawn\n```\n\n```\n[Network]\nVirtualEthernet=no\n```\n\nこれにより、systemd-nspawn@.service の -n/--network-veth オプションが上書きされ、新しく開始されたコンテナはホストネットワークモードを使用します。\n\n"
+    },
+    {
+      "title": "仮想イーサネットリンクを使用する",
+      "level": 4,
+      "content": "コンテナが、-n/--network-veth オプションで起動された場合、systemd-nspawn はホストとコンテナの間に仮想イーサネットリンクを作成します。リンクのホスト側は、ve-container-name という名前のネットワークインターフェイスとして利用可能になります。リンクのコンテナ側は、hosts0 という名前になります。このオプションは、--private-network を意味することに注意してください。\n\n- コンテナ名が長すぎる場合、インターフェイス名は、15文字制限 に収まるように短縮されます(例: ve-long-container-name の代わりに ve-long-conKQGh)。フルネームはインターフェイスの altname プロパティとして設定され(ip-link(8)を参照)、インターフェイスの参照に使用できます。\n\n- ip link でインターフェイスを調べる場合、インターフェイス名は、ve-container-name@if2 や host0@if9 のようにサフィックスを付けて表示されます。@ifN は実際にはインターフェイス名の一部ではありません。その代わりに、ip link はこの情報を追加して、仮想イーサネットケーブルが相手側のどの slot に接続しているかを示します\n\nコンテナを起動する際には、ホストとコンテナの両方のインターフェイスにIPアドレスを割り当てなければなりません。ホストとコンテナの両方で systemd-networkd を使用している場合、初期状態で実行されます:\n\n- ホスト上の /usr/lib/systemd/network/80-container-ve.network ファイルは ve-container-name インターフェイスと一致し、DHCP サーバーを起動します。DHCP サーバーは、IP アドレスをホストインターフェイスとコンテナーに割り当てます。\n- /usr/lib/systemd/network/80-container-host0.network コンテナ内のファイルは host0 インターフェイスと一致し、ホストから IP アドレスを受信する DHCP クライアントを起動します。\n\nsystemd-networkd を使用しない場合は、静的IPアドレスを設定するか、ホストインターフェイスで、DHCP サーバを起動し、コンテナで DHCP クライアントを起動できます。詳細については、ネットワーク設定 を参照してください。\n\nコンテナに外部ネットワークへのアクセスを許可するには、インターネット共有#NAT の有効化 の説明に従って NAT を設定します。systemd-networkd を使用する場合、これは、/usr/lib/systemd/network/80-container-ve.network ファイルの IPMasquerade=yes オプションを介して（部分的に）自動的に行われます。ただし、これは次のような iptables ルールのみを発行します。\n\n```\n-t nat -A POSTROUTING -s 192.168.163.192/28 -j MASQUERADE\n```\n\nfilter テーブルは、インターネット共有#NAT の有効化のように手動で設定する必要があります。ワイルドカードを使用して、ve- で始まるすべてのインターフェイスに一致させることができます:\n\n```\n# iptables -A FORWARD -i ve-+ -o internet0 -j ACCEPT\n```\n\nさらに、DHCP サーバー（systemd-networkd によって運用される）への着信接続用に ve-+ インターフェースの UDP ポート 67 を開く必要があります：\n\n```\n# iptables -A INPUT -i ve-+ -p udp -m udp --dport 67 -j ACCEPT\n```\n\n"
+    },
+    {
+      "title": "ネットワークブリッジを使用する",
+      "level": 4,
+      "content": "ホストシステムにネットワークブリッジを構成している場合は、コンテナの仮想イーサネットリンクを作成し、そのホスト側をネットワークブリッジに追加できます。 これは、--network-bridge=bridge-name オプションを使用して実行されます。--network-bridge は --network-veth を意味することに注意してください。つまり、仮想イーサネットリンクは自動的に作成されます。 ただし、リンクのホスト側は ve- ではなく vb- プリフィックスを使用するため、DHCP サーバーと IP マスカレードを起動するための systemd-networkd オプションは適用されません。\n\nブリッジの管理は管理者に任されています。例えば、ブリッジは物理インターフェースと仮想インターフェースを接続したり、複数のコンテナの仮想インターフェースのみを接続したりすることができます。systemd-networkd を使用した設定例については、systemd-networkd#DHCP を用いたネットワークブリッジ と systemd-networkd#静的 IP アドレスを持つネットワークブリッジ を参照してください。\n\nまた、--network-zone=zone-name オプションは --network-bridge と似ていますが、ネットワークブリッジは systemd-nspawn と systemd-networkd によって自動的に管理されます。vz-zone-name という名前のブリッジインターフェースは、--network-zone=zone-name を設定した最初のコンテナが起動したときに自動的に作成され、--network-zone=zone-name を設定した最後のコンテナが終了したときに自動的に削除されます。したがって、このオプションを使用すると、複数の関連するコンテナを共通の仮想ネットワーク上に簡単に配置することができます。vz-* インターフェースは、/usr/lib/systemd/network/80-container-vz.network ファイルのオプションを使って、ve-* インターフェースと同じように systemd-networkd によって管理されることに注意してください。\n\n"
+    },
+    {
+      "title": "「macvlan」または「ipvlan」インターフェースを使用する",
+      "level": 4,
+      "content": "仮想イーサネットリンク（ホスト側がブリッジに追加される場合とされない場合があります）を作成する代わりに、既存の物理インターフェイス（つまり、VLAN インターフェイス）上に仮想インターフェイスを作成し、それをコンテナに追加できます。仮想インターフェイスは、基盤となるホストインターフェイスとブリッジされるため、コンテナは外部ネットワークに公開されます。これにより、ホストが接続されているのと同じ LAN から DHCP を介して個別の IP アドレスを取得できます。\n\nsystemd-nspawn には2つのオプションがあります:\n\n- --network-macvlan=interface – 仮想インターフェイスは、基盤となる物理インターフェイスとは異なるMACアドレスを持ち、mv-interface という名前が付けられます。\n\n- --network-ipvlan=interface – 仮想インターフェイスは、基礎となる物理インターフェイスと同じMACアドレスを持ち、iv-interface と名付けられます。\n\nどちらのオプションも --private-network を意味します。\n\n"
+    },
+    {
+      "title": "既存のインターフェイスを使用する",
+      "level": 4,
+      "content": "ホストシステムに複数の物理ネットワークインターフェイスがある場合は、 --network-interface=interface を使用してコンテナにインターフェイスを割り当てることができます(コンテナが起動している間はホストからは利用できないようにします)。--network-interface は--private-network を意味することに注意してください。\n\n"
+    },
+    {
+      "title": "ポートマッピング",
+      "level": 3,
+      "content": "プライベートネットワークが有効になっている場合、ホストの個々のポートは、-p/--port オプションを使用するか、または .nspawn ファイルの Port 設定を使用してコンテナのポートにマッピングすることができます。たとえば、ホストの TCP ポート 8000 をコンテナの TCP ポート 80 にマッピングするには：\n\n```\n/etc/systemd/nspawn/container-name.nspawn\n```\n\n```\n[Network]\nPort=tcp:8000:80\n```\n\nこれは、nat テーブルに iptables ルールを発行することで機能しますが、filter テーブルの FORWARD チェインは、#仮想イーサネットリンクを使用するに示されているように手動で設定する必要があります。さらに、シンプルなステートフルファイアウォールに従った場合、ホストの wan_interface で転送されたポートへの新しい接続を許可するには、次のコマンドを実行してください：\n\n```\n# iptables -A FORWARD -i wan_interface -o ve-+ -p tcp --syn --dport 8000 -m conntrack --ctstate NEW -j ACCEPT\n```\n\n- systemd-nspawn は、ポートをマッピングする際に loopback インターフェイスを明示的に除外します。したがって、上記の例では、localhost:8000 はホストに接続し、コンテナには接続しません。他のインターフェイスへの接続のみがポートマッピングの対象となります。詳細は、[5] を参照してください。\n- ポートマッピングは IPv4 接続に対してのみ機能します。 [6]\n\n"
+    },
+    {
+      "title": "ドメイン名前解決",
+      "level": 3,
+      "content": "コンテナ内の ドメイン名前解決 は systemd-nspawn の --resolv-conf オプションか、.nspawn ファイルの ResolvConf= オプションで設定できます。systemd-nspawn(1) § 統合オプション に多くの値が記述されています。\n\nデフォルト値は auto で以下の事を意味します:\n\n- --private-network が有効になっている場合、/etc/resolv.conf はコンテナ内のまま残ります。\n- あるいは、ホストで systemd-resolved が実行されている場合、そのスタブ resolv.conf ファイルがコンテナにコピーまたはバインドマウントされます。\n- それ以外の場合、/etc/resolv.conf ファイルはホストからコンテナにコピーされるか、バインドマウントされます。\n\n最後の2つのケースでは、コンテナルートが書き込み可能な場合はファイルがコピーされ、読み取り専用の場合はバインドマウントされます。\n\nホスト上で systemd-resolved が実行される 2 番目のケースでは、コンテナがホストからのスタブ symlink ファイル /etc/resolv.conf を使用できるように systemd-nspawn がコンテナ内でも実行されることを期待します。そうでない場合、デフォルト値の auto はもはや機能しませんので、replace-* オプションのいずれかを使ってシンボリックリンクを置き換える必要があります。\n\n"
+    },
+    {
+      "title": "シェル/init 以外のコマンドを実行する",
+      "level": 3,
+      "content": "systemd-nspawn(1) § Execution Options より。\n\n"
+    },
+    {
+      "title": "非特権コンテナ",
+      "level": 3,
+      "content": "systemd-nspawn は非特権コンテナをサポートしますが、コンテナは root として起動する必要があります。\n\nこれを行う最も簡単な方法は、-U オプションを使用して systemd-nspawn が自動的に未使用の UIDs/GIDs の範囲を選択させることです:\n\n```\n# systemd-nspawn -bUD ~/MyContainer\n```\n\nカーネルがユーザー名前空間をサポートしている場合、-U オプションは --private-users=pick --private-users-chown と同等です。これはコンテナの開始時にコンテナ内のファイルとディレクトリが選択された範囲のプライベート UIDs/GIDs に変更される事を意味します。詳細は、 systemd-nspawn(1) § User Namespacing Options を参照してください。\n\nプライベート UID/GID の範囲を持つコンテナを起動したら、パーミッションエラーを避けるために、そのコンテナを使い続ける必要があります。あるいは、--private-users-chown (または -U) のファイルシステムへの影響を元に戻すには、0で始まるIDの範囲を指定します:\n\n```\n# systemd-nspawn -D ~/MyContainer --private-users=0 --private-users-chown\n```\n\n"
+    },
+    {
+      "title": "X 環境",
+      "level": 3,
+      "content": "新しいコンテナで X アプリケーションを動かす必要がある場合は Xhost を見て下さい。\n\n外部の X サーバーにコンテナのセッションを接続するには DISPLAY 環境変数を設定する必要があります。\n\nX は必要なファイルを /tmp ディレクトリに保存します。コンテナから全てを表示させるには、/tmp ディレクトリのファイルにアクセスできるようにしなくてはなりません。コンテナを起動するときに --bind=/tmp/.X11-unix:/tmp/.X11-unix オプションを追加してください。\n\n"
+    },
+    {
+      "title": "xhost の回避",
+      "level": 4,
+      "content": "xhost は、Xサーバに対してかなり粗いアクセス権しか与えません。​$XAUTHORITY ファイルを使用すると、より詳細なアクセス制御が可能になります。​残念ながら、コンテナ内の$XAUTHORITY ファイルにアクセスできるようにしただけではうまくいきません。$XAUTHORITY ファイルはホスト固有のものですが、コンテナは別のホストです。​stackoverflowを参考にした以下のトリックを使えば、Xサーバがコンテナ内で実行されているXアプリケーションから、$XAUTHORITY ファイルを受け入れるようにすることができます:\n\n```\n$ XAUTH=/tmp/container_xauth\n$ xauth nextract - \"$DISPLAY\" | sed -e 's/^..../ffff/' | xauth -f \"$XAUTH\" nmerge -\n# systemd-nspawn -D myContainer --bind=/tmp/.X11-unix --bind=\"$XAUTH\" -E DISPLAY=\"$DISPLAY\" -E XAUTHORITY=\"$XAUTH\" --as-pid2 /usr/bin/xeyes\n```\n\n上記の2行目では、接続ファミリーを \"\"FamilyWild\"\"(値65535) に設定しているため、エントリはすべての表示に一致します。​詳細はXsecurity(7) を参照。\n\n"
+    },
+    {
+      "title": "X nesting/Xephyr を使用",
+      "level": 4,
+      "content": "X アプリケーションを実行し、共有 X デスクトップのリスクを回避するもう1つの簡単な方法は、X nesting を使用することです。 ここでの利点は、コンテナ内アプリケーションと非コンテナアプリケーションの間の相互作用を完全に回避し、異なる デスクトップ環境 または ウィンドウマネージャ を実行できることです。 欠点はパフォーマンスの低下と Xephyr を使用した場合のハードウェアアクセラレーションの欠如です。\n\nXephyr をコンテナの外で起動するには以下の方法があります。\n\n```\n# Xephyr :1 -resizeable\n```\n\nその後、以下のオプションでコンテナを起動します。\n\n```\n--setenv=DISPLAY=:1 --bind-ro=/tmp/.X11-unix/X1\n```\n\n他のバインドは必要ありません。\n\n状況によっては、コンテナ内で DISPLAY=:1 を手動で設定する必要があるかもしれません（主に -b と併用する場合）\n\n"
+    },
+    {
+      "title": "Firefox を起動する",
+      "level": 4,
+      "content": "PID 1 として実行するには\n\n```\n# systemd-nspawn --setenv=DISPLAY=:0 \\\n              --setenv=XAUTHORITY=~/.Xauthority \\\n              --bind-ro=$HOME/.Xauthority:/root/.Xauthority \\\n              --bind=/tmp/.X11-unix \\\n              -D ~/containers/firefox \\\n              firefox\n```\n\nあるいは、コンテナを起動して、例えば、systemd-networkd に仮想ネットワークインターフェイスを設定することもできます。\n\n```\n# systemd-nspawn --bind-ro=$HOME/.Xauthority:/root/.Xauthority \\\n              --bind=/tmp/.X11-unix \\\n              -D ~/containers/firefox \\\n              --network-veth -b\n```\n\nコンテナが起動したら、次のようにXorgバイナリを実行します:\n\n```\n# systemd-run -M firefox --setenv=DISPLAY=:0 firefox\n```\n\n"
+    },
+    {
+      "title": "3D グラフィックスアクセラレーション",
+      "level": 4,
+      "content": "3Dグラフィックスアクセラレーションを有効にするためには、.nspawn ファイルに以下の行を追加して、マウント /dev/dri をコンテナにバインドする必要があるかもしれません。\n\n```\nBind=/dev/dri\n```\n\nこの方法は patrickskiba.com から引用しました。これにより、以下の問題が解決されます。\n\n```\nlibGL error: MESA-LOADER: failed to retrieve device information\nlibGL error: Version 4 or later of flush extension not found\nlibGL error: failed to load driver: i915\n```\n\nglxinfo または glxgears を実行して、有効になっているか確認してください。\n\nコンテナ上にホストと同じバージョンの NVIDIA ドライバをインストールできない場合、ドライバライブラリファイルもバインドする必要がある場合があります。ホスト上で pacman -Ql nvidia-utils を実行すると、含まれている全てのファイルを確認することができます。全てをコピーする必要はありません。以下の systemd override ファイルは、コンテナを machinectl start container-name で実行する際に必要なファイルを全てバインドします。\n\nTable content:\nこの記事またはセクションの正確性には問題があります。 理由: No reason to bind from /usr/lib/ into /usr/lib/x86_64-linux-gnu/. (議論: トーク:Systemd-nspawn#)\n\n```\n/etc/systemd/system/systemd-nspawn@.service.d/nvidia-gpu.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --machine=%i \\\n--bind=/dev/dri \\\n--bind=/dev/shm \\\n--bind=/dev/nvidia0 \\\n--bind=/dev/nvidiactl \\\n--bind=/dev/nvidia-modeset \\\n--bind=/usr/bin/nvidia-bug-report.sh:/usr/bin/nvidia-bug-report.sh \\\n--bind=/usr/bin/nvidia-cuda-mps-control:/usr/bin/nvidia-cuda-mps-control \\\n--bind=/usr/bin/nvidia-cuda-mps-server:/usr/bin/nvidia-cuda-mps-server \\\n--bind=/usr/bin/nvidia-debugdump:/usr/bin/nvidia-debugdump \\\n--bind=/usr/bin/nvidia-modprobe:/usr/bin/nvidia-modprobe \\\n--bind=/usr/bin/nvidia-ngx-updater:/usr/bin/nvidia-ngx-updater \\\n--bind=/usr/bin/nvidia-persistenced:/usr/bin/nvidia-persistenced \\\n--bind=/usr/bin/nvidia-powerd:/usr/bin/nvidia-powerd \\\n--bind=/usr/bin/nvidia-sleep.sh:/usr/bin/nvidia-sleep.sh \\\n--bind=/usr/bin/nvidia-smi:/usr/bin/nvidia-smi \\\n--bind=/usr/bin/nvidia-xconfig:/usr/bin/nvidia-xconfig \\\n--bind=/usr/lib/gbm/nvidia-drm_gbm.so:/usr/lib/x86_64-linux-gnu/gbm/nvidia-drm_gbm.so \\\n--bind=/usr/lib/libEGL_nvidia.so:/usr/lib/x86_64-linux-gnu/libEGL_nvidia.so \\\n--bind=/usr/lib/libGLESv1_CM_nvidia.so:/usr/lib/x86_64-linux-gnu/libGLESv1_CM_nvidia.so \\\n--bind=/usr/lib/libGLESv2_nvidia.so:/usr/lib/x86_64-linux-gnu/libGLESv2_nvidia.so \\\n--bind=/usr/lib/libGLX_nvidia.so:/usr/lib/x86_64-linux-gnu/libGLX_nvidia.so \\\n--bind=/usr/lib/libcuda.so:/usr/lib/x86_64-linux-gnu/libcuda.so \\\n--bind=/usr/lib/libnvcuvid.so:/usr/lib/x86_64-linux-gnu/libnvcuvid.so \\\n--bind=/usr/lib/libnvidia-allocator.so:/usr/lib/x86_64-linux-gnu/libnvidia-allocator.so \\\n--bind=/usr/lib/libnvidia-cfg.so:/usr/lib/x86_64-linux-gnu/libnvidia-cfg.so \\\n--bind=/usr/lib/libnvidia-egl-gbm.so:/usr/lib/x86_64-linux-gnu/libnvidia-egl-gbm.so \\\n--bind=/usr/lib/libnvidia-eglcore.so:/usr/lib/x86_64-linux-gnu/libnvidia-eglcore.so \\\n--bind=/usr/lib/libnvidia-encode.so:/usr/lib/x86_64-linux-gnu/libnvidia-encode.so \\\n--bind=/usr/lib/libnvidia-fbc.so:/usr/lib/x86_64-linux-gnu/libnvidia-fbc.so \\\n--bind=/usr/lib/libnvidia-glcore.so:/usr/lib/x86_64-linux-gnu/libnvidia-glcore.so \\\n--bind=/usr/lib/libnvidia-glsi.so:/usr/lib/x86_64-linux-gnu/libnvidia-glsi.so \\\n--bind=/usr/lib/libnvidia-glvkspirv.so:/usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so \\\n--bind=/usr/lib/libnvidia-ml.so:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so \\\n--bind=/usr/lib/libnvidia-ngx.so:/usr/lib/x86_64-linux-gnu/libnvidia-ngx.so \\\n--bind=/usr/lib/libnvidia-opticalflow.so:/usr/lib/x86_64-linux-gnu/libnvidia-opticalflow.so \\\n--bind=/usr/lib/libnvidia-ptxjitcompiler.so:/usr/lib/x86_64-linux-gnu/libnvidia-ptxjitcompiler.so \\\n--bind=/usr/lib/libnvidia-rtcore.so:/usr/lib/x86_64-linux-gnu/libnvidia-rtcore.so \\\n--bind=/usr/lib/libnvidia-tls.so:/usr/lib/x86_64-linux-gnu/libnvidia-tls.so \\\n--bind=/usr/lib/libnvidia-vulkan-producer.so:/usr/lib/x86_64-linux-gnu/libnvidia-vulkan-producer.so \\\n--bind=/usr/lib/libnvoptix.so:/usr/lib/x86_64-linux-gnu/libnvoptix.so \\\n--bind=/usr/lib/modprobe.d/nvidia-utils.conf:/usr/lib/x86_64-linux-gnu/modprobe.d/nvidia-utils.conf \\\n--bind=/usr/lib/nvidia/wine/_nvngx.dll:/usr/lib/x86_64-linux-gnu/nvidia/wine/_nvngx.dll \\\n--bind=/usr/lib/nvidia/wine/nvngx.dll:/usr/lib/x86_64-linux-gnu/nvidia/wine/nvngx.dll \\\n--bind=/usr/lib/nvidia/xorg/libglxserver_nvidia.so:/usr/lib/x86_64-linux-gnu/nvidia/xorg/libglxserver_nvidia.so \\\n--bind=/usr/lib/vdpau/libvdpau_nvidia.so:/usr/lib/x86_64-linux-gnu/vdpau/libvdpau_nvidia.so \\\n--bind=/usr/lib/xorg/modules/drivers/nvidia_drv.so:/usr/lib/x86_64-linux-gnu/xorg/modules/drivers/nvidia_drv.so \\\n--bind=/usr/share/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf:/usr/share/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf \\\n--bind=/usr/share/dbus-1/system.d/nvidia-dbus.conf:/usr/share/dbus-1/system.d/nvidia-dbus.conf \\\n--bind=/usr/share/egl/egl_external_platform.d/15_nvidia_gbm.json:/usr/share/egl/egl_external_platform.d/15_nvidia_gbm.json \\\n--bind=/usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \\\n--bind=/usr/share/licenses/nvidia-utils/LICENSE:/usr/share/licenses/nvidia-utils/LICENSE \\\n--bind=/usr/share/vulkan/icd.d/nvidia_icd.json:/usr/share/vulkan/icd.d/nvidia_icd.json \\\n--bind=/usr/share/vulkan/implicit_layer.d/nvidia_layers.json:/usr/share/vulkan/implicit_layer.d/nvidia_layers.json \\\nDeviceAllow=/dev/dri rw\nDeviceAllow=/dev/shm rw\nDeviceAllow=/dev/nvidia0 rw\nDeviceAllow=/dev/nvidiactl rw\nDeviceAllow=/dev/nvidia-modeset rw\n```\n\n"
+    },
+    {
+      "title": "ホストのファイルシステムにアクセス",
+      "level": 3,
+      "content": "例えばホストとコンテナの両方が Arch Linux で、pacman のキャッシュを共有するには:\n\n```\n# systemd-nspawn --bind=/var/cache/pacman/pkg\n```\n\n詳しくは systemd-nspawn(1) の --bind と --bind-ro を参照してください。\n\nファイルを使ってコンテナごとにバインドを設定することもできます:\n\n```\n/etc/systemd/nspawn/my-container.nspawn\n```\n\n```\n[Files]\nBind=/var/cache/pacman/pkg\n```\n\n#コンテナごとに設定を指定するを参照。\n\n"
+    },
+    {
+      "title": "systemd を使っていない環境で動作させる",
+      "level": 3,
+      "content": "Init#systemd-nspawn を見て下さい。\n\n"
+    },
+    {
+      "title": "Btrfs のサブボリュームをコンテナのルートとして使う",
+      "level": 3,
+      "content": "Btrfs サブボリュームをコンテナのルートのテンプレートとして使うには、--template フラグを使用します。サブボリュームのスナップショットを使ってコンテナのルートディレクトリが生成されます。\n\n例えば、/.snapshots/403/snapshot に存在するスナップショットを使うには:\n\n```\n# systemd-nspawn --template=/.snapshots/403/snapshots -b -D my-container\n```\n\nmy-container は作成するコンテナのディレクトリの名前に置き換えてください。電源を切っても、新しく作成されたサブボリュームは消えません。\n\n"
+    },
+    {
+      "title": "コンテナの一時的な Btrfs スナップショットを使う",
+      "level": 3,
+      "content": "--ephemeral や -x フラグを使ってコンテナの一時的な btrfs スナップショットを作成してコンテナのルートとして利用できます。コンテナの実行中に変更が加えられても保存されません。例:\n\n```\n# systemd-nspawn -D my-container -xb\n```\n\nmy-container はシステムに存在する既存のコンテナのディレクトリに置き換えてください。例えば / が btrfs のサブボリュームだった場合、以下のコマンドで実行中のホスト環境の一時的なコンテナを作成することができます:\n\n```\n# systemd-nspawn -D / -xb\n```\n\nコンテナの電源を切ると、作成された btrfs サブボリュームはすぐに削除されます。\n\n"
+    },
+    {
+      "title": "system-nspawn で docker を実行",
+      "level": 3,
+      "content": "Docker 20.10 以降、cgroups v2 を有効にした非特権 systemd-nspawn コンテナ内で Docker コンテナを実行することが可能になりました（Arch Linux ではデフォルト）。これにより、cgroups やユーザー名前空間を無効にすることなくセキュリティ対策を損なうことなく行えます。これを行うには、/etc/systemd/nspawn/myContainer.nspawn を編集し（存在しない場合は作成）、以下の設定を追加します。\n\n```\n/etc/systemd/nspawn/myContainer.nspawn\n```\n\n```\n[Exec]\nSystemCallFilter=add_key keyctl bpf\n```\n\nその後、コンテナ内で Docker はそのまま機能するはずです。\n\noverlayfs はユーザー名前空間と互換性がなく、デフォルトでは systemd-nspawn 内で使用できません。そのため、Docker は非効率な vfs をストレージドライバーとして使用することになります。これはコンテナを開始するたびにイメージのコピーを作成します。これを回避するためには、ストレージドライバーとして fuse-overlayfs を使用する必要があります。これを行うためには、まずコンテナに fuse を公開する必要があります：\n\n```\n/etc/systemd/nspawn/myContainer.nspawn\n```\n\n```\n[Files]\nBind=/dev/fuse\n```\n\nそして、コンテナがデバイスノードを読み書きできるように設定します：\n\n```\n# systemctl set-property systemd-nspawn@myContainer DeviceAllow='/dev/fuse rwm'\n```\n\n最後に、コンテナ内に fuse-overlayfs パッケージをインストールします。すべての設定を有効にするには、コンテナを再起動する必要があります。\n\n"
+    },
+    {
+      "title": "root ログインが失敗する",
+      "level": 3,
+      "content": "(machinectl login <name> を使用して) ログインしようとしたときに以下のエラーが表示される場合:\n\n```\narch-nspawn login: root\nLogin incorrect\n```\n\nそして、コンテナの journal が以下のように表示する場合:\n\n```\npam_securetty(login:auth): access denied: tty 'pts/0' is not secure !\n```\n\nTable content:\nこの記事またはセクションの正確性には問題があります。 理由: Files in /usr/lib should not be edited by users, the change in /usr/lib/tmpfiles.d/arch.conf will be lost when filesystem is upgraded. (議論: トーク:Systemd-nspawn#)\n\nコンテナファイルシステム上の、/etc/securetty[7] と /usr/share/factory/etc/securetty を削除するか、コンテナファイイルシステム上の /etc/securetty に必要な pty 端末デバイス(pts/0 のような)を追加します。変更は、次の起動時に上書きされるため、/etc/securetty のエントリを削除する必要があります。FS#63236 を参照。削除を選択した場合は、/etc/pacman.conf の NoExtract にそれらを追加し、再インストールされないようにします。FS#45903 を参照してください。\n\n"
+    },
+    {
+      "title": "execv(...) failed: Permission denied",
+      "level": 3,
+      "content": "systemd-nspawn -bD /path/to/container によってコンテナを起動 (またはコンテナ内で何かを実行) しようとすると、以下のようなエラーが発生します:\n\n```\nexecv(/usr/lib/systemd/systemd, /lib/systemd/systemd, /sbin/init) failed: Permission denied\n```\n\n問題のファイル (例えば /lib/systemd/systemd) のパーミッションが正しくても、コンテナが保存されているファイルシステムを非rootユーザーとしてマウントした結果である可能性があります。例えば、fstab に noauto,user,... というオプションを指定して手動でディスクをマウントした場合、systemd-nspawn は rootが所有するファイルであっても実行は許可しません。\n\n"
+    },
+    {
+      "title": "TERM の端末タイプが間違っている (色が壊れている)",
+      "level": 3,
+      "content": "machinectl login でコンテナにログインすると、コンテナ内の端末の色とキーストロークが壊れることがあります。これは、TERM 環境変数の端末タイプが正しくないことが原因である可能性があります。環境変数はホストのシェルから継承されませんが、明示的に設定されていない限り、systemd (vt220) で固定されたデフォルトに戻ります。設定するには、コンテナ内の container-getty@.service サービス用のオーバーレイを作成して、machinectl login の login getty を起動し、ログインしているホスト端末と一致する値を TERM に設定してください。\n\n```\n/etc/systemd/system/container-getty@.service.d/term.conf\n```\n\n```\n[Service]\nEnvironment=TERM=xterm-256color\n```\n\nもしくは、machinectl shell を使用してください。端末から TERM 環境変数を適切に継承します。\n\n"
+    },
+    {
+      "title": "コンテナ内へのNFS共有のマウント",
+      "level": 3,
+      "content": "現時点（2019年6月）では利用できません。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- 自動コンソールログイン\n- Creating containers with systemd-nspawn\n- Presentation by Lennart Poettering on systemd-nspawn\n- Running Firefox in a systemd-nspawn container\n- Graphical applications in systemd-nspawn\n\n"
+    }
+  ]
+}

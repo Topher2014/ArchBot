@@ -1,0 +1,111 @@
+{
+  "title": "Transmission (Español)",
+  "url": "https://wiki.archlinux.org/title/Transmission_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-05** \n\nTransmission es un cliente BitTorrent ligero y multiplataforma.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Hay varios paquetes disponibles para instalar con Transmission:\n\n- transmission-cli – demonio, con CLI, e #Interfaz web.\n- transmission-gtk – Interfaz gráfica en GTK 3.\n- transmission-qt – Interfaz gráfica en Qt 5.\n- tremcAUR or tremc-gitAUR – Interfaz Curses para el demonio.\n- stigAUR or stig-gitAUR – Interfaz Curses para el demonio.\n- transmission-remote-gtk – Interfaz gráfica en GTK 3para el demonio.\n\n"
+    },
+    {
+      "title": "Configurar la versión GUI",
+      "level": 2,
+      "content": "Ambas versiones GUI, transmission-gtk y transmission-qt, pueden funcionar de forma autónoma sin un demonio como back-end.\n\nLas versiones GUI están configuradas para funcionar directamente, pero es posible que el usuario desee cambiar algunas de las configuraciones. La ruta predeterminada a los archivos de configuración GUI es ~/.config/transmission.\n\nSe puede encontrar una guía de las opciones de configuración en el Github de Transmission.\n\n"
+    },
+    {
+      "title": "Demonio Transmission y CLI",
+      "level": 2,
+      "content": "La órdenes para transmission-cli son:\n\n"
+    },
+    {
+      "title": "Iniciar y detener el demonio",
+      "level": 3,
+      "content": "El demonio Transmission se puede ejecutar:\n\n- Como el usuario transmission, iniciando/activando transmission.service mediante systemd. El usuario se puede cambiar como se explica en #Elegir un usuario.\n\n- Como su propio usuario, ejecutando bajo su nombre de usuario:\n\n```\n$ transmission-daemon\n```\n\nAl iniciar el demonio, se creará un archivo de configuración inicial. Véase #Configurar el demonio.\n\nEl demonio se puede detener con:\n\n```\n$ pkill -3 transmission-daemon\n```\n\nUna opción alternativa para detener Transmission es utilizar la orden transmission-remote:\n\n```\n$ transmission-remote --exit\n```\n\n"
+    },
+    {
+      "title": "Reducir el journal spam",
+      "level": 3,
+      "content": "Correr transmission-daemon puede dar lugar a muchas entradas journal no deseadas. La salida se puede filtrar iniciándolo con un pequeño script de envoltura. El siguiente ejemplo también proporciona algunas notificaciones:\n\n```\ntranswrap.sh\n```\n\n```\n#!/bin/zsh\nkillall transmission-daemon 2> /dev/null\ntransmission-daemon --foreground --log-info 2>&1 | while read line; do\n\techo $line |\n\t\tgrep -v \"announcer.c:\\|platform.c:\\|announce done (tr-dht.c:\" |\n\t\tgrep -v \"Saved.*variant.c:\" |\n\t\twhile read line; do\n\t\t\techo $line | grep -q \"Queued for verification (verify.c:\" &&\n\t\t\t\tnotify-send --app-name=\"Transmission Started\" \"${line#* * }\"\n\t\t\techo $line | grep -q \"changed from .Incomplete. to .Complete.\" &&\n\t\t\t\tnotify-send --app-name=\"Transmission Complete\" \"${line#* * }\"\n\t\t\techo $line | systemd-cat --identifier=\"TransWrap\" --priority=5\n\t\tdone 2>&1 > /dev/null\n\tdone&disown\n```\n\n"
+    },
+    {
+      "title": "Netctl",
+      "level": 4,
+      "content": "Puede ser conveniente ejecutar Transmission solo en determinadas redes. La siguiente secuencia de órdenes verifica que la conexión esté en una lista de redes autorizadas y luego procede a iniciar transmission-daemon.\n\n```\n/etc/netctl/hooks/90-transmission.sh\n```\n\n```\n#!/bin/bash\n\n# Los SSID para los que activamos esto.\ndeclare -A ssids=(\n    [\"network_1\"]=y\n    [\"network_2\"]=y\n)\n\nif [[ ${ssids[$SSID]} ]]; then\n    case $ACTION in\n        CONNECT|REESTABLISHED)\n            # Necesito esperar, de lo contrario no parece vincularse a 9091.\n            sleep 30\n            systemctl start transmission\n            ;;\n        *)\n            systemctl stop transmission\n            ;;\n    esac\nfi\n```\n\n"
+    },
+    {
+      "title": "Wicd",
+      "level": 4,
+      "content": "Cree un script de inicio en la carpeta /etc/wicd/scripts/postconnect, y un script de detención en la carpeta /etc/wicd/scripts/predisconnect. Recuerde hacerlos ejecutables. Por ejemplo:\n\n```\n/etc/wicd/scripts/postconnect/transmission\n```\n\n```\n#!/bin/bash\n\nsystemctl start transmission\n```\n\n```\n/etc/wicd/scripts/predisconnect/transmission\n```\n\n```\n#!/bin/bash\n\nsystemctl stop transmission\n```\n\n"
+    },
+    {
+      "title": "Elegir un usuario",
+      "level": 3,
+      "content": "Elija cómo quiere ejecutar transmission:\n\n- Como un usuario separado, transmission por defecto (recomendado para mayor seguridad).\n\nPor defecto, transmission crea un usuario y un grupo transmission, con sus archivos de inicio en /var/lib/transmission/, y se ejecuta como este \"usuario\". Esta es una precaución de seguridad, así que transmission, y sus descargas, no tienen acceso a archivos fuera de /var/lib/transmission/. La configuración, el funcionamiento y el acceso a las descargas deben realizarse con privilegios de superusuario \"root\" (por ejemplo, utilizando sudo).\n\n- Bajo tu propio usuario.\n\nPara configurar esto, anule el archivo de servicio proporcionado y especifique su nombre de usuario:\n\n```\n/etc/systemd/system/transmission.service.d/username.conf\n```\n\n```\n[Service]\nUser=su_usuario\n```\n\n"
+    },
+    {
+      "title": "Configurar el demonio",
+      "level": 3,
+      "content": "Cree un archivo de configuración inicial iniciando el demonio.\n\n- Si ejecuta Transmission con el nombre de usuario Transmission, el archivo de configuración se ubicará en /var/lib/transmission/.config/transmission-daemon/settings.json.\n\n- Si ejecuta Transmission con su propio nombre de usuario, el archivo de configuración se ubicará en ~/.config/transmission-daemon/settings.json.\n\nUno puede personalizar el demonio utilizando un cliente Transmission o mediante la interfaz web incluida accesible a través de http://localhost:9091 en un navegador compatible.\n\nPuede encontrar una guía de las opciones de configuración en el sitio web de Transmission: https://github.com/transmission/transmission/wiki/Editing-Configuration-Files\n\nUna recomendación para aquellos que lo ejecutan bajo el nombre de usuario transmission es crear un directorio de descarga compartido, con los permisos correctos, para permitir el acceso tanto al usuario Transmission como a los usuarios del sistema, y ​​luego actualizar el archivo de configuración. en consecuencia. Por ejemplo:\n\n```\n# mkdir /mnt/data/torrents\n# chown -R fachada:transmission /mnt/data/torrents\n# chmod -R 775 /mnt/data/torrents\n```\n\nAhora /mnt/data/torrents será accesible para el usuario del sistema fachada y para el grupo transmission al que pertenece el usuario transmission. No se recomienda hacer al directorio destino con permisos de lectura/escritura para todos (es decir, no haga chmod al directorio con 777). En su lugar, otorgue a los usuarios/grupos individuales los permisos adecuados para los directorios correspondientes.\n\nUna alternativa es añadir su usuario al grupo transmission (#usermod -a -G transmission su_usuario) y luego modificar los permisos en los directorios /var/lib/transmission y /var/lib/transmission/Downloads para permitir el acceso de rwx a los miembros del grupo transmission.\n\n"
+    },
+    {
+      "title": "Lista blanca de hosts",
+      "level": 4,
+      "content": "Si planea acceder al demonio Transmission a través de la red utilizando el nombre de host del servidor, debe añadir este nombre de host a rpc-host-whitelist en settings.json. De lo contrario, obtendrá un error \"421 Misdirected Request\" al acceder al servidor.\n\nSi se conecta al demonio utilizando la dirección IP del servidor, esto no es necesario.\n\n"
+    },
+    {
+      "title": "Directorio vigilado",
+      "level": 4,
+      "content": "Si desea Añadir automáticamente archivos .torrent desde una carpeta, pero encuentra que las opciones watch-dir y watch-dir-enabled establecidas en el archivo de configuración no funcionan, puede iniciar el demonio Transmission con la opción -c /ruta/al/directorio/vigilado.\n\nSi está utilizando systemd, edite la unidad transmission.service como se describe en systemd (Español)#Modificar los archivos de unidad suministrados.\n\n"
+    },
+    {
+      "title": "Activar IPv6",
+      "level": 4,
+      "content": "De forma predeterminada, el demonio solo escucha conexiones IPv4. Para escuchar también las conexiones IPv6, cambie la opción rpc-bind-address a \"::\" en settings.json.\n\n"
+    },
+    {
+      "title": "Ejemplos CLI",
+      "level": 4,
+      "content": "Si desea eliminar todos los torrents finalizados, puede utilizar la orden siguiente con su propio nombre de usuario y contraseña:\n\n```\n# transmission-remote -n 'usuario:contraseña' -l | grep 100% | awk '{print $1}'| paste -d, -s | xargs -i transmission-remote -t {} -r\n```\n\nSiembra un torrent que ya se haya descargado:\n\n```\n# transmission-remote [HOST] --torrent=ejemplo.torrent -a ejemplo.torrent --verify --download-dir=/ruta/a/la/carpeta --start\n```\n\n"
+    },
+    {
+      "title": "La forma GUI",
+      "level": 3,
+      "content": "Una vez que Transmission está instalado, puede configurar fácilmente la interfaz web. Todo lo que necesita hacer es clic en el menú Editar y seleccionar Preferencias. Haga clic en la pestaña Remoto y active Permitir acceso remoto.\n\nAquí, tiene la oportunidad de cambiar el puerto de escucha predeterminado de 9091.\n\nMarque Usar autenticación y rellene un nombre de usuario y contraseña para que se pueda utilizar la autenticación.\n\nPara aumentar la seguridad, puede restringir el acceso desde cualquier dirección IP activando Permitir solo estas direcciones IP.\n\nAhora está listo para iniciar la interfaz web haciendo clic en Abrir cliente web, que hace que su navegador web predeterminado lo abra, o llegando manualmente a http://DIRECCION_IP_DESTINO:PUERTO con cualquier navegador web compatible.\n\nSi no ha cambiado el puerto de escucha, el predeterminado es 9091. En este caso, el enlace es http://localhost:9091.\n\n"
+    },
+    {
+      "title": "La forma CLI",
+      "level": 3,
+      "content": "No necesita una interfaz gráfica para configurar la interfaz web, el demonio ofrece las mismas opciones. Puede acceder a la interfaz web sin especificar ninguna opción. Véase #Iniciar y detener el demonio\n\nNo obstante, puede especificar todo lo que vea en la sección anterior:\n\n```\n$ transmission-daemon --auth --username arch --password linux --port 9091 --allowed \"127.0.0.1\"\n```\n\nes equivalente a\n\n```\n$ transmission-daemon -t -u arch -v linux -p 9091 -a \"127.0.0.1\"\n```\n\n"
+    },
+    {
+      "title": "Tema de interfaz web opcional",
+      "level": 3,
+      "content": "Si la interfaz de usuario predeterminada de la aplicación web parece obsoleta y menos elegante de lo esperado, intente utilizar este sencillo tema CSS:\n\nhttps://git.eigenlab.org/sbiego/transmission-web-soft-theme\n\nTambién hay un proyecto de reemplazo completo que puede coexistir con la interfaz de usuario predeterminada:\n\nhttps://github.com/ronggang/transmission-web-control\n\n"
+    },
+    {
+      "title": "No se puede acceder al demonio a través de la red",
+      "level": 3,
+      "content": "El demonio se inicia después de inicializar network.service. Sin embargo, si activa el servicio dhcpcd en lugar del servicio específico del dispositivo, como por ejemplo dhcpcd@enp1s0.service, puede suceder que Transmission se inicie demasiado pronto y no se pueda enlazar a la interfaz de red. Por lo tanto, la interfaz web es inalcanzable. Una posible solución es añadir la línea Requires al archivo de configuración de la unidad:\n\n```\n/etc/systemd/system/transmission.service.d/fixdep.conf\n```\n\n```\n[Unit]\nRequires=network.target\n```\n\n"
+    },
+    {
+      "title": "No se puede acceder a la interfaz web",
+      "level": 3,
+      "content": "```\n404: Not Found\n\nCouldn't find Transmission's web interface files!\n\nUsers: to tell Transmission where to look, set the TRANSMISSION_WEB_HOME environment variable to the folder where the web interface's index.html is located.\n\nPackage Builders: to set a custom default at compile time, #define PACKAGE_DATA_DIR in libtransmission/platform.c or tweak tr_getClutchDir () by hand.\n```\n\nIncluso si utiliza la interfaz gráfica, aún necesita instalar transmission-cli para que la interfaz web funcione.\n\n"
+    },
+    {
+      "title": "No se pudo configurar el búfer de envío/recepción",
+      "level": 3,
+      "content": "Transmission puede mostrar cualquiera de estos mensajes en el diario al inicio:\n\n```\nUDP Failed to set receive buffer: requested 4194304, got 425984\nUDP Failed to set send buffer: requested 1048576, got 425984\n```\n\nEstos se pueden corregir configurando net.core.rmem_max=4194304 y net.core.wmem_max=1048576 con sysctl.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Wiki de Transmission\n- Uso sin monitor\n- Wiki de Transmission en GitHub\n\n"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "title": "DSL SpeedTouch modem",
+  "url": "https://wiki.archlinux.org/title/DSL_SpeedTouch_modem",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This howto shows one way to get a working speedtouch USB modem. It uses the kernel driver, not the userspace driver. This howto assumes that your ISP uses PPPoA and not PPPoE.\n\n"
+    },
+    {
+      "title": "Kernel modules and ppp",
+      "level": 2,
+      "content": "Make sure you have a kernel with the proper support (at least the modules ppp_generic, pppoatm, slhc, atm, usbatm and speedtch). The default Arch kernel should work.\n\nOtherwise make sure that your kernel supports firmware loading:\n\n```\n$ zgrep FW_LOADER /proc/config.gz\n```\n\nThen install the ppp package.\n\n"
+    },
+    {
+      "title": "Configuring pppd",
+      "level": 3,
+      "content": "```\n###  /etc/ppp/peers/speedtch\n\n# To connect to using this configuration file, do\n#       pppd call speedtch\n\nlcp-echo-interval 10\nlcp-echo-failure 10\nnoipdefault\ndefaultroute\nuser \"username@ispname\"\nnoauth\nnoaccomp\nnopcomp\nnoccp\nnovj\nholdoff 4\npersist\nmaxfail 25\nupdetach\nusepeerdns\nplugin pppoatm.so\n# Following entry is country/ISP dependent\n8.48\n```\n\nThe last entry depends on your country/ISP and is created from the VPI and VCI setting in the format VPI.VCI. This page has a VPI / VCI Setting List.\n\nYou also need to configure /etc/ppp/pap-secrets or chap-secrets, depending on your ISP. pap-secrets files are of the format:\n\n```\n# Secrets for authentication using PAP\n# client        server  secret\t\tIP addresses\n\"ISP-Username\"\t*\tISP-password\t*\n```\n\nSee The PAP/CHAP secrets file for more details.\n\nIf you want to use the DNS servers provided by your ISP (you probably do!) then make a symlink /etc/resolv.conf pointing to /etc/ppp/resolv.conf:\n\n```\ncd etc\nrm resolv.conf\nln -s ppp/resolv.conf resolv.conf\n```\n\n"
+    },
+    {
+      "title": "Configure udev",
+      "level": 3,
+      "content": "Make a file /etc/udev/rules.d/99-speedtouch.rules and put something like the following in it:\n\n```\nACTION==\"add\", SUBSYSTEM==\"atm\", KERNEL==\"speedtch*\", RUN=\"/usr/bin/pppd call speedtch\"\n```\n\nWith this Udev will start pppd automatically, if you do not want this you can simply bring up your modem using\n\n```\npppd call speedtch\n```\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "Now you have everything except the firmware loading. The easiest way is to let udev do it. Download rev4fw.zip (note disclaimer here) and unzip it. It contains two files, a small one and a big one. Copy the small file to /usr/lib/firmware/speedtch-1.bin and the big one to /usr/lib/firmware/speedtch-2.bin\n\n```\n# mkdir -p /usr/lib/firmware\n# cp small_file /usr/lib/firmware/speedtch-1.bin\n# cp large_file /usr/lib/firmware/speedtch-2.bin\n```\n\nIf you cannot download this file then follow the instructions of the second link above and use the firmware extractor (or download another firmware which has the two files).\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If the modem is being detected correctly and the firmware is loading, you should see something like the following from dmesg:\n\n```\nusbcore: registered new driver speedtch\nusb 1-1: found stage 1 firmware speedtch-1.bin\nCSLIP: code copyright 1989 Regents of the University of California\nPPP generic driver version 2.4.2\nusb 1-1: found stage 2 firmware speedtch-2.bin\nip_tables: (C) 2000-2002 Netfilter core team\nADSL line is synchronising\nDSL line goes up\nADSL line is up (800 Kib/s down || 256 Kib/s up)\n```\n\nThe pppd output in the journal should look something like:\n\n```\nPlugin pppoatm.so loaded.\nPPPoATM plugin_init\nPPPoATM setdevname - remove unwanted options\nPPPoATM setdevname_pppoatm - SUCCESS:8.48\nUsing interface ppp0\nConnect: ppp0 <--> 8.48\nPAP authentication succeeded\nlocal  IP address 123.45.67.89\nremote IP address 195.190.249.10\nprimary   DNS address 195.121.1.34\nsecondary DNS address 195.121.1.66\n```\n\nIf you are having problems you can check pppd debug messages by adding debug to /etc/ppp/peers/speedtch. This can help identify authentication problems (e.g. pap vs chap auth), etc. Otherwise make sure you check your VPI/VCI settings!\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- http://www.linux-usb.org/SpeedTouch\n- https://lore.kernel.org/lkml/41D02EBD.80600@benton987.fsnet.co.uk/\n- Arch Linux Forums: speedtouch modem driver not loading after reboot\n\n"
+    }
+  ]
+}

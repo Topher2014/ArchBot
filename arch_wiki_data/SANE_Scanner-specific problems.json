@@ -1,0 +1,171 @@
+{
+  "title": "SANE/Scanner-specific problems",
+  "url": "https://wiki.archlinux.org/title/SANE/Scanner-specific_problems",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article contains scanner or manufacturer-specific instructions for SANE.\n\n"
+    },
+    {
+      "title": "Snapscan e40",
+      "level": 3,
+      "content": "Firmware Snape40.bin from here[dead link 2024-10-12 ⓘ] is required.\n\nIf USB autosuspend is enabled, the printer may need to be turned off and on again before each scan.\n\n"
+    },
+    {
+      "title": "BenQ/Acer",
+      "level": 2,
+      "content": "If you own an USB scanner from Acer (now BenQ), you need to download a suitable firmware binary and configure /etc/sane.d/snapscan.conf.\n\n- Find out which model you own and take note of the USB ID:\n\n```\n$ lsusb\n```\n\n```\nBus 002 Device 010: ID 04a5:20b0 Acer Peripherals Inc. (now BenQ Corp.) S2W 3300U/4300U\n```\n\n- Go to snapscan main page and see whether your scanner is supported and which firmware you need (e.g, u176v046.bin).\n- Search the firmware image on the Internet and download it to /usr/share/sane/snapscan/.\n- Edit the head of /etc/sane.d/snapscan.conf and configure the following two lines:\n\n```\nfirmware /usr/share/sane/snapscan/u176v046.bin\n/dev/usb/scanner0 bus=usb\n```\n\n"
+    },
+    {
+      "title": "Brother",
+      "level": 2,
+      "content": "In order to install a Brother scanner or printer/scanner combo you need the right driver. To find the right one, see the FAQ for your model at the Brother Support, i.e. Home > Country > Your model > FAQs & Troubleshooting > Linux > Scanner / Scan Key Tool > Scan using XSane or GIMP. You can also search the web. Or see the information below for more scanners. Or extract each of the AUR packages below. Each package seems to contain an exhaustive list of the models it is suitable to.\n\nThen, install the appropriate package:\n\n- brscan2AUR\n- brscan3AUR\n- brscan4AUR (MFC-J5620DW)\n- brscan5AUR\n- libsane-dsseriesAUR\n\nNow, the scanner should be recognized by SANE.\n\nFor network scanners, Brother provides a different configuration tool for each brscan version (e.g., brsaneconfig2 for brscan2 compatible devices):\n\n```\n# brsaneconfig2 -a name=<ScannerName> model=<ScannerModel> ip=<ScannerIP>\n```\n\nExample:\n\n```\n# brsaneconfig2 -a name=SCANNER_DCP770CW model=DCP-770CW ip=192.168.0.110\n```\n\nTo get the IP and node name of your scanner, you can use Nmap:\n\n```\n$ nmap -sP 10.0.0.0/24\n```\n\nIt's also possible to add a scanner via its node name instead of its IP, for example:\n\n```\n# brsaneconfig4 -a name=Brother_DCP-L3550CDW model=DCP-L3550CDW nodename=BRWC0B5D72A0B87\n```\n\n"
+    },
+    {
+      "title": "Network Scanning",
+      "level": 3,
+      "content": "In case of network scanning, e.g. by WiFi, Sane may still be unable to find the scanner. If so, you need to specify the IP address of the scanner in the /etc/sane.d/net.conf file.\n\nNow use scanimage --list-devices to check whether sane is able to find your scanner. If not, further check that Sane expects this device through the network (see [1][dead link 2023-05-06 ⓘ]). Check that /etc/sane.d/dll.conf contains brotherX, where the X stands for the brscan version from above. If nothing was found, add brotherX to the end of the file.\n\n"
+    },
+    {
+      "title": "Invalid argument",
+      "level": 3,
+      "content": "If all the necessary packages are installed but you still get the \"invalid argument\" error this could mean that the configuration file has been corrupted. Run the following command (in case of brscan4):\n\n```\n# brsaneconfig4 -d\n```\n\nThe output should narrow down the problem. Most likely the connection is not set up correctly. In case of a network scanner, check if the IP address is right by opening /etc/opt/brother/scanner/brscan4/brsanenetdevice4.cfg with an editor. In case of a USB connection, check if the path to the scanner in the configuration file is set up correctly. For that, compare the values of the lsusb command with your configuration file and change them if necessary. You might also try to follow the brotherX suggestion from Network Scanning above even for non-network scanners.\n\n"
+    },
+    {
+      "title": "Scan-key-tool",
+      "level": 3,
+      "content": "Brother has released a tool to enable scanning to be triggered by user interaction with the scanner itself (e.g., by selecting one of \"Scan to email\", \"Scan to image\", etc. on the scanner's keypad) rather than by an attached computer. This can be set up by installing the brscan-skeyAUR package and starting brscan-skey.service using systemd. Note that by default this service runs as the brscan-skey user which is created by the package, whose home directory is located at /srv/brscan-skey.\n\nBrother supplies some default scripts that are executed when a scan type is selected on the keypad. These may require the installation of some optional dependencies of the brscan-skeyAUR package. For all options apart from \"Scan to email\" the resulting output can be found inside $HOME/brscan, with $HOME the home directory of the user running this tool (so /srv/brscan-skey if started via systemd as a systemwide process).\n\nIt is possible to change what action takes place when a given type of scan is selected on the keypad. This is done by editing /opt/brother/scanner/brscan-skey/brscan-skey-0.2.4-0.cfg. For each variable SCAN_COMMAND in IMAGE, OCR, EMAIL, FILE, the command\n\n```\n$ $SCAN_COMMAND $SCANNER_DEVICE $SCANNER_FRIENDLY_NAME\n```\n\nis executed when the corresponding scan type is selected. Note that $SCAN_COMMAND is not quoted so may specify more than one positional parameter in the final command that is executed. $SCANNER_DEVICE refers to the name of the device that should be specified to a sane frontend (e.g. via the --device-name flag when using scanimage), for example brother3:bus4;dev2. $SCANNER_FRIENDLY_NAME is the human-readable name of the scanner.\n\n"
+    },
+    {
+      "title": "xsane crashes",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n- Should be mentioned on AUR page\n- This may only be relevant for the Brother DCP-150C scanner (Discuss in Talk:SANE/Scanner-specific problems)\n\nIf xsane crashes with message \"=bugchk_free(ptr==(nil))@brother_modelinf.c(482)\", then you need to create the link /usr/local/Brother -> /usr/share/brother.\n\n"
+    },
+    {
+      "title": "Scanning over the network with Canon PIXMA or imageCLASS all-in-one printer/scanners",
+      "level": 3,
+      "content": "Find out your printer/scanner's IP address, and add it on a new line to /etc/sane.d/pixma.conf in the format bjnp://10.0.0.20. For imageCLASS printers you may need to use the format mfnp://10.0.0.20 instead.\n\nSane should now find your device. For more details refer to sane-pixma(5).\n\nAlternatively, scangearmp2AUR can be used for some Canon PIXMA all-in-one printer/scanners which are not detected over the network.\n\n"
+    },
+    {
+      "title": "Driver-Backends",
+      "level": 3,
+      "content": "For Epson scanners, you can choose between two different backends: \"Image Scan v3\" (imagescanAUR/utsushi) or \"Image Scan! for Linux\" (iscanAUR/epkowa). A list of supported devices exists for imagescan/utsushi and iscan/epkowa.\n\n"
+    },
+    {
+      "title": "Image Scan v3",
+      "level": 4,
+      "content": "If you have to use Image Scan v3-backend you can install imagescanAUR. It should detect supported USB scanners automatically by default. If your scanner is not recognized you can directly edit the /etc/utsushi/utsushi.conf and add the following lines.\n\n```\n[devices]\ndev1.udi     = esci:usb:<vendor id>:<product id>\ndev1.name    = foo\ndev1.model   = <Model Name of the scanner>\n```\n\nIf you want to make use of a network scanner you also have to install imagescan-plugin-networkscanAUR. Then edit /etc/utsushi/utsushi.conf and enter the ip address of your scanner to it.\n\n```\n[devices]\nmyscanner.udi    = esci:networkscan://<ip-address-here>:1865\nmyscanner.vendor = Epson\nmyscanner.model  = Model-name\n```\n\nWhen you then start Image Scan v3 by typing in the command\n\n```\n$ utsushi\n```\n\nthe name of the scanner should be visible in the top left corner. If a connection problem happened, an error dialog will be shown.\n\n"
+    },
+    {
+      "title": "Image Scan! for Linux",
+      "level": 4,
+      "content": "- Install the iscanAUR package.\n- Install the appropriate iscan-plugin package for your scanner (for example, iscan-plugin-gt-x820AUR for the Epson Perfection Photo V600)\n- Run udevadm control --reload so that udev will recognize the device as a scanner and apply appropriate permissions.\n\nFor network (including Wi-Fi) scanners, install iscan and iscan-plugin-networkAUR, then edit /etc/sane.d/epkowa.conf and add a line of the following format:\n\n```\nnet <IP-address|hostname> [port-number]\n```\n\nUpstream version of iscan did not support 16bpc color depth scanning. Choosing any bit depth other than 8 made iscan stop without warning, leaving the scanner stuck until restarted. To enable 16bpc scanning, iscan used to required to be patched. It could be that an old patch, found in this forum thread, will enable 16bpc depth mode.\n\n"
+    },
+    {
+      "title": "Epson DS-6500",
+      "level": 3,
+      "content": "Usually this device works with the epsonds-backend. However, there may be an error \"Error during device I / O\" when scanning multiple pages. If this error occurs, the Image Scan v3 backend can be used and imagescanAUR needs to be installed. If you want to use the network module, the scanner can be configured in the /etc/utsushi/utsushi.conf after installing imagescan-plugin-networkscanAUR as described above.\n\n"
+    },
+    {
+      "title": "Epson Perfection V39",
+      "level": 3,
+      "content": "This device (vendor id: 0x04b8, device id: 0x013d) is known to be supported by SANE's epkowa backend. To use this backend, install iscan-dataAUR, iscanAUR and iscan-plugin-gt-s650AUR.\n\nThe latter package provides the firmware /usr/share/iscan/esfw010c.bin which is required to make the scanner work.\n\nIn case of a successful device setup, running scanimage -L results in:\n\n- the scanner waking up and performing some movements,\n- a constantly shining blue led at the device's front, and\n- output similar to device `epkowa:interpreter:001:007' is a Epson Perfection V39 flatbed scanner.\n\nIn some cases, the above fails due to improper firmware, provided by iscan-plugin-gt-s650AUR.\n\n- the blue device led blinks endlessly,\n- scanimage -d device_name fails with scanimage: sane_start: Invalid argument.\n\nAs stated in this forum thread, using the firmware esfw010c.bin provided by epsonscan2-non-free-pluginAUR can solve the problem. There seem to exist different incompatible versions of the same firmware.\n\n"
+    },
+    {
+      "title": "Epson Perfection V550 Photo",
+      "level": 3,
+      "content": "Install iscan-plugin-perfection-v550AUR\n\n"
+    },
+    {
+      "title": "Epson Perfection 1270",
+      "level": 3,
+      "content": "For Epson Perfection 1270, you also need a firmware named esfw3e.bin. It can be obtained by installing the Windows driver.\n\nModify the configuration file of the snapscan backend, /etc/sane.d/snapscan.conf. Change the firmware path line with yours:\n\n```\n# Change to the fully qualified filename of your firmware file, if\n# firmware upload is needed by the scanner\nfirmware /mnt/mydata/Backups/firmware/esfw3e.bin\n```\n\nAnd add the following line in the end or anywhere you like\n\n```\n# Epson Perfection 1270\nusb 0x04b8 0x0120\n```\n\nYou can get such code information (usb 0x04b8 0x0120) by sane-find-scanner command.\n\nAlso add such information lines to /etc/hotplug/usb/libsane.usermap to setup your privilege, like:\n\n```\n# Epson Perfection 1270\nlibusbscanner 0x0003 0x04b8 0x0120 0x0000 0x0000 0x00 0x00 0x00 0x00 0x00 0x00 0x00000000\n```\n\nReplug scanner, you have a working Epson Perfection 1270 now.\n\n- To prevent scanimage: sane_start: Error during device I/O and hangup of the scanner itself, when trying to scan with ADF (automatic document feed) enabled, I had to remove or comment out all Backends from /etc/sane.d/dll.conf and instead just add this to the file: snapscan\n\n```\nsnapscan\n```\n\nIf you still get the Error during device I/O messages check that the transportation lock of the scanner (on the bottom of the scanner) is open.\n\n"
+    },
+    {
+      "title": "Epson Perfection 1670/2480/2580/3490/3590",
+      "level": 3,
+      "content": "Make sure to download the correct firmware for your Epson model. You can get an overview of some models and their drivers here and here. The download links of the firmware are broken, but you can use this link as alternative instead. Make sure to change the firmware filename of the link suiting your model. If you want to download and extract the firmware sources from the official epson sites yourself you can use this guide.\n\nAs an alternative you can also install the AUR package sane-epson-perfection-firmwareAUR which will download the firmware from the official sources, extract the binary and install those to /usr/share/sane/snapscan/.\n\nModify the configuration file of the snapscan backend, /etc/sane.d/snapscan.conf. Change the firmware path line with yours:\n\n```\n# Change to the fully qualified filename of your firmware file, if\n# firmware upload is needed by the scanner\nfirmware /usr/share/sane/snapscan/esfw52.bin\n```\n\nOther modifications were not needed for the Epson Perfection 3590 and might not be for other models as well. If you still have problems it can also help if you completely remove the iscanAUR package.\n\n"
+    },
+    {
+      "title": "EPSON WorkForce printer/scanners over the network",
+      "level": 3,
+      "content": "Install imagescanAUR and imagescan-plugin-networkscanAUR.\n\nEdit the configuration file /etc/utsushi/utsushi.conf. Find the [devices] section and edit the template for dev2. Replace the IP address accordingly. You can find the IP address on your printer screen. For example,\n\n```\n...\ndev2.udi    = esci:networkscan://192.168.1.123:1865\ndev2.model  = WF-2860\ndev2.vendor = EPSON\n...\n```\n\nMeanwhile, comment out epson2 in /etc/sane.d/dll.conf as it conflicts with ImageScan.\n\nOnce this is done you can use any SANE frontend to access this scanner.\n\n"
+    },
+    {
+      "title": "Fujitsu fi series",
+      "level": 3,
+      "content": "For some of the Fujitsu fi series document scanners, the pfufsAUR proprietary driver offers advanced functionality over the already mature SANE default driver, such as control of an optional imprinter for stamping scanned documents or requesting accurate status of the consumables from the host.\n\n"
+    },
+    {
+      "title": "ScanSnap S300/S300M/S1100/S1300",
+      "level": 3,
+      "content": "For the operation of the ScanSnap scanners a firmware file is required, which can be downloaded from here or extracted from the Windows driver. Get the files that you need and put them in the /usr/share/sane/epjitsu directory, which should be created if it does not exist. For instance, you should end up with a file called /usr/share/sane/epjitsu/1100_0B00.nal. These files should be owned by the root user.\n\nTo make sure that you have the right file in the right place, take note of the device ID:\n\n```\n# sane-find-scanner\nfound possible USB scanner (vendor=0x04c5 [FUJITSU], product=0x1200 [ScanSnap S1100]) at libusb:003:011\n```\n\nThere should be a corresponding entry in /etc/sane.d/epjitsu.conf, such as usb 0x04c5 0x1200, which in turn should reference the path of the firmware file that you just added.\n\nFor the S300/S300M scanners, the 300M_0C00.nal and 300_0C00.nal files are interchangeable; the S300 device can use the 300M_0C00.nal file and the S300M device can use the 300_0C00.nal file. The file can be renamed to fit the entry in /etc/sane.d/epjitsu.conf, or that entry can be edited to match the file name.\n\nAlternative download locations for the firmware files: here and here.\n\nCommands to fetch and install the firmware:\n\n```\n# git clone https://github.com/stevleibelt/scansnap-firmware.git\n # mkdir -p /usr/share/sane/epjitsu\n # cp scansnap-firmware/*.nal /usr/share/sane/epjitsu\n```\n\n"
+    },
+    {
+      "title": "HP",
+      "level": 2,
+      "content": "If your HP device is supported by hplip, install the hplip package.\n\nIt comes with several tools:\n\n- hp-setup to add and setup the device\n- hp-check to check the installation of all required dependencies to successfully run (a very helpful tool)\n- hp-plugin is the 'HPLIP Plugin Download and Install Utility' (plugin also available from hplip-pluginAUR).\n- hp-scan is the 'HPLIP Scan Utility'. If you need that tool, you will need to install python-pillow.\n\nhp-setup runs in GUI mode by default, which requires python-pyqt5. You can run the CLI by using the -i flag.\n\nIf the device is connected by USB, run hp-setup as root and follow the on-screen instructions.\n\nIf your device is connected on the network, use hp-setup printer_ip instead.\n\n"
+    },
+    {
+      "title": "Alternative way to scan with network HP scanner",
+      "level": 3,
+      "content": "- Find out IP address of your network HP scanner, for example 192.168.1.8\n- Make device URI using hp-makeuri utility:\n\n```\n$ hp-makeuri 192.168.1.8\n```\n\n```\nhpaio:/net/DeskJet_3630_series?ip=192.168.1.8\n```\n\n- This URI could be given to xsane or scanimage tools, for example:\n\n```\n$ xsane \"hpaio:/net/DeskJet_3630_series?ip=192.168.1.8\"\n$ scanimage --device \"hpaio:/net/DeskJet_3630_series?ip=10.12.129.6\" --format=png --resolution 300 >scan01.png\n```\n\n"
+    },
+    {
+      "title": "Lexmark",
+      "level": 2,
+      "content": "For Lexmark devices printing issues, please read CUPS/Printer-specific problems#Lexmark.\n\nMost Lexmark scanners are still (2019) not supported by SANE, and thus cannot be detected either by sane-find-scanner or by scanimage -L. Lexmark provides a non-free driver for GNU/Linux, which is supposed to support all its scanners. Nevertheless, the driver is only distributed for Debian, OpenSUSE, Fedora and Red Hat, but not for Arch. Here is a way to install it.\n\n"
+    },
+    {
+      "title": "Warning",
+      "level": 3,
+      "content": "Before following these steps, note that :\n\n- This driver is non-free (copyrighted by Lexmark)\n- This hasn’t been widely tested yet (but the driver is supposed to work for all Lexmark scanners)\n- The tree does not respect Arch standards — namely, all will be installed in /usr/local; you’ll get a /usr/lexmark/ symbolic link; and get symbolic links to the files installed in /usr/local/lexmark.\n- This process might generate conflicts if you’ve already installed some Lexmark drivers.\n\n"
+    },
+    {
+      "title": "Process",
+      "level": 3,
+      "content": "1. Ensure Java is installed.\n1. Download the .deb file[dead link 2021-11-19 ⓘ] containing the driver and save it (eg at ~/lexmark.deb).\n\n"
+    },
+    {
+      "title": "Option 1 : using DPKG",
+      "level": 4,
+      "content": "dpkg is the standard package-manager for Debian-based distributions. It should not be used to replace pacman unless you precisely know what you’re doing. Simply run as root\n\n```\n# dpkg -i lexmark.deb\n```\n\nYour scanner should be detected after reboot.\n\n"
+    },
+    {
+      "title": "Option 2 : manual installation",
+      "level": 4,
+      "content": "Alternatively, if you dont want to install dpkg or wish to control exactly what is done during install, you can follow these instructions (assuming you’re working in ~). Please note that md5 sums will not be checked, which could cause security issues.\n\n1. Extract the ~/lexmark.deb archive, running ar x lexmark.deb. File debian-binary can be dropped.\n1. Extract both ~/control.tar.gz and ~/data.tar.gz archives.\n1. data.tar.gz gives a ~/usr/ directory. As root, move ~/usr/local/lexmark to /usr/local/lexmark.\n1. As root, run ~/control/postinst to perform install. This script will automatically set all files owners an chmod, then set some fonts, drivers and docs tricks. It will also eventually run /usr/local/lexmark/network-scan.link, creating several symbolic links in your Arch architecture.\n1. Your scanner should be detected after reboot.\n\n"
+    },
+    {
+      "title": "Option 3 : Using AUR package",
+      "level": 4,
+      "content": "Install the lexmark-network-scanAUR package.\n\n"
+    },
+    {
+      "title": "Supported devices",
+      "level": 3,
+      "content": "This process has been successfully tested for the following devices:\n\n- Lexmark MB2236 (USB only; network untested).\n- Lexmark MX517de (network only; USB untested).\n- Lexmark X204n (network only; USB untested).\n\n"
+    },
+    {
+      "title": "To do",
+      "level": 3,
+      "content": "In order to improve Lexmark scanners support, you can:\n\n- Check whether this process works for your computer and device\n- Help defining the list of dependencies required for this process\n- Create an AUR package with this driver which installation would not mess architecture up. Namely, such a package should not need to create a /usr/lexmark symlink, and should be containerized (eg in /opt/lexmark).\n\n"
+    },
+    {
+      "title": "Medion",
+      "level": 2,
+      "content": "If you own the USB scanner MD 9705 from Medion, you need to download a suitable firmware binary. This firmware file is in the device driver for Windows.\n\nFind out which model you own and take note of the USB ID:\n\n```\n$ lsusb\n```\n\n```\nBus 006 Device 007: ID 05d8:4003 Ultima Electronics Corp. Artec E+ 48U\n```\n\nDownload the windows driver from https://download.medion.com/downloads/treiber/scamd9705w9xxp.exe\n\nThen enter the following commands to extract the firmware file, and copy it to the location SANE expects it:\n\n```\n$ unzip scamd9705w9xxp.exe Win2000/Artec48.usb\n# cp Win2000/Artec48.usb /usr/share/sane/artec_eplus48u/Artec48.usb\n```\n\n"
+    },
+    {
+      "title": "BearPaw 2400CU",
+      "level": 3,
+      "content": "Works with sane-gt68xx (sane-gt68xx-firmware)\n\n"
+    },
+    {
+      "title": "Samsung",
+      "level": 2,
+      "content": "For some Samsung MFP printers you may need to edit /etc/sane.d/xerox_mfp.conf.\n\nexample entry:\n\n```\n#Samsung SCX-3200\nusb 0x04e8 0x3441\n```\n\nChange the printer model as needed. You can get the idVendor and idProduct code with lsusb. See this thread.\n\nTo access the scanner over the network rather than the usb interface, add a line to /etc/sane.d/xerox_mfp.conf such as\n\n```\n#Samsung scx4500w wireless ip network address\ntcp xx.xx.xx.xx\n```\n\nwhere xx.xx.xx.xx is the static ip address of the printer.\n\n"
+    }
+  ]
+}

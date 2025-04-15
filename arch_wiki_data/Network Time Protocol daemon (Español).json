@@ -1,0 +1,76 @@
+{
+  "title": "Network Time Protocol daemon (Español)",
+  "url": "https://wiki.archlinux.org/title/Network_Time_Protocol_daemon_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2013-11-28** \n\nArtículos relacionados\n\n- Fecha y hora del sistema\n- systemd-timesyncd\n- OpenNTPD\n- Chrony\n\nNetwork Time Protocol es el método más común para sincronizar el reloj del software de un sistema GNU/Linux con los servidores horarios de Internet. Está diseñado para mitigar los efectos de la variable de latencia de la red y, por lo general, pueden mantener el horario dentro de un margen de decenas de milisegundos respecto a Internet. La precisión en las redes de área local es aún mejor, hasta un milisegundo.\n\nEl Proyecto NTP proporciona una implementación de referencia del protocolo llamado simplemente NTP. Una alternativa a NTP es Chrony, un dial-up amigable y diseñado específicamente para los sistemas que no están en línea todo el tiempo, y OpenNTPD, que forma parte del proyecto OpenBSD y que actualmente no se mantiene para Linux.\n\nEn este artículo se describe, además, cómo configurar y ejecutar el demonio NTP, tanto como cliente, así como servidor.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale ntp, disponible en los repositorios oficiales.\n\nPor defecto, ntpd trabaja en modo cliente sin configuración adicional. Puede saltar directamente a #Configuración si quiere usar la configuración por defecto de Arch Linux. Para la configuración de servidor, vea #Configurar el propio servidor NTP.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "El demonio principal es ntpd, que está configurado en /etc/ntp.conf. El paquete ntp proporciona un archivo de configuración por defecto que debe hacer funcionar ntpd en modo cliente, sin necesidad de configuración personalizada.\n\n"
+    },
+    {
+      "title": "Configurar conexión a servidores NTP",
+      "level": 3,
+      "content": "El primer elemento a definir en el archivo /etc/ntp.conf serán los servidores a los que el equipo se va a conectar para sincronizar el tiempo (fecha y hora).\n\nLos servidores NTP se clasifican en un sistema jerárquico con muchos niveles llamados strata (estrato): los dispositivos que se consideran fuentes independientes de tiempo horario son clasificados como fuentes de stratum 0; los servidores conectados directamente a dispositivos de stratum 0 son clasificados como fuentes de stratum 1; los servidores conectados a fuentes de stratum 1 se clasifican consiguientemente como fuentes de stratum 2 y así sucesivamente.\n\nSe ha de entender que el stratum de un servidor no puede ser tomado como un indicador de su precisión o fiabilidad. Normalmente, los servidores de stratum 2 se utilizan con fines de sincronización generales: si no sabe aún los servidores a los que se va a conectar, debe mirar los servidores en pool.ntp.org (enlace alternativo) y seleccionar el grupo de servidores que esté más cercano a su zona.\n\nA modo de ejemplo:\n\n```\n/etc/ntp.conf\n```\n\n```\nserver 0.pool.ntp.org iburst\nserver 1.pool.ntp.org iburst\nserver 2.pool.ntp.org iburst\nserver 3.pool.ntp.org iburst\n```\n\nLa opción iburst está recomendada, ya que envía una serie («burst») de paquetes solo si no se puede obtener una conexión con el primer intento. Por otro lado, la opción burst siempre está presente, incluso en el primer intento, pero nunca debe utilizarse sin permiso explícito, dado que puede incluirse en blacklist.\n\n"
+    },
+    {
+      "title": "Configurar el propio servidor NTP",
+      "level": 3,
+      "content": "Si va a configurar un servidor NTP, es necesario agregar local clock como un servidor, por lo que , si el ordenador pierde el acceso a internet, continuará el mismo como un servidor dando el horario a la red; añada local clock como un servidor de stratum 10 (use la orden fudge) de modo que nunca se hará uso de esa función a menos que el acceso a internet se pierda:\n\n```\nserver 127.127.1.0\nfudge  127.127.1.0 stratum 10\n```\n\nA continuación, defina las reglas que permiten a los clientes conectarse a su servicio (localhost es considerado igualmente un cliente) usando la orden restrict; le debe quedar en el archivo una línea como la siguiente:\n\n```\nrestrict default nomodify nopeer noquery\n```\n\nEstas opciones impiden que nadie pueda modificar algo y evitan igualmente que alguien pueda consultar el estado de su time server: nomodify impide la reconfiguración de ntpd (con ntpq o ntpdc), y noquery impide conocer el estado dumping de los datos de ntpd (también con ntpq o ntpdc).\n\nTambién puede agregar estas otras opciones:\n\n```\nrestrict default kod nomodify notrap nopeer noquery\n```\n\nLa documentación completa para la opción \"restrict\" se encuentra en ntp.conf(5). Consulte https://support.ntp.org/bin/view/Support/AccessRestrictions para obtener instrucciones detalladas.\n\nSiguiendo con la configuración, debe decirle a ntpd qué debe permitir a través del propio servidor; la siguiente línea es suficiente si no va a configurar un servidor NTP:\n\n```\nrestrict 127.0.0.1\n```\n\nSi desea forzar la resolución de DNS para el namespace de IPv6, escriba -6 antes de la dirección IP o nombre de host (-4 obliga a IPv4 en su lugar), por ejemplo:\n\n```\nrestrict -6 default kod nomodify notrap nopeer noquery\nrestrict -6 ::1    # ::1 is the IPv6 equivalent for 127.0.0.1\n```\n\nPor último, especifique la ubicación del archivo drift (que realiza un seguimiento de la desviación del horario del sistema) y, opcionalmente, la ubicación del archivo de registro:\n\n```\ndriftfile /var/lib/ntp/ntp.drift\nlogfile /var/log/ntp.log\n```\n\nUn archivo de configuración muy básica se vería así:\n\n```\n/etc/ntp.conf\n```\n\n```\nserver 0.pool.ntp.org iburst\nserver 1.pool.ntp.org iburst\nserver 2.pool.ntp.org iburst\nserver 3.pool.ntp.org iburst\n\nrestrict default kod nomodify notrap nopeer noquery\nrestrict -6 default kod nomodify notrap nopeer noquery\n\nrestrict 127.0.0.1\nrestrict -6 ::1  \n\ndriftfile /var/lib/ntp/ntp.drift\nlogfile /var/log/ntp.log\n```\n\n"
+    },
+    {
+      "title": "Otros recursos para la configuración de NTP",
+      "level": 3,
+      "content": "En conclusión, no olvide consultar las páginas man: es probable que ntp.conf(5) responda a cualquier duda que todavía pudiera tener (consulta las páginas man relacionadas: man {ntpd|ntp_auth|ntp_mon|ntp_acc|ntp_clock|ntp_misc}).\n\n"
+    },
+    {
+      "title": "Usar sin demonio",
+      "level": 2,
+      "content": "Para sincronizar el reloj del sistema en un momento dado, sin iniciar el demonio NTP, ejecute:\n\n```\n# ntpd -qg\n```\n\nDespués de actualizar el reloj del sistema, guarde el horario para el reloj del hardware de manera que se conserve al reiniciar:\n\n```\n# hwclock -w\n```\n\n"
+    },
+    {
+      "title": "Sincronizar cada vez que arranque",
+      "level": 3,
+      "content": "Escriba una unidad oneshot de systemd:\n\n```\n/etc/systemd/system/ntp-once.service\n```\n\n```\n[Unit]\nDescription=Network Time Service (once)\nAfter=network.target nss-lookup.target \n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ntpd -q -g -u ntp:ntp ; /sbin/hwclock -w\n\n[Install]\nWantedBy=multi-user.target\n```\n\ny actívela.\n\n"
+    },
+    {
+      "title": "Netctl",
+      "level": 3,
+      "content": "Puede sincronizar el reloj del sistema con una conexión de red mediante el uso de Netctl. Para ello, añada la siguiente línea a su perfil netctl.\n\n```\nExecUpPost='/usr/bin/ntpd -q || true'\n```\n\nNote: **una vez** \n\n"
+    },
+    {
+      "title": "Ejecutar como un demonio",
+      "level": 2,
+      "content": "Inicie ntpd.service. Para iniciarlo en el arranque o bien actívelo o, alternativamente, utilice la orden:\n\n```\n# timedatectl set-ntp 1\n```\n\n"
+    },
+    {
+      "title": "Comprobar si el demonio está sincronizando correctamente",
+      "level": 3,
+      "content": "Utilice la herramienta ntpq para ver la lista de pares («peers») configurados:\n\n```\n$ ntpq -np\n```\n\nLas columnas delay, offset y jitter deben mostrar una fluctuación distinta de cero. Los servidores ntpd que se estén sincronizando aparecerán con un asterisco como prefijo. Pueden pasar varios minutos antes que ntpd seleccione un servidor para sincronizarse, pruebe a comprobar pasados 17 minutos (1024 segundos).\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "ntpd puede ser puesto up/down junto con una conexión de red mediante el uso de los scripts de NetworkManager dispatcher. Puede ser necesario instalar networkmanager-dispatcher-ntpdAUR desde los repositorios oficiales.\n\n"
+    },
+    {
+      "title": "Ejecutar en un entorno chroot",
+      "level": 3,
+      "content": "Edite /etc/conf.d/ntpd.conf y cambie\n\n```\nNTPD_ARGS=\"-g -u ntp:ntp\"\n```\n\npor\n\n```\nNTPD_ARGS=\"-g -i /var/lib/ntp -u ntp:ntp\"\n```\n\nA continuación, edite /etc/ntp.conf para cambiar la ruta de driftfile de modo que sea dirigida al directorio chroot, en lugar de a la raíz del sistema real. Cambie:\n\n```\ndriftfile       /var/lib/ntp/ntp.drift\n```\n\npor\n\n```\ndriftfile       /ntp.drift\n```\n\nCrear un entorno chroot adecuado para que getaddrinfo() funcione mediante la creación de directorios y archivos pertinentes (como root):\n\n```\n# mkdir /var/lib/ntp/etc /var/lib/ntp/lib /var/lib/ntp/proc\n# touch /var/lib/ntp/etc/resolv.conf /var/lib/ntp/etc/services\n```\n\ny seguidamente montar los enlaces a los archivos arriba indicados:\n\n```\n/etc/fstab\n```\n\n```\n...\n#ntpd chroot mounts\n/etc/resolv.conf  /var/lib/ntp/etc/resolv.conf none bind 0 0\n/etc/services\t  /var/lib/ntp/etc/services none bind 0 0\n/lib\t\t  /var/lib/ntp/lib none bind 0 0\n/proc\t\t  /var/lib/ntp/proc none bind 0 0\n```\n\n```\n# mount -a\n```\n\nPor último, reinicie el demonio ntpd de nuevo.\n\nEs relativamente difícil estar seguro de que su configuración driftfile está realmente trabajando sin tener que esperar un tiempo, dado que ntpd no lee ni escribe muy a menudo. Si se equivoca, se registrará un error, y si se hace bien, se actualizará la fecha y hora («timestamp»). Si no aparece ningún error al respecto después de un día completo de funcionamiento, y timestamp se actualiza, puede estar seguro de haberlo hecho correctamente.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Time (Español) (para más información sobre la gestión del horario del ordenador)\n- https://www.ntp.org/\n- https://support.ntp.org/\n- https://www.pool.ntp.org/\n- http://www.eecis.udel.edu/~mills/ntp/html/index.html\n- https://www.akadia.com/services/ntp_synchronize.html\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "ZoneMinder",
+  "url": "https://wiki.archlinux.org/title/ZoneMinder",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "ZoneMinder is an integrated set of applications which provide a complete surveillance solution allowing capture, analysis, recording and monitoring of any CCTV or security cameras attached to a Linux based machine. It is designed to run on distributions which support the Video For Linux (V4L) interface and has been tested with video cameras attached to BTTV cards, various USB cameras and also supports most IP network cameras.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the zoneminderAUR package.\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 4,
+      "content": "1) Edit Apache's /etc/httpd/conf/httpd.conf and uncomment the following lines:\n\n```\nLoadModule proxy_module modules/mod_proxy.so\nLoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so\nLoadModule rewrite_module modules/mod_rewrite.so\nLoadModule cgid_module modules/mod_cgid.so\n```\n\n2) In the same file, enable ZoneMinder's configuration by adding the following line at the end:\n\n```\nInclude conf/extra/zoneminder.conf\n```\n\nNow start or restart httpd.service.\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 4,
+      "content": "1) Edit Nginx's /etc/nginx/nginx.conf and add the following line at the end of the http block:\n\n```\ninclude sites-enabled/*.conf;\n```\n\n2) Create the /etc/nginx/sites-enabled directory if it does not already exist:\n\n```\n# mkdir -p /etc/nginx/sites-enabled\n```\n\n3) Link ZoneMinder's configuration file from /etc/nginx/sites-available to /etc/nginx/sites-enabled:\n\n```\n# ln -sf /etc/nginx/sites-{available,enabled}/zoneminder.conf\n```\n\nNow start or restart fcgiwrap-multiwatch.service and nginx.service.\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 4,
+      "content": "1) If you have not already done so, initialize MariaDB's default database:\n\n```\n# mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql 2> /dev/null\n```\n\n2) Start mariadb.service and create a database and user for ZoneMinder:\n\n```\n# mariadb -u root -p < /usr/share/zoneminder/db/zm_create.sql\n# mariadb -u root -p -e \"grant select,insert,update,delete,create,drop,alter,index,lock tables,alter routine,create routine,trigger,execute on zm.* to 'zmuser'@localhost identified by 'zmpass';\"\n```\n\n"
+    },
+    {
+      "title": "Final steps",
+      "level": 4,
+      "content": "Run the following command to create some volatile files and directories that are required by ZoneMinder during runtime:\n\n```\n# systemd-tmpfiles --create\n```\n\nThen, in addition to any services already started in the above steps, start php-fpm.service and zoneminder.service. ZoneMinder's web interface will be accessible at http://localhost:8095.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Logs by default are kept in /var/log/zoneminder. You can also inspect the log within the web interface.\n\nSee the upstream wiki page: Troubleshooting.\n\n"
+    },
+    {
+      "title": "Flushing application data",
+      "level": 3,
+      "content": "This is useful for developers or users that need to wipe all ZoneMinder and start fresh.\n\n"
+    },
+    {
+      "title": "Recreate the database",
+      "level": 4,
+      "content": "Drop the ZoneMinder MySQL database and delete the MySQL user:\n\n```\n# mysql -u root -p\n```\n\n```\nDROP DATABASE zm;\nDROP USER 'zmuser'@'localhost';\n```\n\nRecreate the database and user:\n\n```\n# mysql -u root -p\n```\n\n```\nCREATE DATABASE zm;\nCREATE USER 'zmuser'@'localhost' IDENTIFIED BY 'zmpass';\nGRANT ALTER, CREATE, DELETE, INSERT, SELECT, UPDATE ON zm.* TO 'zmuser'@'localhost';\nexit\n```\n\nImport the preconfigured tables into your newly created zm database:\n\n```\n# mysql -u root -p zm < /usr/share/zoneminder/db/zm_create.sql\n```\n\n"
+    },
+    {
+      "title": "Flush the cache folders",
+      "level": 4,
+      "content": "```\n# rm -Rf /var/lib/zoneminder/events/* /var/lib/zoneminder/images/* /var/lib/zoneminder/cache/*\n```\n\n"
+    },
+    {
+      "title": "Local video devices",
+      "level": 3,
+      "content": "It is important that the user running httpd (usually http) can access your cameras, for example:\n\n```\n$ groups http\n```\n\n```\nvideo http\n```\n\n```\n$ ls -l /dev/video0\n```\n\n```\ncrw-rw----+ 1 root video 81, 0 Oct 28 21:54 /dev/video0\n```\n\nThat is, add the http user to the video group.\n\nTo add a user to the group run the command:\n\n```\n# usermod -aG video http\n```\n\n"
+    },
+    {
+      "title": "Multiple local USB cameras",
+      "level": 3,
+      "content": "If you observe an error like, libv4l2: error turning on stream: No space left on device when using multiple USB video devices (such as multiple webcams), you may need to increase the bandwidth on the bus.\n\nTest first by stopping zoneminder.service, then:\n\n```\n# rmmod uvcvideo\n# modprobe uvcvideo quirks=128\n```\n\nStart zoneminder.service and if the issue is resolved, persist the change by adding the module option to /etc/modprobe.d/uvcvideo.conf. For example:\n\n```\noptions uvcvideo nodrop=1 quirks=128\n```\n\n(reference)\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://wiki.zoneminder.com/index.php/Arch_Linux — Upstream project page.\n\n"
+    }
+  ]
+}

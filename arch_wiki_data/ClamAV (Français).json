@@ -1,0 +1,106 @@
+{
+  "title": "ClamAV (Français)",
+  "url": "https://wiki.archlinux.org/title/ClamAV_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Clam AntiVirus est un kit d'outils antivirus open source (GPL) pour UNIX. Il fournit un certain nombre d'utilitaires, notamment un daemon multithread flexible et évolutif, un scanner en ligne de commande et un outil avancé de mise à jour automatique des bases de données. Comme ClamAV est principalement utilisé sur les serveurs de fichiers et de courrier électronique pour les ordinateurs de bureau Windows, il détecte principalement les virus et les logiciels malveillants Windows grâce à ses signatures intégrées.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Installez le paquet clamav.\n\n"
+    },
+    {
+      "title": "Mise à jour de la base de données",
+      "level": 2,
+      "content": "Mettez à jour les définitions de virus avec :\n\n```\n# freshclam\n```\n\nSi vous êtes derrière un proxy, éditez /etc/clamav/freshclam.conf et mettez à jour HTTPProxyServer, HTTPProxyPort, HTTPProxyUsername et HTTPProxyPassword.\n\nLes fichiers de la base de données sont enregistrés dans :\n\n```\n/var/lib/clamav/daily.cvd\n/var/lib/clamav/main.cvd\n/var/lib/clamav/bytecode.cvd\n```\n\nDémarrez et activez clamav-freshclam.service pour que les définitions de virus restent récentes.\n\n"
+    },
+    {
+      "title": "Démarrage du daemon",
+      "level": 2,
+      "content": "- Vous devrez exécuter freshclam avant de démarrer le service pour la première fois ou vous rencontrerez des problèmes/erreurs qui empêcheront ClamAV de démarrer correctement.\n- Le daemon n'est pas nécessaire si vous souhaitez uniquement effectuer des analyses autonomes. Consultez #Scanner les virus ci-dessous.\n\nLe service s'appelle clamav-daemon.service. Démarrez et activez son exécution au démarrage.\n\n"
+    },
+    {
+      "title": "Tester le logiciel",
+      "level": 2,
+      "content": "Afin de vous assurer que ClamAV et les définitions sont correctement installés, analysez le fichier de test EICAR (une signature inoffensive sans code de virus) avec clamscan.\n\n```\n$ curl https://secure.eicar.org/eicar.com.txt | clamscan -\n```\n\nLa sortie doit inclure :\n\n```\nstdin : Win.Test.EICAR_HDB-1 FOUND\n```\n\nSinon, lisez la partie Dépannage ou demandez de l'aide sur le site Arch Forums.\n\n"
+    },
+    {
+      "title": "Ajouter d'autres dépôts de bases de données/signatures",
+      "level": 2,
+      "content": "ClamAV peut utiliser des bases de données/signatures provenant d'autres dépôts ou de fournisseurs de sécurité.\n\nPour ajouter les plus importants en une seule étape, installez soit clamav-unofficial-sigsAUR. (consultez description GitHub) ou python-fangfrischAUR. (consultez documentation en ligne). Les deux ajouteront des signatures/bases de données provenant de fournisseurs populaires, par exemple MalwarePatrol, SecuriteInfo, Yara, Linux Malware Detect, etc.\n\n"
+    },
+    {
+      "title": "Option #1 : Configurer Fangfrisch",
+      "level": 3,
+      "content": "Fangfrisch a été conçu comme un remplacement plus sûr, plus flexible et plus pratique de clamav-unofficial-sigs, et nécessite très peu de configuration (/etc/fangfrisch/fangfrisch.conf).\n\nPlus important encore, Fangfrisch n'a jamais besoin d'être exécuté avec les droits root, contrairement à clamav-unofficial-sigs.\n\nCréez la structure de la base de données en exécutant :\n\n```\n# sudo -u clamav /usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf initdb\n```\n\nActivez fangfrisch.timer.\n\n"
+    },
+    {
+      "title": "Option #2 : Configurer clamav-unofficial-sigs",
+      "level": 3,
+      "content": "Activez clamav-unofficial-sigs.timer.\n\nCela mettra régulièrement à jour les signatures non officielles en fonction des fichiers de configuration du répertoire /etc/clamav-unofficial-sigs.\n\nPour mettre à jour les signatures manuellement, exécutez la commande suivante :\n\n```\n# clamav-unofficial-sigs.sh\n```\n\nPour changer les paramètres par défaut, consultez et modifiez /etc/clamav-unofficial-sigs/user.conf.\n\n"
+    },
+    {
+      "title": "Base de données MalwarePatrol",
+      "level": 4,
+      "content": "Si vous souhaitez utiliser la base de données MalwarePatrol, créez un compte à l'adresse https://www.malwarepatrol.net/free-guard-upgrade-option[dead link 2023-07-30 ⓘ].\n\nDans /etc/clamav-unofficial-sigs/user.conf, modifiez les éléments suivants pour activer cette fonctionnalité :\n\n```\nmalwarepatrol_receipt_code=\"YOUR-RECEIPT-NUMBER\" # entrez votre numéro de reçu ici\nmalwarepatrol_product_code=\"8\" # Utilisez 8 si vous avez un compte gratuit ou 15 si vous êtes un client Premium.\nmalwarepatrol_list=\"clamav_basic\" # clamav_basic ou clamav_ext\nmalwarepatrol_free=\"yes\" # Définir à oui si vous avez un compte gratuit ou non si vous êtes un client Premium.\n```\n\nSource : https://www.malwarepatrol.net/clamav-configuration-guide/\n\n"
+    },
+    {
+      "title": "Scanner les virus",
+      "level": 2,
+      "content": "Il existe deux options pour l'analyse à la demande :\n\n"
+    },
+    {
+      "title": "utilisation de l'analyseur autonome",
+      "level": 3,
+      "content": "clamscan peut être utilisé pour analyser certains fichiers, répertoires personnels ou un système entier :\n\n```\n$ clamscan monfichier\n$ clamscan --recursive --infected /home\n# clamscan --recursive --infected --exclude-dir='^/sys|^/dev' /\n```\n\nSi vous souhaitez que clamscan supprime le fichier infecté, ajoutez à la commande l'option --remove, ou vous pouvez utiliser --move=/dir pour les mettre en quarantaine.\n\nVous pouvez également souhaiter que clamscan analyse des fichiers plus volumineux. Dans ce cas, ajoutez les options --max-filesize=4000M et --max-scansize=4000M à la commande. 4000M' est la plus grande valeur possible, et peut être réduite si nécessaire.\n\nL'utilisation de l'option -l /path/to/file imprimera les journaux de clamscan dans un fichier texte pour localiser les infections signalées.\n\n"
+    },
+    {
+      "title": "utilisation du daemon",
+      "level": 3,
+      "content": "clamdscan est similaire à la commande ci-dessus mais utilise le daemon, qui doit être en cours d'exécution pour que la commande fonctionne. La plupart des options sont ignorées puisque le daemon lit les paramètres spécifiés dans /etc/clamav/clamd.conf.\n\n"
+    },
+    {
+      "title": "Utilisation de milter",
+      "level": 2,
+      "content": "Milter analysera votre serveur sendmail pour détecter les e-mails contenant des virus. Adaptez /etc/clamav/clamav-milter.conf à vos besoins. Par exemple :\n\n```\n/etc/clamav/clamav-milter.conf\n```\n\n```\nMilterSocket /tmp/clamav-milter.socket\nMilterSocketMode 660\nFixStaleSocket yes\nUser clamav\nMilterSocketGroup clamav\nPidFile /run/clamav/clamav-milter.pid\nTemporaryDirectory /tmp\nClamdSocket unix:/run/clamav/clamd.ctl\nLogSyslog yes\nLogInfected Basic\n```\n\nCréer /etc/systemd/system/clamav-milter.service :\n\n```\n/etc/systemd/system/clamav-milter.service\n```\n\n```\n[Unit]\nDescription='ClamAV Milter'\nAfter=clamav-daemon.service\n\n[Service]\nType=forking\nExecStart=/usr/bin/clamav-milter --config-file /etc/clamav/clamav-milter.conf\nRestart=Always\n\n[Install]\nWantedBy=multi-user.target\n```\n\nVous pourriez avoir envie d'ajuster la ligne Restart= pour vos besoins. Cette ligne est nécessaire si vous utilisez des outils qui tuent le service clamav-milter, tels que logrotate.\n\nActivez et démarrez clamav-milter.service.\n\nPour Postfix, ajoutez les lignes suivantes à /etc/postfix/main.cf :\n\n```\netc/postfix/main.cf\n```\n\n```\nsmtpd_milters = unix:/tmp/clamav-milter.socket\nmilter_default_action = tempfail\n```\n\nVérifiez journalctl si la permission d'accéder à clamav-milter.socket pour postfix est définie en conséquence, si non, ajoutez l'utilisateur postfix au groupe clamav.\n\n"
+    },
+    {
+      "title": "OnAccessScan",
+      "level": 2,
+      "content": "L'analyse à l'accès analyse le fichier pendant sa lecture, son écriture ou son exécution.\n\nL'analyse à l'accès nécessite que le noyau soit compilé avec le module de noyau fanotify (noyau >= 3.8), ce qui est vrai pour les paquets officiels du noyau d'Arch Linux. Vérifiez si fanotify a été activé avant d'activer l'analyse sur accès.\n\n```\n$ zgrep FANOTIFY /proc/config.gz\n```\n\nTout d'abord, modifiez le fichier de configuration /etc/clamav/clamd.conf en ajoutant ce qui suit à la fin du fichier (vous pouvez également modifier les options individuelles).\n\n```\n/etc/clamav/clamd.conf\n```\n\n```\n# Set the mount point where to recursively perform the scan,\n# this could be every path or multiple path (one line for path)\nOnAccessMountPath /\nOnAccessExcludePath /proc\nOnAccessExcludePath /run\nOnAccessExcludePath /sys\n\n# Alternatively, add some directories instead of mount points\n# OnAccessIncludePath /home\n\n# Prevention doesn't work with OnAccessMountPath.\n# It works with OnAccessIncludePath, as long as /usr and /etc are not included.\n# Including /var while activating prevention is also not recommended, because\n# this would slow down package installation by a factor of 1000.\nOnAccessPrevention false\n\n# Perform scans on newly created, moved, or renamed files\nOnAccessExtraScanning true\n\n# Exclude the UID of the scanner itself from checking, to prevent loops\nOnAccessExcludeUname clamav\n\n# Optionally, also exclude root-owned processes\n# OnAccessExcludeRootUID true\n\n# Specify an action to perform when clamav detects a malicious file\n# it is possible to specify an inline command too\nVirusEvent /etc/clamav/virus-event.bash\n\n# WARNING: for security reasons, clamd should NEVER run as root.\n# Previous instructions in this wiki included this line, remove it:\n# User root    # REMOVE THIS\n# Add this instead:\nUser clamav\n```\n\nEnsuite, autorisez l'utilisateur clamav à exécuter notify-send en tant qu'utilisateur avec des variables d'environnement personnalisées via sudo :\n\n```\n/etc/sudoers.d/clamav\n```\n\n```\nclamav ALL = (ALL) NOPASSWD : SETENV : /usr/bin/notify-send\n```\n\nEnsuite, créez le fichier /etc/clamav/virus-event.bash, rendez-le exécutable et ajoutez ce qui suit :\n\n```\n/etc/clamav/virus-event.bash\n```\n\n```\n#!/bin/bash\nPATH=/usr/bin\nALERT=\"Signature détectée par clamav : $CLAM_VIRUSEVENT_VIRUSNAME dans $CLAM_VIRUSEVENT_FILENAME\"\n\n# Envoyer une alerte à tous les utilisateurs graphiques.\nfor ADDRESS in /run/user/* ; do\n    USERID=${ADDRESS#/run/user/}\n    /usr/bin/sudo -u \"#$USERID\" DBUS_SESSION_BUS_ADDRESS=\"unix:path=$ADDRESS/bus\" PATH=${PATH} \\\n        /usr/bin/notify-send -i dialog-warning \"Virus trouvé !\" \"$ALERT\"\ndone\n```\n\nCela vous permet de modifier/spécifier le message lorsqu'un virus a été détecté par le service d'analyse à l'accès de clamd.\n\nRedémarrez clamav-daemon.service.\n\nPar défaut, clamonacc transmet à clamav les noms des fichiers qui viennent d'être accédés pour analyse. C'est un problème, car les fichiers inaccessibles à l'utilisateur de clamav ne peuvent pas être analysés de cette manière. À la place, il est possible de demander à clamonacc (qui s'exécute toujours en tant que root) d'utiliser le passage par les descripteurs de fichiers.\n\nÉditez clamav-clamonacc.service avec le contenu suivant :\n\n```\n[Service]\nExecStart=\nExecStart=/usr/sbin/clamonacc -F --fdpass --log=/var/log/clamav/clamonacc.log\n```\n\nEnfin, activez et démarrez clamav-clamonacc.service.\n\nSi vous obtenez des refus de AppArmor concernant clamd, définissez le profil en mode plainte uniquement :\n\n```\n# aa-complain clamd\n```\n\n"
+    },
+    {
+      "title": "Erreur : Clamd n'a PAS été notifié",
+      "level": 3,
+      "content": "Si vous obtenez les messages suivants après avoir exécuté freshclam :\n\n```\nWARNING: Clamd was NOT notified: Cannot connect to clamd through \n/var/lib/clamav/clamd.sock connect(): No such file or directory\n```\n\nAjoutez un fichier sock pour ClamAV :\n\n```\n# touch /run/clamav/clamd.ctl\n# chown clamav:clamav /run/clamav/clamd.ctl\n```\n\nEnsuite, éditez /etc/clamav/clamd.conf - décommentez cette ligne :\n\n```\nLocalSocket /run/clamav/clamd.ctl\n```\n\nSauvegardez le fichier et redémarrez clamav-daemon.service.\n\n"
+    },
+    {
+      "title": "Erreur : Aucun fichier de base de données pris en charge n'a été trouvé",
+      "level": 3,
+      "content": "Si vous obtenez l'erreur suivante au démarrage du daemon :\n\n```\nLibClamAV Error: cli_loaddb(): No supported database files found\nin /var/lib/clamav ERROR: Not supported data format\n```\n\nCela se produit à cause d'un désaccord entre le paramètre /etc/clamav/freshclam.conf DatabaseDirectory et le paramètre /etc/clamav/clamd.conf DatabaseDirectory. /etc/clamav/freshclam.conf pointe vers /var/lib/clamav, mais /etc/clamav/clamd.conf (répertoire par défaut) pointe vers /usr/share/clamav, ou un autre répertoire. Modifiez /etc/clamav/clamd.conf et remplacez par le même DatabaseDirectory que dans /etc/clamav/freshclam.conf. Après cela, clamav démarrera avec succès.\n\n"
+    },
+    {
+      "title": "Erreur : Impossible de créer un répertoire temporaire",
+      "level": 3,
+      "content": "Si vous obtenez l'erreur suivante, accompagnée d'un 'HINT' (indice) contenant un numéro UID et un numéro GID :\n\n```\n# can't create temporary directory (Impossible de créer un répertoire temporaire)\n```\n\nCorrigez les permissions comme suit :\n\n```\n# chown UID:GID /var/lib/clamav && chmod 755 /var/lib/clamav\n```\n\n"
+    },
+    {
+      "title": "Utilisation de clamscan",
+      "level": 4,
+      "content": "Lors de l'analyse d'un fichier ou d'un répertoire à partir de la ligne de commande en utilisant clamscan, un seul thread CPU est utilisé. Cela peut convenir dans les cas où le temps n'est pas critique ou si vous ne voulez pas que l'ordinateur devienne lent. S'il est nécessaire d'analyser rapidement un grand répertoire ou un lecteur USB, vous pouvez vouloir utiliser tous les processeurs disponibles pour accélérer le processus.\n\nclamscan est conçu pour être monotâche, donc xargs peut être utilisé pour exécuter l'analyse en parallèle :\n\n```\n$ find /home/archie -type f -print0 | xargs -0 -P $(nproc) clamscan\n```\n\nDans cet exemple, le paramètre -P de xargs exécute clamscan dans autant de processus qu'il y a de CPU (signalés par nproc) en même temps. Les options --max-lines et --max-args permettent un contrôle encore plus fin de la répartition de la charge de travail entre les threads.\n\n"
+    },
+    {
+      "title": "Utilisation de clamdscan",
+      "level": 4,
+      "content": "Si le daemon clamd fonctionne déjà, clamdscan peut être utilisé à la place (consultez #Démarrage du daemon) :\n\n```\n$ clamdscan --multiscan --fdpass /home/archie\n```\n\nIci, le paramètre --multiscan permet à clamd d'analyser le contenu du répertoire en parallèle en utilisant les threads disponibles. Le paramètre --fdpass est nécessaire pour transmettre les permissions du descripteur de fichier à clamd car le daemon est exécuté sous l'utilisateur et le groupe clamav.\n\nLe nombre de threads disponibles pour clamdscan est déterminé dans /etc/clamav/clamd.conf via le paramètre MaxThreads (consultez clamd.conf(5)). Même si vous pouvez constater que le nombre de MaxThreads spécifié est supérieur à un (la valeur par défaut actuelle est 10), lorsque vous lancez l'analyse en utilisant clamdscan à partir de la ligne de commande et que vous ne spécifiez pas l'option --multiscan, un seul thread CPU réel sera utilisé pour l'analyse.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Wikipedia:ClamAV\n\n"
+    }
+  ]
+}

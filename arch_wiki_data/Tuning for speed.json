@@ -1,0 +1,266 @@
+{
+  "title": "Tuning for speed",
+  "url": "https://wiki.archlinux.org/title/Tuning_for_speed",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- /Boot process\n- Pacman/Tips and tricks#Performance\n- OpenSSH#Speeding up SSH\n- Openoffice#Speed up OpenOffice\n- Laptop\n- Preload\n\nThis article provides information on basic system diagnostics relating to performance as well as steps that may be taken to reduce resource consumption or to otherwise optimize the system with the end-goal being either perceived or documented improvements to a system's performance. See also Gaming#Improving performance for additional gaming and low latency specific advice.\n\n"
+    },
+    {
+      "title": "Know your system",
+      "level": 3,
+      "content": "The best way to tune a system is to target bottlenecks, or subsystems which limit overall speed. The system specifications can help identify them.\n\n- If the computer becomes slow when large applications (such as LibreOffice and Firefox) run at the same time, check if the amount of RAM is sufficient. Use the following command, and check the \"available\" column:$ free -h\n- If boot time is slow, and applications take a long time to load at first launch (only), then the hard drive is likely to blame. The speed of a hard drive can be measured with the hdparm command: # hdparm -t /dev/sdX Note: hdparm indicates only the pure read speed of a hard drive, and is not a valid benchmark. A value higher than 40MB/s (while idle) is however acceptable on an average system.\n- If CPU load is consistently high even with enough RAM available, then try to lower CPU usage by disabling running daemons and/or processes. This can be monitored in several ways, for example with htop, pstree or any other system monitoring tool: $ htop\n- If applications using direct rendering are slow (i.e those which use the GPU, such as video players, games, or even a window manager), then improving GPU performance should help. The first step is to verify if direct rendering is actually enabled. This is indicated by the glxinfo command, part of the mesa-utils package, which should return direct rendering: Yes when used: $ glxinfo | grep \"direct rendering\"\n- When running a desktop environment, disabling (unused) visual desktop effects may reduce GPU usage. Use a more lightweight environment or create a custom environment if the current does not meet the hardware and/or personal requirements.\n- Using an optimized kernel improves performance. Generally, linux-zen is a good option. However, the default kernel can be tweaked as shown in certain parts of this article to perform better.\n\n```\n$ free -h\n```\n\n```\n# hdparm -t /dev/sdX\n```\n\n```\n$ htop\n```\n\n```\n$ glxinfo | grep \"direct rendering\"\n```\n\n"
+    },
+    {
+      "title": "Benchmarking",
+      "level": 3,
+      "content": "The effects of optimization are often difficult to judge. They can however be measured by benchmarking tools.\n\n"
+    },
+    {
+      "title": "Sector size",
+      "level": 4,
+      "content": "Check that your NVMe drives and Advanced Format hard disk drives are using the optimal logical sector size.\n\n"
+    },
+    {
+      "title": "Partitioning",
+      "level": 3,
+      "content": "Make sure that your partitions are properly aligned.\n\n"
+    },
+    {
+      "title": "Multiple drives",
+      "level": 4,
+      "content": "If you have multiple disks available, you can set them up as a software RAID for serious speed improvements.\n\nCreating swap on a separate disk can also help quite a bit, especially if your machine swaps frequently.\n\nWhen forgoing hard disk drives is not an option, a solid state drive can be added as a caching layer to improve the read and/or write speeds and reduce the noise from random access. The options to accomplish this include LVM#Cache, Bcache and Bcachefs#SSD caching.\n\n"
+    },
+    {
+      "title": "Layout on HDDs",
+      "level": 4,
+      "content": "If using a traditional spinning HDD, your partition layout can influence the system's performance. Sectors at the beginning of the drive (closer to the outside of the disk) are faster than those at the end. Also, a smaller partition requires less movements from the drive's head, and so speed up disk operations. Therefore, it is advised to create a small partition (15-20GiB, more or less depending on your needs) only for your system, as near to the beginning of the drive as possible. Other data (pictures, videos) should be kept on a separate partition, and this is usually achieved by separating the home directory (/home) from the system (/).\n\n"
+    },
+    {
+      "title": "Choosing and tuning your filesystem",
+      "level": 3,
+      "content": "Choosing the best filesystem for a specific system is very important because each has its own strengths. The File systems article provides a short summary of the most popular ones. You can also find relevant articles in Category:File systems.\n\n"
+    },
+    {
+      "title": "Mount options",
+      "level": 4,
+      "content": "The various *atime options can mitigate the performance penalty of strictatime.\n\nOther mount options are filesystem specific, therefore see the relevant articles for the filesystems:\n\n- Ext3\n- Ext4#Improving performance\n- JFS#Optimizations\n- XFS#Performance\n- Btrfs#Defragmentation, Btrfs#Compression, and btrfs(5)\n- ZFS#Tuning\n- NTFS#Improving performance\n\n"
+    },
+    {
+      "title": "Tuning kernel parameters",
+      "level": 3,
+      "content": "There are several key tunables affecting the performance of block devices, see sysctl#Virtual memory for more information.\n\n"
+    },
+    {
+      "title": "Background information",
+      "level": 4,
+      "content": "The input/output (I/O) scheduler is the kernel component that decides in which order the block I/O operations are submitted to storage devices. It is useful to remind here some specifications of two main drive types because the goal of the I/O scheduler is to optimize the way these are able to deal with read requests:\n\n- An HDD has spinning disks and a head that moves physically to the required location. Therefore, random latency is quite high ranging between 3 and 12ms (whether it is a high end server drive or a laptop drive and bypassing the disk controller write buffer) while sequential access provides much higher throughput. The typical HDD throughput is about 200 I/O operations per second (IOPS).\n\n- An SSD does not have moving parts, random access is as fast as sequential one, typically under 0.1ms, and it can handle multiple concurrent requests. The typical SSD throughput is greater than 10,000 IOPS, which is more than needed in common workload situations.\n\nIf there are many processes making I/O requests to different storage parts, thousands of IOPS can be generated while a typical HDD can handle only about 200 IOPS. There is a queue of requests that have to wait for access to the storage. This is where the I/O schedulers plays an optimization role.\n\n"
+    },
+    {
+      "title": "The scheduling algorithms",
+      "level": 4,
+      "content": "One way to improve throughput is to linearize access: by ordering waiting requests by their logical address and grouping the closest ones. Historically this was the first Linux I/O scheduler called elevator.\n\nOne issue with the elevator algorithm is that it is not optimal for a process doing sequential access: reading a block of data, processing it for several microseconds then reading next block and so on. The elevator scheduler does not know that the process is about to read another block nearby and, thus, moves to another request by another process at some other location. The anticipatory I/O scheduler overcomes the problem: it pauses for a few milliseconds in anticipation of another close-by read operation before dealing with another request.\n\nWhile these schedulers try to improve total throughput, they might leave some unlucky requests waiting for a very long time. As an example, imagine the majority of processes make requests at the beginning of the storage space while an unlucky process makes a request at the other end of storage. This potentially infinite postponement of the process is called starvation. To improve fairness, the deadline algorithm was developed. It has a queue ordered by address, similar to the elevator, but if some request sits in this queue for too long then it moves to an \"expired\" queue ordered by expire time. The scheduler checks the expire queue first and processes requests from there and only then moves to the elevator queue. Note that this fairness has a negative impact on overall throughput.\n\nThe Completely Fair Queuing (CFQ) approaches the problem differently by allocating a timeslice and a number of allowed requests by queue depending on the priority of the process submitting them. It supports cgroup that allows to reserve some amount of I/O to a specific collection of processes. It is in particular useful for shared and cloud hosting: users who paid for some IOPS want to get their share whenever needed. Also, it idles at the end of synchronous I/O waiting for other nearby operations, taking over this feature from the anticipatory scheduler and bringing some enhancements. Both the anticipatory and the elevator schedulers were decommissioned from the Linux kernel replaced by the more advanced alternatives presented below.\n\nThe Budget Fair Queuing (BFQ) is based on CFQ code and brings some enhancements. It does not grant the disk to each process for a fixed time-slice but assigns a \"budget\" measured in number of sectors to the process and uses heuristics. It is a relatively complex scheduler, it may be more adapted to rotational drives and slow SSDs because its high per-operation overhead, especially if associated with a slow CPU, can slow down fast devices. The objective of BFQ on personal systems is that for interactive tasks, the storage device is virtually as responsive as if it was idle. In its default configuration it focuses on delivering the lowest latency rather than achieving the maximum throughput, which can sometimes greatly accelerate the startup of applications on hard drives.\n\nKyber is a recent scheduler inspired by active queue management techniques used for network routing. The implementation is based on \"tokens\" that serve as a mechanism for limiting requests. A queuing token is required to allocate a request, this is used to prevent starvation of requests. A dispatch token is also needed and limits the operations of a certain priority on a given device. Finally, a target read latency is defined and the scheduler tunes itself to reach this latency goal. The implementation of the algorithm is relatively simple and it is deemed efficient for fast devices.\n\n"
+    },
+    {
+      "title": "Kernel's I/O schedulers",
+      "level": 4,
+      "content": "While some of the early algorithms have now been decommissioned, the official Linux kernel supports a number of I/O schedulers. The Multi-Queue Block I/O Queuing Mechanism (blk-mq) maps I/O queries to multiple queues, the tasks are distributed across threads and therefore CPU cores. Within this framework the following schedulers are available:\n\n- None, where no queuing algorithm is applied.\n- mq-deadline, the adaptation of the deadline scheduler (see below) to multi-threading.\n- Kyber\n- BFQ\n\n"
+    },
+    {
+      "title": "Changing I/O scheduler",
+      "level": 4,
+      "content": "To list the available schedulers for a device and the active scheduler (in brackets):\n\n```\n$ cat /sys/block/sda/queue/scheduler\n```\n\n```\nmq-deadline kyber [bfq] none\n```\n\nTo list the available schedulers for all devices:\n\n```\n$ grep \"\" /sys/block/*/queue/scheduler\n```\n\n```\n/sys/block/pktcdvd0/queue/scheduler:none\n/sys/block/sda/queue/scheduler:mq-deadline kyber [bfq] none\n/sys/block/sr0/queue/scheduler:[mq-deadline] kyber bfq none\n```\n\nTo change the active I/O scheduler to bfq for device sda, use:\n\n```\n# echo bfq > /sys/block/sda/queue/scheduler\n```\n\nThe process to change I/O scheduler, depending on whether the disk is rotating or not can be automated and persist across reboots. For example the udev rules below set the scheduler to bfq for rotational drives, bfq for SSD/eMMC drives and none for NVMe drives:\n\n```\n/etc/udev/rules.d/60-ioschedulers.rules\n```\n\n```\n# HDD\nACTION==\"add|change\", KERNEL==\"sd[a-z]*\", ATTR{queue/rotational}==\"1\", ATTR{queue/scheduler}=\"bfq\"\n\n# SSD\nACTION==\"add|change\", KERNEL==\"sd[a-z]*|mmcblk[0-9]*\", ATTR{queue/rotational}==\"0\", ATTR{queue/scheduler}=\"bfq\"\n\n# NVMe SSD\nACTION==\"add|change\", KERNEL==\"nvme[0-9]*\", ATTR{queue/rotational}==\"0\", ATTR{queue/scheduler}=\"none\"\n```\n\nReboot or force udev#Loading new rules.\n\n"
+    },
+    {
+      "title": "Tuning I/O scheduler",
+      "level": 4,
+      "content": "Each of the kernel's I/O scheduler has its own tunables, such as the latency time, the expiry time or the FIFO parameters. They are helpful in adjusting the algorithm to a particular combination of device and workload. This is typically to achieve a higher throughput or a lower latency for a given utilization. The tunables and their description can be found within the kernel documentation.\n\nTo list the available tunables for a device, in the example below sdb which is using deadline, use:\n\n```\n$ ls /sys/block/sdb/queue/iosched\n```\n\n```\nfifo_batch  front_merges  read_expire  write_expire  writes_starved\n```\n\nTo improve deadline's throughput at the cost of latency, one can increase fifo_batch with the command:\n\n```\n# echo 32 > /sys/block/sdb/queue/iosched/fifo_batch\n```\n\n"
+    },
+    {
+      "title": "Power management configuration and write cache",
+      "level": 3,
+      "content": "When dealing with traditional rotational disks (HDDs) you may want to completely disable or lower power saving features, and check if the write cache is enabled.\n\nSee Hdparm#Power management configuration and Hdparm#Write cache.\n\nAfterwards, you can make a udev rule to apply them on boot-up.\n\n"
+    },
+    {
+      "title": "Reduce disk reads/writes",
+      "level": 3,
+      "content": "Avoiding unnecessary access to slow storage drives is good for performance and also increasing lifetime of the devices, although on modern hardware the difference in life expectancy is usually negligible.\n\nNote: **10GB of data written per day** \n\n"
+    },
+    {
+      "title": "Show disk writes",
+      "level": 4,
+      "content": "The iotop package can sort by disk writes, and show how much and how frequently programs are writing to the disk. See iotop(8) for details.\n\n"
+    },
+    {
+      "title": "Relocate files to tmpfs",
+      "level": 4,
+      "content": "Relocate files, such as your browser profile, to a tmpfs file system, for improvements in application response as all the files are now stored in RAM:\n\n- Refer to Profile-sync-daemon for syncing browser profiles. Certain browsers might need special attention, see e.g. Firefox on RAM.\n- Refer to Anything-sync-daemon for syncing any specified folder.\n- Refer to Makepkg#Improving build times for improving compile times by building packages in tmpfs.\n\n"
+    },
+    {
+      "title": "File systems",
+      "level": 4,
+      "content": "Refer to corresponding file system page in case there were performance improvements instructions, see the list at #Choosing and tuning your filesystem.\n\n"
+    },
+    {
+      "title": "Swap space",
+      "level": 4,
+      "content": "See Swap#Performance for details.\n\n"
+    },
+    {
+      "title": "Writeback interval and buffer size",
+      "level": 4,
+      "content": "See Sysctl#Virtual memory for details.\n\n"
+    },
+    {
+      "title": "Disable core dumps",
+      "level": 4,
+      "content": "See Core dump#Disabling automatic core dumps.\n\n"
+    },
+    {
+      "title": "Storage I/O scheduling with ionice",
+      "level": 3,
+      "content": "Many tasks such as backups do not rely on a short storage I/O delay or high storage I/O bandwidth to fulfill their task, they can be classified as background tasks. On the other hand quick I/O is necessary for good UI responsiveness on the desktop. Therefore it is beneficial to reduce the amount of storage bandwidth available to background tasks, whilst other tasks are in need of storage I/O. This can be achieved by making use of the Linux I/O scheduler CFQ, which allows setting different priorities for processes.\n\nThe I/O priority of a background process can be reduced to the \"Idle\" level by starting it with\n\n```\n# ionice -c 3 command\n```\n\nSee a short introduction to ionice and ionice(1) for more information.\n\n"
+    },
+    {
+      "title": "Trimming",
+      "level": 3,
+      "content": "For optimal performance, empty blocks of solid state drives should be discarded (a.k.a. trimmed) periodically to optimize random write speeds. See Solid state drive#TRIM for more information.\n\n"
+    },
+    {
+      "title": "Network",
+      "level": 2,
+      "content": "- Kernel networking: see Sysctl#Improving performance\n- NIC: see Network configuration#Set device MTU and queue length\n- DNS: consider using a caching DNS resolver, see Domain name resolution#DNS servers\n- Samba: see Samba#Improve throughput\n\n"
+    },
+    {
+      "title": "Overclocking",
+      "level": 3,
+      "content": "Overclocking improves the computational performance of the CPU by increasing its peak clock frequency. The ability to overclock depends on the combination of CPU model and motherboard model. It is most frequently done through the BIOS. Overclocking also has disadvantages and risks. It is neither recommended nor discouraged here.\n\nMany Intel chips will not correctly report their clock frequency to acpi_cpufreq and most other utilities. This will result in excessive messages in dmesg, which can be avoided by unloading and blacklisting the kernel module acpi_cpufreq. To read their clock speed use i7z from the i7z package. To check for correct operation of an overclocked CPU, it is recommended to do stress testing.\n\n"
+    },
+    {
+      "title": "Frequency scaling",
+      "level": 3,
+      "content": "See CPU frequency scaling.\n\n"
+    },
+    {
+      "title": "CPU scheduler",
+      "level": 3,
+      "content": "The default CPU scheduler in the mainline Linux kernel is EEVDF.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n- MuQSS — Multiple Queue Skiplist Scheduler. Available with the -ck patch set developed by Con Kolivas.\n\n- Project C — Cross-project for refactoring BMQ into Project C, with re-creation of PDS based on the Project C code base. So it is a merge of the two projects, with a subsequent update of the PDS as Project C. Recommended as a more recent development.\n\n- BORE — The BORE scheduler focuses on sacrificing some fairness for lower latency in scheduling interactive tasks, it is built on top of CFS and is only adjusted for vruntime code updates, so the overall changes are quite small compared to other unofficial CPU schedulers.\n\n- SCX — Allows dynamic injection of various CPU schedulers without requiring a system reset.\n\n"
+    },
+    {
+      "title": "Real-time kernel",
+      "level": 3,
+      "content": "Some applications such as running a TV tuner card at full HD resolution (1080p) may benefit from using a realtime kernel.\n\n"
+    },
+    {
+      "title": "Adjusting priorities of processes",
+      "level": 3,
+      "content": "See also nice(1) and renice(1).\n\n"
+    },
+    {
+      "title": "Ananicy",
+      "level": 4,
+      "content": "Ananicy CPP is a daemon, available as ananicy-cpp or ananicy-cpp-gitAUR, for auto adjusting the nice levels of executables. The nice level represents the priority of the executable when allocating CPU resources.\n\n"
+    },
+    {
+      "title": "cgroups",
+      "level": 4,
+      "content": "See cgroups.\n\n"
+    },
+    {
+      "title": "Cpulimit",
+      "level": 4,
+      "content": "Cpulimit is a program to limit the CPU usage percentage of a specific process. After installing cpulimitAUR, you may limit the CPU usage of a processes' PID using a scale of 0 to 100 times the number of CPU cores that the computer has. For example, with eight CPU cores the percentage range will be 0 to 800. Usage:\n\n```\n$ cpulimit -l 50 -p 5081\n```\n\n"
+    },
+    {
+      "title": "irqbalance",
+      "level": 3,
+      "content": "The purpose of irqbalance is distribute hardware interrupts across processors on a multiprocessor system in order to increase performance. It can be controlled by the provided irqbalance.service.\n\n"
+    },
+    {
+      "title": "Turn off CPU exploit mitigations",
+      "level": 3,
+      "content": "Turning off CPU exploit mitigations may improve performance. Use below kernel parameter to disable them all:\n\n```\nmitigations=off\n```\n\nThe explanations of all the switches it toggles are given at kernel.org. You can use spectre-meltdown-checkerAUR or lscpu(1) (from util-linux) for vulnerability check.\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 3,
+      "content": "Graphics performance may depend on the settings in xorg.conf(5); see the NVIDIA, AMDGPU and Intel articles. Improper settings may stop Xorg from working, so caution is advised.\n\n"
+    },
+    {
+      "title": "Mesa configuration",
+      "level": 3,
+      "content": "The performance of the Mesa drivers can be configured via drirc. adriconf (Advanced DRI Configurator) is a GUI tool to configure Mesa drivers by setting options and writing them to the standard drirc file.\n\n"
+    },
+    {
+      "title": "Hardware video acceleration",
+      "level": 3,
+      "content": "Hardware video acceleration makes it possible for the video card to decode/encode video.\n\n"
+    },
+    {
+      "title": "Overclocking",
+      "level": 3,
+      "content": "As with CPUs, overclocking can directly improve performance, but is generally recommended against. There are several packages, such as rovclockAUR (ATI cards), rocm-smi-lib (recent AMD cards), nvclockAUR (old NVIDIA - up to Geforce 9), and nvidia-utils for recent NVIDIA cards.\n\nSee AMDGPU#Overclocking or NVIDIA/Tips and tricks#Enabling overclocking in nvidia-settings.\n\n"
+    },
+    {
+      "title": "Enabling PCIe resizable BAR",
+      "level": 3,
+      "content": "- On some systems enabling PCIe resizable BAR can result in a significant loss of performance. Benchmark your system to make sure it increases performance.\n- The Compatibility Support Module (CSM) must be disabled for this to take effect.\n\nThe PCI specification allows larger Base Address Registers (BARs) to be used for exposing PCI devices memory to the PCI Controller. This can result in a performance increase for video cards. Having access to the full video memory improves performance, but also enables optimizations in the graphics driver. The combination of resizable BAR, above 4G decoding and these driver optimizations are what AMD calls AMD Smart Access Memory, available at first on AMD Series 500 chipset motherboards, later expanded to AMD Series 400 and Intel Series 300 and later through UEFI updates. This setting may not be available on all motherboards, and is known to sometimes cause boot problems on certain boards.\n\nIf the BAR has a 256M size, the feature is not enabled or not supported:\n\n```\n# dmesg | grep BAR=\n```\n\n```\n[drm] Detected VRAM RAM=8176M, BAR=256M\n```\n\nTo enable it, enable the setting named \"Above 4G Decode\" or \">4GB MMIO\" in your motherboard settings. Verify that the BAR is now larger:\n\n```\n# dmesg | grep BAR=\n```\n\n```\n[drm] Detected VRAM RAM=8176M, BAR=8192M\n```\n\n"
+    },
+    {
+      "title": "Clock frequency and timings",
+      "level": 3,
+      "content": "RAM can run at different clock frequencies and timings, which can be configured in the BIOS. Memory performance depends on both values. Selecting the highest preset presented by the BIOS usually improves the performance over the default setting. Note that increasing the frequency to values not supported by both motherboard and RAM vendor is overclocking, and similar risks and disadvantages apply, see #Overclocking.\n\n"
+    },
+    {
+      "title": "Root on RAM overlay",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf running off a slow writing medium (USB, spinning HDDs) and storage requirements are low, the root may be run on a RAM overlay ontop of read only root (on disk). This can vastly improve performance at the cost of a limited writable space to root. See liverootAUR.\n\n"
+    },
+    {
+      "title": "zram or zswap",
+      "level": 3,
+      "content": "Similar benefits (at similar costs) can be achieved using zswap or zram. The two are generally similar in intent although not operation: zswap operates as a compressed RAM cache and neither requires (nor permits) extensive userspace configuration, whereas zram is a kernel module which can be used to create a compressed block device in RAM. zswap works in conjunction with a swap device while zram does not require a backing swap device.\n\n"
+    },
+    {
+      "title": "Using the graphics card's RAM",
+      "level": 3,
+      "content": "In the unlikely case that you have very little RAM and a surplus of video RAM, you can use the latter as swap. See Swap on video RAM.\n\n"
+    },
+    {
+      "title": "Improving system responsiveness under low-memory conditions",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nOn traditional GNU/Linux system, especially for graphical workstations, when allocated memory is overcommitted, the overall system's responsiveness may degrade to a nearly unusable state before either triggering the in-kernel out-of-memory (OOM)-killer or a sufficient amount of memory got free (which is unlikely to happen quickly when the system is unresponsive, as you can hardly close any memory-hungry applications which may continue to allocate more memory). The behaviour also depends on specific setups and conditions, returning to a normal responsive state may take from a few seconds to more than half an hour, which could be a pain to wait in serious scenario like during a conference presentation.\n\nWhile the behaviour of the kernel as well as the userspace things under low-memory conditions may improve in the future as discussed on kernel and Fedora mailing lists, users can use more feasible and effective options than hard-resetting the system or tuning the vm.overcommit_* sysctl parameters:\n\n- Manually trigger the kernel OOM-killer with Magic SysRq key, namely Alt+SysRq+f.\n- Use a userspace OOM daemon to tackle these automatically (or interactively).\n\nSometimes a user may prefer OOM daemon to SysRq because with kernel OOM-killer you cannot prioritize the process to (or not) terminate. To list some OOM daemons:\n\n- systemd-oomd — Provided by systemd as systemd-oomd.service that uses cgroups-v2 and pressure stall information (PSI) to monitor and take action on processes before an OOM occurs in kernel space.\n\n- earlyoom — Simple userspace OOM-killer implementation written in C.\n\n- oomd — OOM-killer implementation based on PSI, requires Linux kernel version 4.20+. Configuration is in JSON and is quite complex. Confirmed to work in Facebook's production environment.\n\n- nohang — Sophisticated OOM handler written in Python, with optional PSI support, more configurable than earlyoom.\n\n- low-memory-monitor — GNOME developer's effort that aims to provides better communication to userspace applications to indicate the low memory state, besides that it could be configured to trigger the kernel OOM-killer. Based on PSI, requires Linux 5.2+.\n\n- uresourced — A small daemon that enables cgroup based resource protection for the active graphical user session.\n\n"
+    },
+    {
+      "title": "Watchdogs",
+      "level": 2,
+      "content": "According to Wikipedia:Watchdog timer:\n\nHence, a watchdog is employed to optimize kernel recovery from exceptional circumstances. If a key system service (e.g., networking, file systems, ACPI or systemd) becomes unresponsive, the watchdog detects this and triggers a reboot. Thereby, system lockups and subsequent long delays that would stall shutdown due to the unresponsive service can be avoided. It is important to distinguish this emergency mechanism from managing system resources at runtime, as described in #Improving system responsiveness under low-memory conditions.\n\n"
+    },
+    {
+      "title": "systemd watchdog",
+      "level": 3,
+      "content": "systemd includes a built-in watchdog reset mechanism interacting with the hardware watchdog exposed via /dev/watchdog to user space if a proper kernel module is loaded (see below). When the system becomes unresponsive, the hardware watchdog will trigger a system reset.\n\n"
+    },
+    {
+      "title": "Configuring the Watchdog in systemd",
+      "level": 4,
+      "content": "By default, RuntimeWatchdogSec is disabled. To enable the system watchdog, create a systemd-system.conf(5) drop-in file with the following content:\n\n```\n/etc/systemd/system.conf.d/watchdog.conf\n```\n\n```\n[Manager]\nRuntimeWatchdogSec=10s\nRebootWatchdogSec=45s\n```\n\n- RuntimeWatchdogSec=10s: If systemd is unresponsive for more than 10 seconds, the system reboots.\n- RebootWatchdogSec=45s: If the system hangs during reboot, the watchdog forces a reset after 45 seconds.\n\nApply the changes with:\n\n```\n# systemctl daemon-reexec\n```\n\nVerify that the watchdog is active:\n\n```\n$ systemctl show | grep Watchdog\n```\n\n```\nRuntimeWatchdogUSec=10000000\nRebootWatchdogUSec=45000000\n```\n\n"
+    },
+    {
+      "title": "Checking Hardware Watchdog Support",
+      "level": 4,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nOn many systems, hardware watchdog support may be provided by different kernel modules (e.g., iTCO_wdt on some Intel chipsets, sp5100_tco on certain AMD platforms). To check for a hardware watchdog module, run:\n\n```\n$ lsmod | grep wdt\n```\n\nIf you find a relevant watchdog module (e.g., iTCO_wdt, sp5100_tco), ensure it is loaded at boot by creating a file such as:\n\n```\n/etc/modules-load.d/watchdog.conf\n```\n\n```\nmodule_name\n```\n\n```\n# modprobe module_name\n```\n\nReplace module_name with the actual module name for your hardware.\n\n"
+    },
+    {
+      "title": "References",
+      "level": 3,
+      "content": "- systemd-system.conf(5)\n- Linux Kernel Watchdog documentation\n- Arch Wiki – Systemd Boot\n- Blog post by Lennart Poettering on systemd watchdog\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Red Hat Performance Tuning Guide\n- Linux Performance Measurements using vmstat\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "DNSCrypt (Español)",
+  "url": "https://wiki.archlinux.org/title/DNSCrypt_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-11-06** \n\ndnscrypt-proxy es un proxy DNS con soporte para los protocolos DNS cifrados, DNS sobre HTTPS y DNSCrypt, que se puede utilizar para evitar ataques de intermediario y escuchas ilegales. dnscrypt-proxy es compatible también con DNSSEC.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete dnscrypt-proxy.\n\n"
+    },
+    {
+      "title": "Poner en marcha",
+      "level": 3,
+      "content": "El servicio se puede iniciar de dos maneras mutuamente excluyentes (es decir, solo se puede activar uno de los dos):\n\n- Con el archivo .service.\n\n- Mediante la activación del .socket.\n\n"
+    },
+    {
+      "title": "Seleccionar clientes DNS",
+      "level": 3,
+      "content": "Al dejar server_names comentado en el archivo de configuración /etc/dnscrypt-proxy/dnscrypt-proxy.toml, dnscrypt-proxy elegirá el servidor más rápido de entre los ya configurados en [sources] [1]. Las listas de dichos servidores se descargarán, verificarán y actualizarán automáticamente. [2]. Por lo tanto, la configuración de un conjunto específico de servidores es opcional.\n\nPara establecer manualmente qué servidor utilizar, edite /etc/dnscrypt-proxy/dnscrypt-proxy.toml y elimine el comentario de la variable server_names, seleccionando uno o más de los servidores. Por ejemplo, para usar los servidores de Cloudflare:\n\n```\nserver_names = ['cloudflare', 'cloudflare-ipv6']\n```\n\nUna lista completa de clientes DNS («resolver») se encuentra en la página upstream o Github. Si dnscrypt-proxy se ejecutó con éxito en el sistema anteriormente, /var/cache/dnscrypt-proxy/public-resolvers.md también contendrá una lista. Mire la descripción de los servidores que validan DNSSEC, sin registro y sin cesura. Estos requisitos se pueden configurar de forma global con las opciones require_dnssec, require_nolog, require_nofilter.\n\n"
+    },
+    {
+      "title": "Desactivar cualquier servicio ligado al puerto 53",
+      "level": 3,
+      "content": "Para ver si algún programa está usando el puerto 53, ejecute:\n\n```\n$ ss -lp 'sport = :domain'\n```\n\nSi el resultado contiene más de una línea a parte de los nombres de las columnas, debe desactivar cualquier servicio que esté utilizando el puerto 53. Un servicio común que lo utiliza es systemd-resolved.service, (NetworkManager#Unit dbus-org.freedesktop.resolve1.service not found), pero otros administradores de red pueden tener componentes análogos. Puede continuar una vez que la orden anterior imprima solo la siguiente línea:\n\n```\nNetid               State                 Recv-Q                Send-Q                                 Local Address:Port                                   Peer Address:Port\n```\n\n"
+    },
+    {
+      "title": "Modificar resolv.conf",
+      "level": 3,
+      "content": "Modifique el archivo resolv.conf y reemplace el conjunto vigente de direcciones de resolución con la dirección para localhost y las opciones [3]:\n\n```\nnameserver ::1\nnameserver 127.0.0.1\noptions edns0 single-request-reopen\n```\n\nOtros programas pueden sobrescribir esta configuración; consulte resolv.conf#Overwriting of /etc/resolv.conf para obtener más detalles.\n\n"
+    },
+    {
+      "title": "Iniciar el servicio de systemd",
+      "level": 3,
+      "content": "Finalmente, inicie/active la unidad dnscrypt-proxy.service o dnscrypt-proxy.socket, dependiendo del método que elija.\n\n"
+    },
+    {
+      "title": "Configuración de la caché DNS local",
+      "level": 3,
+      "content": "Se recomienda ejecutar dnscrypt-proxy como un reenviador a una caché de DNS local, si no se utiliza la función caché de dnscrypt-proxy; de lo contrario, cada consulta hará un viaje de ida y vuelta al servidor de resolución ascendente. Cualquier programa de almacenamiento DNS local debería funcionar. Además de configurar dnscrypt-proxy, debe configurar su programa de caché de DNS local.\n\n"
+    },
+    {
+      "title": "Cambiar el puerto",
+      "level": 4,
+      "content": "Para reenviar consultas desde una caché del DNS local, dnscrypt-proxy debe escuchar en un puerto diferente del predeterminado 53, ya que la caché DNS necesita escuchar en el puerto 53 y la consulta de dnscrypt-proxy debe hacerse sobre un puerto diferente. El número de puerto 53000 se usa como ejemplo en esta sección. En este ejemplo, el número de puerto es mayor que 1024 por lo que no es necesario que dnscrypt-proxy sea ejecutado por root.\n\nHay dos métodos para cambiar el puerto predeterminado:\n\nMétodo socket\n\nModifique dnscrypt-proxy.socket con los siguientes contenidos:\n\n```\n[Socket]\nListenStream=\nListenDatagram=\nListenStream=127.0.0.1:53000\nListenStream=[::1]:53000\nListenDatagram=127.0.0.1:53000\nListenDatagram=[::1]:53000\n```\n\nCuando las consultas se reenvían desde la caché del DNS local al puerto 53000, dnscrypt-proxy.socket iniciará dnscrypt-proxy.service.\n\nMétodo service\n\nModifique la opción listen_addresses en /etc/dnscrypt-proxy/dnscrypt-proxy.toml con lo siguiente:\n\n```\nlisten_addresses = ['127.0.0.1:53000', '[::1]:53000']\n```\n\n"
+    },
+    {
+      "title": "Ejemplo de configuraciones para una caché DNS local",
+      "level": 4,
+      "content": "Las siguientes configuraciones deberían funcionar con dnscrypt-proxy y asumir que está escuchando en el puerto 53000.\n\nConfigure Unbound a su gusto (en particular, consulte Unbound#Local DNS server) y añada las siguientes líneas al final de la sección server en /etc/unbound/unbound.conf:\n\n```\ndo-not-query-localhost: no\nforward-zone:\n  name: \".\"\n  forward-addr: ::1@53000\n  forward-addr: 127.0.0.1@53000\n```\n\nReinicie unbound.service para aplicar los cambios.\n\nConfigure dnsmasq como un caché DNS local. La configuración básica para trabajar con dnscrypt-proxy es:\n\n```\n/etc/dnsmasq.conf\n```\n\n```\nno-resolv\nserver=::1#53000\nserver=127.0.0.1#53000\nlisten-address=::1,127.0.0.1\n```\n\nSi configuró dnscrypt-proxy para usarlo como un «resolver» con la validación DNSSEC, asegúrese de activarla también en dnsmasq:\n\n```\n/etc/dnsmasq.conf\n```\n\n```\nconf-file=/usr/share/dnsmasq/trust-anchors.conf\ndnssec\ndnssec-check-unsigned\n```\n\nReinicie dnsmasq.service para aplicar los cambios.\n\nInstale pdnsd. Una configuración básica para trabajar con dnscrypt-proxy es:\n\n```\n/etc/pdnsd.conf\n```\n\n```\nglobal {\n    perm_cache = 1024;\n    cache_dir = \"/var/cache/pdnsd\";\n    run_as = \"pdnsd\";\n    server_ip = 127.0.0.1;\n    status_ctl = on;\n    query_method = udp_tcp;\n    min_ttl = 15m;       # Retain cached entries at least 15 minutes.\n    max_ttl = 1w;        # One week.\n    timeout = 10;        # Global timeout option (10 seconds).\n    neg_domain_pol = on;\n    udpbufsize = 1024;   # Upper limit on the size of UDP messages.\n}\n\nserver {\n    label = \"dnscrypt-proxy\";\n    ip = 127.0.0.1;\n    port = 53000;\n    timeout = 4;\n    proxy_only = on;\n}\n\nsource {\n    owner = localhost;\n    file = \"/etc/hosts\";\n}\n```\n\nReinicie pdnsd.service para aplicar los cambios.\n\n"
+    },
+    {
+      "title": "Sandboxing",
+      "level": 3,
+      "content": "Note: **(del traductor):** \n\nEdite dnscrypt-proxy.service para incluir las siguientes líneas:\n\n```\n[Service]\nCapabilityBoundingSet=CAP_IPC_LOCK CAP_SETGID CAP_SETUID CAP_NET_BIND_SERVICE\nProtectSystem=strict\nProtectHome=true\nProtectKernelTunables=true\nProtectKernelModules=true\nProtectControlGroups=true\nPrivateTmp=true\nPrivateDevices=true\nMemoryDenyWriteExecute=true\nNoNewPrivileges=true\nRestrictRealtime=true\nRestrictAddressFamilies=AF_INET AF_INET6\nSystemCallArchitectures=native\nSystemCallFilter=~@clock @cpu-emulation @debug @keyring @ipc @module @mount @obsolete @raw-io\n```\n\nConsulte systemd.exec(5) y Systemd (Español)#Entornos seguros para probar aplicaciones para obtener más información.\n\n"
+    },
+    {
+      "title": "Activar EDNS0",
+      "level": 3,
+      "content": "Los mecanismos de extensión de DNS permiten, entre otras cosas, que un cliente especifique cuán grande puede ser una respuesta a través de UDP.\n\nAñada la siguiente línea a /etc/resolv.conf:\n\n```\noptions edns0\n```\n\nTambién es posible que desee agregar el siguiente argumento a /etc/dnscrypt-proxy.conf:\n\n```\nEDNSPayloadSize <bytes>\n```\n\nDonde <bytes> es un número, El tamaño por defecto comienza en 1252, con valores de hasta 4096 bytes siguen siendo, supuestamente, seguros. Un valor por debajo o igual a 512 bytes desactivará este mecanismo, a menos que un cliente envíe un paquete con una sección OPT, proporcionando un tamaño de carga útil.\n\n"
+    },
+    {
+      "title": "Test de EDNS0",
+      "level": 4,
+      "content": "Haga uso del DNS Reply Size Test Server, utilizando la herramienta de línea de órdenes drill para emitir una consulta TXT para el nombre rs.dns-oarc.net:\n\n```\n$ drill rs.dns-oarc.net TXT\n```\n\nCon EDNS0 funcionando, la salida de la «answer section» debe ser similar a esta:\n\n```\nrst.x3827.rs.dns-oarc.net.\nrst.x4049.x3827.rs.dns-oarc.net.\nrst.x4055.x4049.x3827.rs.dns-oarc.net.\n\"2a00:d880:3:1::a6c1:2e89 DNS reply size limit is at least 4055 bytes\"\n\"2a00:d880:3:1::a6c1:2e89 sent EDNS buffer size 4096\"\n```\n\n"
+    }
+  ]
+}

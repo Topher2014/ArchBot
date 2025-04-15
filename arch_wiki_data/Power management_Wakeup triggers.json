@@ -1,0 +1,76 @@
+{
+  "title": "Power management/Wakeup triggers",
+  "url": "https://wiki.archlinux.org/title/Power_management/Wakeup_triggers",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Wake-on-LAN\n- Laptop\n\nWakeup triggers are event sources that can wake the system from any of the hardware power-saving states. The obvious example is the power or suspend button, the Wake-on-LAN functionality or the lid switch in laptop systems. Wakeup triggers can be controlled through various kernel interfaces listed below. There is no unified interface covering all possible triggers.\n\n"
+    },
+    {
+      "title": "/proc/acpi/wakeup",
+      "level": 3,
+      "content": "Reading the /proc/acpi/wakeup file yields list of ACPI-registered wakeup sources with corresponding sysfs IDs where available. Writing an entry from the Device column to the file toggles its state. For example, to disable waking on opening the laptop lid, run:\n\n```\n# echo \"LID\" > /proc/acpi/wakeup\n```\n\n"
+    },
+    {
+      "title": "/sys/module/acpi/parameters/ec_no_wakeup",
+      "level": 3,
+      "content": "This file represents the value of ACPI kernel module option ec_no_wakeup, which controls passing the wakeup triggers from embedded controller when the system is in the suspend-to-idle (s2idle) power state [1]. On modern laptops embedded controller wakeups can cause excessive battery drain in some cases.\n\n"
+    },
+    {
+      "title": "/sys/devices/",
+      "level": 3,
+      "content": "Each sysfs device that supports wakeup contains the file wakeup in a device's power subdirectory. The file contains wakeup trigger's status and can be written to as well. Bus controllers as well as endpoint devices can be capable of waking up the system. For example, to disable wakeups from the first USB controller (bus), run:\n\n```\n# echo \"disabled\" > /sys/bus/usb/devices/usb1/power/wakeup\n```\n\nAn endpoint device should be able to wake the device if the trigger is enabled regardless of the controller's setting, however this might be hardware-dependent.\n\nProgram PowerTOP interfaces with sysfs, but it only lists wakeup triggers of networking and USB devices by reading /sys/class/net/ and /sys/bus/usb/devices/ (containing symlinks to /sys/devices/).\n\n"
+    },
+    {
+      "title": "/sys/class/wakeup/*",
+      "level": 3,
+      "content": "Almost all wakeup triggers can be found in the /sys/class/wakeup directory, which contains symlinks to all relevant devices. This is useful for finding possible wakeup triggers by going through subdirectories. Some of the triggers can correspond to virtual devices while hardware-related wakeup triggers are the ones that contain at least one of these files:\n\n```\n/sys/class/wakeup/*/device/physical_node/power/wakeup\n/sys/class/wakeup/*/device/power/wakeup\n```\n\nSome of wakeup triggers in /sys/class/wakeup also provide a link to the cryptic /proc/acpi/wakeup names where the following file is present:\n\n```\n/sys/class/wakeup/*/device/path\n```\n\n"
+    },
+    {
+      "title": "Persistent settings",
+      "level": 2,
+      "content": "The one-time methods should suffice for setting the /proc/acpi/wakeup states and acpi.ec_no_wakeup kernel parameter while the event-driven approach with udev is the reliable way to configure the sysfs devices.\n\n"
+    },
+    {
+      "title": "One-time with systemd",
+      "level": 3,
+      "content": "The ec_no_wakeup ACPI kernel module option can be set at boot as described in the article. The standard solution to set the sysfs values at boot are systemd services such as in this troubleshooting case. Another systemd-based manager for /proc/acpi/wakeup is wakeup-triggersAUR.\n\nSome systems can override some of the ACPI wakeup triggers upon power state transition(s) in what is more of a bug rather than a feature. If the hardware is overriding triggers at predictable times that can still be solved with appropriately crafted systemd units. The sleep.target is a generic target covering all different suspended states that might be helpful in this case, but there is no generic wakeup.target [2].\n\nThis method only works reliably with sysfs devices that are connected all the time.\n\n"
+    },
+    {
+      "title": "Event-driven with udev",
+      "level": 3,
+      "content": "Setting the wakeup trigger status with udev rules is an event-driven method that works reliably any time the devices with wakeup triggers are connected. The key is to detect an addition of a new device (ACTION==\"add\") in a rule and set the wakeup trigger status with ATTR{power/wakeup}=\"disabled\". If the hardware is resetting this setting, udev can try to circumvent it by reapplying rules upon every device change (ACTION==\"add|change\"). A device tree with possible parameters for matching a particular device found in sysfs can be obtained with udevadm info -q all -a /sys/devices/....\n\nA representative common example here would be a Logitech Unifying USB receiver. Its wakeup trigger should be enabled by default and if that is not desired, a solution could be a udev rule, as follows:\n\n```\n/etc/udev/rules.d/logitech-unifying.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"usb\", DRIVERS==\"usb\", ATTRS{idVendor}==\"046d\", ATTRS{idProduct}==\"c52b\", ATTR{power/wakeup}=\"disabled\"\n```\n\nThe reverse case to enable the necessary trigger(s) is described in the udev article.\n\nudev triggers so early in the device enumeration that disabling wakeup trigger with the method above causes (some?) disabled triggers to not be listed in /sys/class/wakeup. That might be dependent on whether the device was already present at boot and needs further clarification.\n\n"
+    },
+    {
+      "title": "List device and/or bus trees",
+      "level": 3,
+      "content": "These auxiliary commands can be helpful when trying to understand all wakeup triggers of a certain system, to aid with udev rule writing or general wakeup source troubleshooting:\n\n```\n# lshw -businfo -numeric\n# lspci -DPPnn\n# lsusb -tvv\n```\n\n"
+    },
+    {
+      "title": "Last wakeup trigger source",
+      "level": 3,
+      "content": "The information on which wakeup source was the reason for the last device wakeup is unfortunately platform-specific. On x86 machines dmidecode can be used:\n\n```\n# dmidecode -t system | grep -P '\\tWake-up Type\\: '\n```\n\nHowever for some computers it always reports \"Power Switch\" regardless of the real cause, e.g. for any of the USB keyboard, laptop keyboard, the power switch and the mouse.\n\n"
+    },
+    {
+      "title": "Intel Haswell with LynxPoint(-LP)",
+      "level": 4,
+      "content": "For some Intel Haswell systems with the LynxPoint and LynxPoint-LP chipset, instantaneous wakeups after suspending are reported. They are linked to erroneous BIOS ACPI implementations and how the xhci_hcd module interprets it during boot. As a work-around reported affected systems are added to a denylist (named XHCI_SPURIOUS_WAKEUP) by the kernel case-by-case [3].\n\nWakeup may happen, for example, if a USB device is plugged during suspending and ACPI wakeup triggers are enabled. A viable workaround for such a system is to disable the relevant wakeup triggers. An example to disable wakeup through USB is described as follows [4].\n\nTo view the current configuration:\n\n```\n$ cat /proc/acpi/wakeup\n```\n\n```\nDevice  S-state   Status   Sysfs node\n...\nEHC1      S3    *enabled  pci:0000:00:1d.0\nEHC2      S3    *enabled  pci:0000:00:1a.0\nXHC       S3    *enabled  pci:0000:00:14.0\n...\n```\n\nThe relevant devices are EHC1, EHC2 and XHC (for USB 3.0). To toggle their state you have to echo the device name to the file as root:\n\n```\n# echo EHC1 > /proc/acpi/wakeup\n# echo EHC2 > /proc/acpi/wakeup\n# echo XHC > /proc/acpi/wakeup\n```\n\nThis should result in suspension working again. However, this settings are only temporary and need to be set at every boot. To automate this, see systemd-tmpfiles or BBS thread for possible solutions.\n\n"
+    },
+    {
+      "title": "Gigabyte motherboards",
+      "level": 4,
+      "content": "On some Gigabyte motherboards, the GPP bridge to the NVMe drive may cause premature wakeups from suspend.\n\nKnown boards affected:\n\n- B550i AORUS,\n- B550 AORUS ELITE V2,\n- B550 AORUS ELITE AX V2 (Rev. 1.5),\n- B550M DS3H\n- B550M AORUS PRO-P\n\nSetting the status of GPP0 to disabled may fix the issue:\n\n```\n# echo GPP0 > /proc/acpi/wakeup\n```\n\nSame as the Haswell solution above, this setting is only temporary. An example of automating the fix can be found in this BBS thread.\n\nFor some Gigabyte motherboards, disabling everything in /proc/acpi/wakeup including GPP0 does not prevent an instantaneous wakeup from suspension. If this is the case, your motherboard may have issues with ACPI in Linux.\n\nKnown boards affected:\n\n- B650 GAMING X AX V2\n- B650i AORUS ULTRA (Rev. 1.0)\n- X670E AORUS PRO X\n- X670 GAMING X AX V2\n\nApply the following to your kernel parameters:\n\n```\nacpi_osi=\"!Windows 2015\"\n```\n\n- You may also try other strings that your DSDT provides. See DSDT#Tell the kernel to report a version of Windows for examples.\n- Depending on your setup, you may or may not need to disable wakeup triggers. See #Wakeup trigger interfaces.\n\n"
+    },
+    {
+      "title": "NVIDIA drivers",
+      "level": 4,
+      "content": "Installing NVIDIA proprietary drivers might render suspension and hibernation not possible. In that case the system log might include:\n\n```\nkernel: NVRM: GPU 0000:01:00.0: PreserveVideoMemoryAllocations module parameter is set. System Power Management attempted without driver procfs suspend interface. Please refer to the 'Configuring Power Management Support' section in the driver README.\nkernel: PM: pci_pm_suspend(): nv_pmops_suspend+0x0/0x20 [nvidia] returns -5\nkernel: PM: dpm_run_callback(): pci_pm_suspend+0x0/0x160 returns -5\nkernel: nvidia 0000:01:00.0: PM: failed to suspend async: error -5\n```\n\nSee NVIDIA/Tips and tricks#Preserve video memory after suspend.\n\n"
+    },
+    {
+      "title": "nouveau driver",
+      "level": 4,
+      "content": "If the nouveau driver is used, the reason for instantaneous wakeups may be a bug in the driver, which sometimes prevents GPU from suspending. A possible workaround is unloading the nouveau kernel module right before going to sleep and loading it back after wakeup. To do this, create the following script:\n\n```\n/usr/lib/systemd/system-sleep/10-nouveau.sh\n```\n\n```\n#!/bin/bash\n\ncase $1/$2 in\n  pre/*)\n    # echo \"Going to $2...\"\n    /usr/bin/echo \"0\" > /sys/class/vtconsole/vtcon1/bind\n    /usr/bin/rmmod nouveau\n    ;;\n  post/*)\n    # echo \"Waking up from $2...\"\n    /usr/bin/modprobe nouveau\n    /usr/bin/echo \"1\" > /sys/class/vtconsole/vtcon1/bind\n    ;;\nesac\n```\n\nThe first echo line unbinds nouveaufb from the framebuffer console driver (fbcon). Usually it is vtcon1 as in this example, but it may also be another vtcon*. See /sys/class/vtconsole/vtcon*/name which one of them is a frame buffer device [5].\n\n"
+    }
+  ]
+}

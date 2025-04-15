@@ -1,0 +1,96 @@
+{
+  "title": "Sshguard (日本語)",
+  "url": "https://wiki.archlinux.org/title/Sshguard_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Fail2ban\n- Secure Shell\n\nsshguard は SSH などのサービスをブルートフォース攻撃から守るためのサービスで、fail2ban と似ています。\n\nsshguard は他の2つと違って C で書かれており、軽量かつシンプルです。コアの機能は同等ながら機能は抑えめに作られています。\n\nsshguard は同じようなツールが持っている、ログ解析による 脆弱性 から攻撃されることは (ほとんど、または絶対に) ありません。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 FirewallD 2.2 UFW 2.3 iptables 2.4 nftables\n- 3 使用方法 3.1 systemd 3.2 syslog-ng\n- 4 設定 4.1 脅威レベルの変更 4.2 適度に ban を行う例 4.3 積極的に ban を行う\n- 5 ヒントとテクニック 5.1 ban を解除する 5.1.1 iptables 5.1.2 nftables 5.2 ログ出力\n\n- 2.1 FirewallD\n- 2.2 UFW\n- 2.3 iptables\n- 2.4 nftables\n\n- 3.1 systemd\n- 3.2 syslog-ng\n\n- 4.1 脅威レベルの変更\n- 4.2 適度に ban を行う例\n- 4.3 積極的に ban を行う\n\n- 5.1 ban を解除する 5.1.1 iptables 5.1.2 nftables\n- 5.2 ログ出力\n\n- 5.1.1 iptables\n- 5.1.2 nftables\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "sshguard パッケージをインストールしてください。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "sshguard は /var/log/auth.log や syslog-ng、そして systemd の journal にログイン試行の失敗がないか監視することで動作します。試行が失敗するたびに、問題のホストは ban されて、しばらく通信ができなくなります。違反者が通信できなくなるデフォルトの時間は120秒で、ログインを失敗するたびに通信禁止時間が1.5倍になります。何度もログイン失敗したホストは永久的に追放するように sshguard を設定することもできます。\n\n一時的な ban も永続的な ban も、どちらも iptables の \"sshguard\" チェインにエントリを追加して違反者からのパケットを全て拒否することで行われています。ban は syslog に記録され /var/log/auth.log に残ったり、systemd を使っている場合、systemd の journal に記録されます。\n\nsshguard によるブロックを機能させるにはファイアウォールを設定する必要があります。\n\n"
+    },
+    {
+      "title": "FirewallD",
+      "level": 4,
+      "content": "sshguard は Firewalld で使うことができます。firewalld が有効になっていることを確認して、先に firewalld をセットアップしてください。sshguard から設定ゾーンに書き込みが行われるようにするには、以下のコマンドを実行します:\n\n```\n# firewallctl zone \"<zone name>\" --permanent add rich-rule \"rule source ipset=sshguard4 drop\"\n```\n\nIPv6 を使っている場合、sshguard4 を sshguard6 に置き換えて同じコマンドを実行してください。設定したら、以下のコマンドを実行します:\n\n```\n# firewall-cmd --reload\n```\n\n以下のコマンドで確認できます:\n\n```\n# firewall-cmd --info-ipset=sshguard4\n```\n\n最後に /etc/sshguard.conf の BACKEND 行を以下のように変更してください:\n\n```\nBACKEND=\"/usr/lib/sshguard/sshg-fw-firewalld\"\n```\n\n"
+    },
+    {
+      "title": "UFW",
+      "level": 4,
+      "content": "UFW をインストール・有効化している場合、DROP の制御を sshguard に渡す必要があります。/etc/ufw/before.rules を編集して以下の行を記述することで設定できます。ループバックデバイスのセクションの後に挿入してください。\n\n```\n/etc/ufw/before.rules\n```\n\n```\n# allow all on loopback\n-A ufw-before-input -i lo -j ACCEPT\n-A ufw-before-output -o lo -j ACCEPT\n\n# hand off control for sshd to sshguard\n# ipv4\n:sshguard - [0:0]\n-A ufw-before-input -p tcp --dport 22 -j sshguard\n#for ipv6\n:sshguard - [0:0]\n-A ufw6-before-input -p tcp --dport 22 -j sshguard\n```\n\n上記の変更を行った後に ufw を再起動してください。\n\n"
+    },
+    {
+      "title": "iptables",
+      "level": 4,
+      "content": "必要な設定は iptables に sshguard という名前のチェインを作成することです。sshguard はこのチェインに自動的に悪いホストからのパケットを拒否するルールを追加します:\n\n```\n# iptables -N sshguard\n```\n\n次に INPUT チェインから sshguard チェインにジャンプするルールを追加します。以下のルールは sshguard が保護するポートを処理する他のルールよりも前に追加してください [1]:\n\n```\n# iptables -A INPUT -m multiport -p tcp --destination-ports 21,22 -j sshguard\n```\n\nルールを保存するには:\n\n```\n# iptables-save > /etc/iptables/iptables.rules\n```\n\n"
+    },
+    {
+      "title": "nftables",
+      "level": 4,
+      "content": "/etc/sshguard.conf を編集して BACKEND の値を以下のように変更してください:\n\n```\n/etc/sshguard.conf\n```\n\n```\nBACKEND=\"/usr/lib/sshguard/sshg-fw-nft-sets\"\n```\n\nsshguard.service を起動・有効化したときに、ip と ip6 アドレスファミリーに新しいテーブル sshguard が追加され、受信トラフィックが sshguard の IP アドレスリストを経由してフィルタリングされるようになります。sshguard テーブルのチェインのプライオリティは -10 に設定されるため、他のルールよりも先に処理されます。詳しくは sshguard-setup(7) や nftables を見てください。\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 3,
+      "content": "sshguard.service を起動・有効化してください。\n\n"
+    },
+    {
+      "title": "syslog-ng",
+      "level": 3,
+      "content": "syslog-ng をインストールしている場合、コマンドラインから直接 sshguard を起動することができます:\n\n```\n/usr/sbin/sshguard -l /var/log/auth.log -b /var/db/sshguard/blacklist.db\n```\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "sshguard を使うのに必要な設定は /etc/sshguard.conf で行います。コメント付きの例は /usr/share/doc/sshguard/sshguard.conf.sample にあります。また、Bitbucket sshguard.conf.sample にもあります。\n\n"
+    },
+    {
+      "title": "脅威レベルの変更",
+      "level": 3,
+      "content": "デフォルトの設定ファイルでは、違反者の \"danger\" レベルが 120 に淘汰すると永続的に ban されるようになっています (もしくはログインを12回失敗。詳しくは 攻撃の脅威 を参照)。ブラックリストファイルの前に脅威レベルを付けることで挙動を変えることができます:\n\n```\nBLACKLIST_FILE=200:/var/db/sshguard/blacklist.db\n```\n\n上記の例では 200: によって、ホストの脅威レベルが 200 にまで達したときに sshguard によって永続的に ban されるようになります。\n\n設定後 sshguard.service ユニットを 再起動 してください。\n\n"
+    },
+    {
+      "title": "適度に ban を行う例",
+      "level": 3,
+      "content": "ここでは、さまざまなオプションを説明するために、デフォルトよりも少し積極的な ban ルールを提案します。\n\n- sshd と vsftpd を systemd/ジャーナル のログから監視する。\n- 2 回の試行 (それぞれのコストは 10、THRESHOLD パラメーターの値が 20 として) で 180 秒間攻撃者をブロックし、その後のブロック時間は 1.5 倍長くなります。この 1.5 倍の遅延は内部的なものであり、設定では制御されないことに注意してください。\n- 攻撃者は 10 回の試行後に永続的にブラックリストに登録されます (10 回の試行のコストは 10 であり、BLACKLIST_FILE パラメーターの値が 100 とします。)\n- 攻撃者の IP だけでなく、すべての IPv4 サブネット 24 (CIDR 表記) をブロックします。\n\n```\n/etc/sshguard.conf\n```\n\n```\n# Full path to backend executable (required, no default)\nBACKEND=\"/usr/lib/sshguard/sshg-fw-iptables\"\n\n# Log reader command (optional, no default)\nLOGREADER=\"LANG=C.UTF-8 /usr/bin/journalctl -afb -p info -n1 -t sshd -t vsftpd -o cat\"\n\n# How many problematic attempts trigger a block\nTHRESHOLD=20\n# Blocks last at least 180 seconds\nBLOCK_TIME=180\n# The attackers are remembered for up to 3600 seconds\nDETECTION_TIME=3600\n\n# Blacklist threshold and file name\nBLACKLIST_FILE=100:/var/db/sshguard/blacklist.db\n\n# IPv6 subnet size to block. Defaults to a single address, CIDR notation. (optional, default to 128)\nIPV6_SUBNET=64\n# IPv4 subnet size to block. Defaults to a single address, CIDR notation. (optional, default to 32)\nIPV4_SUBNET=24\n```\n\n"
+    },
+    {
+      "title": "積極的に ban を行う",
+      "level": 3,
+      "content": "断続的な攻撃に悩まされているユーザーにとっては、もっとアグレッシブな ban ポリシーを有効にしたほうが効果的でしょう。偶発的にログインを失敗するようなことは絶対ないと言えるのであれば、一度でもログインを失敗したらホストを自動的に ban するよう SSHGuard を設定することができます。設定ファイルのパラメータを以下のように編集してください:\n\n```\nTHRESHOLD=10\nBLACKLIST_FILE=10:/var/db/sshguard/blacklist.db\n```\n\n設定したら sshguard.service ユニットを 再起動 してください。\n\nまた、多重認証を拒否するには /etc/ssh/sshd_config に以下のように定義します:\n\n```\nMaxAuthTries 1\n```\n\n変更を適用するには sshd.service を 再起動 してください。\n\n"
+    },
+    {
+      "title": "ban を解除する",
+      "level": 3,
+      "content": "自分自身が ban されてしまった場合、自動的に ban が解除されるのを待つか、iptables や nftables を使って自分で ban を解除することができます。\n\n"
+    },
+    {
+      "title": "iptables",
+      "level": 4,
+      "content": "まず sshguard によって IP が ban されているか確認してください。\n\n```\n# iptables --list sshguard --line-numbers --numeric\n```\n\nそれから次のコマンドを使って ban を解除します、line-number は前のコマンドで確認した番号に置き換えてください:\n\n```\n# iptables --delete sshguard line-number\n```\n\n永続的に ban を解除するには /var/db/sshguard/blacklist.db から IP アドレスを削除する必要があります。\n\n"
+    },
+    {
+      "title": "nftables",
+      "level": 4,
+      "content": "attackers から自分の IP アドレスを削除するには:\n\n```\n# nft delete element family sshguard attackers { ip_address }\n```\n\nfamily には ip または ip6 のどちらかを指定します。\n\n"
+    },
+    {
+      "title": "ログ出力",
+      "level": 3,
+      "content": "sshguard に渡されたものを確認したい場合、/usr/lib/systemd/scripts/sshguard-journalctl のスクリプトや systemd サービス sshguard.service をチェックしてください。以下のコマンドでもターミナルで同じログを表示できます:\n\n```\n$ journalctl -afb -p info SYSLOG_FACILITY=4 SYSLOG_FACILITY=10\n```\n\n"
+    }
+  ]
+}

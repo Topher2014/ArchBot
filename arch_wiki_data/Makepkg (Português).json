@@ -1,0 +1,131 @@
+{
+  "title": "Makepkg (Português)",
+  "url": "https://wiki.archlinux.org/title/Makepkg_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Criando pacotes\n- PKGBUILD\n- Arch User Repository\n- pacman\n- Repositórios oficiais\n- Arch Build System\n\nmakepkg é um script usado para automatizar a compilação de pacotes. Os requisitos para usar o script são uma plataforma tipo Unix capaz de compilar e um PKGBUILD.\n\nO makepkg é fornecido pelo pacote pacman.\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 2,
+      "content": "Veja makepkg.conf(5) para detalhes sobre as opções de configuração do makepkg.\n\nA configuração do sistema está disponível em /etc/makepkg.conf, mas alterações específicas para cada usu[ario podem ser feitas em $XDG_CONFIG_HOME/pacman/makepkg.conf ou ~/.makepkg.conf. É recomendado revisar a configuração antes de compilar pacotes.\n\n"
+    },
+    {
+      "title": "Informação do empacotador",
+      "level": 3,
+      "content": "Cada pacote é marcado com metadados identificando, entre outros, também o empacotador. Por padrão, os pacotes compilados pelo usuário são marcados com Empacotador desconhecido. Se vários usuários estiverem compilando pacotes em um sistema, ou de outra forma estiverem distribuindo os pacotes para outros usuários, é conveniente fornecer contato real. Isso pode ser feito configurando a variável PACKAGER em makepkg.conf.\n\nPara verificar isso em um pacote instalado:\n\n```\n$ pacman -Qi pacote\n```\n\n```\n...\nEmpacotador       : John Doe <john@doe.com>\n...\n```\n\nPara automaticamente produzir pacotes assinados, defina também a variável GPGKEY em makepkg.conf.\n\n"
+    },
+    {
+      "title": "Saída de pacote",
+      "level": 3,
+      "content": "Por padrão, makepkg cria os tarballs de pacote no diretório atual de trabalho e baixa os dados fonte diretamente para o diretório src/. Caminhos personalizados podem ser configurados, por exemplo, para manter todos os pacotes compilados em ~/build/pacotes/ e todos os fontes em ~/build/fontes/.\n\nConfigure as seguintes variáveis do makepkg.conf, se necessário:\n\n- PKGDEST – diretório para armazenar pacotes resultantes\n- SRCDEST – diretório para armazenar dados fonte (links simbólicos serão colocados em src/ se ele aponta para outro lugar)\n- SRCPKGDEST – diretório para armazenar os pacotes fontes (compilado com makepkg -S)\n\n"
+    },
+    {
+      "title": "Verificação de assinatura",
+      "level": 3,
+      "content": "Se um arquivo de assinatura na forma de .sig ou .asc é parte do vetor fonte do PKGBUILD, o makepkg tenta automaticamente verificá-la. No caso do chaveiro do usuário não contém a chave pública necessária para verificação de assinatura, o makepkg vai abortar a instalação com uma mensagem de que a chave PGP não pôde ser verificada.\n\nSe uma chave pública necessária para um pacote está faltando, o PKGBUILD muito provavelmente vai conter uma entrada validpgpkeys com os IDs de chaves necessárias. Importe-a manualmente, ou localize-a em um servidor de chaves e importe-a de lá. Para temporariamente desabilitar verificação de assinatura, execute o makepkg com a opção --skippgpcheck.\n\n"
+    },
+    {
+      "title": "Uso",
+      "level": 2,
+      "content": "Antes de continuar, instale o grupo base-devel. Os pacotes que pertencem a este grupo não são exigidos na lista de dependência de compilação (makedepends) nos arquivos PKGBUILD.\n\n- Certifique-se de que o sudo está configurado corretamente para comandos passados para o pacman.\n- Executar makepkg em si como root não é permitido.[2] Além disso, como um PKGBUILD pode conter comandos arbitrários, compilar como root geralmente é considerado inseguro.[3] Usuários que não possuem acesso a uma conta de usuário comum devem executar o makepkg como o usuário nobody.\n\nPara compilar um pacote, deve-se primeiro criar um PKGBUILD, ou um script de compilação, como descrito em Criando pacotes. Scripts existentes estão disponíveis na árvore do Arch Build System (ABS) ou do AUR. Uma vez em posse de um PKGBUILD, altere o diretório no qual está salvo e execute o seguinte comando para compilar o pacote:\n\n```\n$ makepkg\n```\n\nSe estiverem faltando dependências necessárias, o makepkg emitirá um aviso antes de falhar. Para compilar o pacote e instalar as dependências necessárias, adicione a opção -s/--syncdeps:\n\n```\n$ makepkg --syncdeps\n```\n\nAdicionar as opções -r/--rmdeps faz com que o makepkg remova as dependências de compilação logo em seguida, já que não são mais necessárias. Se estiver compilando pacotes constantemente, considere usar Pacman/Dicas e truques#Removendo pacotes não usados (órfãos) de vez em quando.\n\n- Essas dependências devem estar disponíveis nos repositórios configurados; veja pacman (Português)#Repositórios e espelhos para detalhes. Alternativamente, pode-se instalar manualmente as dependências antes de compilar (pacman -S --asdeps dep1 dep2).\n- Apenas valores globais são usados ao instalar dependências, ou seja, qualquer sobrescrita feita em uma função de empacotamento de pacotes divididos não serão sadas.\n\nUma vez que todas as dependências estejam satisfeitas e os pacotes compilados com sucesso, um arquivo de pacote (pkgname-pkgver.pkg.tar.zst) será criado no diretório. Para instalar, use -i/--install (o mesmo que pacman -U pkgname-pkgver.pkg.tar.zst):\n\n```\n# pacman --install\n```\n\nPara limpar arquivos e diretórios restantes, tais como arquivos extraídos para $$srcdir, adicione a opção -c/--clean. Isso é útil para várias compilações do mesmo pacote ou ao atualizar a versão do pacote, enquanto usa o mesmo diretório de compilação. Isso evita arquivos obsoletos e remanescentes de serem carregados para novas compilações:\n\n```\n$ makepkg --clean\n```\n\nPara mais informações, veja makepkg(8).\n\n"
+    },
+    {
+      "title": "Reduzir tempos de download e extração de fontes",
+      "level": 3,
+      "content": "Faça uso de SRCDEST, especialmente ao compilar pacotes VCS, para economizar tempo ao adquirir e desempacotar fontes em recompilações subsequentes.\n\n"
+    },
+    {
+      "title": "Compilando binários otimizados",
+      "level": 3,
+      "content": "Uma melhoria de desempenho do software empacotado pode ser conseguida ao habilitar otimizações do compilador para a máquina host. A desvantagem é que os binários compilados para uma arquitetura de processador específica não serão executados corretamente em outras máquinas. Nas máquinas x86_64, raramente existem ganhos de desempenho reais significativos que justificariam investir o tempo para reconstruir pacotes oficiais.\n\nNo entanto, é muito fácil reduzir o desempenho usando flags de compilação \"não padronizadas\". Muitas otimizações de compilação só são úteis em certas situações e não devem ser aplicadas indiscriminadamente em cada pacote. A menos que dados de benchmark estejam disponíveis para provar que algo é mais rápido, há uma chance muito boa de não ser! Os artigos da wiki do Gentoo otimização do GCC e CFLAGS seguras (ambos em inglês) fornecem mais informações detalhadas sobre a otimização do compilador.\n\nAs opções passadas para um compilador C/C++ (ex.: gcc ou clang) são controladas pelas variáveis de ambiente CFLAGS, CXXFLAGS eCPPFLAGS. Para usar o sistema de compilação do Arch, o makepkg expõe essas variáveis de ambiente como opções de configuração no makepkg.conf. Os valores padrão são configurados para produzir binários genéricos que podem ser instalados em uma ampla gama de máquinas.\n\n- A configuração fornecida com o código fonte no Makefile ou em um argumento específico na linha de comando de compilação tem a preferência e pode potencialmente sobrescrever aquela no makepkg.conf.\n\nO GCC pode detectar e habilitar automaticamente otimizações seguras específicas para cada arquitetura. Para usar esse recurso, primeiro remova os sinalizadores -march e -mtune, então adicione -march = native. Por exemplo:\n\n```\n/etc/makepkg.conf\n```\n\n```\nCFLAGS=\"-march=native -O2 -pipe -fno-plt\"\nCXXFLAGS=\"${CFLAGS}\"\n```\n\nPara ver quais sinalizadores isso habilita, execute:\n\n```\n$ gcc -march=native -v -Q --help=target\n```\n\nNote: **não vai** \n\nA partir do pacman versão 5.2.2, makepkg.conf também inclui substituições para a variável de ambiente RUSTFLAGS, para sinalizadores fornecidos ao compilador Rust. O compilador Rust também pode detectar e habilitar otimizações específicas de arquitetura adicionando -C target-cpu=native ao valor RUSTFLAGS fornecido:\n\n```\n/etc/makepkg.conf\n```\n\n```\nRUSTFLAGS=\"-C opt-level=2 -C target-cpu=native\"\n```\n\nPara ver quais recursos de CPU isso vai habilitar, execute:\n\n```\n$ rustc -C target-cpu=native --print cfg\n```\n\nExecutar --print cfg sem -C target-cpu=native irá imprimir a configuração padrão. O parâmetro opt-level pode ser alterado para 3, s ou z conforme desejado. Consulte a documentação do compilador Rust para obter detalhes.\n\n"
+    },
+    {
+      "title": "Compilação paralela",
+      "level": 4,
+      "content": "O sistema de compilação do make usa a variável de ambiente MAKEFLAGS para especificar opções adicionais para o make. A variável também pode ser definida no arquivo makepkg.conf.\n\nOs usuários com sistemas multi-core/multiprocessados podem especificar o número de trabalhos a serem executados simultaneamente. Isso pode ser realizado com o uso de nproc para determinar o número de processadores disponíveis, ex. MAKEFLAGS=\"-j$(nproc)\". Alguns PKGBUILD substituem especificamente isso com -j1, devido a condições de corrida em certas versões ou simplesmente porque não é suportado em primeiro lugar. Os pacotes que não conseguem ser compilados devido a isso devem ser relatados no rastreador de erros (ou no caso dos pacotes do AUR, ao mantenedor do pacote) depois de ter certeza de que o erro está sendo realmente causado pelo MAKEFLAGS.\n\nVeja make(1) para uma lista completa de opções disponíveis.\n\n"
+    },
+    {
+      "title": "Compilando de arquivos na memória",
+      "level": 4,
+      "content": "Como a compilação requer muitas operações de E/S e lidar com arquivos pequenos, mover o diretório de trabalhos para um tmpfs pode trazer melhorias em tempos de compilação.\n\nA variável BUILDDIR pode ser temporariamente exportada para makepkg para definir o diretório de compilação para um tmpfs existente. Por exemplo:\n\n```\n$ BUILDDIR=/tmp/makepkg makepkg\n```\n\nUma configuração persistente pode ser feita no makepkg.conf descomentando a opção BUILDDIR, que é encontrada no fim da seção BUILD ENVIRONMENT no arquivo padrão /etc/makepkg.conf. Definir esses valores para, por exemplo, BUILDDIR=/tmp/makepkg fará uso do sistema de arquivos temporário /tmp padrão do Arch.\n\n- Evite compilar pacotes grandes no tmpfs para evitar ficar sem memória.\n- O diretório tmpfs deve ser montado sem a opção noexec; do contrário, ele vai impedir que binários sejam executados.\n- Tenha em mente que pacotes compilados no tmpfs não persistirá após reinicialização. Considere configurar a opção PKGDEST apropriadamente para mover o pacote compilado automaticamente para um diretório persistente.\n\n"
+    },
+    {
+      "title": "Usando cache de compilação",
+      "level": 4,
+      "content": "O uso de ccache pode melhorar os tempos de compilação ao armazenar em cache os resultados de compilações para uso sucessivo.\n\n"
+    },
+    {
+      "title": "Gerar novos checksums",
+      "level": 3,
+      "content": "Instale pacman-contrib e execute o seguinte comando no mesmo diretório que o arquivo PKGBUILD para gerar novas somas de verificação (checksums):\n\n```\n$ updpkgsums\n```\n\nupdpkgsums usa makepkg --geninteg para gerar as somas de verificação. Veja esta discussão de fórum para obter mais detalhes.\n\nAs somas de verificação também podem ser obtidos com, por exemplo, sha256sum e adicionados ao vetor sha256sums manualmente.\n\n"
+    },
+    {
+      "title": "Usar outros algoritmos de compressão",
+      "level": 3,
+      "content": "Para acelerar o empacotamento e a instalação, com a consequência de ter arquivos de pacotes maiores, altere PKGEXT.\n\nPor exemplo, o seguinte pula a compressão do arquivo de pacote, o qual vai, por sua vez, não ter a necessidade de descompressão na instalação:\n\n```\n$ PKGEXT='.pkg.tar' makepkg\n```\n\nUm outro exemplo abaixo mostra o uso do algoritmo lzop, com o pacote lzop necessário:\n\n```\n$ PKGEXT='.pkg.tar.lzo' makepkg\n```\n\nPara fazer uma dessas configurações permanentes, configure PKGEXT em /etc/makepkg.conf.\n\n"
+    },
+    {
+      "title": "Usando vários núcleos na compressão",
+      "level": 3,
+      "content": "O xz oferece suporte a multiprocessamento simétrico (SMP) por meio do sinalizador --threads para acelerar a compressão. Por exemplo, para deixar o makepkg usar quantos núcleos de CPU for possível para comprimir os pacotes, edite o vetor COMPRESSXZ em /etc/makepkg.conf:\n\n```\nCOMPRESSXZ=(xz -c -z --threads=0 -)\n```\n\nO pigz é uma implementação paralela para o gzip que, por padrão, usa todos os núcleos disponíveis na CPU (o sinalizador -p/--processes pode ser usado para empregar menos núcleos):\n\n```\nCOMPRESSGZ=(pigz -c -f -n)\n```\n\npbzip2 é um drop-in, implementação paralela para bzip2 que também usa todos os núcleos de CPU disponíveis por padrão. A opção -p# pode ser usado para empregar menos núcleos (note: nenhum espaço entre o -p e número de núcleos).\n\n```\nCOMPRESSBZ2 =(pbzip2 -c -f)\n```\n\nzstd possui suporte a multiprocessamento simétrico (SMP) por meio do sinalizador --threads para acelerar compressão. Por exemplo, para deixar o makepkg usar o máximo possível de núcleos de CPU para comprimir pacotes, edite o vetor COMPRESSZST em /etc/makepkg.conf:\n\n```\nCOMPRESSZST=(zstd -c -z -q --threads=0 -)\n```\n\n"
+    },
+    {
+      "title": "Mostrar pacotes com um empacotador específico",
+      "level": 3,
+      "content": "expac é um utilitário de extração de base de dados do pacman. Este comando mostra todos os pacotes instalados no sistema com o empacotador chamado nome-empacotador:\n\n```\n$ expac \"%n %p\" | grep \"nome-empacotador\" | column -t\n```\n\nIsso mostra todos os pacotes instalados no sistema com o empacotador definido na variável PACKAGER do /etc/makepkg. Isso mostra apenas pacotes que estão em um repositório definido em /etc/pacman.conf.\n\n```\n$ . /etc/makepkg.conf; grep -xvFf <(pacman -Qqm) <(expac \"%n\\t%p\" | grep \"$PACKAGER$\" | cut -f1)\n```\n\n"
+    },
+    {
+      "title": "Compilar pacotes 32 bits em um sistema 64 bits",
+      "level": 3,
+      "content": "Veja Diretrizes de pacotes 32-bit.\n\n"
+    },
+    {
+      "title": "Assinatura autônoma de pacote",
+      "level": 3,
+      "content": "Uma pessoa pode não estar disponível para fornecer a senha para a chave privada gpg usada para fazer login em ambientes de compilação automatizados, como Jenkins. É desaconselhável armazenar uma chave gpg privada em um sistema sem uma senha.\n\nUm pacote zst resultante feito com makepkg ainda pode ser assinado após a criação:\n\n```\n$ gpg --detach-sign --pinentry-mode loopback --passphrase --passphrase-fd 0 --output RecémCompilado.pkg.tar.zst.sig --sign RecémCompilado.pkg.tar.zst\n```\n\nonde a senha GPG é fornecida com segurança e obscurecida pelo seu conjunto de automação de escolha.\n\nO arquivo zst e sig resultante pode ser referenciado por clientes pacman esperando uma assinatura válida e repositórios criados com repo-add --sign ao hospedar seu próprio repositório.\n\n"
+    },
+    {
+      "title": "URIs magnéticos",
+      "level": 3,
+      "content": "Suporte para recursos de URIs magnéticos (com prefixo magnet://) no campo source pode ser adicionado usando o agente de download transmission-dlagentAUR.\n\n"
+    },
+    {
+      "title": "Especificando diretório de instalação para pacotes baseados em QMAKE",
+      "level": 3,
+      "content": "O makefile gerado pelo qmake usa a variável de ambiente INSTALL_ROOT para especificar onde o programa deve ser instalado. Então, essa função package deve funcionar:\n\n```\nPKGBUILD\n```\n\n```\n...\npackage() {\n\tcd \"$srcdir/${pkgname%-git}\"\n\tmake INSTALL_ROOT=\"$pkgdir\" install\n}\n...\n```\n\nNote que o qmake também tem que ser configurado adequadamente. Por exemplo, coloque isso no arquivo .pro correspondente:\n\n```\nSeuProjeto.pro\n```\n\n```\n...\ntarget.path = /usr/local/bin\nINSTALLS += target\n...\n```\n\n"
+    },
+    {
+      "title": "AVISO: O pacote contém referência para $srcdir",
+      "level": 3,
+      "content": "De alguma forma, as strings literais contidas nas variáveis $srcdir ou $pkgdir acabaram em um dos arquivos instalados no pacote.\n\nPara identificar quais arquivos, execute o seguinte do diretório de compilação makepkg:\n\n```\n$ grep -R \"$PWD/src\" pkg/\n```\n\nUma causa possível seria pelo uso da macro __FILE__ no código C/C++ com caminho completo passado para o compilador.\n\n"
+    },
+    {
+      "title": "Makepkg falha em baixar dependências quando por trás de um proxy",
+      "level": 3,
+      "content": "Quando o makepkg chama dependências, ele chama o pacman para instalar os pacotes, o que requer privilégios administrativos via sudo. No entanto, o sudo não passa nenhuma variável de ambiente para o ambiente privilegiado, e inclui as variáveis relacionadas ao proxy ftp_proxy, http_proxy, https_proxy e no_proxy.\n\nPara que ter o makepkg funcionando por trás de um proxy, Use um dos métodos a seguir.\n\n"
+    },
+    {
+      "title": "Habilitar proxy definindo sua URL no XferCommand",
+      "level": 4,
+      "content": "O XferCommand pode ser definido para usar a URL de proxy desejada no /etc/pacman.conf. Adicione ou descomente a linha a seguir no pacman.conf[5]:\n\n```\n/etc/pacman.conf\n```\n\n```\n...\nXferCommand = /usr/bin/curl -x http://usuário:senha@proxy.proxyhost.com:80 -L -C - -f -o %o %u\n...\n```\n\n"
+    },
+    {
+      "title": "Habilitar proxy via env_keep do sudoers",
+      "level": 4,
+      "content": "Alternativamente, pode-se usar a opção env_keep do sudoers, a qual permite preservar as variáveis de ambiente dadas no ambiente privilegiado. Veja sudo#Variáveis de ambiente para mais informações.\n\n"
+    },
+    {
+      "title": "Makepkg falha, mas make obtém sucesso",
+      "level": 3,
+      "content": "Se algo compilar com sucesso usando make, mas falhar através do makepkg, é quase certo que seja porque o /etc/makepkg.conf define uma variável de compilação incompatível. Tente adicionar esses sinalizadores ao array options do PKGBUILD:\n\n!buildflags, para evitar seu CPPFLAGS, CFLAGS, CXXFLAGS e LDFLAGS padrão.\n\n!makeflags, para evitar seu MAKEFLAGS padrão.\n\n!debug, para evitar seu DEBUG_CFLAGS e DEBUG_CXXFLAGS padrão, no caso do PKGBUILD ser uma compilação de depuração.\n\nSe alguma dessas corrigir o problema, isso pode merecer um relatório de bug ao upstream, presumindo que o sinalizador ofensivo foi identificado.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- makepkg(8)\n- makepkg.conf(5)\n- Um breve passeio no processo do makepkg\n- Código fonte do makepkg\n\n"
+    }
+  ]
+}

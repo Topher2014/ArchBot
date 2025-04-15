@@ -1,0 +1,106 @@
+{
+  "title": "Multiboot USB drive (Português)",
+  "url": "https://wiki.archlinux.org/title/Multiboot_USB_drive_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- GRUB (Português)\n- Syslinux\n- Archiso (Português)\n\nUma unidade flash de múltipla inicialização USB permite inicializar múltiplos arquivos ISO a partir de um único dispositivo. Os arquivos ISO podem ser copiados para o dispositivo e inicializados diretamente sem a necessidade de extraí-los. Existem vários métodos disponíveis, mas eles podem não funcionar para todos arquivos ISO.\n\n"
+    },
+    {
+      "title": "Usando GRUB e dispositivos de loopback",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n"
+    },
+    {
+      "title": "Vantagens:",
+      "level": 4,
+      "content": "- a necessidade de uma única partição;\n- todos arquivos ISO podem ser localizados no mesmo diretório;\n- adicionar arquivos ISO é muito simples.\n\n"
+    },
+    {
+      "title": "Desvantagens:",
+      "level": 4,
+      "content": "- nem todas as imagens ISO são compatíveis;\n- o menu de inicialização original para o arquivo ISO não será exibido;\n- pode ser difícil encontrar uma entrada de inicialização funcional.\n\n"
+    },
+    {
+      "title": "Preparação",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nCrie pelo menos uma partição e um sistema de arquivos suportado pelo GRUB na unidade USB. Veja Partitioning e File systems#Create a file system. Escolha o tamanho baseado no tamanho total dos arquivos ISO que desejar armazenar na unidade, mais um espaço adicional para o bootloader.\n\n"
+    },
+    {
+      "title": "Instalação única",
+      "level": 4,
+      "content": "Monte o sistema de arquivos localizado na unidade USB:\n\n```\n# mount /dev/sdXY /mnt\n```\n\nCrie o diretório /boot:\n\n```\n# mkdir /mnt/boot\n```\n\nInstale GRUB na unidade USB:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/mnt/boot /dev/sdX\n```\n\nNo caso de você desejar inicializar ISOs em modo UEFI, terá de instalar grub para o alvo UEFI:\n\n```\n# grub-install --target=x86_64-efi --removable --boot-directory=/mnt/boot --efi-directory=/mnt\n```\n\nPara UEFI, a partição deverá ser a primeira da tabela de partições MBR e deverá ser formatada com FAT32.\n\n"
+    },
+    {
+      "title": "inicialização híbrida com UEFI GPT + BIOS GPT/MBR",
+      "level": 4,
+      "content": "Esta configuração é útil para criar uma unidade USB universal, teoricamente inicializável em qualquer computador. Em primeiro lugar, você deverá criar uma tabela de partições GPT em seu dispositivo. Serão necessárias, pelo menos, 3 partições:\n\n1. Uma partição do tipo BIOS boot (código do gdisk EF02). Esta partição deverá ter 1 MiB de tamanho\n1. Uma partição do tipo EFI System partition (código do gdisk EF00 com uma EFI system partition#Formatar a partição|FAT32 filesystem). Esta partição poderá ser pequena, como 50 MiB.\n1. Sua partição de dados (use um sistema de arquivos suportado pelo GRUB). Esta partição poderá ocupar o espaço restante da unidade USB.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nA seguir você deverá criar uma tabela de partições MBR híbrida, pois definir uma boot flag no setor protetivo da MBR poderá não ser suficiente em alguns casos.\n\nExemplo de criação de uma tabela de partições MBR híbrida usando gdisk:\n\n```\n# gdisk /dev/sdX\n\nCommand (? for help): r\nRecovery/transformation command (? for help): h\n\nWARNING! Hybrid MBRs are flaky and dangerous! If you decide not to use one,\njust hit the Enter key at the below prompt and your MBR partition table will\nbe untouched.\n\nType from one to three GPT partition numbers, separated by spaces, to be added to the hybrid MBR, in sequence: 1 2 3\nPlace EFI GPT (0xEE) partition first in MBR (good for GRUB)? (Y/N): N\n\nCreating entry for GPT partition #1 (MBR partition #1)\nEnter an MBR hex code (default EF):\nSet the bootable flag? (Y/N): N\n\nCreating entry for GPT partition #2 (MBR partition #2)\nEnter an MBR hex code (default EF):\nSet the bootable flag? (Y/N): N\n\nCreating entry for GPT partition #3 (MBR partition #3)\nEnter an MBR hex code (default 83):\nSet the bootable flag? (Y/N): Y\n\nRecovery/transformation command (? for help): x\nExpert command (? for help): h\nExpert command (? for help): w\n\nFinal checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING\nPARTITIONS!!\n\nDo you want to proceed? (Y/N): Y\n```\n\nNão se esqueça de formatar as partições:\n\n```\n# mkfs.fat -F32 /dev/sdX2\n# mkfs.ext4 /dev/sdX3\n```\n\nAgora será possível instalar GRUB para suportar ambos EFI + GPT e BIOS + GPT/MBR. A configuração do grub (--boot-directory) poderá ser mantida no mesmo lugar.\n\nPrimeiro, você deverá montar a partição do tipo 'EFI system' e a partição de dados da unidade USB.\n\nUm exemplo disso poderia ser como a seguir:\n\n```\n# mount /dev/sdX3 /mnt\n# mkdir -p /mnt/boot/EFI\n# mount /dev/sdX2 /mnt/boot/EFI\n```\n\nEntão, você poderá instalar GRUB para UEFI com:\n\nNota: na maioria dos casos EFI_MOUNTPOINT corresponde ao subdiretório /mnt/boot/EFI na unidade USB montada.\n\n```\n# grub-install --target=x86_64-efi --recheck --removable --efi-directory=/EFI_MOUNTPOINT --boot-directory=/DATA_MOUNTPOINT/boot\n```\n\nE para BIOS com:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/DATA_MOUNTPOINT/boot /dev/sdX\n```\n\nComo opção de reserva, você poderá também instalar o GRUB na sua partição MBR inicializável:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/DATA_MOUNTPOINT/boot /dev/sdX3\n```\n\n"
+    },
+    {
+      "title": "Usando um modelo",
+      "level": 4,
+      "content": "Existem alguns projetos no git que fornecem alguns arquivos de configuração do GRUB preexistentes, e um grub.cfg genérico que poderá ser usado para carregar outras entradas de inicialização sob demanda, exibindo-as somente caso os arquivos ISO especificados - ou pastas que contenham-nos - estiverem presentes na unidade.\n\nMultiboot USB: https://github.com/hackerncoder/multibootusb\n\nGLIM (GRUB2 Live ISO Multiboot): https://github.com/thias/glim\n\n"
+    },
+    {
+      "title": "Configuração manual",
+      "level": 4,
+      "content": "Para a proposta de uma unidade USB inicializável, é mais fácil editar o arquivo grub.cfg manualmente do que gerá-lo. Alternativamente, faça as seguintes alterações em /etc/grub.d/40_custom ou /mnt/boot/grub/custom.cfg e gere o /mnt/boot/grub/grub.cfg usando grub-mkconfig.\n\nComo é recomendado usar um nome persistente ao invés de /dev/sdxY para identificar a partição na unidade USB onde estarão as imagens, defina uma variável conveniente para manter o valor. Se as imagens ISO estiverem na mesma partição do GRUB, use o seguinte para ler o UUID na inicialização:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# caminho para a partição onde estão as imagens ISO (usando UUID)\nprobe -u $root --set=rootuuid\nset imgdevpath=\"/dev/disk/by-uuid/$rootuuid\"\n```\n\nOu especifique explicitamente a UUID:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# caminho para a partição onde estão as imagens ISO (usando UUID)\nset imgdevpath=\"/dev/disk/by-uuid/UUID_value\"\n```\n\nAlternativamente, use a LABEL do dispositivo ao invés da UUID:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# caminho para a partição onde estão as imagens ISO (usando LABEL)\nset imgdevpath=\"/dev/disk/by-label/label_value\"\n```\n\nA UUID ou LABEL necessária poderá ser encontrada usando lsblk -f. Não use a mesma LABEL do Arch ISO para a unidade USB, caso contrário o processo de inicialização falhará.\n\nPara finalizar a configuração, uma entrada de inicialização para cada imagem ISO deverá ser adicionada abaixo deste cabeçalho, veja exemplos na próxima seção.\n\n"
+    },
+    {
+      "title": "Entradas de inicialização",
+      "level": 3,
+      "content": "Assume-se que as imagens ISO estão armazenadas no diretório boot/iso/ e no mesmo sistema de arquivos onde o GRUB está instalado. Do contrário, será necessário prefixar o caminho para o arquivo ISO com a identificação do dispositivo ao usar o comando loopback, por exemplo loopback loop (hd1,2)$isofile. Como esta identificação de dispositivos não é persistente, não será usada em exemplos nesta seção.\n\nPode-se usar a nomenclatura de dispositivo de bloco persistente dessa forma. Substitua a UUID de acordo com a UUID do seu sistema de arquivos ISO.\n\n```\n# define globalmente (isto é, fora de qualquer menu de entrada)\ninsmod search_fs_uuid\nsearch --no-floppy --set=isopart --fs-uuid 123-456\n# depois, usa dentro de cada menu de entrada\nloopback loop ($isopart)$isofile\n```\n\n"
+    },
+    {
+      "title": "Lançamento mensal do Arch Linux",
+      "level": 4,
+      "content": "Veja também archiso (Português).\n\n```\nmenuentry '[loopback]archlinux-2020.10.01-x86_64.iso' {\n\tset isofile='/boot/iso/archlinux-2020.10.01-x86_64.iso'\n\tloopback loop $isofile\n\tlinux (loop)/arch/boot/x86_64/vmlinuz-linux img_dev=$imgdevpath img_loop=$isofile earlymodules=loop\n\tinitrd (loop)/arch/boot/intel-ucode.img (loop)/arch/boot/amd-ucode.img (loop)/arch/boot/x86_64/initramfs-linux.img\n}\n```\n\nVeja README.bootparams para opções de archiso suportados pela linha de comando do kernel.\n\n"
+    },
+    {
+      "title": "Memtest86+",
+      "level": 4,
+      "content": "Memtest86+ está incluido na ISO mensal.\n\n```\nmenuentry '[loopback]archlinux-2020.10.01-x86_64.iso' {\n\tset isofile='/boot/iso/archlinux-2020.10.01-x86_64.iso'\n\tloopback loop $isofile\n\tlinux16 (loop)/arch/boot/memtest\n}\n```\n\n"
+    },
+    {
+      "title": "Archboot",
+      "level": 4,
+      "content": "Veja também Archboot.\n\n```\nmenuentry '[loopback]archlinux-2014.11-1-archboot' {\n\tset isofile='/boot/iso/archlinux-2014.11-1-archboot.iso'\n\tloopback loop $isofile\n\tlinux (loop)/boot/vmlinuz_x86_64 iso_loop_dev=$imgdevpath iso_loop_path=$isofile\n\tinitrd (loop)/boot/initramfs_x86_64.img\n}\n```\n\n"
+    },
+    {
+      "title": "Usando Syslinux e memdisk",
+      "level": 2,
+      "content": "Usando o módulo memdisk, a imagem ISO é carregada na memória, e seu bootloader é carregado. Certifique-se de que o sistema que irá inicializar esta unidade USB tem uma quantidade de memória suficiente para o arquivo de imagem e para executá-la como um sistema operacional.\n\n"
+    },
+    {
+      "title": "Preparação",
+      "level": 3,
+      "content": "Certifique-se de que a unidade USB está adequadamente Partitioning#particionada e que é uma partição com um sistema de arquivos suportado pelo Syslinux, como por exemplo FAT32 ou ext4. Então, instale o Syslinux nesta partição, veja Syslinux#BIOS systems.\n\n"
+    },
+    {
+      "title": "Instalação do módulo memdisk",
+      "level": 3,
+      "content": "O módulo memdisk não foi instalado no ato da instalação do Syslinux, portanto deverá ser instalado manualmente. Monte a partição onde o Syslinux está instalado para /mnt/ e copie o módulo do memdisk para o mesmo diretório onde o Syslinux estiver instalado:\n\n```\n# cp /usr/lib/syslinux/bios/memdisk /mnt/boot/syslinux/\n```\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 3,
+      "content": "Após copiar os arquivos ISO para a unidade USB, edite o Arquivo de configuração do Syslinux e crie as entradas de menu para as imagens ISO. Uma entrada básica corresponde a algo como:\n\n```\nboot/syslinux/syslinux.cfg\n```\n\n```\nLABEL some_label\n    LINUX memdisk\n    INITRD /path/to/image.iso\n    APPEND iso\n```\n\nVeja memdisk on Syslinux wiki para mais opções de configuração.\n\n"
+    },
+    {
+      "title": "Caveat para sistemas 32-bit",
+      "level": 3,
+      "content": "Ao inicializar um sistema 32-bit a partir de uma imagem maior do que 128MiB, é necessário aumentar o uso máximo de memória de vmalloc. Isto é feito adicionando vmalloc=valorM aos parâmetros do kernel, onde valor é maior do que o tamanho da imagem ISO, em MiB. [1]\n\nPor exemplo, ao inicializar um sistema 32-bit a partir da Arch installation ISO, pressione a tecla Tab sobre a entrada Boot Arch Linux (i686) no menu e adicione vmalloc=768M ao final. Pular este passo resultará no seguinte erro durante a inicialização:\n\n```\nmodprobe: ERROR: could not insert 'phram': Input/output error\n```\n\n"
+    },
+    {
+      "title": "Ferramentas automatizadas",
+      "level": 2,
+      "content": "- GRUB2 Live ISO Multiboot (GLIM) — Um conjunto de arquivos de configuração do GRUB para transformar uma unidade USB formatada em VFAT com imagens ISO de distribuições GNU/Linux em uma unidade USB de inicialização múltipla.\n\n- liveusb-builder — Um conjunto de scripts para criar uma unidade USB de inicialização múltipla para distribuições GNU/Linux.\n\n- MultiBootUSB — Um software Python cross-platform com interfaces CLI e GUI interfaces que permitem instalar e remover múltiplas imagens live do Linux em uma unidade USB.\n\n- Ventoy — Uma ferramenta de código aberto para criar uma unidade USB inicializávelpara arquivos ISO/WIM/IMG/VHD(x)/EFI. Não é necessário formatar o disco várias vezes, apenas copiar os arquivos para a unidade USB e inicialize-a diretamente.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- GRUB: https://help.ubuntu.com/community/Grub2/ISOBoot/Examples https://help.ubuntu.com/community/Grub2/ISOBoot GRUB Live ISO Multiboot - GRUB configurations for booting ISO images\n- Syslinux: Boot an ISO image\n\n- https://help.ubuntu.com/community/Grub2/ISOBoot/Examples\n- https://help.ubuntu.com/community/Grub2/ISOBoot\n- GRUB Live ISO Multiboot - GRUB configurations for booting ISO images\n\n- Boot an ISO image\n\n"
+    }
+  ]
+}

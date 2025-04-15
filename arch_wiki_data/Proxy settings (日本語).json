@@ -1,0 +1,101 @@
+{
+  "title": "Proxy settings (日本語)",
+  "url": "https://wiki.archlinux.org/title/Proxy_settings_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- HTTP トンネリング\n\nWikipedia によると:\n\nコンピュータネットワークにおいて、プロキシサーバーとは、他のサーバーからのリソースを求めるクライアントからのリクエストの仲介を行うサーバー（コンピュータシステムまたはアプリケーション）のことである。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 HTTPS MITM プロキシ\n- 2 環境変数 2.1 sudo でもプロキシを使う 2.2 ネットワークマネージャによる自動化\n- 3 libproxy について\n- 4 ウェブプロキシ 4.1 SSH によるシンプルなプロキシ\n- 5 SOCKS プロキシを使う 5.1 curl と pacman\n- 6 GNOME3 のプロキシ設定\n- 7 Microsoft NTLM プロキシ 7.1 Alpaca 7.1.1 使い方 7.1.2 サービスとして実行 7.2 Cntlm 7.2.1 設定 7.2.2 使い方\n\n- 2.1 sudo でもプロキシを使う\n- 2.2 ネットワークマネージャによる自動化\n\n- 4.1 SSH によるシンプルなプロキシ\n\n- 5.1 curl と pacman\n\n- 7.1 Alpaca 7.1.1 使い方 7.1.2 サービスとして実行\n- 7.2 Cntlm 7.2.1 設定 7.2.2 使い方\n\n- 7.1.1 使い方\n- 7.1.2 サービスとして実行\n\n- 7.2.1 設定\n- 7.2.2 使い方\n\n"
+    },
+    {
+      "title": "HTTPS MITM プロキシ",
+      "level": 2,
+      "content": "HTTPS 接続をデバッグする際、ブラウザの外で通信を監視できると便利な場合があります。TLS MITM で傍受するためには、ブラウザやシステムにおけるプロキシの 認証局 の信頼情報を登録する必要があります。\n\n- Charles — Javaで書かれたグラフィカルな試用版ソフト。\n\n- Fiddler — Mono 上で動くプロプライエタリでグラフィカルなツール。\n\n- microsocks — C言語で書かれたシンプルな SOCKS5 プロキシサーバー。\n\n- mitmproxy — Pythonで書かれたコマンドラインとウェブインターフェース。APIも提供しています。\n\n- sslsplit — TLS 接続に対して汎用的に動作するプロキシ。しかしブラウザにおける HTTP プロキシとしては使えません。C言語で書かれています。\n\n"
+    },
+    {
+      "title": "環境変数",
+      "level": 2,
+      "content": "(wget など) いくつかのプログラムは \"protocol_proxy\" という形式の環境変数を使って特定のプロコトルのプロキシを決定します (例: HTTP, FTP, ...)。\n\n以下はそれらの変数をシェルで設定する方法の例です:\n\n```\nexport http_proxy=http://10.203.0.1:5187/\nexport https_proxy=$http_proxy\nexport ftp_proxy=$http_proxy\nexport rsync_proxy=$http_proxy\nexport no_proxy=\"localhost,127.0.0.1,localaddress,.localdomain.com\"\n```\n\nプログラムによっては大文字の環境変数を使用することがあります。\n\nプロキシ環境変数を全てのユーザーと全てのアプリケーションで使えるようにするために、上記の export コマンドをスクリプトに追加することができます。例えば /etc/profile.d/ に \"proxy.sh\" を作成。スクリプトには実行可能属性を付与してください。この方法はプロクシ設定のオプションが存在しない Xfce などのデスクトップ環境を使ってる場合に便利です。例えば、Chromium ブラウザは Xfce の実行中、この方法を使って設定されて変数を利用します。\n\nシステム全体でプロキシを簡単に設定できることを標榜している ProxyMan という名前のツールも存在します。Git, npm, Dropbox などのソフトウェアのプロキシ設定も管理されます。Alan Pope によるスクリプトに影響を受けています。\n\nまた、.bashrc に関数を追加することで変数の切り替えを自動化することも可能です：\n\n```\nfunction proxy_on() {\n    export no_proxy=\"localhost,127.0.0.1,localaddress,.localdomain.com\"\n\n    if (( $# > 0 )); then\n        valid=$(echo $@ | sed -n 's/\\([0-9]\\{1,3\\}.\\)\\{4\\}:\\([0-9]\\+\\)/&/p')\n        if [[ $valid != $@ ]]; then\n            >&2 echo \"Invalid address\"\n            return 1\n        fi\n\n        export http_proxy=\"http://$1/\" \\\n               https_proxy=$http_proxy \\\n               ftp_proxy=$http_proxy \\\n               rsync_proxy=$http_proxy\n        echo \"Proxy environment variable set.\"\n        return 0\n    fi\n\n    echo -n \"username: \"; read username\n    if [[ $username != \"\" ]]; then\n        echo -n \"password: \"\n        read -es password\n        local pre=\"$username:$password@\"\n    fi\n\n    echo -n \"server: \"; read server\n    echo -n \"port: \"; read port\n    export http_proxy=\"http://$pre$server:$port/\" \\\n           https_proxy=$http_proxy \\\n           ftp_proxy=$http_proxy \\\n           rsync_proxy=$http_proxy \\\n           HTTP_PROXY=$http_proxy \\\n           HTTPS_PROXY=$http_proxy \\\n           FTP_PROXY=$http_proxy \\ \n           RSYNC_PROXY=$http_proxy\n}\n\nfunction proxy_off(){\n    unset http_proxy https_proxy ftp_proxy rsync_proxy \\\n          HTTP_PROXY HTTPS_PROXY FTP_PROXY RSYNC_PROXY\n    echo -e \"Proxy environment variable removed.\"\n}\n```\n\nユーザー名やパスワードが必要ない場合は削除してください。\n\n別の手段として、以下のスクリプトを使うこともできます。\"YourUserName\", \"ProxyServerAddress:Port\", \"LocalAddress\", \"LocalDomain\" の文字列を置き換えてから、~/.bashrc を編集して関数を含めて下さい。新しい bash ウィンドウでは自動的に新しい関数が使えます。既存の bash ウィンドウでは、source ~/.bashrc と入力して下さい。.bashrc に全てを記述するのではなく、functions などの別のファイルに関数の定義を記述して .bashrc に source functions を追加することもできます。また、\"myProxy\" はもっと短く書くことができます。\n\n```\n#!/bin/bash\n\nassignProxy(){\n  PROXY_ENV=\"http_proxy ftp_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY\"\n  for envar in $PROXY_ENV\n  do\n     export $envar=$1\n  done\n  for envar in \"no_proxy NO_PROXY\"\n  do\n     export $envar=$2\n  done\n}\n\nclrProxy(){\n   PROXY_ENV=\"http_proxy ftp_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY\"\n   for envar in $PROXY_ENV\n   do\n      unset $envar\n   done\n}\n\nmyProxy(){\n  user=YourUserName\n  read -p \"Password: \" -s pass &&  echo -e \" \"\n  proxy_value=\"http://$user:$pass@ProxyServerAddress:Port\"\n  no_proxy_value=\"localhost,127.0.0.1,LocalAddress,LocalDomain.com\"\n  assignProxy $proxy_value $no_proxy_value\n}\n```\n\n"
+    },
+    {
+      "title": "sudo でもプロキシを使う",
+      "level": 3,
+      "content": "プロキシ環境変数を (手動コマンドや .bashrc で) 単一のユーザーでのみ設定した場合、sudo でコマンドを実行するとプロキシ設定は失われます (もしくは yaourt などのプログラムで sudo を内部的に使用した場合)。\n\nこれを防ぐには、sudo の設定ファイルに次の行を追加します。\n\n```\n/etc/sudoers.d/05_proxy\n```\n\n```\nDefaults env_keep += \"*_proxy *_PROXY\"\n```\n\n"
+    },
+    {
+      "title": "ネットワークマネージャによる自動化",
+      "level": 3,
+      "content": "- NetworkManager は環境変数を変更することができません。\n- netctl は環境変数を設定することはできますが、netctl の子供ではない他のアプリケーションから変数を参照することはできません。\n\n"
+    },
+    {
+      "title": "libproxy について",
+      "level": 2,
+      "content": "libproxy (extra リポジトリに入っています) はネットワークリソースにアクセスする全てのアプリケーションによって使われることを目指している抽象レイヤーです。開発中ですが、広く採用されたら、GNU/Linux における統合的な自動プロキシ管理が実現するでしょう。\n\nlibproxy の役割は様々なソースからプロキシ設定を読み込んで、ライブラリを使用するアプリケーションから使えるようにすることです。libproxy の面白いところは Web Proxy Autodiscovery Protocol の実装と Proxy Auto-Config の実装を提供しているところです。\n\n/usr/bin/proxy バイナリには引数として URL を指定することができ、ネットワークリソースを取得するのに使えるプロキシを返します。\n\n"
+    },
+    {
+      "title": "ウェブプロキシ",
+      "level": 2,
+      "content": "- Squid はとても人気のあるキャッシュ/最適化プロキシです。\n- Privoxy は匿名化とアドブロックを行うプロキシです。\n- tinyproxy は小さく効率的な HTTP/SSL プロキシデーモンです。\n- シンプルなプロキシが欲しい場合、ssh とポートフォワーディングを使うことができます。\n\n"
+    },
+    {
+      "title": "SSH によるシンプルなプロキシ",
+      "level": 3,
+      "content": "以下のようにアカウント (USER) があるサーバー (HOST) に接続してください:\n\n```\n$ ssh -D PORT USER@HOST\n```\n\nPORT については、IANA で登録されてないポート番号を選択してください。ローカル PORT のトラフィックを指定し、リモート HOST に転送されます。ssh は SOCKS サーバーのように動作します。SOCKS プロキシサーバーをサポートしているソフトウェアを設定することで localhost の PORT に接続することができます。\n\n"
+    },
+    {
+      "title": "SOCKS プロキシを使う",
+      "level": 2,
+      "content": "2つのケースが考えられます:\n\n- 使いたいアプリケーションが SOCKS5 プロキシに対応している場合 (例えば Firefox)、プロキシを使うようにアプリケーションを設定するだけです。\n- 使いたいアプリケーションが SOCKS プロキシに対応していない場合、tsocks や proxychains-ng を使うことができます。\n\nFirefox では、設定 > ネットワーク > 接続設定から SOCKS プロキシを使うことができます。\"手動でプロキシを設定する\" を選択して、SOCKS ホストを設定してください (HTTP プロキシや SSL プロキシなどの他のフィールドは空のままにしておいてください)。例えば、SOCKS5 プロキシが localhost のポート 8080 で動作している場合、SOCKS ホストフィールドには \"127.0.0.1\" と書いて、ポートには \"8080\" と書きます。\n\nproxychains-ng を使う場合、設定は /etc/proxychains.conf で行います。最後の行をアンコメントする必要があり (デフォルトでは Tor を使うように設定されています)、SOCKS プロキシのパラメータで置き換えてください。例えば、上記と同じ SOCKS5 プロキシを使う場合、最後の行を以下のように置き換えます:\n\n```\nsocks5 127.0.0.1 8080\n```\n\nproxychains-ng は次のコマンドで起動できます:\n\n```\nproxychains <program>\n```\n\n{ic|program}} はシステムにインストールされているどのプログラムにも置き換えられます (例: xterm, gnome-terminal など)。\n\ntsocks を使う場合、設定は /etc/tsocks.conf に記述します。オプションについては tsocks.conf(5) を見て下さい。最小限の設定ファイルは以下のようになります:\n\n```\n/etc/tsocks.conf\n```\n\n```\nserver = 127.0.0.1\nserver_port = 8080\nserver_type = 5\ndefault_user = \"\"\ndefault_pass = \"\"\n```\n\n"
+    },
+    {
+      "title": "curl と pacman",
+      "level": 3,
+      "content": "all_proxy 環境変数を設定することで curl と pacman で socks5 プロキシを使用できます:\n\n```\n$ export all_proxy=\"socks5://your.proxy:1080\"\n```\n\n"
+    },
+    {
+      "title": "GNOME3 のプロキシ設定",
+      "level": 2,
+      "content": "Chromium など、プログラムによっては gnome で保存された設定を優先的に使うことがあります。この設定は gnome-control-center フロントエンドや gsettings で変更することが可能です。\n\n```\ngsettings set org.gnome.system.proxy mode 'manual' \ngsettings set org.gnome.system.proxy.http host 'proxy.localdomain.com'\ngsettings set org.gnome.system.proxy.http port 8080\ngsettings set org.gnome.system.proxy.ftp host 'proxy.localdomain.com'\ngsettings set org.gnome.system.proxy.ftp port 8080\ngsettings set org.gnome.system.proxy.https host 'proxy.localdomain.com'\ngsettings set org.gnome.system.proxy.https port 8080\ngsettings set org.gnome.system.proxy ignore-hosts \"['localhost', '127.0.0.0/8', '10.0.0.0/8', '192.168.0.0/16', '172.16.0.0/12' , '*.localdomain.com' ]\"\n```\n\nAUR の proxydriverAUR パッケージを使用することで、NetworkManager が特定のネットワークに接続した際に自動的に実行するように設定することもできます。\n\n"
+    },
+    {
+      "title": "Microsoft NTLM プロキシ",
+      "level": 2,
+      "content": "Windows ネットワークでは、NT LAN Manager (NTLM) がユーザーの認証や整合性、機密性を実現する Microsoft セキュリティプロトコルのサービスを提供します。\n\nAUR の cntlmAUR はアプリケーションと NTLM プロキシの間に入って、NTLM 認証をオンザフライで追加します。複数の \"parent\" プロキシを指定することができ Cntlm はどれか一つが動作するまで試行します。認証済みの接続は全てキャッシュされ効率を高めるために再利用されます。\n\n```\n(NTLM PROXY IP:PORT + CREDENTIALS + OTHER INFO) -----> (127.0.0.1:PORT)\n```\n\nAUR からは 2 つのオプションが利用可能です:\n\n- alpaca-proxyAUR\n- cntlmAUR\n\n"
+    },
+    {
+      "title": "Alpaca",
+      "level": 3,
+      "content": "AUR の alpaca-proxyAUR は、コマンドラインツール用のローカル HTTP プロキシです。プロキシ自動設定 (PAC) ファイルと NTLM 認証をサポートします。\n\n"
+    },
+    {
+      "title": "使い方",
+      "level": 4,
+      "content": "Alpaca は対話的に起動できますが、パスワードの入力が必要です:\n\n```\n$ alpaca -d MYDOMAIN -u me\nPassword (for MYDOMAIN\\me):\n```\n\nalpaca を非対話的に起動するには、NTLM ハッシュを生成し、変数としてエクスポートする必要があります:\n\n```\n$ ./alpaca -d MYDOMAIN -u me -H\nPassword (for MYDOMAIN\\me):\nNTLM_CREDENTIALS=\"me@DOMAIN:00000000000000000000000000000000\"; export NTLM_CREDENTIALS\n```\n\nAlpaca はデフォルトで localhost:3128 をリッスンしますが、これは -l および -p オプションを使用してオーバーライドできます。\n\nさらに、プロキシ PAC URL を -C オプションのパラメータとして指定する必要があります。\n\n"
+    },
+    {
+      "title": "サービスとして実行",
+      "level": 4,
+      "content": "alpaca-proxyAUR には、非対話型の方法で alpaca を自動的に開始するために使用できる alpaca.service systemd ユーザーサービス が含まれています。\n\n次の環境変数を ~/.config/alpaca.environment に設定する必要があります:\n\n```\nLISTEN_ADDRESS=localhost\nLISTEN_PORT=3128\nNTLM_CREDENTIALS=\"me@DOMAIN:00000000000000000000000000000000\"\nPAC_URL=\"http://some.url/to/some-file.pac\"\n```\n\n"
+    },
+    {
+      "title": "Cntlm",
+      "level": 3,
+      "content": "AUR の cntlmAUR は複数の \"多段\" プロキシで設定でき、Cntlm は 1 つが機能するまで次々に試行します。すべての認証された接続はキャッシュされ、再利用されるため、高い効率が実現されます。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 4,
+      "content": "/etc/cntlm.conf の設定を必要に応じて変更してください。パスワードは絶対に変更してください。それから次を実行:\n\n```\n$ cntlm -H\n```\n\nこのコマンドによってプロキシのホスト名、ユーザー名、パスワードそれぞれの暗号化されたパスワードハッシュが生成されます。\n\n/etc/cntlm.conf をもう一度編集して生成された3つのハッシュを全て記述して、cntlm.service を 有効化 してください。\n\n設定をテストするには、次を実行:\n\n```\n$ cntlm -v\n```\n\n"
+    },
+    {
+      "title": "使い方",
+      "level": 4,
+      "content": "プロキシアドレスとして 127.0.0.1:port または localhost:port を使用します。port は、/etc/cntlm.conf の Listen パラメータと一致します。デフォルトでは、3128 です。\n\n"
+    }
+  ]
+}

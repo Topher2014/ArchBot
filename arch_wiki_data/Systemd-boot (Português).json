@@ -1,0 +1,121 @@
+{
+  "title": "Systemd-boot (Português)",
+  "url": "https://wiki.archlinux.org/title/Systemd-boot_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Processo de inicialização do Arch\n- Secure Boot\n- Unified Extensible Firmware Interface\n\nsystemd-boot, antigamente chamado de gummiboot (Alemão para: \"bote de borracha\"), é um simples gerenciador de boot UEFI que executa imagens EFI configuradas. A entrada padrão é selecionada por um padrão (glob) definido ou um menu navegável na tela por meio das setas. Vêm com o systemd, que é instalado em um sistema Arch por padrão.\n\nÉ simples de configurar mas pode somente iniciar executáveis EFI como o EFISTUB do kernel Linux, shell do UEFI, GRUB ou o gerenciador de boot do Windows.\n\n"
+    },
+    {
+      "title": "Instalando o gerenciador de boot EFI",
+      "level": 3,
+      "content": "Para instalar o gerenciador de boot EFI systemd-boot, primeiro tenha certeza que o sistema inicializou no modo UEFI e que as variáveis UEFI são acessíveis. Isto pode ser verificado ao executar o comando efivar --list ou, se efivar não está instalado, ao executar ls /sys/firmware/efi/efivars (se o diretório existe, o sistema foi inicializado no modo UEFI).\n\nNesta página, esp será usado para indicar o ponto de montagem ESP, ex. /efi ou /boot. Isto assume que você fez um chroot no ponto de montagem do seu sistema.\n\nCom a partição de sistema EFI (ESP) montada em esp, use bootctl(1) para instalar systemd-boot na ESP:\n\n```\n# bootctl install\n```\n\non a x64 architecture system /usr/lib/systemd/boot/efi/systemd-bootx64.efi will be copied to esp/EFI/systemd/systemd-bootx64.efi and esp/EFI/BOOT/BOOTX64.EFI, and systemd-boot will be set as the default EFI application.\n\nIsto vai copiar o gerenciador de boot systemd-boot para a ESP: em um sistema com arquitetura x64 /usr/lib/systemd/boot/efi/systemd-bootx64.efi será copiado para esp/EFI/systemd/systemd-bootx64.efi and esp/EFI/BOOT/BOOTX64.EFI, e systemd-boot será definido como a aplicação EFI padrão.\n\n- Ao executar bootctl install, systemd-boot tentará localizar a ESP em /efi, /boot e / boot/efi. Definir esp para um local diferente requer passar a opção --esp-path=esp. (Veja bootctl(1) § OPTIONS para detalhes.)\n- Instalar systemd-boot sobrescreverá qualquer arquivo existente em esp/EFI/BOOT/BOOTX64.EFI, por exemplo, a versão da Microsoft deste arquivo.\n\nPara concluir a instalação, configure o systemd-boot.\n\n"
+    },
+    {
+      "title": "Instalação usando XBOOTLDR",
+      "level": 3,
+      "content": "Uma partição /boot separada do tipo \"Linux extended boot\" (XBOOTLDR) pode ser criada para manter o kernel e initramfs separados da ESP. Isso é particularmente útil para fazer dual boot com Windows com uma ESP existente que é muito pequena.\n\nPrepare uma ESP como de costume e crie outra partição para XBOOTLDR na mesma unidade física. A partição XBOOTLDR deve ter um GUID de tipo de partição de bc13c2ff-59e6-4262-a352-b275fd6f7172 [1]. O tamanho da partição XBOOTLDR deve ser grande o suficiente para acomodar todos os kernels que você vai instalar.\n\n- systemd-boot não faz verificação de tipo do sistema de arquivos para a ESP. Então, é possível usar qualquer sistema de arquivos que sua implementação UEFI possa ler.\n- UEFI pode pular o carregamento de outras partições que não são a ESP quando o modo \"fast boot\" está habilitado. Isto pode levar ao systemd-boot falhando em encontrar entradas na partição XBOOTLDR; neste caso, desabilite o modo \"fast boot\";\n- A partição XBOOTLDR deve estar no mesmo disco físico que a ESP para que o systemd-boot seja reconhecido.\n\nDurante a instalação, monte a ESP em /mnt/efi e a partição XBOOTLDR em /mnt/boot.\n\nUma vez no ambiente chroot, use o comando:\n\n```\n# bootctl --esp-path=/efi --boot-path=/boot install\n```\n\nPara concluir a instalação, configure o systemd-boot.\n\n"
+    },
+    {
+      "title": "Atualizando o gerenciador de boot EFI",
+      "level": 3,
+      "content": "Toda vez que tiver uma nova versão do systemd-boot, o gerenciador de boot EFI pode ser opcionalmente reinstalado pelo usuário. Isto pode ser feito manualmente ou automaticamente. As duas abordagens são descritas a seguir.\n\n"
+    },
+    {
+      "title": "Atualização manual",
+      "level": 4,
+      "content": "Use bootctl para atualizar o systemd-boot:\n\n```\n# bootctl update\n```\n\n"
+    },
+    {
+      "title": "Atualização automática",
+      "level": 4,
+      "content": "Para atualizar o systemd-boot automaticamente, use um serviço do systemd ou um hook do pacman. Os dois métodos são descritos abaixo.\n\nA partir da versão 250, systemd vem com systemd-boot-update.service. Habilitar este serviço atualizará o bootloader na próxima inicialização.\n\nO pacote systemd-boot-pacman-hookAUR adiciona um hook do pacman que é executado toda vez que o systemd é atualizado.\n\nEm vez de instalar systemd-boot-pacman-hook, você pode preferir colocar manualmente o seguinte arquivo em /etc/pacman.d/hooks/:\n\n```\n/etc/pacman.d/hooks/95-systemd-boot.hook\n```\n\n```\n[Trigger]\nType = Package\nOperation = Upgrade\nTarget = systemd\n\n[Action]\nDescription = Gracefully upgrading systemd-boot...\nWhen = PostTransaction\nExec = /usr/bin/systemctl restart systemd-boot-update.service\n```\n\nSe você tem Secure Boot habilitado, você pode querer adicionar um hook do pacman para automaticamente reassinar o kernel e o bootloader a cada atualização dos respectivos pacotes:\n\n```\n/etc/pacman.d/hooks/99-secureboot.hook\n```\n\n```\n[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = systemd\n\n[Action]\nDescription = Assinar o Kernel para Secure Boot\nWhen = PostTransaction\nExec = /usr/bin/find /boot -type f ( -name vmlinuz-* -o -name systemd* ) -exec /usr/bin/sh -c 'if ! /usr/bin/sbverify --list {} 2>/dev/null | /usr/bin/grep -q \"signature certificates\"; then /usr/bin/sbsign --key arquivo-de-chave --cert arquivo-de-certificado --output \"$1\" \"$1\"; fi' _ {} ;\nDepends = sbsigntools\nDepends = findutils\nDepends = grep\n```\n\nCertifique-se de que os parâmetros --key arquivo-de-chave --cert arquivo-de-certificado apontam para sua chave de assinatura e certificado. Para melhor compreensão deste hook, consulte sbverify(1) e sbsign(1).\n\n"
+    },
+    {
+      "title": "Configuração do carregador",
+      "level": 3,
+      "content": "A configuração do carregador é armazenada no arquivo esp/loader/loader.conf. Veja loader.conf(5) § OPTIONS para detalhes.\n\nUm exemplo de configuração do carregador é mostrado abaixo:\n\n```\nesp/loader/loader.conf\n```\n\n```\ndefault  arch.conf\ntimeout  4\nconsole-mode max\neditor   no\n```\n\n- systemd-boot não aceita tabulações como indentação, use espaços.\n- default e timeout podem ser mudados no menu de inicialização e as mudanças vão ser salvas como variáveis EFI LoaderEntryDefault e LoaderConfigTimeout, sobrescrevendo estas opções.\n- bootctl set-default \"\" e bootctl set-timeout \"\" pode ser usado para limpar as variáveis EFI sobrescrevendo as opções default e timeout, respectivamente.\n- Um arquivo de configuração básico está localizado em /usr/share/systemd/bootctl/loader.conf.\n\n"
+    },
+    {
+      "title": "Adicionando carregadores",
+      "level": 3,
+      "content": "systemd-boot buscará pelos itens do menu de inicialização em esp/loader/entries/*.conf e adicionalmente em boot/loader/entries/*.conf se usar XBOOTLDR. Observe que as entradas em esp só podem usar arquivos (por exemplo, kernels, initramfs, imagens, etc.) dentro de esp. Da mesma forma, entradas em boot só podem usar arquivos em boot.\n\nAs opções possíveis são:\n\n- title – nome do sistema operacional. necessário.\n- version – versão do kernel, mostrado somente quando múltiplas entradas com o mesmo título existe. Opcional.\n- machine-id – identificador da máquina em /etc/machine-id, mostrado somente quando múltiplas entradas com o mesmo título e versão existem. Opcional.\n- efi – aplicação EFI a iniciar, relativo ao seu ESP (esp); ex. /vmlinuz-linux. Este parâmetro ou linux (veja abaixo) é necessário.\n- options – opções da linha de comando separadas por vírgula para passar para o programa EFI ou parâmetros do kernel. Opcional, mas você precisará no mínimo root=dev se inicializar o Linux. Este parâmetro pode ser omitido se a partição raiz é atribuída ao tipo Root Partition GUID correto como definido na Discoverable Partitions Specification e se o hook do mkinitcpio do systemd está presente.\n\nPara inicializar o Linux, você pode também usar linux ao invês de efi. Ou initrd em adição a options. A sintaxe é:\n\n- linux ou initrd seguido por um caminho relativo dos arquivos correspondentes na ESP (p. ex., /vmlinuz-linux); isto vai ser automaticamente traduzido em efi caminho e options initrd=caminho – esta sintaxe é somente suportada por conveniência e não há diferenças em função.\n\nUm exemplo de arquivos de carregador iniciando o Arch a partir de um volume rotulado arch_os e carregando o microcódigo da CPU da Intel é:\n\n```\nesp/loader/entries/arch.conf\n```\n\n```\ntitle   Arch Linux\nlinux   /vmlinuz-linux\ninitrd  /intel-ucode.img\ninitrd  /initramfs-linux.img\noptions root=\"LABEL=arch_os\" rw\n```\n\n```\nesp/loader/entries/arch-fallback.conf\n```\n\n```\ntitle   Arch Linux (fallback initramfs)\nlinux   /vmlinuz-linux\ninitrd  /intel-ucode.img\ninitrd  /initramfs-linux-fallback.img\noptions root=\"LABEL=arch_os\" rw\n```\n\nsystemd-boot vai automaticamente verificar no tempo de inicialização pelo Gerenciador de Boot do Windows na localização /EFI/Microsoft/Boot/Bootmgfw.efi, shell do UEFI /shellx64.efi e EFI Default Loader (carregador padrão EFI) /EFI/BOOT/bootx64.efi, como também arquivos do kernel especialmente preparados em /EFI/Linux. Quando detectado, as entradas correspondentes com títulos auto-windows, auto-efi-shell e auto-efi-default, respectivamente, serão geradas. Estas entradas não precisam de configuração manual. No entanto, outras aplicações EFI não são detectadas automaticamente (diferente do rEFInd), então para inicializar o kernel Linux, entradas de boot devem ser criadas manualmente.\n\n- As entradas de boot disponíveis que foram configuradas podem ser listadas com o comando bootctl list.\n- Um exemplo de arquivo de entrada está localizado em /usr/share/systemd/bootctl/arch.conf.\n- Os parâmetros do kernel para cenários como LVM, LUKS ou dm-crypt pode ser encontrado nas páginas relevantes.\n\n"
+    },
+    {
+      "title": "Shells EFI ou outras aplicações EFI",
+      "level": 4,
+      "content": "No caso você ter instalado shells EFI com o pacote edk2-shell, systemd-boot vai detectar automaticamente e cirar uma nova entrada se o arquivo EFI for colocado em esp/shellx64.efi. Para fazer isso e para exemplo de comando após instalar o pacote seria:\n\n```\n# cp /usr/share/edk2-shell/x64/Shell.efi /boot/shellx64.efi\n```\n\nPor outro lado, caso você tenha instalado outros aplicativos EFI na ESP, você pode usar os seguintes trechos.\n\n```\nesp/loader/entries/fwupd.conf\n```\n\n```\ntitle  Firmware updator\nefi     /EFI/tools/fwupdx64.efi\n```\n\n```\nesp/loader/entries/gdisk.conf\n```\n\n```\ntitle  GPT fdisk (gdisk)\nefi     /EFI/tools/gdisk_x64.efi\n```\n\n"
+    },
+    {
+      "title": "Inicializar a partir de outro disco",
+      "level": 4,
+      "content": "systemd-boot não pode iniciar binários de partições que não sejam a partição ESP ou XBOOTLDR, mas pode executar um script externo para fazê-lo.\n\nPrimeiro precisamos instalar o edk2-shell (será o interpretador a ser usado) e usando o shell EFI (como explicado acima) podemos usar o comando map para anotar o FS alias (ex: HD0a66666a2) e o caminho completo do arquivo EFI de destino (ex: EFI\\Microsoft\\Boot\\Bootmgfw.efi).\n\nEm seguida, usando o comando exit, podemos inicializar novamente no Linux, onde podemos criar a nova entrada. Para isso precisamos primeiro criar na raiz do ponto de montagem esp um nome de arquivo .nsh com o alias FS, dois pontos e o caminho EFI, aqui um exemplo:\n\n```\nesp/windows.nsh\n```\n\n```\nHD0a66666a2:EFI\\Microsoft\\Boot\\Bootmgfw.efi\n```\n\nUma vez que criamos este arquivo, podemos continuar criando a entrada do carregador para executar o script:\n\n```\nesp/loader/entries/windows.conf\n```\n\n```\ntitle  Windows\nefi     /shellx64.efi\noptions -nointerrupt -noconsolein -noconsoleout windows.nsh\n```\n\nÉ importante que o caminho efi corresponda onde o edk2-shell foi copiado na partição esp, e o último argumento das opções corresponda ao nome do arquivo .nsh na raiz da partição esp. Observe também que o arquivo EFI edk2-shell pode ser movido para evitar a criação automática de entrada de systemd-boot.\n\n"
+    },
+    {
+      "title": "Inicializando para a configuração de Firmware EFI",
+      "level": 3,
+      "content": "systemd-boot adicionará automaticamente uma entrada para inicializar na configuração do firmware UEFI se o firmware do seu dispositivo suportar a reinicialização na configuração do sistema operacional.\n\n"
+    },
+    {
+      "title": "Suporte a hibernação",
+      "level": 3,
+      "content": "Veja Suspensão e hibernação.\n\n"
+    },
+    {
+      "title": "Editor de parâmetros do kernel protegido por senha",
+      "level": 3,
+      "content": "Alternativamente você pode instalar systemd-boot-passwordAUR que suporta configuração básica da opção password. Use sbpctl generate para gerar um valor para esta opção.\n\nInstale systemd-boot-password com o seguinte comando:\n\n```\n# sbpctl install esp\n```\n\nCom o editor habilitado, vai ser solicitado sua senha antes que você possa editar os parâmetros do kernel.\n\n"
+    },
+    {
+      "title": "Teclas dentro do menu de inicialização",
+      "level": 3,
+      "content": "Veja systemd-boot(7) § KEY BINDINGS para as associações de teclas disponíveis dentro do menu de inicialização.\n\n"
+    },
+    {
+      "title": "Escolhendo a próxima inicialização",
+      "level": 3,
+      "content": "O gerenciador de boot é integrado com o comando systemctl, permitindo escolher que opção você quer inicializar depois de reiniciar. Por exemplo, suponha que você tenha compilado um kernel customizado e criou um arquivo de entrada esp/loader/entries/arch-custom.conf para inicializar ele, você pode executar\n\n```\n$ systemctl reboot --boot-loader-entry=arch-custom.conf\n```\n\ne seu sistema irá reiniciar nesta entrada mantendo a opção padrão intacta para inicializações subsequentes. Para ver uma lista de entradas possíveis use a opção --boot-loader-entry=help.\n\nSe você quer inicializar no firmware da sua placa-mãe diretamente, você pode usar esse comando:\n\n```\n$ systemctl reboot --firmware-setup\n```\n\n"
+    },
+    {
+      "title": "Imagens de kernel unificadas",
+      "level": 3,
+      "content": "Imagens de kernel unificadas em esp/EFI/Linux/ são originadas automaticamente pelo systemd-boot e não precisam de uma entrada em esp/loader/entries. (Observe que as imagens de kernel unificadas devem ter uma extensão .efi para serem identificadas por systemd-boot.)\n\n"
+    },
+    {
+      "title": "Grml na ESP",
+      "level": 3,
+      "content": "Grml é um pequeno sistema live com uma coleção de software para administração e recuperação do sistema.\n\nPara instalar Grml na ESP, precisamos somente copiar o kernel vmlinuz, o initramfs initrd.img, e a squashed image (Imagem compactada com sistema de arquivos somente leitura) grml64-small.squashfs do arquivo iso para a ESP. Para fazer isso, primeiro baixe a grml64-small.iso e monte o arquivo (o ponto de montagem desse exemplo é mnt); o kernel e initramfs estão localizados em mnt/boot/grml64small/, e a squashed image reside em mnt/live/grml64-small/.\n\nDepois, crie um diretório para Grml na sua ESP,\n\n```\n# mkdir -p esp/grml\n```\n\ne copie os arquivos mencionados acima para lá:\n\n```\n# cp mnt/boot/grml64small/vmlinuz esp/grml\n# cp mnt/boot/grml64small/initrd.img esp/grml\n# cp mnt/live/grml64-small/grml64-small.squashfs esp/grml\n```\n\nno último passo, crie uma entrada para o carregador do systemd-boot: em esp/loader/entries crie um arquivo grml.conf com o seguinte conteúdo:\n\n```\nesp/loader/entries/grml.conf\n```\n\n```\ntitle   Grml Live Linux\nlinux   /grml/vmlinuz\ninitrd  /grml/initrd.img\noptions apm=power-off boot=live live-media-path=/grml/ nomce net.ifnames=0\n```\n\nPara uma visão geral das opções de boot disponíveis, consulte cheatcode for Grml.\n\n"
+    },
+    {
+      "title": "systemd-boot em sistemas BIOS",
+      "level": 3,
+      "content": "Se você precisa de um gerenciador de boot para sistemas BIOS que segue a Boot Loader Specification, o systemd-boot pode funcionar. O gerenciador de boot Clover suporta inicializar de sistemas BIOS e oferece um ambiente EFI simulado.\n\n"
+    },
+    {
+      "title": "Instalando depois de inicializar no modo BIOS",
+      "level": 3,
+      "content": "Se inicializou no modo BIOS, você ainda pode instalar o systemd-boot, no entanto este processo precisa que você fale ao firmware para lançar o arquivo EFI do systemd-boot na inicialização, normalmente por meio de duas maneiras:\n\n- você tem um Shell EFI funcionando em algum outro lugar.\n- sua interface de firmware oferece uma maneira de apropriadamente definir o arquivo EFI que precisa ser carregado na inicialização.\n\nSe você pode fazer isto, a instalação é mais fácil: vai para seu Shell EFI ou a interface de configuração do firmware e mude o arquivo EFI padrão da sua máquina para esp/EFI/systemd/systemd-bootx64.efi.\n\n"
+    },
+    {
+      "title": "Entrada manual usando efibootmgr",
+      "level": 3,
+      "content": "Se o comando bootctl install falhou, você pode criar uma entrada de boot EFI manualmente usando efibootmgr:\n\n```\n# efibootmgr --create --disk /dev/sdX --part Y --loader \"\\EFI\\systemd\\systemd-bootx64.efi\" --label \"Gerenciador de Boot do Linux\" --unicode\n```\n\nOnde /dev/sdXY é a partição de sistema EFI.\n\n"
+    },
+    {
+      "title": "Entrada manual usando bcdedit do Windows",
+      "level": 3,
+      "content": "Se por alguma razão você precisa criar uma entrada de boot EFI pelo Windows, você pode usar os seguintes comandos em um prompt de administrador:\n\n```\n> bcdedit /copy {bootmgr} /d \"Gerenciador de Boot do Linux\"\n> bcdedit /set {guid} path \\EFI\\systemd\\systemd-bootx64.efi\n```\n\nMude guid para o id retornado pelo primeiro comando. Você pode também defini-lo como a entrada padrão usando\n\n```\n> bcdedit /default {guid}\n```\n\n"
+    },
+    {
+      "title": "Menu não aparece depois de atualização do Windows",
+      "level": 3,
+      "content": "Veja UEFI#Windows changes boot order.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- https://systemd.io/BOOT/\n- https://github.com/systemd/systemd/tree/master/src/boot/efi[link inativo 2024-12-15 ⓘ]\n- https://bbs.archlinux.org/viewtopic.php?id=254374\n- https://uapi-group.org/specifications/specs/boot_loader_specification/\n\n"
+    }
+  ]
+}

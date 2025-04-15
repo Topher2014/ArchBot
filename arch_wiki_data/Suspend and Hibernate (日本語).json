@@ -1,0 +1,146 @@
+{
+  "title": "Suspend and Hibernate (日本語)",
+  "url": "https://wiki.archlinux.org/title/Suspend_and_Hibernate_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- systemd\n- 電源管理\n- 電源管理/復帰トリガー\n- スワップ\n\nサスペンドの複数の方法を利用できます。とりわけ:\n\nカーネルは、基本的な機能を提供しており、問題のあるハードウェアドライバ/カーネルモジュール (例: ビデオカードの再初期化) に対処する機能を提供する高レベルなインターフェイスもいくつかあります。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 カーネルのインターフェイス (swsusp)\n- 2 高レベルインターフェイス (systemd)\n- 3 サスペンドの方法を変更する\n- 4 ハイバネーション 4.1 スワップパーティション（ファイル）のサイズについて 4.2 initramfs の設定 4.3 ハイバネート先指定を initramfs に渡す 4.3.1 ハイバネート先を手動で指定する 4.3.1.1 スワップファイルのオフセットを手に入れる 4.4 ハイバネート用のスワップファイルを zram で保持する 4.5 thinly-provisioned LVM ボリュームへのハイバネーション 4.6 Zswap のライトバックを無効化し、スワップ領域をハイバネートのみに使用する\n- 5 スリープフック 5.1 カスタムの systemd ユニット 5.1.1 スリープ/復帰のユニットの統合 5.2 /usr/lib/systemd/system-sleep のフック\n- 6 ヒントとテクニック 6.1 スリープを完全に無効化する 6.2 Intel Rapid Start Technology (IRST)\n- 7 トラブルシューティング 7.1 ACPI_OS_NAME 7.2 サスペンド/ハイバネートが動作しない、あるいはたまに動作しなくなる 7.3 Wake-on-LAN 7.4 サスペンドからすぐに復帰する 7.5 ハイバネートした時にシステムの電源が落ちない 7.6 ハイバネート後に起動するとオペレーティングシステムが見つからない (または、間違った OS が起動する) 7.7 /home にスワップファイルを置く 7.8 A520I および B550I マザーボードで PC がスリープから復帰しない 7.9 ノートパソコンをサスペンドする Fn キーが動作しない 7.10 システムが60秒間フリーズした後に復帰する、または復帰後にハングアップする\n\n- 4.1 スワップパーティション（ファイル）のサイズについて\n- 4.2 initramfs の設定\n- 4.3 ハイバネート先指定を initramfs に渡す 4.3.1 ハイバネート先を手動で指定する 4.3.1.1 スワップファイルのオフセットを手に入れる\n- 4.4 ハイバネート用のスワップファイルを zram で保持する\n- 4.5 thinly-provisioned LVM ボリュームへのハイバネーション\n- 4.6 Zswap のライトバックを無効化し、スワップ領域をハイバネートのみに使用する\n\n- 4.3.1 ハイバネート先を手動で指定する 4.3.1.1 スワップファイルのオフセットを手に入れる\n\n- 4.3.1.1 スワップファイルのオフセットを手に入れる\n\n- 5.1 カスタムの systemd ユニット 5.1.1 スリープ/復帰のユニットの統合\n- 5.2 /usr/lib/systemd/system-sleep のフック\n\n- 5.1.1 スリープ/復帰のユニットの統合\n\n- 6.1 スリープを完全に無効化する\n- 6.2 Intel Rapid Start Technology (IRST)\n\n- 7.1 ACPI_OS_NAME\n- 7.2 サスペンド/ハイバネートが動作しない、あるいはたまに動作しなくなる\n- 7.3 Wake-on-LAN\n- 7.4 サスペンドからすぐに復帰する\n- 7.5 ハイバネートした時にシステムの電源が落ちない\n- 7.6 ハイバネート後に起動するとオペレーティングシステムが見つからない (または、間違った OS が起動する)\n- 7.7 /home にスワップファイルを置く\n- 7.8 A520I および B550I マザーボードで PC がスリープから復帰しない\n- 7.9 ノートパソコンをサスペンドする Fn キーが動作しない\n- 7.10 システムが60秒間フリーズした後に復帰する、または復帰後にハングアップする\n\n"
+    },
+    {
+      "title": "カーネルのインターフェイス (swsusp)",
+      "level": 2,
+      "content": "カーネル内のソフトウェアサスペンドコード (swsusp) にサスペンド状態に入るよう直接伝えることは可能です。実際の方法と状態はハードウェアサポートのレベルによります。最近のカーネルでは、サスペンドにするために /sys/power/state に適切な文字列を書くことが主な方法になっています。\n\n詳しくは カーネルドキュメント を参照してください。\n\n"
+    },
+    {
+      "title": "高レベルインターフェイス (systemd)",
+      "level": 2,
+      "content": "systemd は、サスペンド、ハイバネート、ハイブリッドサスペンドを行うためのネイティブなコマンドを提供しています。これは、Arch Linux で使用されるデフォルトのインターフェイスです。\n\nsystemctl suspend は、特に設定せずとも動くはずです。systemctl hibernate に関しては、#ハイバネーション の手順に従わないと動作しないかもしれません。\n\nまた、サスペンドとハイバネートを組み合わせたようなモードが2つあります:\n\n- systemctl hybrid-sleep は、システムを RAM とディスクの両方にサスペンドします。なので、電源が完全に失われても、データ損失が発生しません。このモードは suspend to both とも呼ばれています。\n- systemctl suspend-then-hibernate は、最初は可能な限り長くシステムを RAM にサスペンドし、RTC アラームで復帰し、そしてハイバネートします。RTC アラームは systemd-sleep.conf(5) 内の HibernateDelaySec で設定します。デフォルトの値は、システムのバッテリーレベルが 5% に下がるまでの推定された時間に設定されます。システムにバッテリーが存在しない場合は、デフォルトで2時間に設定されます。推定時間は、systemd-sleep.conf(5) 内の SuspendEstimationSec によって指定された時間後のバッテリーレベルの変化から計算されます。SuspendEstimationSec の時間後、システムは短い間サスペンドから復帰し、計測を行います (システムが手動でサスペンドから復帰された場合も、計測が行われます)。\n\nサスペンド/ハイバネートのフックの設定に関するその他の情報は、#スリープフック を見てください。また、systemctl(1)、systemd-sleep(8)、systemd.special(7) も参照してください。\n\n"
+    },
+    {
+      "title": "サスペンドの方法を変更する",
+      "level": 2,
+      "content": "S0ix サスペンドが通常の S3 スリープと同じ節電機能を提供しないシステム、あるいは、電力を節約することが復帰を高速化することよりも優先される場合においては、デフォルトのサスペンド方法を変更することが可能です。\n\n以下のコマンドは、ハードウェアによってサポートされていると広告されている全てのサスペンド方法を出力します (現在のサスペンド方法は角括弧に囲まれます[1]):\n\n```\n$ cat /sys/power/mem_sleep\n```\n\n```\n[s2idle] shallow deep\n```\n\nTable content:\nmem_sleep 文字列 | スリープ状態\ns2idle | suspend-to-idle\nshallow | standby\ndeep | suspend-to-RAM\n\nハードウェアが deep スリープ状態を広告していない場合、UEFI にそのような設定がないか確認してください。通常、Power や Sleep state などのような項目にあります。S0ix のオプションは Windows 10 や Windows and Linux や S3/Modern standby support という名前です。S3 スリープのオプションは Legacy、Linux、Linux S3、S3 enabled という名前です。設定できない場合、s2idle を使い続けることもできます、ハイバネート を使うことを検討するか、DSDT テーブルにパッチを当ててみてください (あるいは、パッチ適用済みのバージョンを見つけてください)。\n\nスリープの方法を変更したあと、スリープサイクルを何回かテストして、ハードウェアが S3 スリープで問題を起こさないかテストしてください:\n\n```\n# echo deep > /sys/power/mem_sleep\n```\n\n問題が無ければ、mem_sleep_default=deep カーネルパラメータ か、もしくは systemd-sleep.conf(5) の MemorySleepMode ディレクティブで変更を永続化することができます:\n\n```\n/etc/systemd/sleep.conf.d/mem-deep.conf\n```\n\n```\n[Sleep]\nMemorySleepMode=deep\n```\n\nいくつかの逆の状況では、問題のあるファームウェアが s2idle しかサポートしていないにも関わらず、deep をサポートしていると広告することがあります。この場合、SuspendState 設定を使うことにより、s2idle を使うことができます:\n\n```\n/etc/systemd/sleep.conf.d/freeze.conf\n```\n\n```\n[Sleep]\nSuspendState=freeze\n```\n\n"
+    },
+    {
+      "title": "ハイバネーション",
+      "level": 2,
+      "content": "ハイバネートを行うには、次のことを行う必要があります: スワップパーティションかスワップファイルの作成する。初期ユーザー空間で復帰プロセスを初期化できるようにするために initramfs を設定する。Initramfs から利用できる方法でスワップ領域の場所を指定する (例えば、HibernateLocation EFI 変数を systemd で定義したり、resume= カーネルパラメータを設定したり)。これらの3つの手順は以下で詳細に説明されています。\n\n- ディスク暗号化を利用する場合はdm-crypt/スワップの暗号化#suspend-to-disk を使用するを見てください。\n- linux-hardenedはハイバネーションをサポートしていません。詳しくはFS#63648を見てください。\n- zram 上のスワップへのハイバネートはサポートされていません。たとえ zram が永久記憶装置上のバッキングデバイスを使うように設定されていたとしてもです。logind は zram 上のスワップ領域へのハイバネートから保護してくれますが、スワップ領域を複数作っておくという方法もあります。メモリはスワップファイルに保存され、他の利用可能なスワップ領域は zram 用に予約されます。詳細は #ハイバネート用のスワップファイルを zram で保持する を見てください。\n\n"
+    },
+    {
+      "title": "スワップパーティション（ファイル）のサイズについて",
+      "level": 3,
+      "content": "スワップパーティションが RAM より小さかったとしても、ハイバネートが成功する可能性は高いと思われます。image_size sysfs(5) 疑似ファイルに関する情報は カーネルドキュメントの \"image_size\" を見てください。\n\n(スワップパーティションを小さくして) /sys/power/image_size の値を減らしてサスペンドのイメージをできる限り小さくすることも、値を増やしてハイバネーションを高速化することも可能です。大きな容量の RAM を搭載しているシステムでは、より小さい値にするとハイバネートからの復帰が劇的に速くなることがあります。image_size の値を再起動後も保持するために systemd#systemd-tmpfiles - 一時ファイル を使うことができます:\n\n```\n/etc/tmpfiles.d/hibernation_image_size.conf\n```\n\n```\n#    Path                   Mode UID  GID  Age Argument\nw    /sys/power/image_size  -    -    -    -   0\n```\n\nサスペンドイメージは複数のスワップパーティション/スワップファイルにまたがって保存することができません。イメージのすべての部分が1つのスワップパーティション/スワップファイルに収まらなければなりません。[2]\n\n"
+    },
+    {
+      "title": "initramfs の設定",
+      "level": 3,
+      "content": "- Busybox ベースの initramfs を使用している場合 (Arch ではデフォルトです)、/etc/mkinitcpio.conf に resume フックを追加する必要があります。ラベルあるいは UUID どちらを使用している場合でもスワップパーティションは udev デバイスノードによって参照されるので、resume フックは udev フックの後に追加する必要があります。デフォルトのフック設定に resume フックを追加すると以下のようになります:\n\n```\nHOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems resume fsck)\n```\n\n- initramfs で systemd フックを使っている場合は、復帰機構が既に提供されているので、フックを追加する必要はありません。\n\n"
+    },
+    {
+      "title": "ハイバネート先指定を initramfs に渡す",
+      "level": 3,
+      "content": "システムがハイバネートする際、メモリイメージがスワップ領域に保存されます (メモリイメージには、マウント済みファイルシステムの状態も含まれます)。そのため、ハイバネートから復帰できるようにするには、ハイバネート先がどこであるかという情報が、initramfs で (つまり、ルートファイルシステムがマウントされる前の時点で) 利用できるようにする必要があります。\n\nsystemd v255 及び mkinitcpio v38 からは、システムが UEFI 上で実行されている場合、systemd-sleep(8) はハイバネート先として適切なスワップ領域を自動的に選択し、使用されたスワップ領域の情報は HibernateLocation EFI 変数に格納されます。次回のブート時には、systemd-hibernate-resume(8) がこの EFI 変数からスワップ領域の場所を読み込み、システムが復帰します。よって、システムがレガシー BIOS を使用している場合や、あなたが自動的に選択されるスワップ領域とは別のスワップ領域を使用したい場合を除いて、以下の手順は必須ではありません。\n\n"
+    },
+    {
+      "title": "ハイバネート先を手動で指定する",
+      "level": 4,
+      "content": "カーネルパラメータ resume=swap_device を使用することで可能です。swap_device は永続的なブロックデバイスの命名に従います。例えば:\n\n- resume=/dev/sda1\n- resume=UUID=4209c845-f495-4c43-8a03-5363dd433153\n- resume=/dev/mapper/archVolumeGroup-archLogicVolume – スワップが LVM 論理ボリューム上にある場合 (UUID や Label も使えるはずです)\n\nカーネルパラメータは再起動後に有効となります。すぐにハイバネートできるようにするには、lsblk を使ってボリュームのメジャーデバイスナンバーとマイナーデバイスナンバーを手に入れて、/sys/power/resume に major:minor という形式で書き込んでください。\n\n例えば、スワップデバイスが 8:3 の場合:\n\n```\n# echo 8:3 > /sys/power/resume\n```\n\nスワップファイルを使用する場合、これに加えて #スワップファイルのオフセットを手に入れる の手順も行ってください。\n\nスワップファイルをハイバネート用に使用する場合は、(スワップファイルが存在している) ファイルシステムを含んでいるブロックデバイスを resume= で指定する必要があり、さらに、スワップファイルの物理オフセットも resume_offset= カーネルパラメータで指定する必要があります。[3]\n\nBtrfs 以外のファイルシステムでは、resume_offset= の値は filefrag -v swap_file を実行することで得られます。このコマンドは表を出力します。必要な値は physical_offset 列の最初の行にあります。\n\n例えば:\n\n```\n# filefrag -v /swapfile\n```\n\n```\nFilesystem type is: ef53\nFile size of /swapfile is 4294967296 (1048576 blocks of 4096 bytes)\n ext:     logical_offset:        physical_offset: length:   expected: flags:\n   0:        0..       0:      38912..     38912:      1:\n   1:        1..   22527:      38913..     61439:  22527:             unwritten\n   2:    22528..   53247:     899072..    929791:  30720:      61440: unwritten\n...\n```\n\nこの例では、resume_offset= の値は最初の 38912 になります。\n\nあるいは、オフセットの値を直接手に入れるには:\n\n```\n# filefrag -v swap_file | awk '$1==\"0:\" {print substr($4, 1, length($4)-2)}'\n```\n\nBtrfs の場合、filefrag ツールは使わないでください。filefrag から得られる \"physical\" オフセットの値は、ディスク上の実際の物理オフセットとは異なるからです。複数のデバイスをサポートするために、仮想的なディスクアドレス空間が存在するのです。[4] 代わりに、btrfs-inspect-internal(8) コマンドを使ってください。例えば:\n\n```\n# btrfs inspect-internal map-swapfile -r swap_file\n```\n\n```\n198122980\n```\n\nこの例では、カーネルパラメータは resume_offset=198122980 となります。\n\n再起動せずにこの変更を即座に適用するには、resume offset を /sys/power/resume_offset に書き込んでください。例えば、オフセットが 38912 である場合は:\n\n```\n# echo 38912 > /sys/power/resume_offset\n```\n\n"
+    },
+    {
+      "title": "ハイバネート用のスワップファイルを zram で保持する",
+      "level": 3,
+      "content": "RAM 圧縮 (zram) でのハイバーネートの問題は、複数のスワップ領域を同時に保持することで解決できます。Systemd は、ハイバネートをトリガーする前に zram ブロックデバイスを常に無視するので、特に設定せずに両方の領域 (スワップファイルと zram) を保持できるはずです。\n\nスワップファイルの設定が済んだら、zram のページの手順に従ってください。このとき、zram に高いスワップ優先度 (例えば pri=100) を割り当ててください。\n\n- ハイバネート用のオンデマンドのスワップユニットは作成しないでください。これは公式にはサポートされていません。Systemd の issue #16708 と #30083 を参照してください。\n- カーネルは無名 (anonymous) ページの回収とスワップを行います。スワップ領域を利用しないと、メモリ使用効率の悪化につながる可能性があります。ユーザーは、memory.low によって特定のアプリケーションにおけるメモリ回収の優先度を管理することができます (これはコントロールグループで調整可能です)。全体として、この方が swappiness パラメータを設定するよりも効率的です。\n- 詳細はカーネルドキュメントの Swap Management 章と Chris Down の - In defence of swap: common misconceptions (Hiroaki Nakamura による日本語訳: スワップの弁護：よくある誤解を解く) を参照してください。\n\n"
+    },
+    {
+      "title": "thinly-provisioned LVM ボリュームへのハイバネーション",
+      "level": 3,
+      "content": "thinly-provisioned LVM されたボリュームへの休止状態は可能ですが、ボリュームが完全に割り当てられていることを確認する必要があります。そうしないと、再開に失敗します。FS#50703 を見てください。\n\nLVM ボリュームをゼロで埋めるだけで、 LVM ボリュームを完全に割り当てることができます。 例えば:\n\n```\n# dd if=/dev/zero of=/dev/vg0/swap bs=1M status=progress\n```\n\nボリュームが完全に割り当てられていることを確認するには、次を使用できます:\n\n```\n# lvs\n```\n\n```\nLV                   VG  Attr       LSize   Pool Origin    Data%  Meta%  Move Log Cpy%Sync Convert\n  swap                 vg0 Vwi-aot--- 10.00g  pool           100\n```\n\n完全に割り当てられたボリュームは、100%のデータ使用量であると表示されます。\n\n"
+    },
+    {
+      "title": "Zswap のライトバックを無効化し、スワップ領域をハイバネートのみに使用する",
+      "level": 3,
+      "content": "Linux 6.8 で zswap は cgroup 毎にライトバックを無効化するオプションを設定できるようになりました。Systemd ユニットを使ってすべてのユニットタイプに対して MemoryZSwapWriteback (systemd.resource-control(5) § Memory Accounting and Control を参照) を設定することで、zswap のライトバックを効果的に完全に無効化することができます。これにより、zswap をハイバネートサポートのある zram のように使用できるようになります。\n\nzswap-disable-writebackAUR をインストールすれば、それぞれタイプに対してトップレベルのドロップインファイルを12個 (システムとユーザーに対して scope、service、slice、socket、mount、swap) わざわざ作らなくてすみます。設定を適用するために再起動してください。\n\n何かメモリを大量に消費するタスクを行って zswap がディスクに書き込まないことを確認してください:\n\n```\n# cat /sys/kernel/debug/zswap/written_back_pages\n```\n\n```\n0\n```\n\n"
+    },
+    {
+      "title": "カスタムの systemd ユニット",
+      "level": 3,
+      "content": "systemd は、スリープ状態に応じて suspend.target、hibernate.target、hybrid-sleep.target、suspend-then-hibernate.target のどれかを開始します。これらの target は全て、sleep.target も開始します。これらの target はどれも、サスペンド/ハイバネートの前や後にカスタムのユニットを実行するために使用することができます。ユーザーのアクション用と root ユーザー/システムのアクション用とで、別々のファイルを作成する必要があります。例えば:\n\n```\n/etc/systemd/system/user-suspend@.service\n```\n\n```\n[Unit]\nDescription=User suspend actions\nBefore=sleep.target\n\n[Service]\nUser=%I\nType=forking\nEnvironment=DISPLAY=:0\nExecStartPre= -/usr/bin/pkill -u %u unison ; /usr/local/bin/music.sh stop\nExecStart=/usr/bin/sflock\nExecStartPost=/usr/bin/sleep 1\n\n[Install]\nWantedBy=sleep.target\n```\n\n```\n/etc/systemd/system/user-resume@.service\n```\n\n```\n[Unit]\nDescription=User resume actions\nAfter=suspend.target\n\n[Service]\nUser=%I\nType=simple\nExecStart=/usr/local/bin/ssh-connect.sh\n\n[Install]\nWantedBy=suspend.target\n```\n\n変更を適用するには、user-suspend@user.service や user-resume@user.service を有効化してください。\n\nroot ユーザー/システムのアクション用:\n\n```\n/etc/systemd/system/root-suspend.service\n```\n\n```\n[Unit]\nDescription=Local system suspend actions\nBefore=sleep.target\n\n[Service]\nType=simple\nExecStart=-/usr/bin/pkill sshfs\n\n[Install]\nWantedBy=sleep.target\n```\n\n```\n/etc/systemd/system/root-resume.service\n```\n\n```\n[Unit]\nDescription=Local system resume actions\nAfter=suspend.target\n\n[Service]\nType=simple\nExecStart=/usr/bin/systemctl restart mnt-media.automount\n\n[Install]\nWantedBy=suspend.target\n```\n\n"
+    },
+    {
+      "title": "スリープ/復帰のユニットの統合",
+      "level": 4,
+      "content": "サスペンド/レジュームのサービスファイルを統合すれば、様々なフェイズ (スリープ/レジューム) やターゲット (サスペンド/ハイバネート/ハイブリッドスリープ) でやることをひとつのフックで行うことができます。\n\n例と説明:\n\n```\n/etc/systemd/system/wicd-sleep.service\n```\n\n```\n[Unit]\nDescription=Wicd sleep hook\nBefore=sleep.target\nStopWhenUnneeded=yes\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/usr/share/wicd/daemon/suspend.py\nExecStop=-/usr/share/wicd/daemon/autoconnect.py\n\n[Install]\nWantedBy=sleep.target\n```\n\n- RemainAfterExit=yes: 起動後、明示的に止められるまでサービスは常時 active とみなされます。\n- StopWhenUnneeded=yes: active 時、他のサービスから必要とされなくなった場合、サービスは停止されます。この例では、sleep.target が停止されるとこのサービスは停止されます。\n- sleep.target では StopWhenUnneeded=yes が設定されているため、このフックは別のタスクにおいても適切に開始/停止することが保証されます。\n\n"
+    },
+    {
+      "title": "/usr/lib/systemd/system-sleep のフック",
+      "level": 3,
+      "content": "systemd-sleep は、/usr/lib/systemd/system-sleep/ 内の全ての実行可能ファイルを実行します。このとき、2つの引数が渡されます:\n\n1. pre または post: マシンがスリープしようとしているのか、復帰しようとしているのか。\n1. suspend、hibernate、hybrid-sleep のどれか: どのスリープ状態が実行される/されたのか。\n\nカスタムスクリプトの出力は、systemd-suspend.service や systemd-hibernate.service、systemd-hybrid-sleep.service によって記録されます。systemd の journalctl でこのログを見ることができます:\n\n```\n# journalctl -b -u systemd-suspend.service\n```\n\nカスタムのスリープスクリプト例:\n\n```\n/usr/lib/systemd/system-sleep/example.sh\n```\n\n```\n#!/bin/sh\ncase $1/$2 in\n  pre/*)\n    echo \"Going to $2...\"\n    ;;\n  post/*)\n    echo \"Waking up from $2...\"\n    ;;\nesac\n```\n\nスクリプトを実行可能にするのを忘れないで下さい。\n\n"
+    },
+    {
+      "title": "スリープを完全に無効化する",
+      "level": 3,
+      "content": "デバイスをサーバなどとして使用している場合、サスペンド/ハイバネートは必要ないかもしれませんし、かえって望ましくない可能性もあります。systemd-sleep.conf(5) を使えば任意のスリープ状態を無効化することができます:\n\n```\n/etc/systemd/sleep.conf.d/disable-sleep.conf\n```\n\n```\n[Sleep]\nAllowSuspend=no\nAllowHibernation=no\nAllowHybridSleep=no\nAllowSuspendThenHibernate=no\n```\n\n"
+    },
+    {
+      "title": "Intel Rapid Start Technology (IRST)",
+      "level": 3,
+      "content": "Intel Rapid Start Technology とは、ハイバネートするためのハードウェア上の方法で、あらかじめ設定された時間の後やバッテリー状態に基づいてスリープからハイバネートに移行できるようにします。IRSTは、オペレーティングシステムのレベルではなくファームウェアによって行われるので、通常のハイバネートよりも速く信頼性が高いはずです。一般的に、IRST はファームウェアで有効化する必要があり、またファームウェアで、サスペンド/バッテリイベント後にハイバネートをトリガーするまでの時間を設定できます。しかし、一部のデバイスは IRST をファームウェアでサポートしていますが、Intel の Windows ドライバからでしか設定できません。そのような場合には、以下で説明している intel-rst カーネルモジュールで Linux でもイベントを設定できるはずです。\n\nIntel Rapid Start Technology (IRST) が有効の場合、deep sleep からの再開には \"S3から再開するよりも数秒長くなりますが、ハイバネートから再開するよりもはるかに高速です\"。\n\nIntel ベースのシステムの多くは、 IRST のファームウェアをサポートしていますが、(HDD ではなく) SSD 上に特別なパーティションを必要とします。 Windows の OEM 展開では、Arch Linux インストールプロセス中に (SSD 全体を消去して再パーティションするのではなく) 保持できる IRST パーティションがすでに存在している場合があります。システムの RAM と同じサイズの未フォーマットパーティションとして表示されます。\n\nドライブ全体を消去してパーティションを切り直すつもりなら (あるいはすでにそうしてしまっているなら) IRST パーティションも再作成しなければなりません。これを行うには、システムの RAM と同じサイズの空のパーティションを作成し、そのパーティションの種類が GPT パーティションの場合は GUID D3BFE2DE-3DAF-11DF-BA40-E3A556D89593 に、 MBR パーティションの場合は ID 0x84 に設定します。また、システムのファームウェア設定で IRST のサポートを有効にする必要がある場合もあります。\n\nIRST ハイバネートにかかる時間 (つまり、\"RAMの内容全体を特殊なパーティションに\" コピーする時間) は、システムの RAM サイズと SSD 速度によって異なり、20~60秒かかります。システムによっては、プロセスの完了を(点滅を止めるなどして) LED インジケータで示す場合があります。\n\nLinux カーネルで IRST ハイバネートイベントを設定するには、CONFIG_INTEL_RST オプションでカーネルに組み込むか、カーネルモジュールとして利用可能である必要があります。modprobe intel_rst を実行してモジュールをロードすれば、/sys/bus/acpi/drivers/intel_rapid_start/*/ にファイル wakeup_events と wakeup_time が生成されるはずです。これらを用いて、さらなる設定を行うことができます。このモジュールは簡潔にドキュメント化されています。詳細は drivers/platform/x86/intel/rst.c を見てください。\n\nIntel Rapid Start Technology に関する情報は、general Q&A と user guides も見てください。\n\n"
+    },
+    {
+      "title": "ACPI_OS_NAME",
+      "level": 3,
+      "content": "DSDT table を動作するように設定することができます。DSDT の記事を参照してください。\n\n"
+    },
+    {
+      "title": "サスペンド/ハイバネートが動作しない、あるいはたまに動作しなくなる",
+      "level": 3,
+      "content": "ハイバネートやサスペンドから復帰した時に画面が真っ暗になって、明確なエラーは表示されず、何もできなくなるという報告が多数存在します。これらの問題は、ノートパソコンとデスクトップの両方で確認されています。公式の解決方法ではありませんが、古いカーネル、特に LTS カーネルに切り替えることで問題が解決することがあります。\n\nハードウェアの watchdog タイマーを使用している場合に問題が起こることもあります (デフォルトで無効化されています、systemd-system.conf(5) § OPTIONS の RuntimeWatchdogSec= を見てください)。バグのある watchdog タイマーにより、システムがハイバネートイメージの作成を終える前に、コンピュータがリセットされることがあります。\n\n時々、initramfs 内からのデバイスの初期化によって黒画面が発生することがあります。Mkinitcpio#MODULES 内にあるモジュールを削除し、kms フックを削除し、initramfs を再ビルドすると、この問題を解決できる可能性があります (特に、KMS の早期開始が設定されたグラフィックスドライバの場合)。復帰前にそのようなデバイスを初期化すると、整合性がなくなり、システムのハイバネートからの復帰を妨げてしまう可能性があります。これは RAM からの復帰には影響しません。また、ブログ記事 best practices to debug suspend issues も確認してください。\n\nATI ビデオドライバから新しい AMDGPU ドライバに移行すると、ハイバネートと復帰のプロセスを成功させることができる可能性があります。\n\nNVIDIA ユーザは、nvidiafb モジュールをブラックリスト化すると、問題が解決するかもしれません。[6]\n\nIntel CPU を搭載していて、タッチパッドのために intel_lpss_pci をロードするノート PC では、復帰時にカーネルパニックを引き起こすことがあります(この時、caps lock が点滅する) [7]。このモジュールは、以下のように initramfs に追加する必要があります:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(... intel_lpss_pci ...)\n```\n\nそして、initramfs を再生成してください。\n\n"
+    },
+    {
+      "title": "Wake-on-LAN",
+      "level": 3,
+      "content": "Wake-on-LAN が有効になっている場合、コンピュータがハイバネート状態になっていてもネットワークインターフェイスカードによって電力が消費されます。\n\n"
+    },
+    {
+      "title": "サスペンドからすぐに復帰する",
+      "level": 3,
+      "content": "電源管理/復帰トリガー#サスペンドからすぐに復帰する を見てください。\n\n"
+    },
+    {
+      "title": "ハイバネートした時にシステムの電源が落ちない",
+      "level": 3,
+      "content": "システムをハイバネートすると、(現在の状態がディスクに保存されたあとに) システムの電源が切られるはずです。一部のファームウェアでは、S4 スリープ状態が正しく機能しないことがあります。例えば、電源が切られず、システムが再起動してしまうことがあります。そのような場合、sleep.conf.d(5) で HibernateMode の値を shutdown に設定すると良いかもしれません:\n\n```\n/etc/systemd/sleep.conf.d/hibernatemode.conf\n```\n\n```\n[Sleep]\nHibernateMode=shutdown\n```\n\nこれにより、その他の設定が適切であれば、systemctl hibernate を実行すると現在の状態がディスクに保存され、マシンの電源が切られます。\n\n"
+    },
+    {
+      "title": "ハイバネート後に起動するとオペレーティングシステムが見つからない (または、間違った OS が起動する)",
+      "level": 3,
+      "content": "これは、ブートディスクが外部ディスクである場合に起こる可能性があります。BIOS/ファームウェアの制限が原因であるようです。ハイバネーションは外部 (あるいは別の) ディスク上の OS から行われたが、BIOS/ファームウェアは内部ディスクから起動を試みてしまっているのです。\n\n#ハイバネートした時にシステムの電源が落ちない で説明したように HibernateMode=shutdown を設定することで、この問題を永久に解決できます。すでにシステムから締め出されてしまっている場合、システムを4回再起動 (毎回、エラーが表示されるまで待ってください) してみることで、一部の BIOS 上では通常のブート手順を強制することができます。\n\n"
+    },
+    {
+      "title": "/home にスワップファイルを置く",
+      "level": 3,
+      "content": "スワップファイルが /home/ にある場合、systemd-logind はスワップファイルにアクセスできず、Call to Hibernate failed: No such file or directory という警告メッセージを出力して、systemctl hibernate の実行時に認証を求められます。このようなセットアップは、上流でサポートされていないとされているので、避けるべきです。2つの回避策については systemd issue 15354 を参照してください。\n\n"
+    },
+    {
+      "title": "A520I および B550I マザーボードで PC がスリープから復帰しない",
+      "level": 3,
+      "content": "A520i および B550i チップセットを搭載した一部のマザーボードでは、システムが完全にスリープ状態に入らない、またはスリープ状態から復帰しないことがあります。症状は、システムがスリープ状態に入り、マザーボード上の内部 LED または電源 LED が点灯したまま、モニターの電源が切れるというものです。その後、システムはこの状態から復帰することができず、ハードパワーオフが必要となります。AMD で同様の問題が発生した場合、まずシステムが完全にアップデートされていることを確認し、AMD マイクロコード パッケージがインストールされているかどうかをチェックしてください。\n\nGPP0 で始まる行のステータスが有効になっていることを確認します:\n\n```\n$ cat /proc/acpi/wakeup\n```\n\n```\nDevice\tS-state\t  Status   Sysfs node\nGP12\t  S4\t*enabled   pci:0000:00:07.1\nGP13\t  S4\t*enabled   pci:0000:00:08.1\nXHC0\t  S4\t*enabled   pci:0000:0b:00.3\nGP30\t  S4\t*disabled\nGP31\t  S4\t*disabled\nPS2K\t  S3\t*disabled\nGPP0\t  S4\t*enabled   pci:0000:00:01.1\nGPP8\t  S4\t*enabled   pci:0000:00:03.1\nPTXH\t  S4\t*enabled   pci:0000:05:00.0\nPT20\t  S4\t*disabled\nPT24\t  S4\t*disabled\nPT26\t  S4\t*disabled\nPT27\t  S4\t*disabled\nPT28\t  S4\t*enabled   pci:0000:06:08.0\nPT29\t  S4\t*enabled   pci:0000:06:09.0\n```\n\nこれが有効になっている場合は、次のコマンドを実行して無効化できます:\n\n```\n# echo GPP0 > /proc/acpi/wakeup\n```\n\nsystemctl suspend を実行してテストし、システムをスリープ状態にします。次に、数秒後にシステムを起動してみてください。うまくいく場合は、回避策を永続的にすることができます。systemd ユニットファイルを作成します。:\n\n```\n/etc/systemd/system/toggle-gpp0-to-fix-wakeup.service\n```\n\n```\n[Unit]\nDescription=\"Disable GPP0 to fix suspend issue\"\n\n[Service]\nExecStart=/bin/sh -c \"/bin/echo GPP0 > /proc/acpi/wakeup\"\n\n[Install]\nWantedBy=multi-user.target\n```\n\ndaemon-reload するか、新しく作成したユニットを起動/有効化してください。\n\nあるいは、udev ルールを作成することもできます。先の例のように GPP0 の sysfs ノードが pci:0000:00:01.1 である場合、関連する情報は udevadm info -a -p /sys/bus/pci/devices/0000\\:00\\:01.1 を実行することで得られ、以下のような udev ルールを作成すれば良いことになります:\n\n```\n/etc/udev/rules.d/10-gpp0-acpi-fix.rules\n```\n\n```\nKERNEL==\"0000:00:01.1\", SUBSYSTEM==\"pci\", DRIVERS==\"pcieport\", ATTR{vendor}==\"0x1022\", ATTR{device}==\"0x1483\", ATTR{power/wakeup}=\"disabled\"\n```\n\nデフォルトで、udev デーモンはシステム内の (ルールの) 変更を監視する用に設定されています。必要であれば、手動でルールを再読み込みすることもできます。\n\n"
+    },
+    {
+      "title": "ノートパソコンをサスペンドする Fn キーが動作しない",
+      "level": 3,
+      "content": "logind.conf をどう設定してもスリープボタンが動作しない場合 (ボタンを押しても syslog にメッセージすら表示されない)、おそらく logind がキーボードデバイスを監視していません。[8] 次のコマンドを実行してください:\n\n```\n# journalctl --grep=\"Watching system buttons\"\n```\n\nすると以下のような表示がされます:\n\n```\nMay 25 21:28:19 vmarch.lan systemd-logind[210]: Watching system buttons on /dev/input/event2 (Power Button)\nMay 25 21:28:19 vmarch.lan systemd-logind[210]: Watching system buttons on /dev/input/event3 (Sleep Button)\nMay 25 21:28:19 vmarch.lan systemd-logind[210]: Watching system buttons on /dev/input/event4 (Video Bus)\n```\n\nキーボードデバイスが出力に無いことに注意してください。以下のようにして、キーボードデバイスを一覧表示してみてください:\n\n```\n$ stat -c%N /dev/input/by-id/*-kbd\n```\n\n```\n...\n/dev/input/by-id/usb-SIGMACHIP_USB_Keyboard-event-kbd -> ../event6\n...\n```\n\n次に、親キーボードデバイスの ATTRS{name} の値を調べます [9]。例えば、上記のコマンドの出力から、このキーボードデバイスのデバイス入力イベントは event6 であることがわかるので、このイベント名を使って ATTRS{name} 属性の値を検索することができます:\n\n```\n# udevadm info -a /dev/input/event6\n```\n\n```\n...\nKERNEL==\"event6\"\n...\nATTRS{name}==\"SIGMACHIP USB Keyboard\"\n```\n\nカスタムの udev ルールを作成して、\"power-switch\" タグを追加してください:\n\n```\n/etc/udev/rules.d/70-power-switch-my.rules\n```\n\n```\nACTION==\"remove\", GOTO=\"power_switch_my_end\"\nSUBSYSTEM==\"input\", KERNEL==\"event*\", ATTRS{name}==\"SIGMACHIP USB Keyboard\", TAG+=\"power-switch\"\nLABEL=\"power_switch_my_end\"\n```\n\n上記の udev ルールを再読み込みして systemd-logind.service を再起動したら、logind の journal に Watching system buttons on /dev/input/event6 という出力が現れるはずです。\n\n"
+    },
+    {
+      "title": "システムが60秒間フリーズした後に復帰する、または復帰後にハングアップする",
+      "level": 3,
+      "content": "Systemd v256 以降、systemd がスリープ前に user.slice をフリーズさせるようになりました。これは、(特に KVM が使用されている場合) カーネルのバグにより失敗する可能性があります。[10][11]\n\nスリープ前に Failed to freeze unit 'user.slice' というメッセージがログに残されます。このような問題が起こると、ログイン (他のセッションを開始する) は pam_systemd(process:session): Failed to create session: Job 9876 for unit 'session-6.scope' failed with 'frozen' というエラーで失敗します。\n\n古い systemd の挙動に一時的に戻すには、systemd-suspend.service、systemd-hibernate.service、systemd-hybrid-sleep.service、systemd-suspend-then-hibernate.service を以下のようなドロップインファイルで編集してください:\n\n```\n[Service]\nEnvironment=SYSTEMD_SLEEP_FREEZE_USER_SESSIONS=false\n```\n\n"
+    }
+  ]
+}

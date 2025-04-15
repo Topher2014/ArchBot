@@ -1,0 +1,61 @@
+{
+  "title": "LILO (Čeština)",
+  "url": "https://wiki.archlinux.org/title/LILO_(%C4%8Ce%C5%A1tina)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Arch boot process\n\nThe LInux LOader, or LILO for short, is a legacy multi-boot loader for Linux systems. In spite of being the standard choice over the course of several years, it has been slowly phased out. As of January 2016, LILO is no longer actively developed.\n\n"
+    },
+    {
+      "title": "Supported file systems",
+      "level": 2,
+      "content": "From upstream's readme:\n\nIn practice, the development of LILO has stopped precisely because of some limitations to that approach, e.g. with Btrfs, GPT, RAID.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "LILO is available as liloAUR and lilo-gitAUR (the development version). LILO only works on BIOS systems.\n\nRunning the command lilo (as root) will install LILO to the MBR. Before running the lilo command you should edit /etc/lilo.conf to ensure that the root entry points towards the root partition. If your root partition is on /dev/sda1 then the root entry should look like this: root=/dev/sda1. Remember to change the root line for both the 'arch' and the 'arch-fallback' entries.\n\n"
+    },
+    {
+      "title": "Install to partition or partitionless disk",
+      "level": 3,
+      "content": "Use the -b flag to specify a partition or the whole disk (instead of the implied -M) to install LILO to the volume boot record (VBR) instead of the MBR. See lilo(8) and the answers by Hypnos on the Gentoo forum.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "LILO is configured by editing the /etc/lilo.conf file and running lilo afterwards to apply the new configuration.\n\nAs a reminder, consider that LILO needs to be run after every kernel upgrade, otherwise the system is likely to be left in an unbootable state.\n\nMore help on setting up LILO can be found in the LILO-mini-HOWTO.\n\n"
+    },
+    {
+      "title": "Sample setup",
+      "level": 3,
+      "content": "A typical LILO setup:\n\n```\n/etc/lilo.conf\n```\n\n```\n#\n# /etc/lilo.conf\n#\n\nboot=/dev/sda\n# This line often fixes L40 errors on bootup\n# disk=/dev/sda bios=0x80\n\ndefault=arch\ntimeout=50\nlba32\nprompt\n# Nice colours\ninstall=menu\nmenu-scheme=Wb:Yr:Wb:Wb\n\n# Highly recommended to uncomment line below if it\n#  does not give any error on booting\ncompact\n\n# Remember to change root=/dev/???\nimage=/boot/vmlinuz-linux\n\tlabel=arch\n\troot=/dev/disk/by-uuid/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX\n\tinitrd=/boot/initramfs-linux.img\n\tread-write\n\nimage=/boot/vmlinuz-linux\n\tlabel=arch-fallback\n\troot=/dev/disk/by-uuid/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX\n\tinitrd=/boot/initramfs-linux-fallback.img\n\tread-write\n\n#other=/dev/hda1\n#\tlabel=dos\n```\n\nYou can use hwinfo --framebuffer to determine what vga modes you can use.\n\n"
+    },
+    {
+      "title": "Using an image as background",
+      "level": 3,
+      "content": "First prepare the background image:\n\n- Open it in GIMP.\n- Scale it to 640x480.\n- Change it to indexed mode (Image > Mode > Indexed).\n- Select Create optimal palette and set it to 16 colours. Choose whatever dithering method suits you.\n- Open the \"Indexed Palette\" dialog. Make note of which colours you want to use for menu text entries, the clock, etc. In your lilo.conf, you refer to the colours by index.\n- Export the image as a bmp in your /boot directory. In Export dialog check option Do not write color space information\n\nNow edit lilo.conf. There are a few options that can be set for your graphical menu. See man lilo.conf for more information.\n\n- bitmap=<bitmap-file> Set this to the file that you saved above.\n- bmp-colors=<fg>,<bg>,<sh>,<hfg>,<hbg>,<hsh>\n\n- bmp-table=<x>,<y>,<ncol>,<nrow>,<xsep>,<spill> This option specifies where the menu is placed. x and y are the character coordinates. You can also suffix them with a p to specify pixel coordinates.\n- bmp-timer=<x>,<y>,<fg>,<bg>,<sh> This option specifies the coordinates and colour of the timer that counts down the timeout before booting a default entry. It uses colour indices for the colours, and character (or pixel) coordinates.\n\nFor example:\n\n```\nbitmap=/boot/arch-lilo.bmp\nbmp-colors=1,0,8,3,8,1\nbmp-table=250p,150p,1,18\nbmp-timer=250p,350p,3,8,1\n```\n\nSave lilo.conf, run lilo as root, and reboot and see how it looks!\n\n"
+    },
+    {
+      "title": "Pacman hook",
+      "level": 2,
+      "content": "lilo needs to be run after every kernel update. You can use a pacman hook to automate it. See Pacman#Hooks or alpm-hooks(5).\n\nMake the directory /etc/pacman.d/hooks if it does not already exist.\n\n```\n/etc/pacman.d/hooks/lilo.hook\n```\n\n```\n[Trigger]\nOperation = Install\nOperation = Upgrade\nOperation = Remove\nType = Package\nTarget = linux\nTarget = linux-lts\n\n[Action]\nDescription= Run lilo after kernel update\nWhen = PostTransaction\nDepends = lilo\nExec = /usr/bin/lilo\n```\n\n"
+    },
+    {
+      "title": "Read write error message whilst booting",
+      "level": 3,
+      "content": "This error message is caused by a change in mkinitcpio which was in response to this systemd commit. The change causes partitions to be fsck'ed twice when mounted read only. To fix this error edit /etc/lilo.conf and change the 'read only' line to 'read write' for both arch entries.\n\nSee this forum thread for more information.\n\n"
+    },
+    {
+      "title": "Devmapper not found error message after kernel upgrade",
+      "level": 3,
+      "content": "It is possible that running the lilo command after a kernel upgrade results in a devmapper not found error. If this is the case run modprobe dm-mod before running lilo after a kernel upgrade.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- List of kernel parameters that can be used at boot time\n- List of kernel paramaters with further explanation and grouped by like options ('Kernel Boot Command-Line Parameter Reference', Linux Kernel In A Nutshell)\n\n"
+    }
+  ]
+}

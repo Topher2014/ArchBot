@@ -1,0 +1,41 @@
+{
+  "title": "Ruby Gem Package Guidelines (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Ruby_Gem_Package_Guidelines_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document covers standards and guidelines on writing PKGBUILDs for software that uses ruby.\n\n"
+    },
+    {
+      "title": "Package naming",
+      "level": 2,
+      "content": "For libraries, use ruby-$_name (where $_name is the upstream project name). For applications, use the project name (without the ruby- prefix) and optionally add ruby-$_name to provides.\n\n"
+    },
+    {
+      "title": "Build and tests",
+      "level": 2,
+      "content": "Ruby packages should be built from upstream sources as this provides a transparent chain of trust for the build. To ensure integration with the existing set of Ruby packages, it is expected to run tests using ruby-rake or ruby-rspec.\n\n"
+    },
+    {
+      "title": "Template",
+      "level": 2,
+      "content": "```\nPKGBUILD\n```\n\n```\nprepare() {\n  cd \"${_name}-${pkgver}\"\n\n  # update gemspec/Gemfile to allow newer version of the dependencies\n  sed --in-place --regexp-extended 's|~>|>=|g' \"${_name}.gemspec\"\n}\n\nbuild() {\n  cd \"${_name}-${pkgver}\"\n\n  local _gemdir=\"$(gem env gemdir)\"\n\n  gem build \"${_name}.gemspec\"\n\n  gem install \\\n    --local \\\n    --verbose \\\n    --ignore-dependencies \\\n    --build-root \"tmp_install\" \\\n    \"${_name}-${pkgver}.gem\"\n\n  # remove unrepreducible files\n  rm --force --recursive --verbose \\\n    \"tmp_install/${_gemdir}/cache/\" \\\n    \"tmp_install/${_gemdir}/gems/${_name}-${pkgver}/vendor/\" \\\n    \"tmp_install/${_gemdir}/doc/${_name}-${pkgver}/ri/ext/\"\n\n  find \"tmp_install/${_gemdir}/gems/\" \\\n    -type f \\\n    \\( \\\n      -iname \"*.o\" -o \\\n      -iname \"*.c\" -o \\\n      -iname \"*.so\" -o \\\n      -iname \"*.time\" -o \\\n      -iname \"gem.build_complete\" -o \\\n      -iname \"Makefile\" \\\n    \\) \\\n    -delete\n\n  find \"tmp_install/${_gemdir}/extensions/\" \\\n    -type f \\\n    \\( \\\n      -iname \"mkmf.log\" -o \\\n      -iname \"gem_make.out\" \\\n    \\) \\\n    -delete\n}\n\ncheck() {\n  cd \"${_name}-${pkgver}\"\n\n  local _gemdir=\"$(gem env gemdir)\"\n\n  GEM_HOME=\"tmp_install/${_gemdir}\" rake test\n}\n\npackage() {\n  cd \"${_name}-${pkgver}\"\n\n  cp --archive --verbose tmp_install/* \"${pkgdir}\"\n\n  install --verbose -D --mode=0644 LICENSE --target-directory \"${pkgdir}/usr/share/licenses/${pkgname}\"\n  install --verbose -D --mode=0644 *.md --target-directory \"${pkgdir}/usr/share/doc/${pkgname}\"\n}\n```\n\n"
+    },
+    {
+      "title": "The gem is deriving the files to add with \"git ls-files\"",
+      "level": 3,
+      "content": "In this case you can add the following sed command to the prepare() function:\n\n```\n# we don't build from a git checkout\nsed --in-place --regexp-extended 's|git ls-files|find . -type f -not -path \"*/\\.git/*\"|' \"${_name}.gemspec\"\n```\n\n"
+    },
+    {
+      "title": "The upstream project is using \"rspec\" to run tests",
+      "level": 3,
+      "content": "In this case you can replace the code line in the check() function with the following:\n\n```\nGEM_HOME=\"tmp_install/${_gemdir}\" rspec\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Ruby language documentation\n- Rake documentation\n- Rubygems documentation\n- ruby(1)\n\n"
+    }
+  ]
+}

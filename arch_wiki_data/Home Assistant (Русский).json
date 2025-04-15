@@ -1,0 +1,51 @@
+{
+  "title": "Home Assistant (Русский)",
+  "url": "https://wiki.archlinux.org/title/Home_Assistant_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Home Assistant Supervised\n\nHome Assistant - это программное обеспечение для автоматизации дома с открытым исходным кодом, которое ставит на первое место локальный контроль и конфиденциальность. Работает благодаря всемирному сообществу мастеров и энтузиастов DIY.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет home-assistant.\n\n"
+    },
+    {
+      "title": "Home Assistant Supervised",
+      "level": 3,
+      "content": "Смотрите статью Home Assistant Supervised.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Файлы конфигурации хранятся в /var/lib/hass/. Если конфигурация отсутствует, при запуске будет записана конфигурация по умолчанию.\n\n"
+    },
+    {
+      "title": "Использование",
+      "level": 2,
+      "content": "Для запуска Home Assistant запустите/включите службу home-assistant.service.\n\nПервый запуск может занять до 20 минут, так как будут загружены и установлены необходимые пакеты.[1] Вы можете видеть прогресс в журналах.\n\n```\n# journalctl -fu home-assistant\n```\n\nПо умолчанию веб-интерфейс доступен по адресу http://localhost:8123.\n\n"
+    },
+    {
+      "title": "Использование MariaDB",
+      "level": 3,
+      "content": "По умолчанию в качестве базы данных для интеграций recorder/history используется SQLite. Заметный прирост производительности достигается при использовании MariaDB (особенно для больших систем). Home Assistant использует SQLAlchemy, что означает, что поддерживается любой бэкенд, например MySQL, MariaDB, PostgreSQL или MS SQL Server. В данной статье рассматривается только MariaDB; про другие СУБД можно почитать в документации recorder.\n\nУстановка MariaDB описана в соответствующей статье.\n\nУстановите пакет python-mysqlclient — он используется для соединения с MariaDB.\n\nСоздайте новую базу данных, в примере ниже показано одно имя пользователя для каждой службы с wildcard-доступом ко всем базам данных, имеющим имя пользователя в качестве префикса:\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE USER 'пользователь'@'localhost' IDENTIFIED BY 'пароль' ;\nCREATE DATABASE пользователь;\nGRANT ALL PRIVILEGES ON пользователь.* TO 'пользователь'@'localhost';\nFLUSH PRIVILEGES;\nquit;\n```\n\nДобавьте в ваш конфигурационный файл:\n\n```\n/var/lib/hass/configuration.yaml\n```\n\n```\nrecorder:\n  db_url: !secret recorder_mariadb_url\n```\n\nДобавьте в файл secrets (если не используется сокет Unix, другие варианты написания URL можно посмотреть в документации recorder):\n\n```\n/var/lib/hass/secrets.yaml\n```\n\n```\nrecorder_mariadb_url: \"mysql://ПОЛЬЗОВАТЕЛЬ:ПАРОЛЬ@localhost/БАЗА?unix_socket=/var/run/mysqld/mysqld.sock&charset=utf8mb4\"\n```\n\nНаконец, перезапустите службу home-assistant.service. Теперь база данных должна начать заполняться. Дополнительная информация доступна в документации recorder.\n\n"
+    },
+    {
+      "title": "Нет доступа к устройствам USB",
+      "level": 3,
+      "content": "При установке по умолчанию Home Assistant может не иметь необходимого доступа для работы с некоторыми устройствами, такими как USB-ключ Zigbee. Это происходит потому, что такие устройства контролируются системной группой uucp.\n\nОтредактируйте файл юнита home-assistant.service, добавив в него в него SupplementaryGroups=uucp.\n\nЗатем выполните daemon-reload и перезапустите службу home-assistant.service, после чего всё должно заработать.[2].\n\n"
+    },
+    {
+      "title": "Не работает интеграция Bluetooth",
+      "level": 3,
+      "content": "Если есть проблемы с интеграцией Bluetooth и в вашем журнале появляется следующее сообщение об ошибке, это связано с тем, что интеграция Bluetooth подключается через dbus и есть старый баг в systemd.\n\n```\nConfig entry 'Bluetooth' for bluetooth integration not ready yet: DBus connection broken: [Errno 32] Broken pipe; try restarting `bluetooth` and `dbus`; Retrying in background\n```\n\nРешением является переход на dbus-broker.\n\nИли создайте системного пользователя и группу hass:\n\n```\n# useradd -U -r -s /usr/bin/nologin hass\n```\n\nИ создайте drop-in файл, чтобы служба home-assistant.service использовала этого пользователя:\n\n```\n/etc/systemd/system/home-assistant.service.d/override.conf\n```\n\n```\n[Service]\nDynamicUser=false\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Домашняя страница Home Assistant\n- Документация по Home Assistant\n\n"
+    }
+  ]
+}

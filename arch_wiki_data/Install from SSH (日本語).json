@@ -1,0 +1,61 @@
+{
+  "title": "Install from SSH (日本語)",
+  "url": "https://wiki.archlinux.org/title/Install_from_SSH_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "この記事は、SSH 接続を介して Arch をリモートでインストールする方法を目的としています。ホストがリモートにある場合、または SSH クライアントのコピー/ペースト機能を使用して Arch インストールを実行する場合は、このアプローチを検討してください。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 リモート (ターゲット) マシン上で\n- 2 ローカルマシン上で\n- 3 ヘッドレスサーバーへのインストール 3.1 Cloud-init 設定ファイルを準備する 3.2 追加の FAT フォーマットされたドライブの使用 3.3 追加の ISO の使用 3.4 USB フラッシュドライブを使用する 3.5 単一のカスタムビルド ISO の使用 3.6 インストールメディアから起動する\n\n- 3.1 Cloud-init 設定ファイルを準備する\n- 3.2 追加の FAT フォーマットされたドライブの使用\n- 3.3 追加の ISO の使用\n- 3.4 USB フラッシュドライブを使用する\n- 3.5 単一のカスタムビルド ISO の使用\n- 3.6 インストールメディアから起動する\n\n"
+    },
+    {
+      "title": "リモート (ターゲット) マシン上で",
+      "level": 2,
+      "content": "Live CD/USB イメージの取得とインストール を介して、ターゲットマシンを live Arch 環境で起動して、ユーザーは root としてログインします。\n\nこの時点で、インストールガイド#インターネットへの接続 で提案されている例に従って、ターゲットマシン上にネットワークをセットアップします。\n\nroot のデフォルトの Arch パスワードは空であるため、SSH 接続に必要な root パスワードを設定します:\n\n```\n# passwd\n```\n\n/etc/ssh/sshd_config に PermitRootLogin yes が設定されていることを確認します。そうでない場合は、これを設定し、OpenSSH デーモン sshd.service を 再起動 して変更を適用します。\n\n"
+    },
+    {
+      "title": "ローカルマシン上で",
+      "level": 2,
+      "content": "ローカルマシンで、次のコマンドを使用して SSH 経由でターゲットマシンに接続します:\n\n```\n$ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@ip.address.of.target\n```\n\n```\n$ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@archiso.local\n```\n\nここから、ライブ環境のウェルカムメッセージが表示され、物理キーボードの前に座っているかのようにターゲットマシンを管理できます。この時点で、ライブメディアから Arch をインストールするだけの場合は、インストールガイド に従ってください。破損した既存の Linux インストールを編集することが目的の場合は、既存の Linux からインストール Wiki の記事に従ってください。\n\n"
+    },
+    {
+      "title": "ヘッドレスサーバーへのインストール",
+      "level": 2,
+      "content": "このセクションでは、キーボード、マウス、ディスプレイのないヘッドレスサーバーへの Arch Linux のインストールについて説明します。cloud-init NoCloud 構成の追加ドライブを使用して、OpenSSH 承認キーとオプションで iwd 接続を自動的に設定します。\n\n"
+    },
+    {
+      "title": "Cloud-init 設定ファイルを準備する",
+      "level": 3,
+      "content": "必要な cloud-init 設定ファイルは 3 つあります: meta-data、user-data、および network-config\n\nmeta-data ファイルは空でも構いません:\n\n```\n$ printf \"\" > meta-data\n```\n\nuser-data には関連する設定が含まれます。\n\n```\nuser-data\n```\n\n```\n#cloud-config\nusers:\n  - name: root\n    ssh_authorized_keys:\n      - ssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n      - ssh-ed25519 YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\n```\n\nssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX をパブリック SSH 鍵 に置き換えます。複数のキーを追加するには、上に示したステートメントを繰り返すだけです。\n\nWi-Fi ネットワークに自動的に接続するには、write_files: ステートメントを使用して、iwd ネットワーク設定ファイル を正しいディレクトリに作成します。例えば:\n\n```\nuser-data\n```\n\n```\n#cloud-config\nusers:\n  - name: root\n    ssh_authorized_keys:\n      - ssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n      - ssh-ed25519 YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\n\nwrite_files:\n- content: |\n    [Security]\n    PreSharedKey=aafb192ce2da24d8c7805c956136f45dd612103f086034c402ed266355297295\n  path: /var/lib/iwd/spaceship.psk\n\nruncmd:\n- systemctl restart iwd.service\n```\n\ncloud-init は、ISO で出荷されたものとは異なるネットワーク構成を作成します。つまり、mDNS レスポンダーと DHCPv6 クライアントが有効になっていません。これを回避するには、network-config で Cloud-init のネットワーク設定を無効にします:\n\n```\nnetwork-config\n```\n\n```\nversion: 2\nconfig: disabled\n```\n\n3 つのファイルがすべて作成されたら、CIDATA というラベルの付いた ISO 9660 または FAT ボリュームを持つドライブに配置する必要があります。\n\n"
+    },
+    {
+      "title": "追加の FAT フォーマットされたドライブの使用",
+      "level": 3,
+      "content": "FAT でフォーマットされたドライブを使用してください。meta-data、user-data、および network-config をドライブにコピーし、ファイルシステムの LABEL を {{ic|CIDATA} に変更します}。\n\n公式 ISO を持つドライブに加えて、このドライブをヘッドレスマシンに接続する必要があります。\n\n"
+    },
+    {
+      "title": "追加の ISO の使用",
+      "level": 3,
+      "content": "libisoburn の xorriso を使用して、cloud-init.iso ファイルを作成します:\n\n```\n$ xorrisofs -output cloud-init.iso -volid CIDATA -joliet -rational-rock meta-data user-data network-config\n```\n\ncloud-init.iso を光ディスクに 書き込み して、cloud-init データメディアを準備します。展開オプションが許可する場合は、ISO をそのまま使用します。\n\n"
+    },
+    {
+      "title": "USB フラッシュドライブを使用する",
+      "level": 3,
+      "content": "インストールイメージが USB フラッシュドライブなどに書き込まれる場合、ドライブに十分なスペースがあれば、cloud-init データを格納する追加のパーティションを作成できます。\n\ndosfstools、mtools、および libisoburn を インストール して下さい。\n\nまず、LABEL を CIDATA に設定して FAT イメージを作成します:\n\n```\n$ mkfs.fat -C -n CIDATA cloud-init.img 2048\n```\n\nmeta-data ファイルと user-data ファイルをそのルートにコピーします:\n\n```\n$ mcopy -i cloud-init.img meta-data user-data network-config ::\n```\n\n公式 ISO を再パックして、FAT イメージを 3 番目のパーティションとして含めます:\n\n```\n$ xorriso -indev archlinux-version-x86_64.iso -outdev archlinux-version-x86_64-with-cidata.iso -append_partition 3 0x0c cloud-init.img -boot_image any replay\n```\n\n最後に、USB インストールメディア#ISO をそのまま使う (BIOS と UEFI) に従って、再パックされた ISO (archlinux-version-x86_64-with-cidata.iso) を使用して USB フラッシュドライブインストールメディアを準備します。\n\n"
+    },
+    {
+      "title": "単一のカスタムビルド ISO の使用",
+      "level": 3,
+      "content": "あるいは、Archiso を使用してカスタム ISO を作成します。これにより、タイプに関係なく 1 つのドライブのみを使用できます。\n\nrelen プロファイルを基礎として使用します。Cloud-init 設定ファイル を airrootfs/var/lib/cloud/seed/nocloud/ に配置し、ISO をビルドします。\n\n"
+    },
+    {
+      "title": "インストールメディアから起動する",
+      "level": 3,
+      "content": "完了したら、適切な方法を使用して、インストールメディアと cloud-init データメディア (別々の場合) をヘッドレスマシンに展開します。\n\nヘッドレスマシンの電源を入れ、インストールメディアから live Arch 環境を起動します。ヘッドレスマシンが起動してネットワークに接続するまで、1 分ほど待ちます。\n\n既存のマシン (キーボードとディスプレイ付き) から SSH でヘッドレス サーバー上のライブ Arch 環境に接続し、インストールガイド の説明に従ってインストールを完了します。\n\n"
+    }
+  ]
+}

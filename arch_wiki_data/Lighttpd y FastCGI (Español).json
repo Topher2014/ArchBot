@@ -1,0 +1,71 @@
+{
+  "title": "Lighttpd y FastCGI (Español)",
+  "url": "https://wiki.archlinux.org/title/Lighttpd_y_FastCGI_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Lighttpd es un servidor web \"seguro, rápido, compatible y muy flexible\" que ha sido optimizado para ambientes de alto rendimiento. Consume muy pocos recursos comparado con otros servidores web y se ocupa de balancear el CPU. Sus características avanzadas (FastCGI, CGI, Auth, entre otras) hacen que lighttpd sea el servidor web perfecto para todos aquellos que sufren problemas de balanceo.\"\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete lighttpd.\n\n"
+    },
+    {
+      "title": "Sistema básico",
+      "level": 3,
+      "content": "EL archivo de configuración de lighttpd es: /etc/lighttpd/lighttpd.conf. Por defecto debe producir una pagina de prueba.\n\nPara comprobar su lighttpd.conf por bugs se puede usar el siguiente comando, que ayuda a encontrar errores en la configuración rápidamente:\n\n```\n$ lighttpd -t -f /etc/lighttpd/lighttpd.conf\n```\n\nOtra prueba mucho mas estricta puede ser ejecutada con:\n\n```\n$ lighttpd -tt -f /etc/lighttpd/lighttpd.conf\n```\n\nEl archivo de la configuración por defecto especifica que el directorio /srv/http/ es la base de los documentos servidos. Para comprobar la instalación, cree un archivo de prueba:\n\n```\n/srv/http/index.html\n```\n\n```\nHola Mundo!\n```\n\nDespués active la unidad lighttpd.service y en su navegador diríjase a localhost, donde debería ver la pagina de prueba.\n\nArchivos de configuración con ejemplos están disponibles en /usr/share/doc/lighttpd/.\n\n"
+    },
+    {
+      "title": "Historial básico",
+      "level": 4,
+      "content": "Lighttpd puede escribir archivos con historiales de acceso y de errores. Para habilitar ambas opciones edite el archivo /etc/lighttpd/lighttpd.conf:\n\n```\nserver.modules += (\n   \"mod_access\",\n   \"mod_accesslog\",\n)\n\nserver.errorlog   = \"/var/log/lighttpd/errores.log\"\naccesslog.filename = \"/var/log/lighttpd/accesos.log\"\n```\n\n"
+    },
+    {
+      "title": "Habilitar https con SSL",
+      "level": 4,
+      "content": "- Mozilla tiene un generador de configuracion que puede ser usado con lighttpd.\n- Despues de configurar SSL, puede verificar su configuracion con el servicio de Qualys SSL Labs.\n\nCertificados de SSL que son auto firmados pueden ser generados, asumiendo el paquete openssl esta instalado, de la siguiente manera:\n\n```\n# mkdir /etc/lighttpd/certs\n# openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -sha256 -keyout /etc/lighttpd/certs/server.pem -out /etc/lighttpd/certs/server.pem\n# chmod 600 /etc/lighttpd/certs/server.pem\n```\n\nModifique el archivo /etc/lighttpd/lighttpd.conf para habilitar https:\n\n```\n$SERVER[\"socket\"] == \":443\" {\n    ssl.engine                  = \"enable\" \n    ssl.pemfile                 = \"/etc/lighttpd/certs/server.pem\" \n }\n```\n\nAlternativamente, pero muy recomendado, puede generar un certificado firmado por Let's Encrypt. Despues de seguir las instrucciones de la generacion manual de un certificado, combine los archivos privkey.pem y fullchain.pem en uno:\n\n```\n# cat /etc/letsencrypt/live/su-dominio/{privkey.pem,fullchain.pem} > /etc/letsencrypt/live/su-dominio/combined.pem\n```\n\nEdite su archivo de configuracion principal /etc/lighttpd/lighttpd.conf agregando:\n\n```\n$SERVER[\"socket\"] == \":443\" {\n    ssl.engine                  = \"enable\" \n    ssl.pemfile                 = \"/etc/letsencrypt/live/su-dominio/combined.pem\"\n    ssl.ca-file                 = \"/etc/letsencrypt/live/su-dominio/fullchain.pem\"\n}\n```\n\nSi recibe un error empty reply from server al intentar curl https://su-dominio, intente agregar:\n\n```\nssl.openssl.ssl-conf-cmd = (\"Protocol\" => \"-ALL, TLSv1.2\")\n```\n\na la configuracion anterios. Esto tambien puede arreglar el caso qeu Firefox no pueda abrir la version HTTPs de su sitio.\n\n"
+    },
+    {
+      "title": "CGI",
+      "level": 3,
+      "content": "Interfaz de entrada común (Common Gateway Interface, CGI en ingles) funciona automáticamente con lighttpd, solo es necesario habilitar el modulo, incluir el archivo de configuración y asegurarse que su lenguaje interprete esta instalado. Por ejemplo python o ruby.\n\nCree el archivo /etc/lighttpd/conf.d/cgi.conf y agregue lo siguiente:\n\n```\nserver.modules += ( \"mod_cgi\" )\n\ncgi.assign                 = ( \".pl\"  => \"/usr/bin/perl\",\n                               \".cgi\" => \"/usr/bin/perl\",\n                               \".rb\"  => \"/usr/bin/ruby\",\n                               \".erb\" => \"/usr/bin/eruby\",\n                               \".py\"  => \"/usr/bin/python\",\n                               \".php\" => \"/usr/bin/php-cgi\" )\n\nindex-file.names           += ( \"index.pl\",   \"default.pl\",\n                               \"index.rb\",   \"default.rb\",\n                               \"index.erb\",  \"default.erb\",\n                               \"index.py\",   \"default.py\",\n                               \"index.php\",  \"default.php\" )\n```\n\nPara scripts de PHP debe asegurarse que la siguiente opción se encuentra en /etc/php/php.ini:\n\n```\ncgi.fix_pathinfo = 1\n```\n\nEn su archivo de configuración principal /etc/lighttpd/lighttpd.conf agregue:\n\n```\ninclude \"conf.d/cgi.conf\"\n```\n\n"
+    },
+    {
+      "title": "FastCGI",
+      "level": 3,
+      "content": "Instale el paquete fcgi. Ahora ya tiene lighttpd con soporte para fcgi. Si esto era todo lo que se deseaba.\n\nSi se desea expandir con Ruby on Rails, PHP o Python deben leer las secciones siguientes.\n\nEn primer lugar copie la configuración que provee lighttpd de /usr/share/doc/lighttpd/config/conf.d/fastcgi.conf a /etc/lighttpd/conf.d.\n\nAgregue lo siguiente al archivo de configuración /etc/lighttpd/conf.d/fastcgi.conf:\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\n#server.indexfiles += ( \"dispatch.fcgi\" )      # Opcion obsoleta\nindex-file.names += ( \"dispatch.fcgi\" )        # dispatch.fcgi si Rails se especifica\n\nserver.error-handler-404   = \"/dispatch.fcgi\"  # tambien\nfastcgi.server = (\n    \".fcgi\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/lighttpd/rails-fastcgi.sock\",\n        \"bin-path\" => \"/path/to/rails/application/public/dispatch.fcgi\"\n      )\n    )\n)\n```\n\nIncluya esta linea en su archivo de configuracion principal /etc/lighttpd/lighttpd.conf:\n\n```\ninclude \"conf.d/fastcgi.conf\"\n```\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 4,
+      "content": "Instale php y php-cgi, véase también PHP y LAMP.\n\nAsegúrese que php-cgi funciona ejecutando el comando php-cgi --version\n\n```\nPHP 5.4.3 (cgi-fcgi) (built: May  8 2012 17:10:17)\nCopyright (c) 1997-2012 The PHP Group\nZend Engine v2.4.0, Copyright (c) 1998-2012 Zend Technologies\n```\n\nSi tiene un resultado similar, quiere decir que PHP fue instalado correctamente.\n\nCree un archivo de configuración:\n\n```\n/etc/lighttpd/conf.d/fastcgi.conf\n```\n\n```\n# Asegurese de instalar php and php-cgi. Véase:                                                             \n# https://wiki.archlinux.org/index.php/Lighttpd_(Español)#PHP\n\nserver.modules += (\"mod_fastcgi\")\n\n# Servidor FCGI\n# =============\n#\n# Configuración de un servidor FastCGI con resolución de PHP.\n#\nindex-file.names += (\"index.php\")\nfastcgi.server = ( \n    # Balancear peticiones para esta ruta..\n    \".php\" => (\n        # ... dentro de los siguientes servidores FastCGI. El nombre de cada\n        # servidor es una etiqueta para identificarlo en el historial.\n        \"localhost\" => ( \n            \"bin-path\" => \"/usr/bin/php-cgi\",\n            \"socket\" => \"/tmp/php-fastcgi.sock\",\n            \"broken-scriptfilename\" => \"enable\",\n            \"max-procs\" => 4,                     # Valor por defecto\n            \"bin-environment\" => (\n                \"PHP_FCGI_CHILDREN\" => \"1\"        # Valor por defecto\n            )\n        )\n    )   \n)\n```\n\nAsegúrese que lighttpd use el archivo anterior agregando la siguiente linea a su archivo de configuración principal:\n\n```\n/etc/lighttpd/lighttpd.conf\n```\n\n```\ninclude \"conf.d/fastcgi.conf\"\n```\n\nRecargue lighttpd.\n\n- Si tiene errores de forma Archivo de entrada no encontrado (No input file found), puede tener varias explicaciones. Véase estas preguntas frecuentes por mas información.\n- Asegúrese que ningún otro modulo, por ejemplo mod_cgi, intentara manejar la extensión .php.\n\nEn versiones recientes de lighttps no hay inicio adaptivo. Para manejo dinámico de procesos PHP es posible instalar php-fpm y luego activar e iniciar automáticamente la unidad php-fpm.service.\n\nEn el archivo /etc/lighttpd/conf.d/fastcgi.conf agregue:\n\n```\nserver.modules += ( \"mod_fastcgi\" )\n\nindex-file.names += ( \"index.php\" ) \n\nfastcgi.server = (\n    \".php\" => (\n      \"localhost\" => ( \n        \"socket\" => \"/run/php-fpm/php-fpm.sock\",\n        \"broken-scriptfilename\" => \"enable\"\n      ))\n)\n```\n\n"
+    },
+    {
+      "title": "Python FastCGI",
+      "level": 4,
+      "content": "- lighttpd soporta el protocolo WSGI de Python: HowToPythonWSGI.\n- El siguiente método no funcionara con Python 3, ya que la librería Flup solo esta disponible para Python 2. Si desea usar Python 3, refiérase a la sección #CGI.\n\nInstale y configure FastCGI, véase la sección #FastCGI.\n\nInstale python2-flup[enlace roto: package not found].\n\nConfigure:\n\n```\nfastcgi.server = (\n    \".py\" =>\n    (\n        \"python-fcgi\" =>\n        (\n        \"socket\" => \"/run/lighttpd/fastcgi.python.socket\",\n         \"bin-path\" => \"test.py\",\n         \"check-local\" => \"disable\",\n         \"max-procs\" => 1,\n        )\n    )\n)\n```\n\nPonga el archivo test.py en el directorio raíz de su servidor y no olvide permitir su ejecución: chmod +x test.py.\n\n```\n#!/usr/bin/env python2\n\ndef myapp(environ, start_response):\n    print 'got request: %s' % environ\n    start_response('200 OK', [('Content-Type', 'text/plain')])\n    return ['Hello World!']\n\nif __name__ == '__main__':\n    from flup.server.fcgi import WSGIServer\n    WSGIServer(myapp).run()\n```\n\nGracias a firecat53 por su explicación\n\nPara usar SNI (por sus siglas en ingles) simplemente ponga las directivas del archivo ssl.pemfile en los condicionales del servidor. Un ssl.pemfile es requerido por defecto.\n\n```\n$HTTP[\"host\"] == \"www.example.org\" {\n    ssl.pemfile = \"/etc/lighttpd/certs/www.example.org.pem\" \n}\n\n$HTTP[\"host\"] == \"mail.example.org\" {\n    ssl.pemfile = \"/etc/lighttpd/certs/mail.example.org.pem\" \n}\n```\n\n"
+    },
+    {
+      "title": "Ruby on Rails",
+      "level": 4,
+      "content": "Si se desea usar Ruby on Rails, instale los paquetes ruby y rubygems.\n\nPara documentación de como usar Ruby on Rails por favor consulta http://rubyonrails.org.\n\n"
+    },
+    {
+      "title": "Re-direccionamiento de http a https",
+      "level": 4,
+      "content": "Agregue la linea \"mod_redirect\" en su archivo de configuración principal /etc/lighttpd/lighttpd.conf:\n\n```\nserver.modules += ( \"mod_redirect\" )\n\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"host\"] =~ \"example.org\" {\n    url.redirect = ( \"^/(.*)\" => \"https://example.org/$1\" )\n    server.name                 = \"example.org\" \n  }\n}\n\n$SERVER[\"socket\"] == \":443\" {\n  ssl.engine = \"enable\" \n  ssl.pemfile = \"/etc/lighttpd/certs/server.pem\" \n  server.document-root = \"...\" \n}\n```\n\nPara el re-direccionamiento de todos los sitios a su equivalente seguro, use la siguiente configuración en lugar de la conexión al socket 80:\n\n```\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"host\"] =~ \".*\" {\n    url.redirect = (\".*\" => \"https://%0$0\")\n  }\n}\n```\n\nPara el re-direccionamiento de parte de los sitios, por ejemplo phpmyadmin:\n\n```\n$SERVER[\"socket\"] == \":80\" {\n  $HTTP[\"url\"] =~ \"^/secure\" {\n    url.redirect = ( \"^/(.*)\" => \"https://example.com/$1\" )\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Compresión",
+      "level": 3,
+      "content": "La compresión de los archivos que el servidor provee a los visitantes puede ser una gran ventaja al reducir el ancho de banda requerido para la carga de la pagina web:\n\nEn el archivo principal /etc/lighttpd/lighttpd.conf agregue:\n\n```\nvar.cache_dir           = \"/var/cache/lighttpd\"\n```\n\nCree un directorio para los archivos comprimidos:\n\n```\n# mkdir /var/cache/lighttpd/compress\n# chown http:http /var/cache/lighttpd/compress\n```\n\nCopie el ejemplo del archivo de compresión:\n\n```\n# mkdir /etc/lighttpd/conf.d\n# cp /usr/share/doc/lighttpd/config/conf.d/compress.conf /etc/lighttpd/conf.d/\n```\n\nAgregue la siguiente linea al archivo principal de configuración /etc/lighttpd/lighttpd.conf:\n\n```\ninclude \"conf.d/compress.conf\"\n```\n\nTambién es posible seleccionar el tipo de contenido que se puede comprimir, modifique /etc/lighttpd/conf.d/compress.conf en la opción compress.filetype:\n\n```\ncompress.filetype     = (\"text/plain\", \"text/html\", \"text/javascript\", \"text/css\", \"text/xml\")\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- lighttpd wiki\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "VPN over SSH (Português)",
+  "url": "https://wiki.archlinux.org/title/VPN_over_SSH_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Existem várias maneiras de configurar uma rede privada virtual por meio do SSH. Note que, embora isso possa ser útil de tempos em tempos, pode não ser uma substituição completa para uma VPN regular. Veja por exemplo [1].\n\n"
+    },
+    {
+      "title": "Usando tun2socks do badvpn",
+      "level": 2,
+      "content": "badvpn é uma coleção de utilitários para vários casos de uso relacionados à VPN.\n\n"
+    },
+    {
+      "title": "Iniciar proxy SOCKS dinâmico de SSH",
+      "level": 3,
+      "content": "Primeiro, vamos configurar um proxy socks dinâmico de SSH normal como de costume:\n\n```\n$ ssh -TND 4711 <seu_usuário>@<servidor_SSH>\n```\n\n"
+    },
+    {
+      "title": "Configurar interface de tunelamento e badvpn",
+      "level": 3,
+      "content": "Depois, podemos prosseguir com a configuração do TUN.\n\n```\n# ip tuntap add dev tun0 mode tun user <seu_usuário_local>\n# ip addr replace 10.0.0.1/24 dev tun0\n# badvpn-tun2socks --tundev tun0 --netif-ipaddr 10.0.0.2 --netif-netmask 255.255.255.0 --socks-server-addr localhost:4711\n```\n\nAgora você tem uma interface local tun0 funcionando que encaminha todo o tráfego que entra nele através do proxy SOCKS que você configurou anteriormente.\n\n"
+    },
+    {
+      "title": "Fazer o tráfego passar por um túnel",
+      "level": 3,
+      "content": "Tudo o que resta a fazer agora é configurar uma rota local para obter algum tráfego para ela. Vamos configurar uma rota que direcione todo o tráfego para ela. Vamos precisar de três rotas:\n\n1. Rota que vai para o servidor SSH que usamos para o túnel com uma baixa métrica.\n1. Rota para o servidor DNS (porque o tun2socks não faz o UDP que é necessário para o DNS) com uma baixa métrica.\n1. Rota padrão para todos os outros tráfegos com uma métrica mais alta que as outras rotas.\n\nA ideia por trás da definição específica das métricas é que precisamos garantir que a rota escolhida para o servidor SSH seja sempre direta, caso contrário, ela retornaria ao túnel SSH, o que causaria um loop e, como resultado, perderíamos a conexão SSH. Além disso, precisamos definir uma rota DNS explícita, pois o tun2socks não faz o encapsulamento do UDP (necessário para o DNS). Também precisamos de uma nova rota padrão com uma métrica menor do que a sua rota padrão antiga para que o tráfego entre no túnel. Com tudo isso dito, vamos começar a trabalhar:\n\n```\n# ip route add <IP_do_servidor_SSH> via <IP_do_gateway_original> metric 5\n# ip route add <IP_do_servidor_DNS> via <IP_do_gateway_original> metric 5\n# ip route add default via 10.0.0.2 metric 6\n```\n\nAgora todo o tráfego (exceto o DNS e o próprio servidor SSH) deve passar tun0.\n\n"
+    },
+    {
+      "title": "Tunelamento incorporado do OpenSSH",
+      "level": 2,
+      "content": "O OpenSSH tem suporte a TUN/TAP integrado usando -w<número-tun-local>:<número-tun-remoto>. Aqui, um túnel de camada 3/ponto-a-ponto/TUN é descrito. Também é possível criar um túnel de camada 2/ethernet/TAP.\n\n"
+    },
+    {
+      "title": "Criar interfaces tun usando systemd-networkd",
+      "level": 3,
+      "content": "```\n/etc/systemd/network/vpn.netdev\n```\n\n```\n[NetDev]\nName=tun5\nKind=tun\n\n[Tun]\nUser=vpn\nGroup=network\n```\n\n```\n/etc/systemd/network/vpn.network\n```\n\n```\n[Match]\nName=tun5\n\n[Address]\nAddress=192.168.200.2/24\n```\n\nAssim que esses arquivos são criados, habilite-os reiniciando systemd-networkd.service.\n\nTambém, você pode gerenciar as interfaces tun com o comando ip tunnel.\n\n"
+    },
+    {
+      "title": "Criando interfaces em comando SSH",
+      "level": 4,
+      "content": "O SSH pode criar as duas interfaces automaticamente, mas você deve configurar o IP e o roteamento após a conexão ser estabelecida.\n\n```\nssh \\\n  -o PermitLocalCommand=yes \\\n  -o LocalCommand=\"sudo ifconfig tun5 192.168.244.2 pointopoint 192.168.244.1 netmask 255.255.255.0\" \\\n  -o ServerAliveInterval=60 \\\n  -w 5:5 vpn@example.com \\\n  'sudo ifconfig tun5 192.168.244.1 pointopoint 192.168.244.2 netmask 255.255.255.0; echo tun0 ready'\n```\n\n"
+    },
+    {
+      "title": "Iniciar SSH",
+      "level": 3,
+      "content": "```\nssh -f -w5:5 vpn@example.com -i ~/.ssh/key \"sleep 1000000000\"\n```\n\nou você pode adicionar opções keep-alive se estiver atrás de um NAT.\n\n```\nssh -f -w5:5 vpn@example.com \\\n        -o ServerAliveInterval=30 \\\n        -o ServerAliveCountMax=5 \\\n        -o TCPKeepAlive=yes \\\n        -i ~/.ssh/key \"sleep 1000000000\"\n```\n\n"
+    },
+    {
+      "title": "Solução de problemas",
+      "level": 3,
+      "content": "- ssh deve ter direitos de acesso à interface do tun ou permissões para criá-lo. Verifique o proprietário da interface tun e/ou /dev/net/tun.\n- Obviamente, se você deseja acessar uma rede em vez de uma única máquina, você deve configurar corretamente o encaminhamento de pacotes IP, roteamento e talvez um netfilter em ambos os lados.\n\n"
+    },
+    {
+      "title": "Usando PPP por SSH",
+      "level": 2,
+      "content": "pppd pode ser facilmente usado para criar um túnel por meio de um servidor SSH:\n\n```\n# pppd updetach noauth silent nodeflate pty \"/usr/bin/ssh root@remote-gw /usr/sbin/pppd nodetach notty noauth\" ipparam vpn 10.0.8.1:10.0.8.2\n```\n\nQuando a VPN é estabelecida, você pode rotear o tráfego através dela. Para obter acesso a uma rede interna:\n\n```\n# ip route add 192.168.0.0/16 via 10.0.8.2\n```\n\nPara rotear todo o tráfego da Internet através do túnel, por exemplo, para proteger sua comunicação em uma rede não criptografada, primeiro adicione uma rota ao servidor SSH através de seu gateway regular:\n\n```\n# ip route add <gw-remoto> via <gateway_padrão_atual>\n```\n\nEm seguida, substitua a rota padrão pelo túnel\n\n```\n# ip route replace default via 10.0.8.2\n```\n\n"
+    },
+    {
+      "title": "Script auxiliar",
+      "level": 3,
+      "content": "pvpn (pacote pvpnAUR) é um script wrapper de pppd por SSH.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Configuração de rede\n- Roteador\n- OpenSSH\n- sshuttle, um túnel python\n\n"
+    }
+  ]
+}

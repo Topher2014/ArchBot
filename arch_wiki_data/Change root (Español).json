@@ -1,0 +1,86 @@
+{
+  "title": "Change root (Español)",
+  "url": "https://wiki.archlinux.org/title/Change_root_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-09-27** \n\nArtículos relacionados\n\n- PRoot\n- Linux Containers\n- systemd-nspawn\n\nUn chroot es una operación que cambia el directorio raíz aparente para el proceso en ejecución actual y sus subsidiarios. Un programa que se ejecuta en este entorno modificado no puede acceder a los archivos y comandos fuera de ese árbol de directorios del entorno. Este entorno modificado se denomina jaula chroot.\n\n"
+    },
+    {
+      "title": "Razonamiento",
+      "level": 2,
+      "content": "El cambio de root se realiza comúnmente para realizar el mantenimiento del sistema en sistemas en los que ya no es posible arrancar y/o iniciar sesión. Unos ejemplos típicos son:\n\n- Reinstalar el gestor de arranque.\n- Reconstruir la imagen initramfs.\n- Actualizar o degradar paquetes.\n- Restablecer una contraseña olvidada.\n- Compilar paquetes en un chroot limpio.\n\nVéase también Wikipedia:Chroot#Limitations.\n\n"
+    },
+    {
+      "title": "Requisitos",
+      "level": 2,
+      "content": "- Privilegios de root.\n- Otro entorno Linux, por ejemplo, un LiveCD o un USB, o de otra distribución Linux existente.\n- Mismos entornos de arquitectura; es decir, el chroot desde y el chroot hasta. La arquitectura del entorno actual puede descubrirse con: uname -m (por ejemplo, i686 o x86_64).\n- Módulos del kernel necesarios cargados en el entorno chroot.\n- Swap activado en caso de ser necesario: # swapon /dev/sdxY\n- Conexión a internet en caso de ser necesario.\n\n```\n# swapon /dev/sdxY\n```\n\n"
+    },
+    {
+      "title": "Utilización",
+      "level": 2,
+      "content": "- Algunas herramientas systemd como hostnamectl, localectl y timedatectl no pueden ser utilizadas dentro de un chroot, ya que requieren una conexión dbus activa. [1]\n- El sistema de archivos que servirá como la nueva raíz (/) de su chroot debe ser accesible (es decir, descifrado y montado).\n\nHay dos formas principales de usar chroot, las cuales se describen a continuación.\n\n"
+    },
+    {
+      "title": "Usar arch-chroot",
+      "level": 3,
+      "content": "El script bash arch-chroot es parte del paquete arch-install-scripts. Antes de ejecutar /usr/bin/chroot, el script monta sistemas de archivos API como /proc y hace que /etc/resolv.conf esté disponible desde el chroot.\n\n"
+    },
+    {
+      "title": "Introducir un chroot",
+      "level": 3,
+      "content": "Ejecute arch-chroot con el nuevo directorio raíz como primer argumento:\n\n```\n# arch-chroot ubicación/del/nuevo/root\n```\n\nPor ejemplo, en la guía de instalación este directorio sería /mnt:\n\n```\n# arch-chroot /mnt\n```\n\nPara salir del chroot simplemente use\n\n```\n# exit\n```\n\n"
+    },
+    {
+      "title": "Hacer chroot en una instalación existente",
+      "level": 4,
+      "content": "Ejecute lsblk y observe el diseño de partición de su instalación. Por lo general será algo como /dev/sdXY o si tiene una unidad NVMe /dev/nvme0nXpY.\n\nMonte el sistema de archivos:\n\n```\n# mount /dev/sdXY /mnt\n```\n\nAdemás, si tiene una partición de sistema EFI y necesita hacer cambios en ella (por ejemplo, actualizar las imágenes vmlinuz o initramfs):\n\n```\n# mount /dev/sdXZ /mnt/esp\n```\n\nFinalmente, ingrese en el chroot:\n\n```\n# arch-chroot /mnt\n```\n\nPara salir del chroot utilice:\n\n```\n# exit\n```\n\nAhora puede realizar la mayoría de las operaciones disponibles desde su instalación existente. Algunas tareas que necesitan D-Bus no funcionarán como se indica en #Utilización.\n\n"
+    },
+    {
+      "title": "Ejecutar una sola orden y salir",
+      "level": 4,
+      "content": "Para ejecutar una orden desde el chroot y salir de nuevo, anexe la siguiente orden al final de la línea:\n\n```\n# arch-chroot ubicación/del/nuevo/root miorden\n```\n\nPor ejemplo, para ejecutar mkinitcpio -p linux para un chroot ubicado en /mnt/arch haga:\n\n```\n# arch-chroot /mnt/arch mkinitcpio -p linux\n```\n\n"
+    },
+    {
+      "title": "Usar chroot",
+      "level": 3,
+      "content": "En el siguiente ejemplo, la ruta /ubicación/de/nueva/raíz es el directorio donde reside la nueva raíz.\n\nEn primer lugar, monte los sistemas de archivos temporales de la API:\n\n```\n# cd /ubicación/del/nuevo/root\n# mount -t proc /proc proc/\n# mount -t sysfs /sys sys/\n# mount --rbind /dev dev/\n```\n\nY opcionalmente\n\n```\n# mount --rbind /run run/\n```\n\nSi está ejecutando un sistema UEFI también necesitará acceso a las variables EFI. De lo contrario, al instalar GRUB recibirá un mensaje similar a UEFI variables not supported on this machine:\n\n```\n# mount --rbind /sys/firmware/efi/efivars sys/firmware/efi/efivars/\n```\n\nA continuación, para utilizar una conexión a Internet en el entorno chroot, copie los detalles del DNS:\n\n```\n# cp /etc/resolv.conf etc/resolv.conf\n```\n\nFinalmente, para cambiar el root a /ubiación/de/nuevo/root usando el bash:\n\n```\n# chroot ubicación/del/nuevo/root /bin/bash\n```\n\n- chroot: no se puede ejecutar la orden '/usr/bin/bash': Exec format error, es probable que las arquitecturas del entorno del host y del entorno chroot no coincidan.\n- chroot: '/usr/bin/bash': permiso denegado, vuelva a montar con el permiso de ejecución: mount -o remount,exec /ubicación/de/nuevo/root. si esto no lo arregla, entonces asegúrese de que los componentes base del nuevo entorno están intactos (si es un Arch root intente paccheck --root=/localización/del/nuevo/root --files --file-properties --md5sum glibc filesystem, con pacutils)\n\n- si esto no lo arregla, entonces asegúrese de que los componentes base del nuevo entorno están intactos (si es un Arch root intente paccheck --root=/localización/del/nuevo/root --files --file-properties --md5sum glibc filesystem, con pacutils)\n\nDespués del chroot puede ser necesario cargar la configuración local del bash:\n\n```\n# source /etc/profile\n# source ~/.bashrc\n```\n\n```\n# export PS1=\"(chroot) $PS1\"\n```\n\nCuando haya terminado con el chroot, puedes salir de él mediante:\n\n```\n# exit\n```\n\nA continuación, desmonte los sistemas de archivos temporales:\n\n```\n# cd /\n# umount --recursive /ubicación/del/nuevo/root\n```\n\n"
+    },
+    {
+      "title": "Ejecutar aplicaciones gráficas desde chroot",
+      "level": 2,
+      "content": "Si tiene un servidor X funcionando en su sistema, puede iniciar aplicaciones gráficas desde el entorno chroot.\n\nPara permitir que el entorno chroot se conecte a un servidor X, abra una terminal virtual dentro del servidor X (es decir, dentro del escritorio del usuario que está conectado en ese momento), y luego ejecute la orden xhost, que da permiso a cualquiera para conectarse al servidor X del usuario (véase también Xhost):\n\n```\n$ xhost +local:\n```\n\nLuego, para dirigir las aplicaciones al servidor X desde el chroot, configure la variable de entorno DISPLAY dentro del chroot para que coincida con la variable DISPLAY del usuario propietario del servidor X. Así, por ejemplo, ejecute\n\n```\n$ echo $DISPLAY\n```\n\ncomo el usuario propietario del servidor X para ver el valor de DISPLAY. Si el valor es \":0\" (por ejemplo), entonces en el entorno chroot ejecute:\n\n```\n# export DISPLAY=:0\n```\n\n"
+    },
+    {
+      "title": "Sin privilegios root",
+      "level": 2,
+      "content": "Chroot requiere de privilegios root, que pueden no ser deseables o posibles para el usuario en ciertas situaciones. Sin embargo, hay varias formas de simular un comportamiento similar al de chroot utilizando implementaciones alternativas.\n\n"
+    },
+    {
+      "title": "PRoot",
+      "level": 3,
+      "content": "PRoot puede ser usado para cambiar el directorio raíz aparente y usar mount --bind sin privilegios de root. Esto es útil para confinar aplicaciones a un solo directorio o ejecutar programas construidos para una arquitectura de CPU diferente, pero tiene limitaciones debido a que todos los archivos son propiedad del usuario en el sistema anfitrión. PRoot proporciona un argumento --root-id que puede ser utilizado como una solución para algunas de estas limitaciones de una manera similar (aunque más limitada) a fakeroot.\n\n"
+    },
+    {
+      "title": "Fakechroot",
+      "level": 3,
+      "content": "fakechroot es un shim de biblioteca que intercepta la llamada a chroot y falsea los resultados. Se puede utilizar junto con fakeroot para simular un chroot como un usuario normal.\n\n```\n$ fakechroot fakeroot chroot ~/mi-chroot bash\n```\n\n"
+    },
+    {
+      "title": "Unshare",
+      "level": 3,
+      "content": "Unshare, parte de util-linux, se puede utilizar para crear un nuevo espacio de nombres del kernel. Esto funciona con la orden chroot habitual. Por ejemplo:\n\n```\n$ unshare --map-root-user chroot ~/namespace /bin/sh\n```\n\n"
+    },
+    {
+      "title": "arch-chroot: /location/of/new/root is not a mountpoint. This may have undesirable side effects.",
+      "level": 3,
+      "content": "Al ejecutar arch-chroot /ubicación/de/la/nueva/raíz, se emite una advertencia:\n\n```\n==> WARNING: /ubicación/de/la/nueva/raíz is not a mountpoint. This may have undesirable side effects.\n```\n\nVéase arch-chroot(8) para obtener una explicación y un ejemplo del uso del montaje de enlace (bind mounting) para convertir el directorio chroot en un punto de montaje.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Basic Chroot\n\n"
+    }
+  ]
+}

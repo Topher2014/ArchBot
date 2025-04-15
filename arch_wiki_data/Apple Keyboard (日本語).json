@@ -1,0 +1,91 @@
+{
+  "title": "Apple Keyboard (日本語)",
+  "url": "https://wiki.archlinux.org/title/Apple_Keyboard_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- 特別なキーボードキー\n\n一部の Apple 製のキーボードではキーが変わっていたり動作しなかったりすることがあります。この記事ではキーボードにあわせて適切な動作をするように設定を変更する方法を説明します。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 Numlock が有効\n- 2 ファンクションキーが動作しない 2.1 上記の設定が無線キーボードで動作しない場合 2.2 Cmd と Alt/AltGr を入れ替える\n- 3 < と > が § と ½ に入れ替わる\n- 4 < と > が ^ と ° (あるいは @ と #) に入れ替わる\n- 5 ` と ~ キーで < と > が出力される\n- 6 メディアキー\n- 7 PrintScreen と SysRq\n- 8 Apple Keyboard を通常のキーボードと同じように扱う 8.1 hid-apple のパッチを使う 8.2 un-apple-keyboard を使う 8.3 再起動せずに挙動を変更する\n- 9 Magic Keyboard が接続できない\n- 10 参照\n\n- 2.1 上記の設定が無線キーボードで動作しない場合\n- 2.2 Cmd と Alt/AltGr を入れ替える\n\n- 8.1 hid-apple のパッチを使う\n- 8.2 un-apple-keyboard を使う\n- 8.3 再起動せずに挙動を変更する\n\n"
+    },
+    {
+      "title": "Numlock が有効",
+      "level": 2,
+      "content": "Numlock が有効になってしまうと物理キーと 7, 8, 9, u, i, o, j, k, l と周りのキーしか動作しなくなり数字が出力されるようになります。これを修正するには Fn+F6 を二度押して下さい。\n\nもしくは、xmodmap を使って手動でキーコードを設定することで Numlock を使わないようにできます:\n\n```\nkeycode  90 = KP_0 KP_0 KP_0 KP_0 KP_0 KP_0\nkeycode  87 = KP_1 KP_1 KP_1 KP_1 KP_1 KP_1\nkeycode  88 = KP_2 KP_2 KP_2 KP_2 KP_2 KP_2\nkeycode  89 = KP_3 KP_3 KP_3 KP_3 KP_3 KP_3\nkeycode  83 = KP_4 KP_4 KP_4 KP_4 KP_4 KP_4\nkeycode  84 = KP_5 KP_5 KP_5 KP_5 KP_5 KP_5\nkeycode  85 = KP_6 KP_6 KP_6 KP_6 KP_6 KP_6\nkeycode  79 = KP_7 KP_7 KP_7 KP_7 KP_7 KP_7\nkeycode  80 = KP_8 KP_8 KP_8 KP_8 KP_8 KP_8\nkeycode  81 = KP_9 KP_9 KP_9 KP_9 KP_9 KP_9\n```\n\n"
+    },
+    {
+      "title": "ファンクションキーが動作しない",
+      "level": 2,
+      "content": "F<num> キーが動作しない場合、キーボードのカーネルドライバーがメディアキーを使用することをデフォルトにしているのが原因で、F<num> キーを動作させるには Fn キーを使う必要があります。この挙動を変更するには、ドライバーの設定を変更してください。root で以下を実行:\n\n```\n# echo 2 > /sys/module/hid_apple/parameters/fnmode\n```\n\nファイルが存在しないと表示される場合は、カーネルが古いので代わりに以下を実行してください:\n\n```\n# echo 2 > /sys/module/hid/parameters/pb_fnmode\n```\n\n設定を永続的にするには /etc/modprobe.d/hid_apple.conf にオプションを記述してください:\n\n```\n/etc/modprobe.d/hid_apple.conf\n```\n\n```\noptions hid_apple fnmode=2\n```\n\n初期 RAM ディスクで上記の変更を適用したい場合、mkinitcpio の設定 (通常は /etc/mkinitcpio.conf) で、HOOKS 変数に modconf を指定するか FILES 変数で /etc/modprobe.d/hid_apple.conf を指定してください。変更を反映するにはイメージの再生成が必要です。\n\n"
+    },
+    {
+      "title": "上記の設定が無線キーボードで動作しない場合",
+      "level": 3,
+      "content": "hid_apple/parameters や hid/parameters/pb_fnmode が最近の Apple Bluetooth キーボードモデルとカーネル 3.4 では見つからないことがあります。\n\nまず、キーボードを確認してください。root で次を実行 (hidd は bluez パッケージに含まれています):\n\n```\n# hidd --show\n```\n\n以下のような表示がされます:\n\n```\n40:CA:EC:32:85:AB Apple Wireless Keyboard [05ac:0255] connected\n```\n\nベンダー ID (05ac) とデバイス ID (0255) から、カーネルがキーボードをサポートしているかどうか簡単に確認できます。実際、Linux カーネル 3.4 では上記のデバイスがサポートされています。drivers/hid/hid-ids.h の中に以下の行が確認できます:\n\n```\n#define USB_DEVICE_ID_APPLE_ALU_WIRELESS_2011_ANSI  0x0255\n```\n\nただしファンクションキーのサポートはありません。\n\nこの問題を修正するには以下のパッチを使って abs からカーネルを再ビルドしてください (Linux カーネル 3.5 からパッチはマージされています): https://pastebin.com/CvFJz3Fn\n\nバグはすでに上流に報告済みです: https://bugzilla.kernel.org/show_bug.cgi?id=43135\n\n"
+    },
+    {
+      "title": "Cmd と Alt/AltGr を入れ替える",
+      "level": 3,
+      "content": "左の Alt および Cmd キーを、右の Alt/AltGr および Cmd キーとともに、入れ替えます。\n\n起動している状態で仮に入れ替える方法 (ただちに反映されます):\n\n```\n# echo \"1\" > /sys/module/hid_apple/parameters/swap_opt_cmd\n```\n\n再起動後、永続的に反映される方法:\n\n```\n/etc/modprobe.d/hid_apple.conf\n```\n\n```\noptions hid_apple swap_opt_cmd=1\n```\n\nそのあとイメージの再生成をしてください。\n\n"
+    },
+    {
+      "title": "< と > が § と ½ に入れ替わる",
+      "level": 2,
+      "content": "< と > が § と ½ キーに入れ替わる場合、グラフィカル環境で次のコマンドを実行してください:\n\n```\n$ setxkbmap -option apple:badmap\n```\n\nログイン時に自動的に設定させるようにするには ~/.bashrc ファイルに上のコマンドを記述します。\n\nシステム全体で変更を適用させるには以下のように /etc/X11/xorg.conf.d/10-keymap.conf を作成 (または編集) します:\n\n```\nSection \"InputClass\"\n    Identifier \"keyboard catchall\"\n    MatchIsKeyboard \"true\"\n    Driver \"evdev\"\n    Option \"XkbOptions\" \"apple:badmap\"\nEndSection\n```\n\n上記の方法で上手く行かない場合、以下の2行を ~/.Xmodmap ファイルに追加してください:\n\n```\nkeycode  49 = less greater less greater bar brokenbar\nkeycode  94 = section degree section degree notsign notsign\n```\n\n(\"ù\" と \"/\" が変わっている) カナダマルチリンガルレイアウトを使っている場合、以下を使って下さい:\n\n```\nkeycode  94 = slash backslash slash backslash bar brokenbar\nkeycode  49 = ugrave Ugrave ugrave Ugrave notsign notsign\n```\n\nそして xmodmap ~/.Xmodmap を実行します。上記のコマンドも ~/.bashrc に記述することができます。\n\n"
+    },
+    {
+      "title": "< と > が ^ と ° (あるいは @ と #) に入れ替わる",
+      "level": 2,
+      "content": "ドイツ語レイアウトでは、アクセント記号 (^) とデグリー記号 (°) が小なり記号 (<) と大なり記号 (>) に入れ替わっています。フランス語レイアウトでは、@ と # が入れ替わっています。\n\n新しい方法:\n\nまず、新しい方法を試してみてください (root で実行する必要があります):\n\n```\n# echo 0 > /sys/module/hid_apple/parameters/iso_layout\n```\n\n変更を永続化させるには /etc/modprobe.d/hid_apple.conf に以下の行を記述:\n\n```\noptions hid_apple iso_layout=0\n```\n\n古い方法:\n\n```\n$ xmodmap -e 'keycode 49 = less greater less greater bar brokenbar bar' -e 'keycode 94 = dead_circumflex degree dead_circumflex degree U2032 U2033 U2032'\n```\n\nキーを押してみて問題ないようでしたら、以下を実行することで変更を永続化できます:\n\n```\n$ xmodmap -pke | grep \" 49\" >> ~/.Xmodmap\n$ xmodmap -pke | grep \" 94\" >> ~/.Xmodmap\n```\n\n"
+    },
+    {
+      "title": "` と ~ キーで < と > が出力される",
+      "level": 2,
+      "content": "US レイアウトでは、バッククォートキーとチルダキーは小なりと大なりを出力します。\n\nまず、(root で) 以下の方法が使えないか試して下さい:\n\n```\n# echo 0 > /sys/module/hid_apple/parameters/iso_layout\n```\n\n変更を永続化させるには以下の行を /etc/modprobe.d/hid_apple.conf に追加:\n\n```\noptions hid_apple iso_layout=0\n```\n\n"
+    },
+    {
+      "title": "メディアキー",
+      "level": 2,
+      "content": "デフォルトで evdev ドライバーはメディアキーについて適当なキーシムにマッピングされたキーコードを生成します。コンソールウィンドウで xev を実行してメディアキーを押したときのコンソール出力を見ることで確認できます。\n\nメディアキーを使用するには、適当なアクションをメディアキーに割り当てる必要があります。詳しくは Xorg での特別なキーボードキーを参照してください。\n\nメディアキーが適当なキーコードを生成しないときは、~/.Xmodmap ファイルを作成・編集して以下の行を記述してください:\n\n```\nkeycode 160 = XF86AudioMute\nkeycode 176 = XF86AudioRaiseVolume\nkeycode 174 = XF86AudioLowerVolume\n\nkeycode 144 = XF86AudioPrev\nkeycode 162 = XF86AudioPlay\nkeycode 153 = XF86AudioNext\n\nkeycode 101 = XF86MonBrightnessDown\nkeycode 212 = XF86MonBrightnessUp\n\nkeycode 204 = XF86Eject\n```\n\nそして xmodmap ~/.Xmodmap を実行してください。このコマンドを ~/.bashrc ファイルに追加することでログイン時に自動的に実行させることができます。\n\n"
+    },
+    {
+      "title": "PrintScreen と SysRq",
+      "level": 2,
+      "content": "Apple Keyboard には PrintScreen/SysRq キーの代わりに F13 キーがあります。このため Alt+SysRq シーケンスと、PrintScreen を使用するアプリケーションのアクション (Wine で動作するゲームでスクリーンショットを撮影するなど) が使えません。\n\n.xinitrc に setxkbmap -option \"apple:alupckeys\" を追加することで解決できます。PrintScreen/SysRq を F13 に、Scroll lock を F14 に、Pause を F15 にマッピングします。\n\nもしくは Arch User Repository から keyfuzzAUR をインストールすることで解決できます。keyfuzz をインストールしたら、次のコマンドを実行してください:\n\n```\necho \"458856 99\" | /usr/sbin/keyfuzz -s -d /dev/input/by-id/usb-Apple__Inc_Apple_keyboard-event-kbd\n```\n\n458856 (0x070068) は F13 のスキャンコードで、99 は PrintScreen/SysRq のキーコードです。/usr/include/linux/input.h からキーコードを確認できます。特定のキーのスキャンコードを確認する方法は特別なキーボードキー#スキャンコードを見てください。\n\nスキャンコードをキーコードにマップも見てください。\n\n"
+    },
+    {
+      "title": "Apple Keyboard を通常のキーボードと同じように扱う",
+      "level": 2,
+      "content": "2つの方法が存在します。カスタマイズしたいことにあわせて選択してください。\n\n"
+    },
+    {
+      "title": "hid-apple のパッチを使う",
+      "level": 3,
+      "content": "オリジナルの hid-apple モジュールにはキーボードをカスタマイズするオプションがありません (例: Fn キーと左の Ctrl キーを交換したり、Super キーの左側に Alt キーを持ってくるなど)。モジュールに機能を追加する パッチ が存在します。パッチは hid-apple-patched-git-dkmsAUR パッケージでインストールできます。\n\nカーネルモジュールのパッチに加えて、パッケージには /etc/modprobe.d/hid_apple_pclayout.conf 設定ファイルも含まれており、デフォルトで以下のレイアウトが有効になります:\n\n- 最上段のキーは通常のファンクションキーとなり、Fn キーを押したときだけメディアキーになります。#ファンクションキーが動作しないを参照。\n- 左下の4つのキーは Ctrl, Fn, Super, Alt となります。\n- Super と右側の Alt キーが入れ替わります。\n- Ejectcd キーがある場合、Delete キーとして認識するようになります (ejectcd_as_delete=1 オプション)。\n\n設定オプションと設定ファイルについて詳しくは https://github.com/free5lot/hid-apple-patched#configuration を参照してください。\n\nインストールしても変更はすぐにはカーネルには適用されません。システムを再起動すれば効果が反映されます。\n\n"
+    },
+    {
+      "title": "un-apple-keyboard を使う",
+      "level": 3,
+      "content": "カスタマイズは必要なく手動でモジュールをコンパイルしたり DKMS を使いたくない場合、un-apple-keyboardAUR パッケージを使用することができます。このパッケージは以下のことを行います:\n\n- キーボードが通常の ISO キーボードのように認識されます (< と > が Left Shift キーの右側にあるように動作します)。\n- ファンクションキーはデフォルトで無効になります。ファンクションキーを使うには Fn キーも押す必要があります。デフォルトでは F1 から F12 キーにこの挙動が適用されます。\n- Alt と Meta (Command) を入れ替える。\n- F13 を SYSRQ に、F14 を Scroll Lock に、F15 を Pause にマッピングする。\n\n最初の3つはデフォルトのカーネルモジュール hid-apple を使用して実現し、最後の1つは keyfuzzAUR にマッピングして実現します。\n\n"
+    },
+    {
+      "title": "再起動せずに挙動を変更する",
+      "level": 3,
+      "content": "再起動せずにカーネルモジュールをリロードするには # rmmod hid_apple && modprobe hid_apple を実行してください。\n\n"
+    },
+    {
+      "title": "Magic Keyboard が接続できない",
+      "level": 2,
+      "content": "GNOME 3 の設定の Bluetooth メニューなどのツールで Magic Keyboard をシステムに接続できない場合、Blueman をインストールして接続してみてください。それでも接続に失敗する場合、bluetoothctl と hcitool が使用できることを確認してください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- https://help.ubuntu.com/community/AppleKeyboard\n- https://github.com/hlechner/xmodmap-aluminium-pt-br\n- https://github.com/free5lot/hid-apple-patched\n\n"
+    }
+  ]
+}

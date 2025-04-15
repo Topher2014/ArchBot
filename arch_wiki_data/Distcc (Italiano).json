@@ -1,0 +1,146 @@
+{
+  "title": "Distcc (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Distcc_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- TORQUE\n- Slurm\n\ndistcc is a program to distribute builds of C, C++, Objective C or Objective C++ code across several machines on a network to speed up building. It should always generate the same results as a local build, is simple to install and use, and is usually much faster than a local compile. Further, one can use it together with native Arch build tools such as makepkg.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the distcc package on all participating PCs in the distcc cluster. For other distributions, or even operating systems including Windows through using Cygwin, refer to the distcc docs or the included man pages distcc(1) and distccd(1). Be sure to allow traffic through the port on which distcc runs (the default is 3632/tcp), see Category:Firewalls.\n\n"
+    },
+    {
+      "title": "Modes of operation",
+      "level": 3,
+      "content": "Distcc can be run in plain mode (default) or in pump mode. At a high level, the key difference is in how distcc deals with preprocessed source. Plain mode transfers the complete source and compiler arguments. Preprocessing is kept on the client. Pump mode distributes both preprocessing and compilation to the distcc cluster which, in many cases, is more efficient and faster. See distcc(1) for more details.\n\n"
+    },
+    {
+      "title": "Volunteers",
+      "level": 3,
+      "content": "The configuration for the volunteer is stored in /etc/conf.d/distccd. At a minimum, add the --allow-private switch which covers a number of ipv4 private network ranges, or if you have a ipv6 capable network then use --allow with your ipv6 CIDR. Logging to a file is also nice for troubleshooting if needed.\n\n```\nDISTCC_ARGS=\"--allow-private --log-file /tmp/distccd.log\"\n```\n\nOr if you need to allow ipv6 access and your network CIDR is /64:\n\n```\nDISTCC_ARGS=\"--allow-private --allow aaaa:bbbb:cccc:dddd:eeee:::/64 --log-file /tmp/distccd.log\"\n```\n\nIf multiple interfaces are present on the machine, consider passing the --listen ADDRESS option as well. Other options can be defined. Refer to distccd(1).\n\nStart distccd.service on every participating volunteer. To have distccd.service start at boot-up, enable it.\n\n"
+    },
+    {
+      "title": "For use with makepkg",
+      "level": 4,
+      "content": "Edit /etc/makepkg.conf in the following sections:\n\n1. The BUILDENV array will need to have distcc unbanged i.e. list it without exclamation point.\n1. Uncomment the DISTCC_HOSTS line and add the host name or IP addresses of the volunteers. Optionally, follow this with a forward slash and the max number of threads they are to use. The subsequent nodes should be separated by a white space. This list should be ordered from most powerful to least powerful (processing power).\n1. Adjust the MAKEFLAGS variable to correspond roughly twice the number max threads per server. In the example below, this is 2x(9+5+5+3)=44.\n\nIt should be noted that there are no true universal configurations. Try one, test it, compare the results to other setups. The following are a few common setups:\n\n```\nBUILDENV=(distcc fakeroot color !ccache check !sign)\nMAKEFLAGS=\"-j44\"\nDISTCC_HOSTS=\"localhost/9 192.168.10.2/5 192.168.10.3/5 192.168.10.4/3\"\n```\n\n```\nBUILDENV=(distcc fakeroot color !ccache check !sign)\nMAKEFLAGS=\"-j70\"\nDISTCC_HOSTS=\"localhost/9 192.168.10.2,cpp,lzo 192.168.10.3,cpp,lzo 192.168.10.4,cpp,lzo\"\n```\n\nSeveral things to call out here:\n\n- Pump mode generally performs better with a high value for MAKEFLAGS than plain mode.\n- In pump mode, the IP or hostname is suffixed with a literal ',cpp,lzo' as required by pump mode. Further, the localhost in this example was not. This means that distcc will load localhost with the 9 jobs defined and more aggressively distribute the code generation to the volunteers. It could be that in larger clusters, one might want to restrict the number of local jobs on the localhost to fewer to allow processing of distribution out to the cluster. One could also use the ,cpp,lzo suffix to the localhost as well.\n- As mentioned above, there is not a single configuration that will work efficiently with all distcc clusters/determining the optimal settings are derived empirically through testing and benchmarking.\n\n"
+    },
+    {
+      "title": "For use without makepkg",
+      "level": 4,
+      "content": "The minimal configuration for distcc on the client includes the setting of the available volunteers and re-defining the PATH.\n\n```\n$ export PATH=\"/usr/lib/distcc/bin:$PATH\"\n$ export DISTCC_HOSTS=\"localhost/9 192.168.10.2/5 192.168.10.3/5 192.168.10.4/3\"\n```\n\n```\n$ export PATH=\"/usr/lib/distcc/bin:$PATH\"\n$ export DISTCC_HOSTS=\"localhost/9 192.168.10.2,cpp,lzo 192.168.10.3,cpp,lzo 192.168.10.4,cpp,lzo\"\n```\n\n"
+    },
+    {
+      "title": "Plain mode example",
+      "level": 4,
+      "content": "No special steps are needed once /etc/makepkg.conf has been configured. Simply call makepkg as normal.\n\n"
+    },
+    {
+      "title": "Pump mode example",
+      "level": 4,
+      "content": "The user must start pump prior to compiling whether with makepkg or on the shell. Since pump includes a check to make sure there is a set of DISTCC_HOSTS correctly configured, we need to first define a bogus DISTCC_HOSTS line. Remember that makepkg will use the values specified in /etc/makepkg.conf.\n\n```\n$ export DISTCC_HOSTS=\"localhost,cpp,lzo\"\n$ eval $(pump --startup)\n```\n\nNow call makepkg as normal.\n\nWhen finished, optionally stop pump:\n\n```\n$ pump --shutdown\n```\n\n"
+    },
+    {
+      "title": "Plain mode example",
+      "level": 4,
+      "content": "After exporting the two variables described in #For use without makepkg, simply call the compiler:\n\n```\n$ make -j44\n```\n\nSome programs may require one to define the CC and/or CXX variable to work properly:\n\n```\n$ make -j44 CC=distcc CXX=distcc\n```\n\n"
+    },
+    {
+      "title": "Pump mode example",
+      "level": 4,
+      "content": "Start pump as illustrated above. Compilation is no different than plain mode.\n\n"
+    },
+    {
+      "title": "With CMake",
+      "level": 3,
+      "content": "Use the following CMake options to build a CMake-based project with distcc:\n\n```\n$ cmake -DCMAKE_C_COMPILER_LAUNCHER=distcc -DCMAKE_CXX_COMPILER_LAUNCHER=distcc ...\n```\n\n"
+    },
+    {
+      "title": "Monitoring progress",
+      "level": 2,
+      "content": "distcc ships with a cli monitor distccmon-text one can use to check on compilation status.\n\nThe cli monitor can run continuously by appending a space followed by integer to the command which corresponds to the number of sec to wait for a repeat query:\n\n```\n$ distccmon-text 3\n```\n\n```\n29291 Preprocess  probe_64.c                                 192.168.10.2[0]\n30954 Compile     apic_noop.c                                192.168.10.2[0]\n30932 Preprocess  kfifo.c                                    192.168.10.2[0]\n30919 Compile     blk-core.c                                 192.168.10.2[1]\n30969 Compile     i915_gem_debug.c                           192.168.10.2[3]\n30444 Compile     block_dev.c                                192.168.10.3[1]\n30904 Compile     compat.c                                   192.168.10.3[2]\n30891 Compile     hugetlb.c                                  192.168.10.3[3]\n30458 Compile     catalog.c                                  192.168.10.4[0]\n30496 Compile     ulpqueue.c                                 192.168.10.4[2]\n30506 Compile     alloc.c                                    192.168.10.4[0]\n```\n\n"
+    },
+    {
+      "title": "Cross compiling with distcc",
+      "level": 2,
+      "content": "One can use distcc to help cross compile:\n\n- A machine running the target architecture must be used as the client.\n- Non-native architecture volunteers will help compile but they require the corresponding toolchain to be installed and their distccd pointing to it.\n\n"
+    },
+    {
+      "title": "Arch Linux ARM as clients (x86_64 as volunteers)",
+      "level": 3,
+      "content": "This section details how to use Arch Linux (x86_64) volunteers to help an Arch ARM device cross-compile. See these tests for evidence that speed gains on the order of 2-4x can be realized with just a single x86_64 machine helping an ARM device compile.\n\n"
+    },
+    {
+      "title": "Volunteers",
+      "level": 4,
+      "content": "The Arch ARM developers highly recommend using the official project toolchains which should be installed on the x86_64 volunteer(s). Rather than manually managing these, the AUR provides two toolchains as well as configuration and systemd service units:\n\n- distccd-alarm-armv7hAUR\n- distccd-alarm-armv8AUR\n\nSetup on the volunteer containing the arm/arm64 toolchains is identical to #Volunteers except that the name of the configuration and systemd service file matches that of the respective package. For example, for armv7h the configuration file is /etc/conf.d/distccd-armv7h and the systemd service unit is distccd-armv7h.service.\n\nNote that each of the toolchains runs on a unique port thus allowing all four of them to co-exist on the volunteer if needed. Be sure to allow traffic to the port on which distcc runs see Category:Firewalls and distcc(1).\n\nTable content:\nTarget architecture | Distcc Port\narmv7h | 3635\narmv8h/aarch64 | 3636\n\n"
+    },
+    {
+      "title": "Client",
+      "level": 4,
+      "content": "The easiest method to setup the Arch ARM client is to use distccd-arch-armAUR. It provides all four configurations and systemd service units covering all four flavors of Arch ARM. For example, if the Arch ARM client is running an armv7h image, optionally edit /etc/conf.d/distccd-armv7h and change the defaults therein. When ready to build, enable distccd-armv7h.service and compile.\n\nFor a more detailed tutorial, see usage-examples.\n\nIf one would rather setup the client without using the AUR package mentioned above, manual setup of the client is identical to #Client except, one needs to modify the following two files to define the now non-standard port the volunteers are expected to use. Refer to the table above if using the AUR package.\n\n1. /etc/conf.d/distccd: example on an armv7h machine: DISTCC_ARGS=\"--allow-private --log-level info --log-file /tmp/distccd-armv7h.log --port 3635\"\n1. /etc/makepkg.conf: example on an armv7h machine: DISTCC_HOSTS=\"192.168.10.2/5:3635 192.168.10.3/5:3635\"\n\nWhen building on Arch ARM devices using x86_64 volunteers, it is highly recommended to exclude the localhost directive from DISTCC_HOSTS since many ARM devices do not have the needed processing power.\n\nTo illustrate this effect, consider the following example compiling the linux kernel version 5.10.44's Image target. The client is a RPi4B (aarch64) and the volunteer (192.168.1.288) is a quad core/hyper threaded Intel machine. Each compile job was run only once and make clean was run in between them.\n\nTable content:\nDISTCC_HOSTS= | Time (mm:ss) | Fold slower\n\"192.168.1.288:3636/9\" | 6:50 | -\n\"localhost/5 192.168.1.288:3636/9\" | 10:34 | 2.8x\n\"192.168.1.288:3636/9 localhost/5\" | 10:13 | 2.7x\n\n"
+    },
+    {
+      "title": "Arch Linux (x86_64) as clients (Arch ARM as volunteers)",
+      "level": 3,
+      "content": "This section details how to use Arch ARM volunteers to help an x86_64 client cross-compile. See these tests for evidence that compilation times can be significantly sped up using even 1 Arch ARM volunteer and that up to 2 can double that gain.\n\n"
+    },
+    {
+      "title": "Client",
+      "level": 4,
+      "content": "Setup of the client is identical to #Client with distcc running on the standard port 3632.\n\n"
+    },
+    {
+      "title": "Volunteers",
+      "level": 4,
+      "content": "distccd-x86_64AUR will provide a toolchain to install on the Arch ARM devices to enable cross compilation.\n\n"
+    },
+    {
+      "title": "Additional toolchains",
+      "level": 3,
+      "content": "- EmbToolkit: Tool for creating cross compilation tool chain; supports ARM and MIPS architectures; supports building of an LLVM based tool chain\n- crosstool-ng: Similar to EmbToolkit; supports more architectures (see website for more information)\n- Linaro: Provides tool chains for ARM development\n\nThe EmbToolkit provides a nice graphical configuration menu (make xconfig) for configuring the tool chain.\n\n"
+    },
+    {
+      "title": "Quirks compiling the Arch Linux kernel package",
+      "level": 3,
+      "content": "If building the kernel from the official PKGBUILD (or many from the AUR), distcc will not work due to the fact that the kernel is hard-coded to use GCC plugins which cannot be supported by distccd due to technical reasons.\n\nA workaround is to edit the kernel source removing the hard-coded requirement of GCC plugins. This can be accomplished with a sed one liner in the PKGBUILD itself inserted before the make step:\n\n```\nsed -i '/HAVE_GCC_PLUGINS/d' arch/x86/Kconfig\n```\n\nFailure to do this will result in distcc not working during the build. See FS#64275.\n\nAnother option is to pass the CC=distcc and CXX=distcc variables as part of the build command:\n\n```\nmake all CC=distcc CXX=distcc\n```\n\n"
+    },
+    {
+      "title": "Quirks compiling chromium",
+      "level": 3,
+      "content": "Compiling chromium which uses clang is currently affected by issue#386. In order to circumvent the bug, add the following to the _flags array in the PKGBUILD:\n\n```\n'is_cfi=false'\n'use_gold=false'\n'clang_use_default_sample_profile=false'\n'chrome_pgo_phase=0'\n```\n\n"
+    },
+    {
+      "title": "Journalctl",
+      "level": 3,
+      "content": "Use journalctl to find out what was going wrong:\n\n```\n# journalctl $(which distccd) -e --since \"5 min ago\"\n```\n\n"
+    },
+    {
+      "title": "Adjust log level",
+      "level": 3,
+      "content": "By default, distcc will log to /var/log/messages.log as it goes along. One trick (actually recommended in the distccd manpage) is to log to an alternative file directly. Again, one can locate this in RAM via /tmp. Another trick is to lower to log level of minimum severity of error that will be included in the log file. Useful if only wanting to see error messages rather than an entry for each connection. LEVEL can be any of the standard syslog levels, and in particular critical, error, warning, notice, info, or debug.\n\nEither call distcc with the arguments mentioned here on the client or appended it to DISTCC_ARGS in /etc/conf.d/distccd on the volunteers:\n\n```\nDISTCC_ARGS=\"--allow 192.168.10.0/24 --log-level error --log-file /tmp/distccd.log\"\n```\n\n"
+    },
+    {
+      "title": "Limit HDD/SSD usage by relocating $HOME/.distcc",
+      "level": 3,
+      "content": "By default, distcc creates $HOME/.distcc which stores transient relevant info as it serves up work for nodes to compile. This will avoid needless HDD read/writes and is particularly important for SSDs.\n\n```\n$ export DISTCC_DIR=/tmp/distcc\n```\n\n"
+    },
+    {
+      "title": "No such file or directory",
+      "level": 4,
+      "content": "Errors similar to the following indicate that the user is mistakenly running the distccd service provided by distcc and NOT provided by the distccd-alarm packages (i.e. distccd-alarm-armv7hAUR, or distccd-alarm-armv8AUR.)\n\nBe sure to start the correct service for the target architecture.\n\n```\ndistcc[25479] (dcc_execvp) ERROR: failed to exec armv7l-unknown-linux-gnueabihf-g++: No such file or directory\n```\n\n"
+    },
+    {
+      "title": "Avahi-daemon stops publishing when distccd.service starts",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nLaunching distccd.service as a service might cause avahi-daemon to stop working. This can be mitigated by making sure avahi-daemon.service starts after distccd.service by editing avahi-daemon.service's unit file (see Systemd#Editing provided units) and adding After=distccd.service at the end of the [Unit] section:\n\n```\n/etc/systemd/system/avahi-daemon.service\n```\n\n```\n...\n[Unit]\nDescription=Avahi mDNS/DNS-SD Stack\nRequires=avahi-daemon.socket\nAfter=distccd.service\n...\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://github.com/distcc/distcc\n- icecreamAUR - An easier to configure fork of distcc.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "title": "Network UPS Tools (Русский)",
+  "url": "https://wiki.archlinux.org/title/Network_UPS_Tools_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Эта статья описывает установку Network UPS Tools (NUT). Он совместим с тысячами моделей ИБП, полный список которых доступен в списке совместимого оборудования.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет nut.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "У NUT есть 3 связанных с ним демона:\n\n- Драйвер, который связывается с ИБП.\n- Сервер (upsd), который использует драйвер для сообщений о состоянии ИБП.\n- Демон мониторинга (upsmon), который контролирует сервер upsd и выполняет действия на основе полученной информации.\n\nИдея состоит в том, что если существует несколько систем, подключенных к ИБП, одна может сообщать о состоянии ИБП по сети, а другие могут отслеживать это состояние, запуская свои собственные действия upsmon. У NUT есть обширная документация по конфигурации, здесь же будет рассказано о простой настройке USB-ИБП, а также соответствующего сервера и монитора в одной системе (обычная конфигурация рабочего места).\n\n"
+    },
+    {
+      "title": "Настройка драйвера",
+      "level": 3,
+      "content": "Конфигурация зависит от типа используемого ИБП. Обратитесь к ранее упомянутому списку совместимого оборудования (Hardware Compatibility List), чтобы узнать, какой драйвер, скорее всего, будет работать с вашим ИБП. Также можно запустить утилиту nut-scanner(8) для обнаружения подключённых устройств, совместимых с NUT.\n\nДля многих ИБП, подключенных по USB, используется драйвер usbhid-ups(8). Для ИБП с последовательным портом используйте port=/dev/ttySX, где X — номер последовательного порта (например: /dev/ttyS1). Для ИБП с USB-портом используйте port=auto.\n\n```\n/etc/nut/ups.conf\n```\n\n```\n...\n[upsname]\n    driver = usbhid-ups\n    port = auto\n```\n\nНазвать ИБП можно любым удобным именем. ups.conf(5)\n\nЗапустите драйвер от root-пользователя с помощью команды upsdrvctl start. Если ошибок нет, вы увидете подобное сообщение при использовании драйвера usbhid-ups:\n\n```\nNetwork UPS Tools - Generic HID driver 0.34 (2.4.1)\nUSB communication driver 0.31\nUsing subdriver: MGE HID 1.12\nDetected EATON - Ellipse MAX 1100 [ADKK22008]\n```\n\nЕсли же драйвер запускается с ошибками, убедитесь, что выбран правильный вариант для вашего оборудования. Возможно, вам придется попробовать другие драйверы, изменив значение \"driver=\" в ups.conf.\n\n"
+    },
+    {
+      "title": "Ошибка \"Can't claim USB device\"",
+      "level": 4,
+      "content": "Если вы получаете сообщение об ошибке, подобное этому:\n\n```\nCan't claim USB device [XXXX:YYYY]: could not detach kernel driver from\ninterface 0: Operation not permitted\nDriver failed to start (exit status=1)\n```\n\nИли менее конкретное:\n\n```\nUSB communication driver 0.33\nNo matching HID UPS found\nDriver failed to start (exit status=1)\n```\n\nСкорее всего, это проблема с разрешениями доступа к устройству. Её можно исправить, указав udev-правило для установки корректной группы:\n\n```\n/etc/udev/rules.d/50-ups.rules\n```\n\n```\nSUBSYSTEM==\"usb\", ATTR{idVendor}==\"XXXX\", ATTR{idProduct}==\"YYYY\", SYMLINK+=\"ups0\", GROUP=\"nut\"\n```\n\nГде idVendor и idProduct — производитель устройства и идентификатор продукта. Данную информацию можно найти в выводе ошибки [XXXX:YYYY] или с помощью lsusb.\n\nПосле этого обновите и перезагрузите правила udev, выполнив следующую команду:\n\n```\n# udevadm control --reload-rules && udevadm trigger\n```\n\n"
+    },
+    {
+      "title": "Настройка upsd",
+      "level": 3,
+      "content": "По умолчанию upsd слушает только localhost, что отлично подходит для наших целей. Хотя это необязательно, также можно настроить upsd под свои задачи, отредактировав файл /etc/nut/upsd.conf. Смотрите upsd.conf(5) для получения более подробной информации.\n\nДля этого требуется добавить пользователя, чтобы монитор мог подключаться к серверу и выполнять команды. См. upsd.users(5) для получения более подробной информации.\n\n```\n/etc/nut/upsd.users\n```\n\n```\n...\n[upsuser]\n     password = password\n     upsmon master\n     actions = SET\n     instcmds = ALL\n```\n\nНа этом этапе должна быть возможность запустить и включить службу nut-server.service, которая автоматически запустит nut-driver.\n\nПри успешном запуске можно выполнить команду upsc <upsname> для получения информации от ИБП. Пример вывода:\n\n```\nbattery.charge: 100\nbattery.charge.low: 10\nbattery.charge.warning: 20\nbattery.mfr.date: CPS\nbattery.runtime: 5550\nbattery.runtime.low: 300\nbattery.type: PbAcid\nbattery.voltage: 13.5\nbattery.voltage.nominal: 12\ndevice.mfr: CPS\ndevice.model: UPS CP1000AVRLCD\ndevice.type: ups\ndriver.name: usbhid-ups\ndriver.parameter.pollfreq: 30\ndriver.parameter.pollinterval: 2\ndriver.parameter.port: auto\ndriver.parameter.synchronous: no\ndriver.version: 2.7.4\ndriver.version.data: CyberPower HID 0.4\ndriver.version.internal: 0.41\ninput.transfer.high: 140\ninput.transfer.low: 90\ninput.voltage: 122.0\ninput.voltage.nominal: 120\noutput.voltage: 122.0\nups.beeper.status: disabled\nups.delay.shutdown: 20\nups.delay.start: 30\nups.load: 0\nups.mfr: CPS\nups.model: UPS CP1000AVRLCD\nups.productid: 0501\nups.realpower.nominal: 600\nups.status: OL\nups.test.result: Done and passed\nups.timer.shutdown: -60\nups.timer.start: 0\nups.vendorid: 0764\n```\n\n"
+    },
+    {
+      "title": "Настройка upsmon",
+      "level": 3,
+      "content": "Последний шаг — настроить upsmon для прослушивания upsd и выполнения действий при наступлении определённых событий.\n\nДобавьте следующую строку в файл /etc/nut/upsmon.conf:\n\n```\nMONITOR upsname@localhost 1 upsduser password master\n```\n\nupsname — это имя ИБП, а upsduser и password — пользователь и его пароль, который вы установили в /etc/nut/upsd.users.\n\nТакже можно настроить, какие оповещения отправляются и куда, какие действия предпринимаются при разряженном аккумуляторе и многое другое. Смотрите upsmon.conf(5) для получения более подробной информации.\n\nЗатем запустите и включите службу nut-monitor.service.\n\nВ логах должен отобразиться запуск upsmon и мониторинг ИБП.\n\n"
+    },
+    {
+      "title": "NUT-Monitor",
+      "level": 2,
+      "content": "NUT-Monitor — графический пользовательский интерфейс для мониторинга и управления устройствами, подключенными к серверу Network UPS Tools.\n\nУстановите nut-monitor с помощью пакета nut-monitorAUR.\n\n"
+    }
+  ]
+}

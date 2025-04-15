@@ -1,0 +1,216 @@
+{
+  "title": "Allow multiple programs to play sound at once",
+  "url": "https://wiki.archlinux.org/title/Allow_multiple_programs_to_play_sound_at_once",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- /Configuration examples\n- /Troubleshooting\n- PC speaker\n- PipeWire\n- PulseAudio\n- Sound system\n- List of applications/Multimedia#Volume control\n\nThe Advanced Linux Sound Architecture (ALSA) provides kernel driven sound card drivers. It replaces the original Open Sound System (OSS).\n\nBesides the sound device drivers, ALSA also bundles a user space driven library for application developers. They can then use those ALSA drivers for high level API development. This enables direct (kernel) interaction with sound devices through ALSA libraries.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The ALSA drivers are part of the Linux kernel. The ALSA library (alsa-lib) is usually installed as a dependency. Therefore, manual installation is not necessary.\n\nudev will automatically detect your hardware and select needed drivers at boot time, therefore, your sound should already be working.\n\nHowever, your sound may be initially muted. If it is, see #Unmuting the channels.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 3,
+      "content": "The Sound Open Firmware (SOF) (sof-firmware) is usually required for laptops—they tend to utilize Cadence Tensilica Xtensa architecture DSPs, see the list of the supported platforms. In case of the missing firmware the journal will provide messages such as:\n\n```\nerror: sof firmware file is missing\nerror: failed to load DSP firmware -2\nerror: sof_probe_work failed err: -2\n```\n\nFor more SOF troubleshooting information, see Overview of Intel hardware platforms. See also #Cards and modules.\n\nThe alsa-firmware package contains firmware that may be required for certain sound cards.\n\n"
+    },
+    {
+      "title": "ALSA utilities",
+      "level": 3,
+      "content": "Install the alsa-utils package. This contains (among other utilities) the alsamixer(1) and amixer(1) utilities. amixer is a shell command to change audio settings, while alsamixer provides a more intuitive ncurses based interface for audio device configuration.\n\n"
+    },
+    {
+      "title": "ALSA and systemd",
+      "level": 3,
+      "content": "The alsa-utils package comes with systemd unit configuration files alsa-restore.service and alsa-state.service by default.\n\nThese are automatically installed and activated during installation (via package provided symlink to sound.target). The options are as follows:\n\n- alsa-restore.service reads /var/lib/alsa/asound.state on boot and writes updated values on shutdown, provided /etc/alsa/state-daemon.conf does not exist. As /etc/alsa/state-daemon.conf is not created without a conscious action of the user, it is the default method.\n- alsa-state.service (Re-)Starts alsactl in daemon mode to continuously keep track of, and persist, volume changes, under the condition that the user has consciously created /etc/alsa/state-daemon.conf.\n\nEvidently, both methods are mutually exclusive. You can decide for one of the two approaches depending on your requirements. To edit these units, see systemd#Editing provided units. You can check their status using systemctl.\n\nFor further information, see alsactl(1).\n\n"
+    },
+    {
+      "title": "User privileges",
+      "level": 3,
+      "content": "Local users have permission to play audio and change mixer levels. To allow remote users to use ALSA, you need to add those users to the audio group.\n\nNote: **not** \n\n"
+    },
+    {
+      "title": "OSS emulation",
+      "level": 3,
+      "content": "OSS emulation is the ability to intercept OSS calls and reroute them through ALSA instead. This emulation layer is useful e.g. for legacy applications which try to open /dev/dsp and write sound data to them directly. Without OSS or the emulation library, /dev/dsp will be missing, and the application will not produce any sound.\n\nIf you want OSS applications to work with dmix, install the alsa-oss package as well.\n\nLoad the snd_pcm_oss and snd_seq_oss kernel modules. Configure them to load at boot.\n\n"
+    },
+    {
+      "title": "Unmuting the channels",
+      "level": 2,
+      "content": "By default, ALSA has all channels muted. Those have to be unmuted manually.\n\n"
+    },
+    {
+      "title": "Unmute with amixer",
+      "level": 3,
+      "content": "Unmuting the sound card's master volume can be done by using amixer:\n\n```\n$ amixer sset Master unmute\n$ amixer sset Speaker unmute\n$ amixer sset Headphone unmute\n```\n\n"
+    },
+    {
+      "title": "Unmute with alsamixer",
+      "level": 3,
+      "content": "Unmuting the sound card can be done using alsamixer:\n\n```\n$ alsamixer\n```\n\nThe MM label below a channel indicates that the channel is muted, and OO indicates that it is open.\n\nScroll to the Master and PCM channels with the Left and Right keys and unmute them by pressing the m key.\n\nUse the Up key to increase the volume and obtain a value of 0 dB gain. The gain can be found in the upper left next to the Item: field.\n\n"
+    },
+    {
+      "title": "Unmute 5.1/7.1 sound",
+      "level": 3,
+      "content": "To get full 5.1 or 7.1 surround sound, you will likely need to unmute other channels such as Front, Surround, Center, LFE (subwoofer) and Side. (Those are channel names with Intel HD Audio; they may vary with different hardware)\n\n"
+    },
+    {
+      "title": "Enable the microphone",
+      "level": 3,
+      "content": "To enable your microphone, switch to the Capture tab with F4 and enable a channel with Space. See /Troubleshooting#Microphone if microphone does not work.\n\n"
+    },
+    {
+      "title": "Test your changes",
+      "level": 3,
+      "content": "Next, test to see if sound works:\n\n```\n$ speaker-test -c 2\n```\n\nChange -c to fit your speaker setup. Use -c 8 for 7.1, for instance:\n\n```\n$ speaker-test -c 8\n```\n\nIf audio is being outputted to the wrong device, try manually specifying it with the argument -D.\n\n```\n$ speaker-test -D default:PCH -c 8\n```\n\n-D accepts PCM channel names as values, which can be retrieved by running the following:\n\n```\n$ aplay -L | grep :CARD\n```\n\n```\ndefault:CARD=PCH  # 'default:PCH' is the PCM channel name for -D\nsysdefault:CARD=PCH\nfront:CARD=PCH,DEV=0\nsurround21:CARD=PCH,DEV=0\nsurround40:CARD=PCH,DEV=0\nsurround41:CARD=PCH,DEV=0\nsurround50:CARD=PCH,DEV=0\nsurround51:CARD=PCH,DEV=0\nsurround71:CARD=PCH,DEV=0\n```\n\n"
+    },
+    {
+      "title": "Additional notes",
+      "level": 3,
+      "content": "- If your system has more than one soundcard, then you can switch between them by pressing F6\n\n- Some cards need to have digital output muted or disabled in order to hear analog sound and vice versa.\n\n- Some machines, like the Thinkpad T61, have a Speaker channel which must be unmuted and adjusted as well.\n\n- Some machines, like the Dell E6400, may also require the Front and Headphone channels to be unmuted and adjusted.\n\n- If your volume adjustments seem to be lost after you reboot, try running alsamixer as root.\n\n"
+    },
+    {
+      "title": "Driver configuration",
+      "level": 2,
+      "content": "For more information, see Advanced Linux Sound Architecture - Driver Configuration guide.\n\nTo reload ALSA driver configuration you have to reload corresponding modules. Before doing this, all processes using the corresponding ALSA driver—such as PipeWire—must be stopped. To identify processes using sound device files, utilize fuser(1):\n\n```\n# fuser --all --verbose /dev/snd/*\n```\n\nSee also:\n\n- ALSA SoundCard Matrix\n- alsactl(1)\n- Kernel modules#Manual module handling\n\n"
+    },
+    {
+      "title": "Cards and modules",
+      "level": 3,
+      "content": "Run lspci -k -nn -d ::0403 to identify the modules in use for PCI devices.\n\nNote: **is** \n\n- ::0403 here means Audio device subclass of the Multimedia controller PCI device class.\n- Kernel driver in use in lspci output is the loaded module. Kernel modules are capable of handling the device, see lspci(8) § k.\n\nRun lsusb --verbose --tree | grep --after-context=1 'Class=Audio' for USB devices.\n\nRun lsmod | grep '^snd' to get a full list of loaded sound modules.\n\nRun cat /proc/asound/cards to get the list of your sound cards with their corresponding indexes (card numbers).\n\n- For the format of /proc/asound/cards, see the General Overview section of the ALSA library API Control Interface.\n- For general information about /proc/asound procfs tree, see Proc Files of ALSA Drivers.\n\nRun cat /proc/asound/modules to get the card indexes with their corresponding module names.\n\n"
+    },
+    {
+      "title": "Card index",
+      "level": 3,
+      "content": "If you want to change your sound card order (or if your sound card order changes on boot, and you want to make it permanent), reserve the index for the given driver with the slots option of the snd module. See also Kernel module#Setting module options.\n\nThe following sample assumes you want your USB sound card always be the first (i.e. with index 0), no matter when the module is loaded (e.g. the card could be unplugged on boot):\n\n```\n/etc/modprobe.d/alsa-base.conf\n```\n\n```\noptions snd slots=snd_usb_audio\n```\n\nWhen a module name is prepended with an exclamation mark (!), the corresponding index will be given for any modules but that name. For example, reserve the first index (0) for any modules but snd_usb_audio to avoid USB sound cards from getting it:\n\n```\noptions snd slots=!snd_usb_audio\n```\n\nYou can also provide an index of -2 to instruct ALSA to never use a card as the primary one: negative value is interpreted as a bitmask of permissible indexes. The alternative to the previous sample using the index option of the specific module:\n\n```\noptions snd_usb_audio index=-2\n```\n\nIf several sound cards use the same module, and their order is always the same, you can change the order with just index option. The following sample assumes there are two audio cards using the HD Audio module (e.g. an integrated audio card and HDMI output of non-integrated video card), and you want to swap their indexes:\n\n```\noptions snd_hda_intel index=1,0\n```\n\n- The sample above reads as \"the first sound card which uses snd_hda_intel gives the index 1, and the second one gives the index 0\". Which card is first and which one is second is determined by udev.\n- ALSA module option often take not just a single value, but an array of values, each one setting the option's value but only for one of the sound cards that a given module is handling. Look for the presence of the array of notion in the output of:\n\n```\n$ modinfo --field=parm module_name | column --separator=':' --table --table-columns-limit=2\n```\n\nThe slots option can be combined with the index one as long as they do not conflict:\n\n```\noptions snd slots=,snd_hda_intel,snd_hda_intel,snd_usb_audio,snd_usb_audio,snd_usb_audio\noptions snd_hda_intel index=2,1\noptions snd_usb_audio index=3,4,5 vid=0xVID_3,0xVID_4,0xVID_5 pid=0xPID_3,0xPID_4,0xPID_5\n```\n\n- slots=, means \"do not reserve the index zero\", so e.g. some USB card—not mentioned in the snd-usb-audio options—plugged in after a boot could be the first.\n- The snd_usb_audio module allows to specify the cards with vid and pid options, so you do not rely on the order from udev.\n\nSee also:\n\n- MultipleCards\n- MultipleUSBAudioDevices\n\n"
+    },
+    {
+      "title": "Card disabling",
+      "level": 3,
+      "content": "To disable all cards controlled by a given kernel module, prevent the module from loading using install or module_blacklist approach.\n\nNote: **not** \n\nTo select which card should be disabled, use the enable option of a kernel module. For example, disable the second card operated by a module:\n\n```\n/etc/modprobe.d/alsa-base.conf\n```\n\n```\noptions module_name enable=1,0\n```\n\nSee also /Troubleshooting#Codec probing for an HD Audio card codec disabling.\n\n"
+    },
+    {
+      "title": "Library configuration",
+      "level": 2,
+      "content": "The system configuration file is /etc/asound.conf, and the per-user configuration file is ~/.asoundrc.\n\nThe syntax of library configuration—i.e. whitespace, line continuation, comments, including configuration files, punctuators (separators), assignments, compound assignments, operation modes—is explained in Configuration files.\n\nALSA library configuration is loaded for each instance of the library, so to reload it, all you have to do is restart the programs that are using it.\n\nFor more information, see:\n\n- Configuring ALSA\n- .asoundrc article on the ALSA unofficial wiki\n- .asoundrc article on the ALSA project wiki\n\n"
+    },
+    {
+      "title": "Operation modes",
+      "level": 4,
+      "content": "There are different operation modes for parsing nodes, the default mode is merge and create. If operation mode is either merge/create or merge, type checking is done. Only same type assignments can be merged, so strings cannot be merged with integers. Trying to define a simple assignment in default operation mode to a compound (and vice versa) will also not work.\n\nPrefixes of operation modes:\n\n- + — merge and create\n- - — merge\n- ? — do not override\n- ! — override\n\n```\nOperation modes\n```\n\n```\n# Merge/create - If a node does not exist, it is created. If it does exist and types match,\n# subkeyN is merged into key.\nkey.subkeyN valueN;\n\n# Merge/create - Equivalent to above\nkey.+subkeyN valueN;\n\n# Merge - Node key.subkeyN must already exist and must have same data type\nkey.-subkeyN valueN;\n\n# No override - Ignore new assignment if key.subkeyN node already exists\nkey.?subkeyN valueN;\n\n# Override - Removes subkeyN and all keys below it, then creates node key.subkeyN\nkey.!subkeyN valueN;\n```\n\nUsing override operation mode, when done correctly, is usually safe; however, one should bear in mind that there might be other necessary keys in a node for proper functioning.\n\nNote: **do not use !pcm.key** \n\n"
+    },
+    {
+      "title": "Nesting",
+      "level": 4,
+      "content": "Sometimes, it may be useful and even easier to read using nesting in configuration.\n\n```\nNesting PCM plugins\n```\n\n```\npcm.azalia {\ttype hw; card 0\t}\npcm.!default {\ttype plug; slave.pcm \"azalia\"\t}\n\n# is equivalent to\n\npcm.!default {\ttype plug; slave.pcm {\ttype hw; card 0;\t}\t}\n\n# which is also equivalent to\n\npcm.!default.type plug;\npcm.default.slave.pcm.type hw;\npcm.default.slave.pcm.card 0;\n```\n\n"
+    },
+    {
+      "title": "An example of setting default device using \"defaults\" node",
+      "level": 4,
+      "content": "Assuming that \"defaults\" node is set in /usr/share/alsa/alsa.conf, where \"defaults.pcm.card\" and its \"ctl\" counterpart have assignment values \"0\" (type integer), user wants to set default pcm and control device to (third) sound card \"2\" or \"SB\" for an Azalia sound card.\n\n```\nDefaults node\n```\n\n```\ndefaults.ctl.card 2; # Sets default device and control to third card (counting begins with 0).\ndefaults.pcm.card 2; # This does not change the data type.\n\ndefaults.ctl.+card 2; # Equivalent to above.\ndefaults.pcm.+card 2;\n\ndefaults.ctl.-card 2; # Same effect on a default setup, however if defaults node was removed or\ndefaults.pcm.-card 2; # type has been changed, merge operation mode will result in error.\n\ndefaults.pcm.?card 2; # This does nothing, since this assignment already exists.\ndefaults.ctl.?card 2;\n\ndefaults.pcm.!card \"SB\"; # The override operation mode is necessary here, because of\ndefaults.ctl.!card \"SB\"; # different value types.\n```\n\nUsing double quotes here automatically sets values data type to string, so in the above example, setting defaults.pcm.!card \"2\" would result in retaining last default device, in this case card 0. Using double quotes for strings is not mandatory as long as no special characters are used, which ideally should never be the case. This may be irrelevant in other assignments.\n\n"
+    },
+    {
+      "title": "Setting the default sound card via defaults node",
+      "level": 4,
+      "content": "Putting the previous example regarding defaults.pcm.card and defaults.pcm.device into practice, assuming we have 2 cards with index 0 and 1 respectively and wish to simply change the default card to index 1, would lead to the following configuration in /etc/asound.conf or the user-specific ~/.asoundrc to change both the playback and the mixer control card.\n\n```\ndefaults.pcm.card 1\ndefaults.ctl.card 1\n```\n\n"
+    },
+    {
+      "title": "Select the default PCM via environment variable",
+      "level": 4,
+      "content": "Probably, it is enough to set ALSA_CARD to the name of the device. First, get the names with aplay -l, then set ALSA_CARD to the name which comes after the colon and before the bracket; e.g. if you have\n\n```\ncard 1: HDMI [HDA ATI HDMI], device 3: HDMI 0 [HDMI 0]\n```\n\nthen set ALSA_CARD=HDMI.\n\nOther variables are also checked in the default global configuration /usr/share/alsa/alsa.conf. By looking there for constructs of the form vars [ ... ], the following table emerges:\n\nTable content:\n | Variable name | Used by\n1 | ALSA_CARD | pcm.default , pcm.hw , pcm.plughw , ctl.sysdefault , ctl.hw , rawmidi.default , rawmidi.hw , hwdep.hw\n2 | ALSA_CTL_CARD | ctl.sysdefault , ctl.hw\n3 | ALSA_HWDEP_CARD | hwdep.default , hwdep.hw\n4 | ALSA_HWDEP_DEVICE | hwdep.default , hwdep.hw\n5 | ALSA_PCM_CARD | pcm.default , pcm.hw , pcm.plughw\n6 | ALSA_PCM_DEVICE | pcm.hw , pcm.plughw\n7 | ALSA_RAWMIDI_CARD | rawmidi.default , rawmidi.hw\n8 | ALSA_RAWMIDI_DEVICE | rawmidi.default , rawmidi.hw\n\nAlternatively, you can override the behavior in your own configuration file, preferably the global one (/etc/asound.conf). Add:\n\n```\npcm.!default {\n   type plug\n   slave.pcm {\n       @func getenv\n       vars [ ALSAPCM ]\n       default \"hw:Audigy2\"\n   }\n}\n```\n\nIn this case as well, replace Audigy2 with the name of your device. You can get the names with aplay -l or you can also use PCMs like surround51. But if you need to use the microphone, it is a good idea to select full-duplex PCM as default.\n\nNow, you can select the sound card when starting programs by just changing the environment variable ALSAPCM. It works fine for all programs that do not allow to select the card; for the others, ensure you keep the default card. For example, assuming you wrote a downmix PCM called mix51to20, you can use it with mplayer using the commandline ALSAPCM=mix51to20 mplayer example_6_channel.wav\n\n"
+    },
+    {
+      "title": "Addressing hardware directly",
+      "level": 4,
+      "content": "First, you will have to find out the card and device id that you want to set as the default:\n\n```\n$ aplay -l\n```\n\n```\n**** List of PLAYBACK Hardware Devices ****\ncard 0: Intel [HDA Intel], device 0: CONEXANT Analog [CONEXANT Analog]\n  Subdevices: 1/1\n  Subdevice #0: subdevice #0\ncard 0: Intel [HDA Intel], device 1: Conexant Digital [Conexant Digital]\n  Subdevices: 1/1\n  Subdevice #0: subdevice #0\ncard 1: JamLab [JamLab], device 0: USB Audio [USB Audio]\n  Subdevices: 1/1\n  Subdevice #0: subdevice #0\ncard 2: Audio [Altec Lansing XT1 - USB Audio], device 0: USB Audio [USB Audio]\n  Subdevices: 1/1\n  Subdevice #0: subdevice #0\n```\n\nFor example, the last entry in this list has the card index (card number) 2, card ID strings Audio and the device ID 0. To set this card as the default, you can either use the system-wide file /etc/asound.conf or the user-specific file ~/.asoundrc. You may have to create the file if it does not exist. Then insert the following options with the corresponding card.\n\n```\npcm.!default {\n   type hw\n   card Audio #or card 2\n}\n\nctl.!default {\n   type hw\n   card Audio #or card 2\n}\n\npcm.dmixer {\n\ttype dmix\n\tipc_key 2048\n\tslave {\n\t\tpcm \"hw:Audio\" #or \"hw:2\"\n\t}\n}\n```\n\nIt is recommended to use sound card ID strings instead of number references to overcome the boot order problem.\n\npcm.dmixer is a spare for applications which does not support without mixing.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nFor example, chromium -alsa-output-device=pcm.dmixer enables mixing for Chromium tempolary.\n\nThe pcm options affect which card and device will be used for audio playback while the ctl option affects which card is used by control utilities like alsamixer.\n\nThe changes should take effect as soon as you (re-)start an application (e.g. MPlayer). You can also test with a command like aplay:\n\n```\n$ aplay -D default:PCH your_favourite_sound.wav\n```\n\nIf you receive an error regarding your asound configuration, check the upstream documentation for possible changes to the configuration file format.\n\n"
+    },
+    {
+      "title": "Plugins",
+      "level": 2,
+      "content": "Install the alsa-plugins package if you need to enable #Upmixing, #Downmixing, #High quality resampling and other advanced features.\n\nFor more information, see PCM (digital audio) plugins.\n\n"
+    },
+    {
+      "title": "Software mixing",
+      "level": 3,
+      "content": "Mixing enables multiple applications to output sound at the same time. Most discrete sound cards support hardware mixing, which is enabled by default if available. Integrated motherboard sound cards (such as Intel HD Audio), usually do not support hardware mixing. On such cards, software mixing is done by an ALSA plugin called dmix. This feature is enabled automatically if hardware mixing is unavailable.\n\nTo manually enable dmix, add the following to your ALSA configuration file:\n\n```\n/etc/asound.conf\n```\n\n```\npcm.dsp {\n    type plug\n    slave.pcm \"dmix\"\n}\n```\n\n"
+    },
+    {
+      "title": "Upmixing",
+      "level": 3,
+      "content": "In order for stereo sources like music to be able to saturate a 5.1 or 7.1 sound system, you need to use upmixing. In darker days, this used to be tricky and error prone, but nowadays, plugins exist to easily take care of this task. We will use the upmix plugin, included in the alsa-plugins package.\n\nThen add the following to your ALSA configuration file of choice (either /etc/asound.conf or ~/.asoundrc):\n\n```\npcm.upmix71 {\n   type upmix\n   slave.pcm \"surround71\"\n   delay 15\n   channels 8\n}\n```\n\nYou can easily change this example for 7.1 upmixing to 5.1 or 4.0.\n\nThe following example adds a new PCM channel that you can use for upmixing. If you want all sound sources to go through this channel, add it as a default below the previous definition like so:\n\n```\npcm.!default \"plug:upmix71\"\n```\n\nThe plugin automatically allows multiple sources to play through it without problems so setting is as a default is actually a safe choice. If this is not working, you have to setup your own dmixer for the upmixing PCM like this:\n\n```\npcm.dmix6 {\n   type asym\n   playback.pcm {\n       type dmix\n       ipc_key 567829\n       slave {\n           pcm \"hw:0,0\"\n           channels 6\n       }\n   }\n}\n```\n\nand use \"dmix6\" instead of \"surround71\". If you experience skipping or distorted sound, consider increasing the buffer_size (to 32768, for example) or use a high quality resampler.\n\n"
+    },
+    {
+      "title": "Downmixing",
+      "level": 3,
+      "content": "If you want to downmix sources to stereo because you, for instance, want to watch a movie with 5.1 sound on a stereo system, use the vdownmix plugin, included in the alsa-plugins package.\n\nAgain, in your configuration file, add this:\n\n```\npcm.!surround51 {\n   type vdownmix\n   slave.pcm \"default\"\n}\npcm.!surround40 {\n   type vdownmix\n   slave.pcm \"default\"\n}\n```\n\n"
+    },
+    {
+      "title": "Multiband EQ",
+      "level": 3,
+      "content": "Multiband EQ (mbeq)\n\nmbeq is part of Steve Harris' LADSPA plugin suite.\n\nInstall the alsa-plugins, ladspa and swh-plugins packages if you do not already have them.\n\nIf you have not already created either an ~/.asoundrc or a /etc/asound.conf file, then create either one and insert the following:\n\n```\n/etc/asound.conf\n```\n\n```\npcm.eq {\n    type ladspa\n\n    # The output from the EQ can either go direct to a hardware device\n    # (if you have a hardware mixer, e.g. SBLive/Audigy) or it can go\n    # to the software mixer shown here.\n    #slave.pcm \"plughw:0,0\"\n    slave.pcm \"plug:dmix\"\n\n    # Sometimes, you may need to specify the path to the plugins,\n    # especially if you have just installed them.  Once you have logged\n    # out/restarted, this should not be necessary, but if you get errors\n    # about being unable to find plugins, try uncommenting this.\n    #path \"/usr/lib/ladspa\"\n\n    plugins [\n    {\n        label mbeq\n        id 1197\n        input {\n            # The following setting is just an example, edit to your own taste:\n            # bands:\n            #   50 Hz,  100 Hz,  156 Hz,  220 Hz,  311 Hz,   440 Hz,   622 Hz,  880 Hz,\n            # 1250 Hz, 1750 Hz, 2500 Hz, 3500 Hz, 5000 Hz, 10000 Hz, 20000 Hz\n            controls [ -5 -5 -5 -5 -5 -10 -20 -15 -10 -10 -10 -10 -10 -3 -2 ]\n            }\n        }\n    ]\n}\n\n# Redirect the default device to go via the EQ - you may want to do\n# this last, once you are sure everything is working.  Otherwise, all\n# your audio programs will break/crash if something has gone wrong.\npcm.!default {\n    type plug\n    slave.pcm \"eq\"\n}\n\n# Redirect the OSS emulation through the EQ too (when programs are running through \"aoss\")\npcm.dsp0 {\n    type plug\n    slave.pcm \"eq\"\n}\n```\n\n"
+    },
+    {
+      "title": "System-wide",
+      "level": 4,
+      "content": "Install the alsaequalAUR package.\n\nAfter installing the package, add the following to your ALSA configuration file:\n\n```\n/etc/asound.conf\n```\n\n```\nctl.equal {\n    type equal;\n}\n\npcm.plugequal {\n    type equal;\n    # Normally, the equalizer feeds into dmix so that audio\n    # from multiple applications can be played simultaneously:\n    slave.pcm \"plug:dmix\";\n    # If you want to feed directly into a device, specify it instead of dmix:\n    #slave.pcm \"plughw:0,0\";\n}\n\n# Configuring pcm.!default will make the equalizer your default sink\npcm.!default {\n# If you do not want the equalizer to be your default,\n# give it a different name, like pcm.equal commented below\n# Then you can choose it as the output device by addressing\n# it in individual apps, for example mpg123 -a equal 06.Back_In_Black.mp3\n# pcm.equal {\n    type plug;\n    slave.pcm plugequal;\n}\n```\n\nTo change your equalizer settings, run\n\n```\n$ alsamixer -D equal\n```\n\nNote that the equalizer configuration is different for each user (until not specified else). It is saved in ~/.alsaequal.bin. So if you want to use ALSAEqual with mpd or another software running under different user, you can configure it using\n\n```\n$ su mpd -c 'alsamixer -D equal'\n```\n\nor for example, you can make a symlink to your .alsaequal.bin in their home directory.\n\n"
+    },
+    {
+      "title": "Specific outputs only",
+      "level": 4,
+      "content": "If you wish to apply an equalizer to a specific output device only (for example your speakers connected to the S/PDIF output, but not your headphones connected to the headphone jack), but also want be able to output from multiple applications and to both output devices simultaneously, you need to create two dmix devices that feed into their respective devices (slave.pcm) directly. The following works for stereo output and maintains a regular stereo input, applying the equalizer to the S/PDIF output only.\n\n```\n/etc/asound.conf\n```\n\n```\n#\n#  (capture.pcm)  <-- dnsoop\n#        |\n# !default                               --> dmixa\n#        |                               |\n#  (playback.pcm) --> stereo2quad ==> quad\n#                                        |\n#                                        --> softvol --> plugequal --> dmixd\n#\n\n# dmix for analog output\npcm.dmixa {\n  type dmix\n  ipc_key 1024\n  ipc_perm 0666\n  slave.pcm \"hw:PCH,0\"\n  slave {\n    period_time 0\n    period_size 1024\n    buffer_size 4096\n    channels 2\n  }\n  bindings {\n    0 0\n    1 1\n  }\n}\n\n# dmix for digital output\npcm.dmixd {\n  type dmix\n  ipc_key 2048\n  ipc_perm 0666\n  slave.pcm \"hw:PCH,1\"\n  slave {\n    period_time 0\n    period_size 1024\n    buffer_size 4096\n    channels 2\n  }\n  bindings {\n    0 0\n    1 1\n  }\n}\n\n# equalizer with controls\npcm.plugequal {\n  type equal\n  slave {\n    pcm \"plug:dmixd\"\n  }\n}\nctl.equal {\n type equal\n}\n\n# Volume control for S/PDIF\npcm.softvol {\n    type softvol\n    slave.pcm \"plug:plugequal\"\n    control {\n        name \"S/PDIF\"\n    }\n}\n\n# multi:\n# \"a\" (analog)  -> dmix,\n# \"d\" (digital) -> softvol -> plugequal -> dmix\npcm.quad {\n    type multi\n    slaves {\n      a.pcm \"dmixa\"\n      a.channels 2\n      d.pcm \"plug:softvol\" # detour via softvol and equalizer\n      d.channels 2\n    }\n    bindings {\n      0 { slave a; channel 0; }\n      1 { slave a; channel 1; }\n      2 { slave d; channel 0; }\n      3 { slave d; channel 1; }\n    }\n}\n\n# stereo to quad\npcm.stereo2quad {\n  type route\n  slave.pcm \"quad\"\n  ttable [\n    [ 1 0 1 0 ]\n    [ 0 1 0 1 ]\n  ]\n}\n\n# playback to stereo to quad, capture as usual\npcm.!default {\n  type asym\n  playback.pcm \"plug:stereo2quad\"\n  capture.pcm \"plug:dnsoop\"\n}\n```\n\n"
+    },
+    {
+      "title": "Managing states",
+      "level": 4,
+      "content": "Install the alsaequal-mgrAUR package.\n\nConfigure the equalizer as usual with\n\n```\n$ alsamixer -D equal\n```\n\nWhen you are satisfied with the state, you may give it a name (foo in this example) and save it:\n\n```\n$ alsaequal-mgr save foo\n```\n\nThe state \"foo\" can then be restored at a later time with\n\n```\n$ alsaequal-mgr load foo\n```\n\nThis, however, only restores ~/.alsaequal.bin. You then have to update the equalizer by alsamixer -D equal.\n\nYou can thus create different equalizer states for games, movies, music genres, VoIP apps, etc. and reload them as necessary.\n\nSee the project page and the help message for more options.\n\n"
+    },
+    {
+      "title": "High quality resampling",
+      "level": 3,
+      "content": "When #Software mixing is enabled, ALSA is forced to resample everything to the same frequency (48 kHz by default when supported). By default, it will try to use the speexrate converter to do so, and fallback to low-quality linear interpolation if it is not available. Thus, if you are getting poor sound quality due to bad resampling, the problem can be solved by simply installing the alsa-plugins package.\n\nFor even higher quality resampling, you can change the default rate converter to speexrate_medium or speexrate_best. Both perform well enough that in practice it does not matter which one you choose, so using the best converter is usually not worth the extra CPU cycles it requires.\n\nTo change the default converter, place the following contents in your ~/.asoundrc or /etc/asound.conf:\n\n```\ndefaults.pcm.rate_converter \"speexrate_medium\"\n```\n\n- It is also possible to use libsamplerate converters, which are only about half as fast as the speexrate converters but do not achieve much higher quality.\n- It is also possible to use Rate Converter Plugin Using libavresample that use FFmpeg. lavcrate_high and lavcrate_higher are equal to Kodi low and medium quality resamplers respectively.\n- Some applications (like MPlayer and its forks) do their own resampling by default because some ALSA drivers have incorrect delay reporting when resampling is enabled (hence leading to AV desynchronization), so changing this setting will not have any effect unless you configure them to use ALSA resampling.\n\n"
+    },
+    {
+      "title": "Disabling auto mute on startup",
+      "level": 3,
+      "content": "Auto-Mute Mode can be configured on startup with amixer. For example, to disable it:\n\n```\n# amixer -c 0 sset \"Auto-Mute Mode\" Disabled\n```\n\nAlternatively, the ncurses based interface can be utilized through alsamixer. In order to save any modifications, use:\n\n```\n# alsactl store\n```\n\nor\n\n```\n# alsactl daemon\n```\n\nSee also #ALSA and systemd.\n\n"
+    },
+    {
+      "title": "Hot-plugging a USB sound card",
+      "level": 3,
+      "content": "See Writing Udev rules for ALSA.\n\n"
+    },
+    {
+      "title": "Simultaneous output",
+      "level": 3,
+      "content": "You might want to play music via external speakers connected via mini jack and internal speakers simultaneously. This can be done by unmuting Auto-Mute item using alsamixer or amixer:\n\n```\n$ amixer sset \"Auto-Mute\" unmute\n```\n\nand then unmuting other required items, such as Headphones, Speaker, Bass Speaker...\n\n"
+    },
+    {
+      "title": "Keyboard volume control",
+      "level": 3,
+      "content": "Map the following commands to your volume keys: XF86AudioRaiseVolume, XF86AudioLowerVolume, XF86AudioMute.\n\nTo raise the volume:\n\n```\namixer set Master 5%+\n```\n\nTo lower the volume:\n\n```\namixer set Master 5%-\n```\n\nTo toggle mute/unmute of the volume:\n\n```\namixer set Master toggle\n```\n\n"
+    },
+    {
+      "title": "Virtual sound device using snd_aloop",
+      "level": 3,
+      "content": "You might want a jack alternative to create a virtual recording or play device in order to mix different sources, using the snd_aloop module:\n\n```\nmodprobe snd_aloop\n```\n\nList your new virtual devices using:\n\n```\naplay -l\n```\n\nnow you can for example using ffmpeg:\n\n```\nffmpeg -f alsa -i hw:1,1,0 -f alsa -i hw:1,1,1 -filter_complex amerge output.mp3\n```\n\nIn the hw:R,W,N phrase, R is your virtual card device number. W should be set to 1 for recording devices, or 0 for playing. N is your sub device. You can use all the virtual devices available and play/stop using applications like mplayer:\n\n```\nmplayer -ao alsa:device=hw=1,0,0 fileA\nmplayer -ao alsa:device=hw=1,0,1 fileB\n```\n\nAnother thing you could do with this approach is using festival to generate a voice into a recording stream using a script like this:\n\n```\n#!/bin/sh\necho \"$1\" | iconv -f utf-8 -t iso-8859-1 | text2wave  > \"_tmp_.wav\"\nmplayer -ao alsa:device=hw=2,0,0 \"_tmp.wav\"\nrm \"_tmp.wav\"\n```\n\n"
+    },
+    {
+      "title": "Reconfiguring input/output ports",
+      "level": 3,
+      "content": "The alsa-tools package contains the hdajackretask tool, which can be used (on Intel HDA cards) to reconfigure the sound card input/output ports; for instance, to turn a microphone jack into a headphone jack.\n\n"
+    },
+    {
+      "title": "apulse",
+      "level": 3,
+      "content": "apulseAUR provides an alternative partial implementation of the PulseAudio API. It lets you use ALSA for applications that support only PulseAudio for sound. Usage is simply:\n\n```\n$ apulse application\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- ALSA project wiki\n- ALSA unofficial wiki\n- A close look at ALSA\n- Linux ALSA sound notes\n- Pulse-code modulation (PCM)\n\n"
+    }
+  ]
+}

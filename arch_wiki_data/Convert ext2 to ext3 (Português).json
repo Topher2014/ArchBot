@@ -1,0 +1,96 @@
+{
+  "title": "Convert ext2 to ext3 (Português)",
+  "url": "https://wiki.archlinux.org/title/Convert_ext2_to_ext3_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Sistemas de arquivos\n- Ext3\n\nDe Ext4 - Linux Kernel Newbies (traduzido):\n\n"
+    },
+    {
+      "title": "Criando um novo sistema de arquivos ext4",
+      "level": 2,
+      "content": "Para formatar uma partição, faça:\n\n```\n# mkfs.ext4 /dev/partição\n```\n\n- Veja mke2fs(8) para mais opções; edite /etc/mke2fs.conf para ver/configurar as opções padrões.\n- Se houver suporte, você pode querer habilitar suporte a 64-bits e metadados de somas de verificação (também conhecidos como checksums).\n\n"
+    },
+    {
+      "title": "Proporção de bytes por nó-i",
+      "level": 3,
+      "content": "Traduzido de mke2fs(8):\n\nA criação de um novo arquivo, diretório, link simbólico etc. exige pelo menos um nó-i livre. Se a contagem de nós-i for pequena demais, nenhum arquivo pode ser criado no sistema de arquivos mesmo se ainda houver espaço restante nele.\n\nPorque não é possível alterar a proporção de bytes por nó-i ou a contagem de nós-i após o sistema de arquivos ser criado, o mkfs.ext4 usa, por padrão, uma proporção relativamente baixa de um nó-i a cada 16384 bytes (16 KB) para evitar essa situação.\n\nPorém, para partições com tamanho em centenas ou milhares de GB e tamanho de arquivo médio na faixa de megabytes, isso geralmente resulta em um número muito grande de nós-i porque o número de arquivos criados nunca alcança o número de nós-i.\n\nIsso resulta em um desperdício de espaço em disco, porque todos arquivos nós-i não usados ocupam até 256 bytes no sistema de arquivos (isso também é definido em /etc/mke2fs.conf, mas não deve ser alterado). 256 * vários milhões = alguns poucos gigabytes desperdiçados em nós-i não usados.\n\nEssa situação pode ser avaliada comparando as figuras {I}Uso% fornecidas pelo df e df -i:\n\n```\n$ df -h /home\n```\n\n```\nSist. Arq.              Tam.   Usado   Dispo.  Uso%  Montado em\n/dev/mapper/lvm-home    115G    56G    59G     49%   /home\n```\n\n```\n$ df -hi /home\n```\n\n```\nSist. Arq.              Inodes IUsado ILivre IUso%   Montado em\n/dev/mapper/lvm-home    1.8M    1.1K   1.8M   1%     /home\n```\n\nPara especificar uma proporção de bytes por nó-i diferente, você pode usar a opção -T tipo-de-uso que sugere o uso esperado do sistema de arquivos usando tipos definidos em /etc/mke2fs.conf. Além daqueles tipos estão os largefile e largefile4 maiores, que oferecem proporções mais relevantes de um nó-i a cada 1 MB e 4 MB, respectivamente. Pode-se usar da seguinte forma:\n\n```\n# mkfs.ext4 -T largefile /dev/dispositivo\n```\n\nA proporção de bytes por nó-i também pode ser definida diretamente via a opção -i: p.ex.: use -i 2097152 para uma proporção 2 MB e -i 6291456 para uma proporção 6 MB.\n\n"
+    },
+    {
+      "title": "Blocos reservados",
+      "level": 3,
+      "content": "Por padrão, 5% dos blocos de sistema de arquivos serão reservados para o superusuário, para evitar fragmentação e \"permitir daemons do root continuarem a funcionar corretamente após processos sem privilégios serem impedidos de escrever no sistema de arquivos\" (traduzido de mke2fs(8)).\n\nPara discos modernos de alta capacidade, isso é mais alto do que necessário se a partição for usada como um arquivo de longo prazo ou não crucial para operações do sistema (como /home). Veja esse e-mail para a opinião do desenvolvedor do ext4 Ted Ts'o sobre blocos reservados.\n\nGeralmente é seguro reduzir a percentagem de blocos reservados para liberar espaço de disco quando a partição é:\n\n- Grande demais (por exemplo > 50G); ou\n- Usado como arquivo de longo prazo, isto é, onde arquivos não serão excluídos e criados com muita frequência\n\nA opção -m de utilitários relacionados ao ext4 permitem especificar a percentagem de blocos reservados.\n\nPara impedir totalmente de reservar blocos na criação do sistema de arquivos, use:\n\n```\n# mkfs.ext4 -m 0 /dev/dispositivo\n```\n\nPara alterá-lo para 1% posteriormente, use:\n\n```\n# tune2fs -m 1 /dev/dispositivo\n```\n\nVocê pode usar findmnt(8) para localizar o nome do dispositivo:\n\n```\n$ findmnt /o/ponto/de/montagem\n```\n\n"
+    },
+    {
+      "title": "Motivo",
+      "level": 4,
+      "content": "Um compromisso entre a conversão total para ext4 e simplesmente permanecer com ext2/ext3 é montar as partições como ext4.\n\nVantagens:\n\n- Compatibilidade (o sistema de arquivos pode continuar sendo montado como ext3) – Isso permite que os usuários ainda leiam o sistema de arquivos de outros sistemas operacionais sem suporte a ext4 (por exemplo, o Windows com drivers ext2/ext3)\n- Melhor desempenho (embora não tanto como uma partição ext4 totalmente convertida).[1] [2]\n\nDesvantagens:\n\n- Menos recursos do ext4 são usados (apenas aqueles que não alteram o formato do disco, como a alocação de múltiplos blocos e a alocação atrasada)\n\nNote: **não há nenhuma desvantagem importante para esta técnica** \n\n"
+    },
+    {
+      "title": "Procedimento",
+      "level": 4,
+      "content": "1. Edite /etc/fstab e altere o 'type' de ext2/ext3 para ext4 para quaisquer partições você gostaria de montar como ext4.\n1. Monte novamente as partições afetadas.\n\n"
+    },
+    {
+      "title": "Motivo",
+      "level": 4,
+      "content": "Para experimentar os benefícios do ext4, um processo de conversão irreversível deve ser concluído.\n\nVantagens:\n\n- Desempenho melhorado e novos recursos.[3] [4]\n\nDesvantagens:\n\n- As partições que contêm principalmente arquivos estáticos, como uma partição /boot, podem não se beneficiar dos novos recursos. Além disso, adicionar um journal (que está implícito ao mover uma partição ext2 para ext3/4) sempre incorre em despesas extras ao custo de desempenho.\n- Irreversível (as partições ext4 não podem ser \"rebaixadas\" para ext2/ext3. No entanto, é compatível com versões anteriores até que a extensão e outras opções exclusivas estejam habilitadas)\n\n"
+    },
+    {
+      "title": "Procedimento",
+      "level": 4,
+      "content": "Essas instruções foram adaptadas da documentação do Kernel e um tópico do BBS.\n\n- Se você converter o sistema de arquivos raiz do sistema, certifique-se de que o initramfs reserva ('fallback') está disponível na reinicialização. Alternativamente, adicione ext4 de acordo com Mkinitcpio#MODULES e gere novamente o initramfs antes de iniciar.\n- Se você decidir converter uma partição /boot separada, certifique-se que o gerenciador de boot oferece inicialização do ext4.\n\nNas etapas a seguir, /dev/sdxX denota o caminho para a partição a ser convertida, tal como /dev/sda1.\n\n1. Faça backup de todos os dados em quaisquer partições ext3 que serão convertidas para ext4. Um pacote útil, especialmente para partições raiz, é o clonezilla.\n1. Edite /etc/fstab e altere o 'type' de ext3 para ext4 para quaisquer partições que serão convertidos para ext4.\n1. Inicialize uma mídia Live (se necessário). O processo de conversão com e2fsprogs deve ser feito quando a unidade não está montada. Se estiver convertendo uma partição raiz, a forma mais simples de alcançar isso é inicializar de alguma outra mídia Live.\n1. Certifique-se que a partição não está montada.\n1. Se você quiser converter uma partição ext2, a primeira etapa de conversão é adicionar um journal executando tune2fs -j /dev/sdxX como root; fazendo dela uma partição ext3.\n1. Execute tune2fs -O extent,uninit_bg,dir_index /dev/sdxX como root. Esse comando converte o sistema de arquivos ext3 para ext4 (irreversivelmente).\n1. Execute fsck -f /dev/sdxX como root. Esta etapa é necessária, do contrário o sistema de arquivos ficará ilegível. A execução de fsck é necessária para retornar o sistema de arquivos para um estado consistente. Ele vai encontrar erros de soma de verificação nos descritores de grupo - isso é esperado. A opção -f pede que o fsck verifique mesmo se o sistema de arquivos parecer limpo. A opção -p pode ser usada sobre a \"reparação automática\" (do contrário, o usuário será solicitado a intervir em cada erro).\n1. Recomendado: monte a partição e execute e4defrag -c -v /dev/sdxX como root. Mesmo que o sistema de arquivos agora esteja convertido em ext4, todos os arquivos que foram escritos antes da conversão ainda não aproveitam a opção de extensão do ext4, que melhorará o desempenho de arquivos grandes e reduzirá a fragmentação e o tempo de verificação do sistema de arquivos. Para aproveitar plenamente o ext4, todos os arquivos teriam que ser reescritos no disco. Use e4defrag para cuidar desse problema.\n1. Reinicie.\n\n- Esta etapa é necessária, do contrário o sistema de arquivos ficará ilegível. A execução de fsck é necessária para retornar o sistema de arquivos para um estado consistente. Ele vai encontrar erros de soma de verificação nos descritores de grupo - isso é esperado. A opção -f pede que o fsck verifique mesmo se o sistema de arquivos parecer limpo. A opção -p pode ser usada sobre a \"reparação automática\" (do contrário, o usuário será solicitado a intervir em cada erro).\n\n- Mesmo que o sistema de arquivos agora esteja convertido em ext4, todos os arquivos que foram escritos antes da conversão ainda não aproveitam a opção de extensão do ext4, que melhorará o desempenho de arquivos grandes e reduzirá a fragmentação e o tempo de verificação do sistema de arquivos. Para aproveitar plenamente o ext4, todos os arquivos teriam que ser reescritos no disco. Use e4defrag para cuidar desse problema.\n\n"
+    },
+    {
+      "title": "Desabilitando atualização de tempo de acesso",
+      "level": 3,
+      "content": "O sistema de arquivos ext4 registra informações sobre quando um arquivo foi acessado pela última vez e há um custo associado ao registro dele. Com a opção noatime, os timestamps de acesso no sistema de arquivos não são atualizados.\n\n```\n/etc/fstab\n```\n\n```\n/dev/sda5    /    ext4    defaults,noatime    0    1\n```\n\nFazer isso quebra aplicativos que dependem do tempo de acesso, veja fstab#Opções atime para soluções possíveis.\n\n"
+    },
+    {
+      "title": "Aumentando o intervalo de commit",
+      "level": 3,
+      "content": "O intervalo de sincronização para dados e metadados pode ser aumentado, proporcionando um maior atraso de tempo para a opção commit.\n\nO 5 segundos padrão significa que, se a energia for perdida, será perdido tanto quanto os últimos 5 segundos de trabalho. Isso força uma sincronia completa de todos os dados/journals para mídia física a cada 5 segundos. O sistema de arquivos não será danificado, graças ao registro no journaling. O seguinte fstab ilustra o uso de commit:\n\n```\n/etc/fstab\n```\n\n```\n/dev/sda5    /    ext4   defaults,noatime,commit=60    0    1\n```\n\n"
+    },
+    {
+      "title": "Desligando barreiras",
+      "level": 3,
+      "content": "Ext4 permite barreiras de gravação por padrão. Isso garante que os metadados do sistema de arquivos sejam corretamente escritos e ordenados no disco, mesmo quando os caches de gravação perdem energia. Isso ocorre com um custo de desempenho especialmente para aplicativos que usam fsync intensamente ou criam e excluem muitos pequenos arquivos. Para discos que tenham um cache de gravação com respaldo de bateria de uma forma ou de outra, desabilitar as barreiras pode melhorar o desempenho com segurança.\n\nPara desligar as barreiras, adicione a opção barrier=0 ao sistema de arquivos desejado. Por exemplo:\n\n```\n/etc/fstab\n```\n\n```\n/dev/sda5    /    ext4    noatime,barrier=0   0    1\n```\n\n"
+    },
+    {
+      "title": "Desabilitando journaling",
+      "level": 3,
+      "content": "Desabilitar o journal do ext4 pode ser feito com o seguinte comando em um disco desmontado:\n\n```\n# tune2fs -O \"^has_journal\" /dev/sdXN\n```\n\n"
+    },
+    {
+      "title": "Use journal externo para otimizar o desempenho",
+      "level": 3,
+      "content": "Para aqueles com preocupações sobre integridade e desempenho de dados, o registro no jornal pode ser significativamente acelerado com a opção de montagem journal_async_commit. Note que não funciona com o padrão balanceado de data=ordered, então isso é recomendado apenas quando o sistema de arquivos já estiver usando data=journal cautelosamente.\n\nVocê pode formatar um dispositivo dedicado para o journal com mke2fs -O journal_dev /dev/journal_device. Use tune2fs -J device=/dev/journal_device /dev/ext4_fs para atribuir o journal a um dispositivo existente ou substitua tune2fs por mkfs.ext4 se você estiver criando um novo sistema de arquivos.\n\n"
+    },
+    {
+      "title": "Usando criptografia baseada em arquivos",
+      "level": 3,
+      "content": "Desde o Linux 4.1, o ext4 possui suporte nativo a criptografia de arquivos — consulte o artigo fscrypt. A criptografia é aplicada no nível do diretório, e diretórios diferentes podem usar chaves de criptografia diferentes. Isso é diferente de dm-crypt, que é a criptografia em nível de dispositivo de bloco, e de eCryptfs, que é um sistema de arquivos criptográficos empilhados.\n\n"
+    },
+    {
+      "title": "Habilitando somas de verificação de metadados",
+      "level": 3,
+      "content": "Quando um sistema de arquivos foi criado com o e2fsprogs 1.44 ou posterior, as somas de verificação de metadados já devem estar ativadas por padrão. Os sistemas de arquivos existentes podem ser convertidos para permitir o suporte à soma de verificação de metadados.\n\nSe o seu CPU tem suporte a SSE 4.2, certifique-se que o módulo de kernel crc32c_intel esteja carregado para habilitar o algoritmo CRC32C acelerado por hardware [5]. Caso contrário, você precisará carregar o módulo crc32c_generic.\n\nPara ler mais sobre metadados de somas de verificação, veja o wiki do ext4.\n\n```\n# dumpe2fs /dev/caminho/para/disco\n```\n\n"
+    },
+    {
+      "title": "Novo sistema de arquivos",
+      "level": 4,
+      "content": "Para habilitar o suporte a somas de verificação de metadados ext4 ao criar um novo sistema de arquivos.\n\n```\n# mkfs.ext4 -O metadata_csum /dev/caminho/para/disco\n```\n\n"
+    },
+    {
+      "title": "Converter arquivo de sistema existente",
+      "level": 4,
+      "content": "Primeiro, a partição precisa ser verificada e otimizada usando e2fsck:\n\n```\n# e2fsck -Df /dev/caminho/para/disco\n```\n\nConverta o sistema de arquivos para 64 bits:\n\n```\n# resize2fs -b /dev/caminho/para/disco\n```\n\nFinalmente, habilite suporte a somas de verificação:\n\n```\n# tune2fs -O metadata_csum /dev/caminho/para/disco\n```\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Wiki oficial do Ext4\n- Layout de disco com Ext4 descrito no seu wiki\n- Criptografia no Ext4 - artigo do LWN\n- Commits do kernel para criptografia no ext4 [6] [7]\n- Changelog do e2fsprogs\n- Somas de verificação de metadados do Ext4\n\n"
+    }
+  ]
+}

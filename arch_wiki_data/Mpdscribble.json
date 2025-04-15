@@ -1,0 +1,151 @@
+{
+  "title": "Mpdscribble",
+  "url": "https://wiki.archlinux.org/title/Mpdscribble",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Go back to Music Player Daemon.\n\n"
+    },
+    {
+      "title": "Organizing library",
+      "level": 2,
+      "content": "MPD does not manage your library. Check out beets or picard.\n\n"
+    },
+    {
+      "title": "Last.fm/Libre.fm scrobbling",
+      "level": 2,
+      "content": "To scrobble your songs to Last.fm or Libre.fm when using MPD, there are several possibilities.\n\n"
+    },
+    {
+      "title": "mpdas",
+      "level": 3,
+      "content": "mpdas is an AudioScrobbler client for MPD written in C++. It uses curl and libmpd. mpdas supports the latest AudioScrobbler protocol (2.0) and will also cache unscrobbled plays in ~/.mpdascache if there is no network connectivity.\n\nThe mpdasAUR package is available.\n\nConfiguration of mpdas is very simple, see the official README. A very basic example of /etc/mpdasrc is also available as /etc/mpdasrc.\n\nTo autostart mpdas along with mpd, add an entry for it into the file in which you start mpd (e.g. xinitrc):\n\n```\n[[ -z $(pgrep -xU $UID mpdas) ]] && mpdas &\n```\n\nWhen mpd is started as a systemd user service, it is better to start mpdas as a user unit too.\n\n"
+    },
+    {
+      "title": "mpdscribble",
+      "level": 3,
+      "content": "mpdscribble is a daemon that is arguably the best alternative, because it is the semi-official MPD scrobbler and uses the new \"idle\" feature in MPD for more accurate scrobbling. Also, you do not need root access to configure it, because it does not need any changes to /etc at all. Visit the official website for more information.\n\nA sample configuration is included: /usr/share/mpdscribble/mpdscribble.conf.example, copy it to ~/.mpdscribble/mpdscribble.conf and edit to suit.\n\nYour password can also be in the form of an md5hash:\n\n```\necho -n \"password\" | md5sum | cut -f 1 -d \" \"\n```\n\nTo autostart mpdscribble you can use the mpdscribble.service under systemd user instance. See systemd/User for details.\n\nAlternatively you can autostart mpdscribble along with mpd, add an entry for it into the file in which you start mpd (e.g. ~/.xinitrc):\n\n```\n[[ -z $(pgrep -xU $UID mpdscribble) ]] && mpdscribble &\n```\n\n"
+    },
+    {
+      "title": "Sonata",
+      "level": 3,
+      "content": "Sonata has built-in support for scrobbling, although that requires the program to run the whole time. Additionally, Sonata does not cache the songs if they cannot be forwarded to Last.fm at the time of playing, meaning they will not be added to the statistics.\n\n"
+    },
+    {
+      "title": "YAMS",
+      "level": 3,
+      "content": "YAMS is a Last.FM scrobbling daemon for MPD written in Python.\n\nAs it is written for v2.0 of Last.FM's scrobbling API, YAMS does not store your username or password locally, but opts to use a cookie instead. Similar to other scrobblers, YAMS can save failed scrobbles and upload them at a later date. It also offers a decent amount of configuration options for when/how a scrobble should be made (including ignoring duplicate scrobbles when a track is played multiple times in a row).\n\nThe python-yamsAUR package is available.\n\nIn order to authenticate, the user must run the yams command in an interactive terminal, at least once, and follow the printed instructions.\n\nAfterwards, YAMS can be started with its binary:\n\nyams runs as a daemon by default (yams -N will run it in the foreground).\n\nyams -k will kill the current running instance.\n\nyams -a will attach to the current running instance's log file, allowing you to watch the daemon's output.\n\nyams -h will print all command line options.\n\nYAMS also comes with a systemd service file that can be started with the yams.service user unit after authentication is complete.\n\n"
+    },
+    {
+      "title": "Disable resume playback on startup",
+      "level": 2,
+      "content": "This feature is present in mpd after version 0.16.2. When this feature is enabled, mpd will always start in the \"paused\" state, even if a song was playing when mpd was stopped. Add the line below to your mpd.conf to enable this feature.\n\n```\nrestore_paused \"yes\"\n```\n\n"
+    },
+    {
+      "title": "Example configuration: Output with 44.1 KHz at e. g. 16 bit depth, multiple programs at once",
+      "level": 2,
+      "content": "Why these formats? Because they are the standard format for CD audio, because ALSA on its own allows more than one program \"to sound\" only with dmix — which uses an inferior resampling algorithm by default — and because dmix by default resamples anything lower to 48 KHz (or whatever higher format is playing at the time). Also, some get clicking sounds if at least mpd.conf is not changed this way.\n\nWhat is the downside? These settings cause everything (if necessary) to be resampled to this format, such as material from DVD or TV which usually is at 48 KHz. But there is no known way to have ALSA dynamically change the format, and particularly if you listen to far more CDs than anything else the occasional 48 to 44.1 is not too great a loss.\n\nThe following assumes that there are not already other settings which conflict resp. overwrite it. This applies especially to the current user's potential ~/.asoundrc — which MPD as its own user ignores, therefore the following should go to /etc/asound.conf:\n\n```\n/etc/asound.conf\n```\n\n```\ndefaults.pcm.dmix.rate 44100 # Force 44.1 KHz\ndefaults.pcm.dmix.format S16_LE # Force 16 bits\n```\n\n```\n/etc/mpd.conf\n```\n\n```\naudio_output {\n        type                    \"alsa\" # Use the ALSA output plugin.\n\tname\t\t\t\"your_custom_name\" # Must be present and does not have to match the actual card name , e.g. what you have in /etc/asound.conf\n        options                 \"dev=dmixer\"\n        device                  \"plug:dmix\" # Both lines cause MPD to output to dmix\n\tformat\t        \t\"44100:16:2\" # the actual format\n\tauto_resample\t\t\"no\" # This bypasses ALSA's own algorithms, which generally are inferior. See below how to choose a different one.\n}\n```\n\nIf one wants to leave the bit depth decision to ALSA resp. MPD, comment out resp. omit the dmix.format line and change the one for mpd with format to \"44100:*:2\".\n\n"
+    },
+    {
+      "title": "Control MPD with lirc",
+      "level": 2,
+      "content": "There are already some clients designed for communications between lircd and MPD, however, as far as the practical use, they are not very useful since their functions are limited.\n\nIt is recommended to use mpc with irexec. mpc is a command line player which only sends the command to MPD and exits immediately, which is perfect for irexec, the command runner included in lirc. What irexec does is that it runs a specified command once received a remote control button.\n\nFirst of all, please setup your remotes as referred to the LIRC article.\n\nEdit your favored lirc startup configuration file, default location is ~/.lircrc.\n\nFill the file with the following pattern:\n\n```\nbegin\n     prog = irexec\n     button = <button_name>\n     config = <command_to_run>\n     repeat = <0 or 1>\nend\n```\n\nAn example:\n\n```\n## irexec\nbegin\n     prog = irexec\n     button = play_pause\n     config = mpc toggle\n     repeat = 0\nend\n\nbegin\n     prog = irexec\n     button = stop\n     config = mpc stop\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = previous\n     config = mpc prev\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = next\n     config = mpc next\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = volup\n     config = mpc volume +2\n     repeat = 1\nend\nbegin\n     prog = irexec\n     button = voldown\n     config = mpc volume -2\n     repeat = 1\nend\nbegin\n     prog = irexec\n     button = pbc\n     config = mpc random\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = pdvd\n     config = mpc update\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = right\n     config = mpc seek +00:00:05\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = left\n     config = mpc seek -00:00:05\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = up\n     config = mpc seek +1%\n     repeat = 0\nend\nbegin\n     prog = irexec\n     button = down\n     config = mpc seek -1%\n     repeat = 0\nend\n```\n\nThere are more functions for mpc, run mpc(1) for more info.\n\n"
+    },
+    {
+      "title": "Local (as your own user)",
+      "level": 3,
+      "content": "No special options are required; just add a pulse output as described in the comments of mpd's configuration file.\n\n"
+    },
+    {
+      "title": "Local (with separate mpd user)",
+      "level": 3,
+      "content": "When run as its own user as per the wiki instructions, mpd will be unable to send sound to another user's pulseaudio server. Rather than setting up pulseaudio as a system-wide daemon, a practice strongly discouraged by upstream, you can instead configure mpd to use pulseaudio's TCP module to send sound to localhost:\n\nFirst, edit the PulseAudio configuration - either the user configuration in $XDG_CONFIG_HOME/pulse/default.pa (typically ~/.config/pulse/default.pa) if it exists, otherwise the system-wide configuration file in /etc/pulse/default.pa and uncomment the TCP module and set 127.0.0.1 as an allowed IP address like this:\n\n```\n### Network access (may be configured with paprefs, so leave this commented\n### here if you plan to use paprefs)\n#load-module module-esound-protocol-tcp\nload-module module-native-protocol-tcp auth-ip-acl=127.0.0.1\n#load-module module-zeroconf-publish\n```\n\nAdditional IP ranges in cidr notation may be added using ; as the separator. Once this is complete, restart pulseaudio:\n\n```\n$ pulseaudio --kill\n$ pulseaudio --start -or- start-pulseaudio-x11/kde\n```\n\nNext, edit /etc/mpd.conf and add a new pulse output pointing to 127.0.0.1 as a \"remote\" server:\n\n```\naudio_output {\n       type\t\t\"pulse\"\n       name\t\t\"Local Music Player Daemon\"\n       server\t\t\"127.0.0.1\"\n}\n```\n\nOnce this is added, restart mpd.\n\nYou should now have a working local mpd, usable by all users whose pulseaudio servers allow sound from 127.0.0.1.\n\n"
+    },
+    {
+      "title": "Remote",
+      "level": 3,
+      "content": "As with any PulseAudio-enabled program, mpd can send sound over the network. The complete PulseAudio system is not required on the server running mpd; libpulse is the only requirement to act as a source and is already a dependency of mpd.\n\nIn order to send audio from mpd to another computer follow the directions above, editing /etc/mpd.conf on the server running mpd using the IP address of the target computer and /etc/pulse/default.pa or $XDG_CONFIG_HOME/default.pa (typically ~/.config/pulse/default.pa) on the target computer using the IP address of the server.\n\nOnce this is done, the server's mpd source should show up on the target computer while playing or paused as a normal source able to be rerouted and controlled as usual; there will be no visible source on the target while mpd is stopped.\n\n"
+    },
+    {
+      "title": "Cue files",
+      "level": 2,
+      "content": "No additional steps are needed for cue support in mpd since 0.17. MPD has its own integrated parser which works with both external and embedded cue sheets. For example, the command $ mpc load albumx/x.cue loads the file music_directory/albumx/x.cue as playlist; or in the case of an CUESHEET tag, $ mpc load albumx/x.flac.\n\nClient support of cue files is a bit limited. Two available programs that do support CUE files are cantataAUR and ncmpcpp.\n\n"
+    },
+    {
+      "title": "HTTP streaming",
+      "level": 2,
+      "content": "Since version 0.15 there is a built-in HTTP streaming daemon/server that comes with MPD. This allows MPD to broadcast its music to HTTP clients.\n\nThis is not meant to be used as a streaming solution (e.g. replacement of Spotify, Deezer, etc.). First, it only allows one stream to be played, so multiple users cannot listen at the same time to different music. Second, MPD buffers audio a lot so that it plays reliably even when the client drops the connection for a while, therefore it introduces a non-negligeable latency when changing songs. To use MPD as a streaming solution, see #Music streaming with the satellite setup.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "To activate this server simply set it as output device in mpd.conf:\n\n```\naudio_output {\n\ttype\t\t\"httpd\"\n\tname\t\t\"My HTTP Stream\"\n\tencoder\t\t\"opus\"\t\t# optional\n\tport\t\t\"8000\"\n#\tquality\t\t\"5.0\"\t\t\t# do not define if bitrate is defined\n\tbitrate\t\t\"128000\"\t\t\t# do not define if quality is defined\n\tformat\t\t\"48000:16:1\"\n\talways_on       \"yes\"\t\t\t# prevent MPD from disconnecting all listeners when playback is stopped.\n\ttags            \"yes\"\t\t\t# httpd supports sending tags to listening streams.\n}\n```\n\n"
+    },
+    {
+      "title": "Format",
+      "level": 4,
+      "content": "MPD supports several encoding formats. See what your MPD supports with:\n\n```\n$ mpd --version\n```\n\n"
+    },
+    {
+      "title": "Use",
+      "level": 3,
+      "content": "Then to listen to this stream simply open the URL of your mpd server (along with the specified port) in your favorite music player. Note: You may have to specify the file format of the stream using an appropriate file extension in the URL. For example, using Winamp 5.5, You would use http://192.168.1.2:8000/mpd.ogg rather than http://192.168.1.2:8000/.\n\nTo use mpd to connect to the stream from another computer:\n\n```\nmpc add http://192.168.1.2:8000\n```\n\n"
+    },
+    {
+      "title": "Music streaming with the satellite setup",
+      "level": 2,
+      "content": "While #HTTP streaming allows the user to broadcast its music over HTTP, the satellite setup allows multiple users to listen to different songs at the same time, on separate machines.\n\n"
+    },
+    {
+      "title": "Topology",
+      "level": 3,
+      "content": "The satellite setup involves two or more machines: a server and multiple clients. The server is typically the machine that has the music files. It runs an MPD instance that will browse these files and build a database. The clients are the machines that will actually play the music (e.g. your phone or your laptop). They will also run MPD instances, though these ones will fetch the database from the server MPD and play the music. You might notice that MPD on the server is not necessary, however it greatly increases the speed to list all songs, as the client's MPD will not have to browse all the files remotely.\n\nBesides, you will need a way for the server to make the music files available to the clients. MPD supports multiple storage plugins to fetch the music with. For example, if you choose the curl plugin, you will need a WebDAV server on the server.\n\nFinally, you will need a secure communication tunnel between the server and each client. This is because the protocol used to control MPD is not encrypted and does not provide authentication. A VPN or a SSH tunnel will be useful here.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "On the server, write the configuration file for the MPD instance that will build the database:\n\n```\n/etc/mpd.conf\n```\n\n```\npid_file            \"/run/mpd/mpd.pid\"\nplaylist_directory  \"/var/lib/mpd/playlists\"\nmusic_directory     \"/path/to/your/music/\"\n\ndatabase {\n    plugin           \"simple\"\n    path             \"/var/lib/mpd/mpd.db\"\n    cache_directory  \"/var/lib/mpd/cache\"\n}\n\naudio_output {\n    type  \"null\"\n    name  \"This server does not need to play music, but it can\"\n}\n```\n\nThen, setup either the WebDAV server, the NFS server or the Samba share.\n\nOn each client, write the configuration file for the MPD instance that will play the music:\n\n```\n/etc/mpd.conf\n```\n\n```\npid_file            \"/run/mpd/mpd.pid\"\nplaylist_directory  \"/var/lib/mpd/playlists\"\n\n# WebDAV setup\nmusic_directory     \"https://optional_user:optional_password@example.com/path/to/your/music/\"\n\n# NFS setup\nmusic_directory     \"nfs://example.com/path/to/your/music/\"\n\n# Samba setup\nmusic_directory     \"smb://example.com/path/to/your/music/\"\n\n# Note the proxy here\ndatabase {\n    plugin  \"proxy\"\n    host    \"example.com\"\n    port    \"6600\"\n}\n\naudio_output {\n    type  \"alsa\"\n    name  \"Some output name\"\n}\n```\n\n- libsmbclient has a serious bug which causes MPD to crash, and therefore this plugin is disabled by default and should not be used until the bug is fixed [1]\n- On Android the configuration file needs to be at the root of the user storage, alongside the Android folder. Also, files MPD writes to need to lie in the application folder, generally in /data. For example:\n\n```\n/storage/emulated/0/mpd.conf\n```\n\n```\nmusic_directory  \"http://example.com/Music\"\nlog_file         \"/data/user/0/org.musicpd/cache/log\"\nstate_file       \"/data/user/0/org.musicpd/cache/state\"\n\naudio_output {\n    type  \"sles\"\n    name  \"Android only supports OpenSL ES\"\n}\n```\n\n"
+    },
+    {
+      "title": "MPRIS support",
+      "level": 2,
+      "content": "See also MPRIS.\n\n"
+    },
+    {
+      "title": "mpDris2",
+      "level": 3,
+      "content": "Install the mpdris2AUR package. It runs in the user session and monitors the mpd server.\n\nCopy the default configuration file from /usr/share/doc/mpdris2/mpDris2.conf to ~/.config/mpDris2/mpDris2.conf. Edit it as needed.\n\nAfter installation, you can start/enable the mpDris2.service user unit.\n\n"
+    },
+    {
+      "title": "mpd-mpris",
+      "level": 3,
+      "content": "Install the mpd-mpris package.\n\nAfter installation, you can start/enable the mpd-mpris.service user unit.\n\nBy default mpd-mpris connects to localhost:6600 (which is the default host/port of mpd). To change this settings copy /usr/lib/systemd/user/mpd-mpris.service to ~/.config/systemd/user/ then edit run parameters as needed.\n\n"
+    },
+    {
+      "title": "Notifications",
+      "level": 2,
+      "content": "The mpdris2AUR package optionally supports displaying graphical notifications. If you do not want mpris support and are looking for a more lightweight or specific option, here are some alternatives:\n\n"
+    },
+    {
+      "title": "musnify-mpd",
+      "level": 3,
+      "content": "musnify-mpd is a simple python script that provides notification support for Music Player Daemon using libnotify. It can also display the album covers loaded from last fm or load it from the user-local music library.\n\nThe musnify-mpdAUR package is available.\n\nAfter installation you may want to configure your mpd host and port. To do this copy the \".example\" file into ~/.config/musnify-mpd\n\n```\n$ mkdir ~/.config/musnify-mpd \n$ cp /usr/share/doc/musnify-mpd/musnify-mpdconfig.example ~/.config/musnify-mpd/musnify-mpd.config\n```\n\nExample configuration:\n\n```\n~/.config/musnify-mpd/musnify-mpd.config\n```\n\n```\n[mpd]\nhost = localhost\nport = 6600\n\n# This is where musnify-mpd will look for when searching the local album covers.\nmusiclibrary = ~/Music\n#\n\n[apiKey]\n# If you want to fetch the album covers from LastFm,\n# enable this option and provide a apiKey.\n# You can get your apiKey here: https://www.last.fm/api/account/create\n#\n# lastfm = YOUR_LASTFM_API_KEY\n```\n\nTo enable artworks from last.fm, you will need to edit ~/.config/musnify-mpd and provide a apiKey. You can create your apiKey here\n\n"
+    },
+    {
+      "title": "mpd-notification",
+      "level": 3,
+      "content": "Notify about tracks played by mpd. This runs in the background and produces notifications whenever mpd produces an event (e.g. new track is played, playback paused or stopped). This also supports local or .mp3 album artworks.\n\nThe mpd-notificationAUR package is available.\n\nAfter installation, just run mpd-notification to run it once. The mpd-notification.service user unit can be enabled to start it automatically.\n\n"
+    },
+    {
+      "title": "Adding a separate volume control (ALSA)",
+      "level": 2,
+      "content": "While MPD does not allow you to adjust its own volume by default (mpc volume affects global volume), you can easily make a MPD-specific volume slider using the softvol ALSA module. Just add this to asound.conf:\n\n```\npcm.mpd {\n    type softvol\n    slave.pcm \"default\"\n    control.name \"MPD Playback Volume\"\n    control.card 0\n}\n```\n\nAnd link it to MPD:\n\n```\nmpd.conf\n```\n\n```\naudio_output {\n    type \"alsa\"\n    name \"ALSA\"\n    device \"mpd\"\n    mixer_control \"MPD\"\n}\n```\n\nAfterwards you should be able to adjust song volume both through mpc and amixer. (You may need to reboot for the control to work properly.)\n\n"
+    },
+    {
+      "title": "Control the remote mpd server",
+      "level": 2,
+      "content": "To control the remote mpd server, if you have an ssh server on the same machine, you can login and use ncmpcpp to control it.\n\nOr, if your mpd server is listening on an accessible interface/port ($ ss -p -l -t on the mpd machine will show mpd listening on 0.0.0.0, for example) then you can set the MPD_HOST variable which directs a local client like mpc to the remote server.\n\n```\n$ export MPD_HOST=ip.of.server\n$ export MPD_PORT=6600      # optional\n$ mpc play\n```\n\n"
+    }
+  ]
+}

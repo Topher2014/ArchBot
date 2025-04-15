@@ -1,0 +1,206 @@
+{
+  "title": "RAID (Español)",
+  "url": "https://wiki.archlinux.org/title/RAID_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-09-30** \n\nArtículos relacionados\n\n- Software RAID and LVM\n- RAID LVM\n- Installing with Fake RAID\n- Convert a single drive system to RAID\n- ZFS\n- ZFS/Virtual disks\n- Striping en el espacio de intercambio\n- RAID Btrfs\n\nRedundant Array of Independent Disks (Matriz Redundante de Discos Independientes, siglas en inglés RAID) es una tecnología de almacenamiento que combina varios componentes de unidades de disco —normalmente unidades de disco o particiones de los mismos— en una unidad lógica. Dependiendo de la implementación de RAID, la unidad lógica puede ser un sistema de archivos o una capa transparente adicional que puede contener varias particiones. Los datos se distribuyen a través de las unidades de una las muchas maneras que hay, llamadas #Niveles RAID, dependiendo del nivel de redundancia y del rendimiento requeridos. El nivel RAID elegido, por lo tanto, va a depender de si lo que se quiere es prevenir la pérdida de datos en caso de un fallo del disco duro, aumentar el rendimiento o una combinación de ambos.\n\nEn este artículo se explica qué es RAID y cómo crear/administrar una matriz RAID por software utilizando mdadm.\n\n"
+    },
+    {
+      "title": "Niveles RAID",
+      "level": 2,
+      "content": "A pesar de la redundancia implícita en la mayoría de los niveles de RAID, RAID no garantiza que los datos estén seguros. Un RAID no protegerá los datos si el equipo se quema, es robado o fallan varios discos duros a la vez. Además, instalar un sistema con RAID es un proceso complejo que puede destruir datos.\n\n"
+    },
+    {
+      "title": "Niveles RAID estándar",
+      "level": 3,
+      "content": "Hay muchos niveles de RAID, sírvase encontrar a continuación los más comúnmente usados.\n\nNote: **se espera** \n\n"
+    },
+    {
+      "title": "Comparación de niveles RAID",
+      "level": 3,
+      "content": "Table content:\nNivel RAID | Redundancia de datos | Utilización de la unidad física | Rendimiento de lectura | Rendimiento de escritura | Unidades mínimas\n0 | No | 100% | nX Máxima | nX Máxima | 2\n1 | Sí | 50% | Hasta nX si se leen múltiples procesos, de lo contrario 1X | 1X | 2\n5 | Sí | 67% - 94% | (n−1)X Superior | (n−1)X Superior | 3\n6 | Sí | 50% - 88% | (n−2)X | (n−2)X | 4\n10,far2 | Sí | 50% | nX Superior; a la par con RAID0 pero redundante | (n/2)X | 2\n10,near2 | Sí | 50% | Hasta nX si se leen múltiples procesos, de lo contrario 1X | (n/2)X | 2\n\nMáxima\n\nMáxima\n\nSuperior\n\nSuperior\n\nSuperior; a la par con RAID0 pero redundante\n\n* Donde n es el standing multiplicado por el número de discos dedicados.\n\n"
+    },
+    {
+      "title": "Implementación",
+      "level": 2,
+      "content": "Los dispositivos RAID pueden gestionarse de diferentes maneras:\n\n- por una capa de abstracción (por ejemplo, mdadm); Nota: Este es el método que utilizaremos más adelante en esta guía.\n- por un gestor de volúmenes lógicos (por ejemplo, LVM);\n- por un componente de un sistema de archivos (por ejemplo, ZFS, Btrfs).\n\n"
+    },
+    {
+      "title": "¿Qué tipo de RAID tengo?",
+      "level": 3,
+      "content": "Dado que el RAID por software se implementa por el usuario, este tipo de RAID es fácilmente conocido por el usuario.\n\nSin embargo, discernir entre fakeRAID y RAID por hardware verdadero puede ser más difícil. Los fabricantes no suelen distinguir correctamente estos dos tipos de RAID y siempre es posible falsear la publicidad. La mejor solución, en estos casos, es ejecutar la orden lspci y mirar la salida para encontrar la controladora RAID. A continuación, realice una búsqueda para ver qué información puede definir dicha controladora RAID. Los controladores RAID por hardware aparecen en esta lista, pero las implementaciones de FakeRAID no. Además, los verdaderos controladores de RAID por hardware a menudo son bastante caros, por lo que si alguien personaliza el sistema, es muy probable que al elegir una configuración RAID por hardware haya un cambio muy notable en el precio del equipo.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale mdadm disponible en los repositorios oficiales. mdadm se utiliza para la administración de RAID por software puro usando dispositivos de bloque plano: el hardware subyacente no ofrece ninguna lógica RAID, solo un suministro de discos. mdadm funcionará con cualquier colección de dispositivos de bloques. Incluso si son inusuales. Por ejemplo, se puede, pues, hacer un matriz RAID de una colección de memorias USB.\n\n"
+    },
+    {
+      "title": "Preparar los dispositivos",
+      "level": 3,
+      "content": "Si el dispositivo está siendo reutilizado o repuesto de una matriz existente, borre cualquier información de configuración RAID antigua:\n\n```\n# mdadm --misc --zero-superblock /dev/<unidad>\n```\n\no, si se va a eliminar una partición particular de una unidad:\n\n```\n# mdadm --misc --zero-superblock /dev/<partición>\n```\n\n- Hacer limpieza de un superbloque de partición no debe afectar a las otras particiones en el disco.\n- Debido a la naturaleza de la funcionalidad RAID, es muy difícil realizar un borrado con seguridad del disco completo en una matriz en funcionamiento. Considere si es útil hacerlo antes de crearla.\n\n"
+    },
+    {
+      "title": "Particionar los dispositivos",
+      "level": 3,
+      "content": "Es recomendable particionar los discos que se utilizarán en la matriz. Como la mayoría de los usuarios RAID seleccionan discos duros de >2 TB, es preferible y recomendable utilizar tablas de particionado GPT. Consulte Partitioning (Español) para obtener más información sobre la partición y las [[[Partitioning (Español)#Herramientas de particionado]] disposibles.\n\n"
+    },
+    {
+      "title": "Tabla de particiones GUID",
+      "level": 4,
+      "content": "- Después de crear las particiones, su GUID de tipo de partición debe ser A19D880F-05FC-4D3B-A006-743F0F84911E (puede asignarse seleccionando el tipo de partición Linux RAID en fdisk o FD00 en gdisk).\n- Si se emplea una matriz de discos más grande, considere asignar etiquetas de sistemas de archivos o etiquetas de particiones para que sea más fácil identificar un disco individual más tarde.\n- Se recomienda crear particiones que sean del mismo tamaño en cada uno de los dispositivos.\n\n"
+    },
+    {
+      "title": "Master Boot Record",
+      "level": 4,
+      "content": "Para aquellos que creen particiones en discos duros con una tabla de particiones MBR, los ID de tipos de particiones disponibles para su uso son:\n\n- 0xFD para matrices raid autodetectadas (Linux raid autodetect en fdisk)\n- 0xDA para datos sin sistema de archivos (Non-FS data en fdisk)\n\nConsulte Linux Raid Wiki:Partition Types para obtener más información.\n\n"
+    },
+    {
+      "title": "Compilar la matriz",
+      "level": 3,
+      "content": "Utilice mdadm para compilar la matriz. Varios ejemplos se dan a continuación.\n\n- Si se trata de una matriz RAID 1 que se pretende arrancar desde Syslinux (Español) una limitación en la v4.07 de syslinux requiere que el valor de los metadatos se ajuste a 1.0 en lugar de la opción predeterminada de 1.2.\n- Al crear una matriz desde un medio de instalación de Arch utilice la opción --homehost=myhostname (o --homehost=any para tener siempre el mismo nombre independientemente del equipo) para establecer el nombre del equipo, de lo contrario, el nombre del host archiso se escribirá en los metadatos de la matriz.\n\nEl siguiente ejemplo muestra la compilación de una matriz RAID 1 en el dispositivo 2:\n\n```\n# mdadm --create --verbose --level=1 --metadata=1.2 --raid-devices=2 /dev/md/MyRAID1Array /dev/sdb1 /dev/sdc1\n```\n\nEl siguiente ejemplo muestra la compilación de una matriz RAID 5 con 4 dispositivos activos y 1 dispositivo de repuesto:\n\n```\n# mdadm --create --verbose --level=5 --metadata=1.2 --chunk=256 --raid-devices=4 /dev/md/MyRAID5Array /dev/sdb1 /dev/sdc1 /dev/sdd1 /dev/sde1 --spare-devices=1 /dev/sdf1\n```\n\nEl siguiente ejemplo muestra la construcción de una matriz RAID10,far2 con 2 dispositivos:\n\n```\n# mdadm --create --verbose --level=10 --metadata=1.2 --chunk=512 --raid-devices=2 --layout=f2 /dev/md/MyRAID10Array /dev/sdb1 /dev/sdc1\n```\n\nLa matriz se crea en el dispositivo virtual /dev/mdX, ensamblada y lista para usar (en modo degradado). Se puede comenzar a usarla directamente al tiempo que mdadm resincroniza la matriz en segundo plano. Restaurar la paridad puede llevar mucho tiempo. Verifique el progreso con:\n\n```\n$ cat /proc/mdstat\n```\n\n"
+    },
+    {
+      "title": "Actualizar archivo de configuración",
+      "level": 3,
+      "content": "Por defecto, la mayoría de mdadm.conf está comentada y contiene solo lo siguiente:\n\n```\n/etc/mdadm.conf\n```\n\n```\n...\nDEVICE partitions\n...\n```\n\nEsta directiva le dice a mdadm que examine los dispositivos a los que hace referencia /proc/partitions y que ensamble tantas matrices como sea posible. Esto está bien si realmente desea iniciar todos las matrices disponibles y está seguro de que no se encontrarán superbloques inesperados (como después de instalar un nuevo dispositivo de almacenamiento). Un enfoque más preciso es agregar explícitamente las matrices a /etc/mdadm.conf:\n\n```\n# mdadm --detail --scan >> /etc/mdadm.conf\n```\n\nEsto resulta en algo como lo siguiente:\n\n```\n/etc/mdadm.conf\n```\n\n```\n...\nDEVICE partitions\n...\nARRAY /dev/md/MyRAID1Array metadata=1.2 name=pine:MyRAID1Array UUID=27664f0d:111e493d:4d810213:9f291abe\n```\n\nEsto también hace que mdadm examine los dispositivos a los que hace referencia /proc/partitions. Sin embargo, solo los dispositivos que tienen superbloques con un UUID de 27664… se ensamblan en matrices activas.\n\nConsulte mdadm.conf(5) para obtener más información.\n\n"
+    },
+    {
+      "title": "Ensamblar la matriz",
+      "level": 3,
+      "content": "Una vez que el archivo de configuración se ha actualizado, la matriz puede ser ensamblada usando mdadm:\n\n```\n# mdadm --assemble --scan\n```\n\n"
+    },
+    {
+      "title": "Formatear RAID con un sistema de archivos",
+      "level": 3,
+      "content": "La matriz ahora se puede formatear con un sistema de archivos como cualquier otro disco, basta tener en cuenta que:\n\n- debido al gran tamaño del volumen, no todos los sistemas de archivos son adecuados (ver: limitaciones de los sistema de archivos);\n- el sistema de archivos debe apoyar su aumento y reducción mientras se está en línea (ver: características de los sistemas de archivos);\n- se debe calcular el «stride» y «stripe-width» correctos para un rendimiento óptimo.\n\n"
+    },
+    {
+      "title": "Calcular el stride y stripe-width",
+      "level": 4,
+      "content": "Se requieren dos parámetros para optimizar la estructura del sistema de archivos para que se ajuste de manera óptima dentro de la estructura RAID subyacente: el «stride» y «stripe-width». Estos se derivan del tamaño del fragmento («chunk») de RAID , el tamaño del bloque del sistema de archivos, y el número de «discos de datos».\n\nEl tamaño del fragmento (chunk) es una propiedad de la matriz RAID, decidida en el momento de su creación. El valor predeterminado actual de mdadm es 512 KiB. Se puede encontrar con mdadm:\n\n```\n# mdadm --detail /dev/mdX | grep 'tamaño del fragmento (chunk)'\n```\n\nEl tamaño del bloque es una propiedad del sistema de archivos, decidido en su creación. El valor predeterminado para muchos sistemas de archivos, incluido ext4, es 4 KiB. Consulte /etc/mke2fs.conf para obtener detalles sobre ext4.\n\nEl número de «discos de datos» es el número mínimo de dispositivos necesarios en la matriz para reconstruirlo completamente sin pérdida de datos. Por ejemplo, este es N para una matriz raid0 de N dispositivos y N-1 para raid5.\n\nUna vez que tenga estas tres cantidades, el «stride» y el «stripe-width» se pueden calcular utilizando las siguientes fórmulas:\n\n```\nstride = tamaño del fragmento / tamaño del bloque\nstripe width = número de discos físicos de datos * stride\n```\n\nEjemplo formateando con sistema de archivos ext4 con «stride» y «stripe-width» correctas:\n\n- Hipotética matriz RAID0 que se compone de 2 discos físicos.\n- El tamaño del fragmento es 64 KiB.\n- El tamaño del bloque es 4 KiB.\n\nStride = (tamaño fragmento (chunk)/tamaño bloque). En este ejemplo, la matemática es (64/4) por lo que stride = 16.\n\nStripe-width = (número de discos físicos de datos * stride). En este ejemplo, la matemática es (2*16) por lo que stripe-width = 32.\n\n```\n# mkfs.ext4 -v -L myarray -m 0.5 -b 4096 -E stride=16,stripe-width=32 /dev/md0\n```\n\nEjemplo formateando con sistema de archivos ext4 con «stride» y «stripe-width» correctas:\n\n- Hipotética matriz RAID5 que se compone de 4 discos físicos; 3 discos de datos y 1 disco de paridad.\n- El tamaño fragmento (chunk) es 512 KiB.\n- El tamaño de bloque es 4 KiB.\n\nStride = (tamaño fragmento (chunk)/tamaño de bloque). En este ejemplo, la matemática es (256/4) por lo que stride = 64.\n\nStripe-width = (número de discos físicos de datos * stride). En este ejemplo, la matemática es (3*128) de modo que stripe-width = 384.\n\n```\n# mkfs.ext4 -v -L myarray -m 0.01 -b 4096 -E stride=128,stripe-width=384 /dev/md0\n```\n\nPara más información sobre «stride» y stripe-width, ver: Matemáticas RAID.\n\nNote: **[del traductor]** \n\n- Stride: es el número de posicionamiento en la memoria entre los comienzos de uno y otro de los sucesivos elementos de la matriz, se puede traducir por «banda», «tira» o «zancada».\n- Stride-width: es el tamaño o ancho de la zancada.\n- Chunk: es la masa «atómica» más pequeña de datos que puede ser escrita en los dispositivos, lo podríamos traducir por «porción», «trozo» o «fragmento».\n\nEjemplo de formato a ext4 con el «stripe-width» y «stride» correctos:\n\n- La matriz hipotética RAID10 se compone de 2 discos físicos. Debido a las propiedades de RAID10 con el diseño far2, ambos cuentan como discos de datos.\n- El tamaño del fragmento es de 512 KiB.\n\n```\n# mdadm --detail /dev/md0 | grep 'Chunk Size'\n```\n\n```\nChunk Size : 512K\n```\n\n- El tamaño del bloque es de 4 KiB.\n\nstride = tamaño de fragmento / tamaño de bloque. En este ejemplo, la matemática es 512/4, por lo que stride = 128.\n\nstripe width = número de discos físicos de datos * stride. En este ejemplo, la matemática es 2*128, por lo que el «stripe-width» = 256.\n\n```\n# mkfs.ext4 -v -L myarray -m 0.01 -b 4096 -E stride=128,stripe-width=256 /dev/md0\n```\n\n"
+    },
+    {
+      "title": "Montar desde un CD live",
+      "level": 2,
+      "content": "Los usuarios que quieran montar la partición RAID desde un CD live, escriban:\n\n```\n# mdadm --assemble /dev/md<number> /dev/<disk1> /dev/<disk2> /dev/<disk3> /dev/<disk4>\n```\n\nSi su RAID 1, al que le falta una matriz de discos, se autodetectó erróneamente como RAID 1 (según mdadm --detail /dev/md<number>) y se informó como inactivo (según cat /proc/mdstat), detenga primero la matriz:\n\n```\n# mdadm --stop /dev/md<number>\n```\n\n"
+    },
+    {
+      "title": "Instalar Arch Linux en RAID",
+      "level": 2,
+      "content": "Se debe crear la matriz RAID entre los pasos de particionar y formatear del proceso de instalación. En lugar de formatear directamente una partición para que sea su sistema de archivos raíz, ello se hará sobre la matriz RAID. Siga la sección #Instalación para crear la matriz RAID. Luego, continúe con el procedimiento de instalación hasta que se complete el paso pacstrap. Al usar arranque UEFI, consulte también EFI system partition (Español)#Partición ESP sobre RAID.\n\n"
+    },
+    {
+      "title": "Actualizar archivo de configuración",
+      "level": 3,
+      "content": "Después de que el sistema base se haya instalado, el archivo de configuración por defecto, mdadm.conf, debe ser actualizado, así:\n\n```\n# mdadm --detail --scan >> /mnt/etc/mdadm.conf\n```\n\nContinuar con el proceso de instalación hasta que llegue al paso crear un entorno inicial ramdisk y, a continuación, siga en sección siguiente.\n\n"
+    },
+    {
+      "title": "Configurar mkinitcpio",
+      "level": 3,
+      "content": "Añada mdadm_udev a la sección HOOKS de mkinitcpio.conf para añadir soporte para mdadm directamente en la imagen initramfs inicial:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\n HOOKS=(base udev autodetect keyboard modconf block mdadm_udev filesystems fsck)\n...\n```\n\nSi usa el hook mdadm_udev con una matriz FakeRAID, se recomienda incluir mdmon en la matriz BINARIES:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nBINARIES=(mdmon)\n...\n```\n\nDespués regenere la imagen initramfs.\n\n"
+    },
+    {
+      "title": "Configurar el gestor de arranque",
+      "level": 3,
+      "content": "Apunte el parámetro root al dispositivo asignado. Por ejemplo:\n\n```\nroot=/dev/md/MyRAIDArray\n```\n\nSi el arranque desde una partición RAID por software falla usando el método anterior de nodo de dispositivo del kernel, una forma alternativa es usar uno de los métodos de Persistent block device naming (Español), por ejemplo:\n\n```\nroot=LABEL=Root_Label\n```\n\nVéase también GRUB (Español)#RAID.\n\n"
+    },
+    {
+      "title": "Depuración",
+      "level": 3,
+      "content": "Es una buena práctica para que los datos funcionen con normalidad hacer una depuración para comprobar y corregir los errores. Dependiendo del tamaño/configuración de la matriz, una depuración puede durar varias horas en completarse.\n\nPara iniciar una depuración de datos:\n\n```\n# echo check > /sys/block/md0/md/sync_action\n```\n\nLa operación de verificación escanea las unidades para los sectores defectuosos y los repara automáticamente. Si encuentra sectores no defectuosos que contienen datos erróneos (los datos de un sector no concuerdan con los datos que otro disco nos indica que debería tener, por ejemplo, el bloque de paridad + los demás bloques de datos, nos haría pensar que este bloque de datos es incorrecto), entonces no se toma ninguna acción, pero el evento se registra (ver más abajo). Este «no hacer nada», permite a los administradores inspeccionar los datos en el sector y los datos que se producirían mediante la reconstrucción de los sectores con la información redundante, y escoger los datos correctos a mantener.\n\nComo con muchas tareas/artículos relativos a mdadm, el estado de la limpieza se puede consultar mediante la lectura de/proc/mdstat.\n\nEjemplo:\n\n```\n$ cat /proc/mdstat\n```\n\n```\nPersonalities : [raid6] [raid5] [raid4] [raid1] \nmd0 : active raid1 sdb1[0] sdc1[1]\n      3906778112 blocks super 1.2 [2/2] [UU]\n      [>....................]  check =  4.0% (158288320/3906778112) finish=386.5min speed=161604K/sec\n      bitmap: 0/30 pages [0KB], 65536KB chunk\n```\n\nPara detener con seguridad una depuración de datos cuya ejecución está en curso:\n\n```\n# echo idle > /sys/block/md0/md/sync_action\n```\n\nCuando la depuración se ha completado, los administradores pueden comprobar cuántos bloques (si los hay) se han marcado como erróneos:\n\n```\n# cat /sys/block/md0/md/mismatch_cnt\n```\n\n"
+    },
+    {
+      "title": "Notas generales sobre la depuración",
+      "level": 4,
+      "content": "Note: **repair** \n\nEs una buena idea configurar un trabajo cron como root para programar una limpieza periódica. Vea raid-checkAUR que puede ayudar con esto. Para realizar una limpieza periódica utilizando temporizadores systemd en lugar de cron. Consulte raid-check-systemdAUR que contiene el mismo script junto con los archivos de unidad de temporizador systemd asociados.\n\nNote: **seis segundos por gigabyte** \n\n"
+    },
+    {
+      "title": "Notas sobre la depuración de RAID1 y RAID10",
+      "level": 4,
+      "content": "Debido al hecho de que RAID1 y RAID10 escriben en el kernel sin búfer, una matriz puede tener cuentas desajustadas sin 0 incluso cuando la matriz es saludable. Estos recuentos sin 0 solo existirán en áreas de datos transitorios en los que no suponen un problema. Sin embargo, no podemos discernir la diferencia entre una cuenta sin 0 respecto de datos transitorios, con un recuento sin 0 que signifique un verdadero problema. Este hecho es una fuente de falsos positivos en matrices RAID1 y RAID10. Sin embargo, a pesar de ello se recomienda realizar depuraciones regularmente con el fin de detectar y corregir los sectores erróneos que pueden estar presentes en los dispositivos.\n\n"
+    },
+    {
+      "title": "Extracción de dispositivos de una matriz",
+      "level": 3,
+      "content": "Se puede eliminar un dispositivo de la matriz después de marcarlo como defectuoso:\n\n```\n# mdadm --fail /dev/md0 /dev/sdxx\n```\n\nAhora quítelo de la matriz:\n\n```\n# mdadm -r /dev/md0 /dev/sdxx\n```\n\nRetire el dispositivo de forma permanente (por ejemplo, para utilizarlo de forma individual a partir de ahora). Emita las dos órdenes descritas anteriormente, y luego:\n\n```\n# mdadm --zero-superblock /dev/sdxx\n```\n\n- ¡No emita esta orden en matrices lineales o RAID0 o se producirán pérdidas de datos!\n- La reutilización del disco eliminado sin poner a cero el superbloque provocará la pérdida de todos los datos en el próximo arranque. (Después de que mdadm intentará usarlo como parte de la matriz de raid).\n\nPara dejar de usar una matriz:\n\n1. desmontar la matriz de destino;\n1. detener la matriz con: mdadm --stop /dev/md0;\n1. repetir las tres órdenes descritas al principio de esta sección en cada dispositivo;\n1. quitar la línea correspondiente de /etc/mdadm.conf.\n\n"
+    },
+    {
+      "title": "Adición de un nuevo dispositivo a una matriz",
+      "level": 3,
+      "content": "La adición de nuevos dispositivos con mdadm se puede hacer en un sistema en funcionamiento con los dispositivos montados. Particione el nuevo dispositivo usando el mismo diseño de uno de los que ya están en la matriz, como se mencionó anteriormente.\n\nEnsamble la matriz RAID si no está ya ensamblada:\n\n```\n# mdadm --assemble /dev/md0 /dev/sda1 /dev/sdb1\n```\n\nAñada el nuevo dispositivo de la matriz:\n\n```\n# mdadm --add /dev/md0 /dev/sdc1\n```\n\nEsto no debería tomar mucho tiempo para que mdadm lo haga.\n\nDependiendo del tipo de RAID (por ejemplo, con RAID1), mdadm puede agregar el dispositivo como repuesto sin sincronizar los datos. Puede aumentar la cantidad de discos que utiliza RAID utilizando --grow con la opción --raid-devices. Por ejemplo, para aumentar una matriz a cuatro discos:\n\n```\n# mdadm --grow /dev/md0 --raid-devices=4\n```\n\nEsto no debe llevarle mucho tiempo a mdadm. Una vez más, compruebe el progreso con:\n\n```\n# cat /proc/mdstat\n```\n\nCompruebe que el dispositivo se ha añadido, con la orden:\n\n```\n# mdadm --misc --detail /dev/md0\n```\n\nNote: Esto se debe a que los comandos anteriores agregarán el nuevo disco como «repuesto» pero RAID0 no tiene repuestos. Si desea agregar un dispositivo a una matriz RAID0, debe «agrandar» y «añadirß en la misma orden, como se muestra a continuación:\n\n```\nmdadm: add new device failed for /dev/sdc1 as 2: Invalid argument\n```\n\nEsto se debe a que los comandos anteriores agregarán el nuevo disco como «repuesto» pero RAID0 no tiene repuestos. Si desea agregar un dispositivo a una matriz RAID0, debe «agrandar» y «añadirß en la misma orden, como se muestra a continuación:\n\n```\n# mdadm --grow /dev/md0 --raid-devices=3 --add /dev/sdc1\n```\n\n"
+    },
+    {
+      "title": "Incrementar tamaño de un volumen RAID",
+      "level": 3,
+      "content": "Si se instalan discos más grandes en una matriz RAID o se ha aumentado el tamaño de la partición, puede ser conveniente aumentar el tamaño del volumen RAID para llenar el espacio más grande disponible. Este proceso puede comenzar siguiendo primero las secciones anteriores relacionadas con el reemplazo de discos. Una vez que el volumen RAID se ha reconstruido en los discos más grandes, debe «agrandar» para llenar el espacio.\n\n```\n# mdadm --grow /dev/md0 --size=max\n```\n\nA continuación, las particiones presentes en el volumen RAID /dev/md0 puede que necesiten ser redimensionadas. Consulte Partitioning (Español) para más detalles. Finalmente, será necesario cambiar el tamaño del sistema de archivos en la partición mencionada anteriormente. Si la partición se realizó con gparted, esto se hará automáticamente. Si se utilizaron otras herramientas, desmonte y cambie el tamaño del sistema de archivos manualmente.\n\n```\n# umount /storage\n# fsck.ext4 -f /dev/md0p1\n# resize2fs /dev/md0p1\n```\n\n"
+    },
+    {
+      "title": "Cambiar los límites de velocidad de sincronización",
+      "level": 3,
+      "content": "La sincronización puede llevar un tiempo. Si la máquina no es necesaria para otras tareas, se puede aumentar el límite de velocidad.\n\n```\n# cat /proc/mdstat\n```\n\n```\nPersonalities : [raid1]\n md0 : active raid1 sda3[2] sdb3[1]\n       155042219 blocks super 1.2 [2/1] [_U]\n       [>....................]  recovery =  0.0% (77696/155042219) finish=265.8min speed=9712K/sec\n\n unused devices: <none>\n```\n\nVerifique el límite de velocidad actual.\n\n```\n# cat /proc/sys/dev/raid/speed_limit_min\n```\n\n```\n1000\n```\n\n```\n# cat /proc/sys/dev/raid/speed_limit_max\n```\n\n```\n200000\n```\n\nAumente los límites.\n\n```\n# echo 400000 >/proc/sys/dev/raid/speed_limit_min\n# echo 400000 >/proc/sys/dev/raid/speed_limit_max\n```\n\nLuego revise la velocidad de sincronización y el tiempo estimado de finalización.\n\n```\n# cat /proc/mdstat\n```\n\n```\nPersonalities : [raid1]\n md0 : active raid1 sda3[2] sdb3[1]\n       155042219 blocks super 1.2 [2/1] [_U]\n       [>....................]  recovery =  1.3% (2136640/155042219) finish=158.2min speed=16102K/sec\n\n unused devices: <none>\n```\n\nVéase también sysctl#MDADM.\n\n"
+    },
+    {
+      "title": "Monitorización",
+      "level": 2,
+      "content": "Una simple orden de una sola línea imprime el estado de los dispositivos RAID:\n\n```\nawk '/^md/ {printf \"%s: \", $1}; /blocks/ {print $NF}' </proc/mdstat\n```\n\n```\nmd1: [UU]\nmd0: [UU]\n```\n\n"
+    },
+    {
+      "title": "Observar estado con mdstat",
+      "level": 3,
+      "content": "```\n# watch -t 'cat /proc/mdstat'\n```\n\nO preferiblemente usando tmux\n\n```\n# tmux split-window -l 12 \"watch -t 'cat /proc/mdstat'\"\n```\n\n"
+    },
+    {
+      "title": "Seguimiento Entrada/Salida con iotop",
+      "level": 3,
+      "content": "El paquete iotop muestra las estadísticas de entrada/salida para los procesos. Utilice esta orden para ver la Entrada/Salida para los hilos de raid.\n\n```\n# iotop -a -p $(sed 's, , -p ,g' <<<`pgrep \"_raid|_resync|jbd2\"`)\n```\n\n"
+    },
+    {
+      "title": "Seguimiento Entrada/Salida con iostat",
+      "level": 3,
+      "content": "La utilidad iostat del paquete sysstat muestra las estadísticas de entrada/salida para los dispositivos y las particiones.\n\n```\niostat -dmy 1 /dev/md0\n iostat -dmy 1 # todo\n```\n\n"
+    },
+    {
+      "title": "Correos sobre eventos",
+      "level": 3,
+      "content": "Un servidor de correo SMTP (sendmail) o al menos un agente de correo electrónico (sSMTP/msmtp) es necesario para lograr esto. Tal vez la solución más simple es utilizar dma que es muy pequeño (instala 0,08 MiB) y no requiere instalación.\n\nEditar /etc/mdadm.conf para definir la dirección de correo electrónico en la que se recibirán notificaciones.\n\nPara probar la configuración:\n\n```\n# mdadm --monitor --scan --oneshot --test\n```\n\nmdadm incluye un servicio de systemd mdmonitor.service para llevar a cabo la tarea de control, por lo que en este punto, no tiene nada más que hacer. Si no configura un correo electrónico en /etc/mdadm.conf, dicho servicio fallará. Si no desea recibir correos sobre eventos mdadm, el fallo puede ser ignorado; si no desea recibir las notificaciones ni los mensajes acerca del error, puede enmascarar la unidad.\n\n"
+    },
+    {
+      "title": "Método alternativo",
+      "level": 4,
+      "content": "Para evitar la instalación de un servidor de correo SMTP o un expedidor de correo electrónico, puede utilizar la herramienta S-nail (no se olvide de configurarla) ya presente en el sistema.\n\nCree un archivo llamado /etc/mdadm_warning.sh con:\n\n```\n/etc/mdadm_warning.sh\n```\n\n```\n#!/bin/bash\nevent=$1\ndevice=$2\n\necho \" \" | /usr/bin/mailx -s \"$event on $device\" '''destination@email.com'''\n```\n\nY dele permisos de ejecución: chmod +x /etc/mdadm_warning.sh\n\nA continuación, agregue esto a mdadm.conf\n\n```\nPROGRAM /etc/mdadm_warning.sh\n```\n\nPuede probar y activar el uso de la misma como en el método anterior.\n\n"
+    },
+    {
+      "title": "Error: «invalid raid superblock magic»",
+      "level": 3,
+      "content": "Si está obteniendo el error «invalid raid superblock magic» al reiniciar y tiene otros discos duros adicionales que sean los componentes de la matriz, verifique que el orden de los discos duros es el correcto. Durante la instalación, los dispositivos RAID pueden ser HDD, HDE y HDF, pero durante el arranque pueden ser hda, hdb y hdc. Ajuste su línea del kernel en consecuencia.\n\n"
+    },
+    {
+      "title": "Error: «kernel: ataX.00: revalidation failed»",
+      "level": 3,
+      "content": "Si de repente (después del reinicio, al cambiar la configuración del BIOS) experimenta mensajes de error como:\n\n```\nFeb  9 08:15:46 hostserver kernel: ata8.00: revalidation failed (errno=-5)\n```\n\nno significa necesariamente que una unidad esté rota. A menudo se encuentran enlaces de pánico en la web que indican lo peor. En una palabra, No Panic (que no cunda el pánico). Tal vez acaba de cambiar la configuración de APIC o ACPI en la BIOS o los parámetros del kernel de algún modo. Cámbielos de nuevo y debería funcionar bien. Generalmente, cambiar ACPI y/o apagar ACPI debe ayudar.\n\n"
+    },
+    {
+      "title": "Iniciar matrices en solo lectura",
+      "level": 3,
+      "content": "Cuando se inicia una matriz md, el superbloque será escrito, y puede iniciarse la resincronización. Para comenzar en solo lectura, establecer el módulo del kernel md_mod con el parámetro start_ro. Cuando se establece, las nuevas matrices vendrán activadas un modo «auto-ro», que desactiva todas las entradas/salidas internas (actualizaciones de superbloque, resincronización, recuperación) y se pone automáticamente en «rw» cuando llega la primera solicitud de escritura.\n\nPara establecer el parámetro en el arranque, añadir md_mod.start_ro=1 a la línea del kernel.\n\nO establezca el parámetro al tiempo de cargar el módulo desde el archivo /etc/modprobe.d/ o directamente desde /sys/:\n\n```\n# echo 1 > /sys/module/md_mod/parameters/start_ro\n```\n\n"
+    },
+    {
+      "title": "Recuperación de una unidad rota o ausente en el raid",
+      "level": 3,
+      "content": "Se puede obtener el error mencionado anteriormente también cuando una de las unidades se rompe por cualquier razón. En ese caso, tendrá que forzar a raid a encender con un disco más corto. Escriba esta orden (modificar cuando sea necesario):\n\n```\n# mdadm --manage /dev/md0 --run\n```\n\nAhora debería ser capaz de montarla de nuevo con algo como esto (si es que lo tenía en fstab):\n\n```\n# mount /dev/md0\n```\n\nAhora el raid debería estar funcionando de nuevo y disponible para su uso, sin embargo, con un disco corto. Después, debe particionar el disco de la manera como se ha descrito anteriormente en la sección para preparar los dispositivos. Una vez hecho esto puede agregar el nuevo disco a la matriz escribiendo:\n\n```\n# mdadm --manage --add /dev/md0 /dev/sdd1\n```\n\nSi escribe:\n\n```\n# cat /proc/mdstat\n```\n\nes probable que vea que el raid ya está activo y en reconstrucción.\n\nTambién puede actualizar su configuración (ver: #Actualizar archivo de configuración).\n\n"
+    },
+    {
+      "title": "Benchmarking",
+      "level": 2,
+      "content": "Vea Wikipedia:es:Benchmark (informática).\n\nHay varias herramientas para la evaluación comparativa de un RAID. La mejora más notable es el aumento de la velocidad cuando varios subprocesos están leyendo desde el mismo volumen RAID.\n\nTiobench es un programa que mide las mejoras de rendimiento mediante la medición completa de Entrada/Salida de los hilos del disco.\n\nbonnie++ analiza el tipo de acceso a la base de datos para uno o más archivos, y la creación, lectura y borrado de archivos pequeños que puede simular el uso de programas como Squid, INN, o el formato de e-mail Maildir. El programa ZCAV pone a prueba el rendimiento de diferentes zonas de un disco duro sin necesidad de escribir ningún dato en el disco.\n\nhdparm NO debería ser utilizado para comparar un RAID, ya que proporciona resultados muy inconsistentes.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Linux Software RAID (thomas-krenn.com)\n- Linux RAID wiki entry[enlace roto 2024-10-12] on The Linux Kernel Archives\n- How Bitmaps Work\n- Chapter 15: Redundant Array of Independent Disks (RAID)[enlace roto 2024-07-30] of Red Hat Enterprise Linux 6 Documentation\n- Linux-RAID FAQ on the Linux Documentation Project\n- BAARF(Archive.org) including Why should I not use RAID 5?(Archive.org) by Art S. Kagel\n- Introduction to RAID, Nested-RAID: RAID-5 and RAID-6 Based Configurations, Intro to Nested-RAID: RAID-01 and RAID-10, and Nested-RAID: The Triple Lindy in Linux Magazine\n- HowTo: Speed Up Linux Software Raid Building And Re-syncing\n- Wikipedia:Non-RAID drive architectures\n\nmdadm\n\n- mdadm source code\n- Software RAID on Linux with mdadm in Linux Magazine\n- Wikipedia - mdadm\n\nHilos del foro\n\n- Raid Performance Improvements with bitmaps\n- GRUB and GRUB2\n- Can't install grub2 on software RAID\n- Use RAID metadata 1.2 in boot and root partition\n\nRAID con encriptación\n\n- Linux/Fedora: Encrypt /home and swap over RAID with dm-crypt by Justin Wells\n\n"
+    }
+  ]
+}

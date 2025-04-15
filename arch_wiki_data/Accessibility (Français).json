@@ -1,0 +1,66 @@
+{
+  "title": "Accessibility (Français)",
+  "url": "https://wiki.archlinux.org/title/Accessibility_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Il existe plusieurs méthodes pour permettre l'accessibilité aux utilisateurs présentant un handicap physique ou visuel. Cependant, à moins d'utiliser un environnement de bureau, la configuration peut nécessiter quelques retouches jusqu'à ce que l'on en soit satisfait.\n\n"
+    },
+    {
+      "title": "Environnements de bureau",
+      "level": 2,
+      "content": "La plupart des environnements de bureaux récents sont livrés avec un ensemble complet de fonctionnalités, parmi lesquelles on trouve un outil pour configurer les options d'accessibilité. Généralement, ces options peuvent être regroupées sous « accessibilité » ou la rubrique du périphérique d'entrée correspondant (comme « clavier » et « souris »). Par exemple, avec GNOME et KDE.\n\n"
+    },
+    {
+      "title": "Indépendant des environnements de bureau spécifiques",
+      "level": 2,
+      "content": "Le serveur graphique Xorg dispose de fonctionnalités (accessx) d'assistance physique par paramétrage via l' extension de clavier X. Cette section fournit des exemples.\n\nPour le narrateur, voir aussi Text to speech.\n\n"
+    },
+    {
+      "title": "Touches rémanentes avec systemd",
+      "level": 4,
+      "content": "Pour activer les touches rémanentes dans une session TTY, vous devez connaître les codes exacts des touches à utiliser. Ceux-ci peuvent être trouvés par un outil comme xorg-xev ou xkeycaps. Alternativement, vous pouvez inspecter la sortie de dumpkeys, à condition que le keymap actuel soit correct.\n\nPar exemple, un clavier Logitech Ultra-X fournira les codes suivants pour les touches de modification :\n\n```\nLCtrl = 29\nLShift = 42\nLAlt = 56\nRShift = 54\nRCtrl = 97\n```\n\nEnsuite, utilisez dumpkeys pour déterminer la plage des codes des touches :\n\n```\n# dumpkeys {{|}} head -1\n```\n\n```\nkeymaps 0-63\n```\n\nContinuez en créant un nouveau fichier avec un nom approprié, par exemple \"stickyKeys\", et utilisez votre éditeur préféré pour combiner les informations précédemment trouvées avec la fonction de touche désirée.\n\nDans le cas des codes des touches trouvés précédemment, vous obtiendrez :\n\n```\nkeymaps 0-63\nkeycode 29 = SCtrl\nkeycode 42 = SShift\nkeycode 56 = SAlt\nkeycode 54 = SShift\nkeycode 97 = SCtrl\n```\n\nIci, la lettre \"S\" devant une touche de modification indique que nous voulons la version persistante de cette touche.\n\nChargez votre nouveau mappage en exécutant la commande suivante :\n\n```\n# loadkeys ./stickyKeys\n```\n\nSi vous êtes satisfait du résultat, déplacez le fichier dans un répertoire approprié. Pour l'activer au démarrage, l'unité systemd suivante peut vous servir d'exemple :\n\n```\n/etc/systemd/system/loadkeys.service\n```\n\n```\n[Unit]\nDescription=\"load custom keymap (sticky keys)\"\n  \n[Service]\nType=oneshot\nExecStart=/usr/bin/loadkeys /path/to/stickyKeys\nStandardInput=tty\nRemainAfterExit=yes\n \n[Install]\nWantedBy=multi-user.target emergency.target rescue.target\n```\n\n"
+    },
+    {
+      "title": "Touches rémanentes avec xserverrc",
+      "level": 4,
+      "content": "Une méthode d'activation de la fonction d'accessibilité indépendante de l'environnement de bureau consiste à passer par X, étant donné qu'il est compilé avec la prise en charge de XKB. Cela peut être fait en définissant des paramètres pour le serveur X, comme spécifié dans sa page de manuel :\n\n```\n[+-]accessx [ timeout [ timeout_mask [ feedback [ options_mask ] ] ] ]\n              active(+) ou désactive(-) les séquences de touches AccessX (touches rémanentes).\n\n-ardelay milliseconds\n              définit le délai de répétition automatique (durée, en millisecondes, pendant laquelle \n              une touche doit être enfoncée avant que la répétition automatique ne commence).\n\n-arinterval milliseconds\n              définit l'intervalle de répétition automatique (durée en millisecondes qui doit\n              qui doit s'écouler entre les frappes générées par la répétition automatique).\n```\n\nCes paramètres doivent être placés dans le fichier ~/.xserverrc, que vous devrez peut-être créer.\n\nPar exemple, pour activer les touches rémanentes sans délai d'attente et sans retour audible ou visible, on peut utiliser ce qui suit :\n\n```\nif [ -z \"$XDG_VTNR\" ]; then\n  exec /usr/bin/X -nolisten tcp \"$@\" +accessx 0 0x1e 0 0xcef\nelse\n  exec /usr/bin/X -nolisten tcp \"$@\" vt$XDG_VTNR +accessx 0 0x1e 0 0xcef\nfi\n```\n\nNotez qu'une fois que X a démarré, par exemple, en exécutant startx, vous devez toujours appuyer 5 fois sur la touche Maj pour activer les touches rémanentes. Malheureusement, cette manipulation est nécessaire à chaque démarrage de X. Alternativement, un script peut être utilisé pour automatiser ce processus.\n\nComme pour la plupart des implémentations, les touches rémanentes peuvent être désactivées en appuyant sur une touche de modification et sur n'importe quelle autre touche en même temps.\n\n"
+    },
+    {
+      "title": "Mappage des boutons",
+      "level": 4,
+      "content": "En utilisant xmodmap, vous pouvez associer des fonctions aux boutons de la souris indépendamment de votre environnement graphique. Pour cela, vous devez savoir quel bouton physique de votre souris est lu comme quel numéro, ce qui peut être trouvé par un outil tel que xorg-xev. Généralement, les boutons physiques de gauche, du milieu et de droite sont lus comme le premier, le deuxième et le troisième bouton, respectivement.\n\nUne fois que vous les avez, continuez en créant un fichier de configuration à un emplacement approprié, par exemple : ~/.mouseconfig. Ensuite, ouvrez le fichier avec votre éditeur préféré et écrivez le mot-clé pointer = suivi d'une énumération du nombre de boutons de souris trouvés précédemment.\n\nPar exemple, une souris à trois boutons avec une molette de défilement est capable de fournir cinq actions physiques : clic gauche, milieu et droit, ainsi que le défilement vers le haut et vers le bas. Ces actions peuvent être affectées aux mêmes fonctions en utilisant la ligne suivante dans le fichier de configuration :\n\n```\npointer = 1 2 3 4 5\n```\n\nIci, l'emplacement indiquera l'action requise pour exécuter une fonction interne du bouton de la souris. Par exemple, un mappage pour les gauchers (boutons gauche et droit inversés) pourrait ressembler à :\n\n```\npointer = 3 2 1 4 5\n```\n\nLorsque vous avez terminé, vous pouvez tester et inspecter votre mappage en exécutant xmodmap :\n\n```\n$ xmodmap ~/.mouseconfig\n$ xmodmap -pp\n```\n\nUne fois satisfait, vous pouvez l'activer au démarrage en plaçant la première ligne dans ~/.xinitrc.\n\n"
+    },
+    {
+      "title": "Touches souris",
+      "level": 4,
+      "content": "Les «touches souris» (en) sont une fonctionnalité de Xorg (comme les touches rémanentes) permettant d'utiliser le clavier (en particulier un pavé numérique) comme périphérique de pointage. Elle peut remplacer une souris, ou fonctionner en parallèle. Elle est désactivée par défaut. Vous pouvez utiliser\n\n```\n$ xset q | grep \"Mouse Keys\"\n```\n\npour voir le statut. Pour l'activer pour une session :\n\n```\n$ setxkbmap -option keypad:pointerkeys\n```\n\nSi vous utilisez une configuration xmodmap, sachez que setxkbmap la réinitialise.\n\nPour activer les «touches souris» en permanence, ajoutez\n\n```\nOption \"XkbOptions\" \"keypad:pointerkeys\"\n```\n\nau fichier de configuration du clavier. Cela fera basculer les «touches souris» avec Shift+NumLock.\n\nPour plus d'informations, voir Keyboard configuration in Xorg#Using X configuration files et X keyboard extension#Mouse control pour des configurations avancés.\n\n"
+    },
+    {
+      "title": "Assistance visuel",
+      "level": 3,
+      "content": "Comme pour l'assistance physique, la plupart des environnements de bureau modernes sont livrés avec un ensemble complet de fonctionnalités pour peaufiner les aspects visuels de votre système. Généralement, ces options peuvent être trouvées dans les rubriques d'« accessibilité » ou d'« assistance visuelle ». Alternativement, des options utiles peuvent être trouvées dans les paramètres des applications individuelles.\n\n"
+    },
+    {
+      "title": "Reconnaissance vocale",
+      "level": 4,
+      "content": "Consultez Reconnaissance vocal.\n\n"
+    },
+    {
+      "title": "Console et émulateurs de terminal virtuel",
+      "level": 4,
+      "content": "- Modifiez le fichier /etc/vconsole.conf.\n- Modifiez le ficher ~/.Xresources.\n\n"
+    },
+    {
+      "title": "Bugs connus",
+      "level": 2,
+      "content": "- La configuration des périphériques d'entrée n'est pas reconnue par le logiciel qui contourne la couche logicielle, par exemple avec Wine, VirtualBox, et QEMU.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Applications d'accessibilité avancées de KDE.\n\n- Technologies d'assistance pour le bureau Gnome.\n\n"
+    }
+  ]
+}

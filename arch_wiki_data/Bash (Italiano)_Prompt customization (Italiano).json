@@ -1,0 +1,96 @@
+{
+  "title": "Bash (Italiano)/Prompt customization (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Bash_(Italiano)/Prompt_customization_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Environment variables\n- Git#Git prompt\n\nBash has several prompts which can be customized to increase productivity, aesthetic appeal, and nerd cred.\n\n"
+    },
+    {
+      "title": "Prompts",
+      "level": 2,
+      "content": "Bash has five prompt strings that can be customized:\n\n- PS0 is displayed after each command, before any output.\n- PS1 is the primary prompt which is displayed before each command, thus it is the one most people customize.\n- PS2 is the secondary prompt displayed when a command needs more input (e.g. a multi-line command).\n- PS3 is not very commonly used. It is the prompt displayed for Bash's select built-in which displays interactive menus. Unlike the other prompts, it does not expand Bash escape sequences. Usually you would customize it in the script where the select is used rather than in your .bashrc.\n- PS4 is also not commonly used. It is displayed when debugging bash scripts to indicate levels of indirection. The first character is repeated to indicate deeper levels.\n\nAll of the prompts are customized by setting the corresponding variable to the desired string (usually in ~/.bashrc), for example\n\n```\nPS2='> '\n```\n\n"
+    },
+    {
+      "title": "Techniques",
+      "level": 2,
+      "content": "While one can simply set their prompt to a plain string, there are a variety of techniques for making the prompt more dynamic and useful.\n\n"
+    },
+    {
+      "title": "Bash escape sequences",
+      "level": 3,
+      "content": "When printing the prompt string, Bash looks for certain backslash-escaped characters and will expand them into special strings. For example, \\u is expanded into the current username and \\A is expanded to the current time. So a PS1 of '\\A \\u $ ' would be printed like 17:35 username $ .\n\nSee the man page bash(1) § PROMPTING or the Bash reference manual for a complete list of escape sequences.\n\n"
+    },
+    {
+      "title": "Terminfo escape sequences",
+      "level": 3,
+      "content": "Aside from the escape characters recognized by Bash, most terminals recognize special escape sequences that affect the terminal itself rather than printing characters. For example they might change the color of subsequent printed characters, move the cursor to an arbitrary location, or clear the screen. These escape sequences can be somewhat illegible and can vary from terminal to terminal, so they are documented in the terminfo database. To see what capabilities your terminal supports, run\n\n```\n$ infocmp\n```\n\nThe capability names (the part before the =) can be looked up in terminfo(5) for a description of what they do. For example, setaf sets the foreground color of whatever text is printed after it. To get the escape code for a capability, you can use the tput command. For example\n\n```\n$ tput setaf 2\n```\n\nPrints the escape sequence to set the foreground color to green.\n\nTo practically incorporate these capabilities into your prompt, you can use Bash's command substitution and string interpolation. For example\n\n```\nGREEN=\"\\[$(tput setaf 2)\\]\"\nRESET=\"\\[$(tput sgr0)\\]\"\n\nPS1=\"${GREEN}my prompt${RESET}> \"\n```\n\n"
+    },
+    {
+      "title": "ANSI escape sequences",
+      "level": 3,
+      "content": "Unfortunately, valid ANSI escape sequences may be missing from your terminal's terminfo database. This is especially common with escape sequences for newer features such as 256 color support. In that case you cannot use tput, you must input the escape sequence manually.\n\nSee Wikipedia:ANSI escape code for examples of escape sequences. Every escape sequence starts with a literal escape character, which you can input using the Bash escape sequence \\e. So for example,\\e[48;5;209m sets the background to a peachy color (if you have 256 color support) and \\e[2;2H moves the cursor near the top-left corner of the screen.\n\nIn cases where Bash escape sequences are not supported (such as PS3) you can get a literal escape character using Bash's printf builtin:\n\n```\nESC=$(printf \"\\e\")\nPEACH=\"$ESC[48;5;209m\"\n```\n\n"
+    },
+    {
+      "title": "Embedding commands",
+      "level": 3,
+      "content": "If you want to add the output of some command to your prompt, you might be tempted to use command substitution. For example, to add the amount of free memory to your prompt you might try:\n\n```\nPS1=\"$(awk '/MemFree/{print $2}' /proc/meminfo) prompt > \"\n```\n\n```\n53718 prompt >\n53718 prompt >\n53718 prompt >\n```\n\nBut this does not work; the amount of memory shown is the same every time! This is because the command is run once, when PS1 is first set, and never again. The trick is to simply prevent the substitution either by escaping the $ or by defining it in single quotes — either way it will be substituted when the prompt is actually displayed:\n\n```\nPS1=\"\\$(awk '/MemFree/{print \\$2}' /proc/meminfo) prompt > \"\n# or\nPS1='$(awk \"/MemFree/{print \\$2}\" /proc/meminfo) prompt > '\n```\n\nTo prevent long commands from making your PS1 huge, you can define functions:\n\n```\nfree_mem()\n{\n    awk '/MemFree/{print $2}' /proc/meminfo\n}\n\nPS1='$(free_mem) prompt > '\n```\n\nNote: **not** \n\n"
+    },
+    {
+      "title": "PROMPT_COMMAND",
+      "level": 3,
+      "content": "If the PROMPT_COMMAND variable or array is set, it will be evaluated right before PS1 is displayed. This can be used to achieve quite powerful effects. For example it can reassign PS1 based on some condition, or perform some operation on your Bash history every time you run a command.\n\n"
+    },
+    {
+      "title": "Escapes between command input and output",
+      "level": 3,
+      "content": "You can affect your input text in Bash by not resetting the text properties at the end of your PS1. For example, inserting tput blink at the end of your PS1 will make your typed commands blink. However this effect will also continue through the command's output since the text properties are not reset when you hit Enter.\n\nIn order to insert escape sequences after you type a command but before the output is displayed, you can set PS0. Alternatively, you can trap Bash's DEBUG signal, which is sent right before each command is executed:\n\n```\n$ trap 'tput sgr0' DEBUG\n```\n\n"
+    },
+    {
+      "title": "Customizing root prompts",
+      "level": 3,
+      "content": "To ensure that you know when you are running as root, you can customize your root prompt to make it clearly stand out (perhaps blinking red?). This is done by customizing the Bash prompt as usual but in root's home directory, /root. Start off by copying the skeleton files /etc/skel/.bash_profile and /etc/skel/.bashrc to /root, then edit /root/.bashrc as desired.\n\n"
+    },
+    {
+      "title": "Colors",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nTo see the full range of colors your terminal supports, you can use a simple loop with tput (change setab to setaf for text foregrounds):\n\n```\nfor C in {0..255}; do\n    tput setab $C\n    echo -n \"$C \"\ndone\ntput sgr0\necho\n```\n\nIf that does not work (and you cannot fix it by setting the correct TERM value), you can test the different manual escape sequences:\n\n```\n# standard colors\nfor C in {40..47}; do\n    echo -en \"\\e[${C}m$C \"\ndone\n# high intensity colors\nfor C in {100..107}; do\n    echo -en \"\\e[${C}m$C \"\ndone\n# 256 colors\nfor C in {16..255}; do\n    echo -en \"\\e[48;5;${C}m$C \"\ndone\necho -e \"\\e(B\\e[m\"\n```\n\nTo change the manual escapes from background to foreground, the standard color range is 30..37, the high intensity range is 90..97, and the 48 should be changed to 38 for 256 colors.\n\n"
+    },
+    {
+      "title": "Common capabilities",
+      "level": 3,
+      "content": "The following terminfo capabilities are useful for prompt customization and are supported by many terminals. #1 and #2 are placeholders for numeric arguments.\n\nTable content:\nCapability | Escape sequence | Description\nText attributes\nblink | \\e[5m | blinking text on\nbold | \\e[1m | bold text on\ndim | \\e[2m | dim text on\nrev | \\e[7m | reverse video on (switch text/background colors)\nsitm | \\e[3m | italic text on\nritm | \\e[23m | italic text off\nsmso | \\e[7m | highlighted text on\nrmso | \\e[27m | highlighted text off\nsmul | \\e[4m | underlined text on\nrmul | \\e[24m | underlined text off\nsetab #1 | \\e[4#1m | set background color #1 (0-7)\nsetaf #1 | \\e[3#1m | set text color #1 (0-7)\nsgr0 | \\e(B\\e[m | reset text attributes\nCursor movement\nsc | \\e7 | save cursor position\nrc | \\e8 | restore saved cursor position\nclear | \\e[H\\e[2J | clear screen and move cursor to top left\ncuu #1 | \\e[#1A | move cursor up #1 rows\ncud #1 | \\e[#1B | move cursor down #1 rows\ncuf #1 | \\e[#1C | move cursor right #1 columns\ncub #1 | \\e[#1D | move cursor left #1 columns\nhome | \\e[H | move cursor to top left\nhpa #1 | \\e[#1G | move cursor to column #1\nvpa #1 | \\e[#1d | move cursor to row #1, first column\ncup #1 #2 | \\e[#1;#2H | move cursor to row #1, column #2\nRemoving characters\ndch #1 | \\e#1P | remove #1 characters (like backspacing)\ndl #1 | \\e#1M | remove #1 lines\nech #1 | \\e#1X | clear #1 characters (without moving cursor)\ned | \\eE[J | clear to bottom of screen\nel | \\e[K | clear to end of line\nel1 | \\e[1K | clear to beginning of line\n\n"
+    },
+    {
+      "title": "Visualizing exit codes",
+      "level": 3,
+      "content": "Using the same trick from embedding commands you can delay the interpolation of special Bash variables like $?. So the following prompt shows the exit code of the previous command:\n\n```\nPS1=\"\\$? > \"\n# or\nPS1='$? > '\n```\n\nThis can be made more interesting using conditionals and functions:\n\n```\nexitstatus()\n{\n    if [[ $? == 0 ]]; then\n        echo ':)'\n    else\n        echo 'D:'\n    fi\n}\nPS1='$(exitstatus) > '\n```\n\n"
+    },
+    {
+      "title": "Positioning the cursor",
+      "level": 3,
+      "content": "It is possible to move the cursor around the screen inside of PS1 to make different parts of the prompt appear in different locations. However, to ensure that Bash positions the cursor and output in the right position, you must move the cursor back to the original position after you are done printing elsewhere. This can be done using the tput capabilities sc and rc to save and restore the cursor position. The general pattern for a prompt that moves the cursor is\n\n```\nPS1=\"\\[$(tput sc; cursor-moving code) positioned prompt stuff $(tput rc)\\] normal prompt stuff\"\n```\n\nwhere the entire block of repositioned prompt is wrapped in \\[ \\] to prevent Bash from counting it as part of the regular prompt.\n\n"
+    },
+    {
+      "title": "Right-justified text",
+      "level": 4,
+      "content": "The simplest way to print text on the right side of the screen is to use printf\n\n```\nrightprompt()\n{\n    printf \"%*s\" $COLUMNS \"right prompt\"\n}\n\nPS1='\\[$(tput sc; rightprompt; tput rc)\\]left prompt > '\n```\n\nThis creates a right-justified variable-sized field %*s and sets its size to the current number of columns of the terminal $COLUMNS.\n\n"
+    },
+    {
+      "title": "Arbitrary positioning",
+      "level": 4,
+      "content": "The cup capability moves the cursor to a specific position on the screen, for example tput cup 20 5 moves the cursor to line 20, column 5 (where 0 0 is the top left corner). cuu, cud, cuf, and cub (up, down, forward, back) move the cursor relative to its current position. For example tput cuf 10 moves the cursor 10 characters to the right. You can use the LINES and COLUMNS variables in the arguments to move the cursor relative to the bottom and right edges. For example, to move 10 lines and 5 columns away from the bottom right corner:\n\n```\n$ tput cup $((LINES - 11)) $((COLUMNS - 6))\n```\n\n"
+    },
+    {
+      "title": "Customizing the terminal window title",
+      "level": 3,
+      "content": "The terminal window title can be customized in much the same way as the prompt: by printing escape sequences in the shell. Thus it is common for users to include window title customizations in their prompt. Although this is technically a feature of xterm, many modern terminals support it. The escape sequence to use is ESC]2;new titleBEL where ESC and BEL are the escape and bell characters. Using #Bash escape sequences, changing the title in your prompt looks like\n\n```\nPS1='\\[\\e]2;new title\\a\\]prompt > '\n```\n\nOf course your window title string can include output from embedding commands or variables such as $PWD, so that the title changes with each command.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Community examples and screenshots in the Forum thread: What's your PS1? (only accessible if logged in)\n- Gentoo's /etc/bash/bashrc. See also gentoo-bashrcAUR.\n- tput(1) Colours and Cursor Movement With tput\n- Bash Prompt HOWTO\n- Giles Orr's collection of sample prompts\n- Bash tips: Colors and formatting\n- Liquid Prompt — a useful adaptive prompt for Bash & zsh\n- Bash POWER PROMPT\n- Wikipedia:ANSI escape code\n- GNU Bash manual: Controlling the Prompt\n\n- Colours and Cursor Movement With tput\n\n"
+    }
+  ]
+}

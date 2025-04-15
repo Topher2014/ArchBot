@@ -1,0 +1,141 @@
+{
+  "title": "PRIME (Español)",
+  "url": "https://wiki.archlinux.org/title/PRIME_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- NVIDIA Optimus\n- External GPU\n\nNote: **Este artículo o sección necesita ser traducido.** Este artículo o sección necesita ser traducido.\n\nEste artículo o sección necesita ser traducido.\n\nNote: **2024-02-28** \n\nPRIME es una tecnología utilizada para gestionar gráficos híbridos que se encuentran en ordenadores de sobremesa y portátiles recientes (Optimus para NVIDIA, AMD Dynamic Switchable Graphics para Radeon). PRIME GPU offloading y Reverse PRIME son un intento de soportar gráficos híbridos sin mux en el kernel de Linux.\n\n"
+    },
+    {
+      "title": "Controladores de código abierto",
+      "level": 3,
+      "content": "Remueva cualquier controlador gráfico de código cerrado y sustitúyalo por su equivalente de código abierto:\n\n- xf86-video-nouveau\n- xf86-video-ati\n- xf86-video-amdgpu\n- xf86-video-intel\n\nReinicie y compruebe la lista de controladores gráficos adjuntos:\n\n```\n$ xrandr --listproviders\n```\n\n```\nProviders: number : 2\nProvider 0: id: 0x7d cap: 0xb, Source Output, Sink Output, Sink Offload crtcs: 3 outputs: 4 associated providers: 1 name:Intel\nProvider 1: id: 0x56 cap: 0xf, Source Output, Sink Output, Source Offload, Sink Offload crtcs: 6 outputs: 1 associated providers: 1 name:radeon\n```\n\nPodemos ver que hay dos tarjetas gráficas: la tarjeta integrada Intel (id 0x7d) y la tarjeta discreta Radeon (id 0x56), que debería usarse para aplicaciones intensivas de GPU.\n\nPor defecto siempre se utiliza la tarjeta Intel:\n\n```\n$ glxinfo | grep \"OpenGL renderer\"\n```\n\n```\nOpenGL renderer string: Mesa DRI Intel(R) Ivybridge Mobile\n```\n\n"
+    },
+    {
+      "title": "Controladores de código cerrado",
+      "level": 3,
+      "content": "Para que PRIME funcione con los controladores propietarios, el proceso es prácticamente el mismo. Sigue los siguientes artículos para instalar los drivers:\n\n- AMDGPU PRO para instalar controladores para GPUs AMD.\n- NVIDIA para instalar controladores para GPUs NVIDIA.\n\nUna vez instalado el controlador, no reinicies Xorg. Dependiendo de la configuración de tu sistema, esto puede inutilizar tu sistema Xorg hasta que sea reconfigurado.\n\nSiga las instrucciones de la sección en tu caso designado. No es necesario desinstalar los controladores de código abierto para que funcione, pero probablemente debería hacerlo, para evitar el desorden y posibles problemas futuros.\n\n"
+    },
+    {
+      "title": "PRIME GPU offloading",
+      "level": 2,
+      "content": "Queremos renderizar aplicaciones en la tarjeta más potente y enviar el resultado a la tarjeta que tiene pantalla conectada.\n\nEl comando xrandr --setprovideroffloadsink provider sink puede utilizarse para hacer que un proveedor de renderizado envíe su resultado al proveedor sink (el proveedor que tiene una pantalla conectada). Los identificadores de proveedor y sumidero pueden ser numéricos (0x7d, 0x56) o un nombre que distinga entre mayúsculas y minúsculas (Intel, radeon).\n\nNote: **offloading** \n\n- Esta configuración ya no es necesaria cuando se utiliza la mayoría de los controladores Xorg DDX por defecto (el xf86-video-* o el modesetting incorporado) de los repositorios oficiales, ya que tienen DRI3 activado por defecto y, por tanto, realizarán automáticamente estas asignaciones. Sin embargo, volver a configurarlos explícitamente no hace ningún daño.\n- El offloading de la GPU no está soportada por los controladores de código cerrado (para el controlador NVIDIA este ya no es el caso, para más información vea #PRIME render offload más abajo).\n\nEjemplo:\n\n```\n$ xrandr --setprovideroffloadsink radeon Intel\n```\n\nTambién puede utilizar el índice (index) del proveedor en lugar del nombre del proveedor:\n\n```\n$ xrandr --setprovideroffloadsink 1 0\n```\n\nNote: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n"
+    },
+    {
+      "title": "Para controladores de código abierto - PRIME",
+      "level": 3,
+      "content": "Para utilizar su tarjeta discreta para las aplicaciones que más la necesitan (por ejemplo, juegos, modeladores 3D...), añada la variable de entorno DRI_PRIME=1:\n\n```\n$ DRI_PRIME=1 glxinfo | grep \"OpenGL renderer\"\n```\n\n```\nOpenGL renderer string: Gallium 0.4 on AMD TURKS\n```\n\nOtras aplicaciones seguirán usando la tarjeta integrada que consume menos energía. Estos ajustes se pierden una vez que el servidor X se reinicia, es posible que desee hacer una secuencia de comandos y auto-ejecutarlo en el inicio de su entorno de escritorio (como alternativa, ponerlo en /etc/X11/xinit/xinitrc.d/). Sin embargo, esto puede reducir la duración de la batería y aumentar el calor.\n\nVea Gentoo:AMDGPU#Test, if a discrete graphics card is in use para más información.\n\nPara que DRI_PRIME funcione en aplicaciones Vulkan es necesario instalar vulkan-mesa-layers, así como lib32-vulkan-mesa-layers para aplicaciones de 32 bits.\n\n"
+    },
+    {
+      "title": "PRIME render offload",
+      "level": 3,
+      "content": "El controlador NVIDIA desde la versión 435.17 soporta este método. El modesetting, xf86-video-amdgpu (450.57), y xf86-video-intel (455.38) están soportados oficialmente como controladores iGPU.\n\nPara ejecutar un programa en la tarjeta NVIDIA puedes utilizar el script prime-run proporcionado por nvidia-prime:\n\n```\n$ prime-run glxinfo | grep \"OpenGL renderer\"\n$ prime-run vulkaninfo\n```\n\n"
+    },
+    {
+      "title": "Gestión de energía PCI-Express Runtime D3 (RTD3)",
+      "level": 4,
+      "content": "La gestión de energía PCI del kernel apaga la GPU cuando no se utiliza con PRIME offloading o reverse PRIME. Esta función es compatible con los controladores modesetting, xf86-video-amdgpu, xf86-video-intel, xf86-video-nouveau.\n\nEl siguiente comando puede utilizarse para comprobar el estado de energía actual de cada GPU:\n\n```\n$ cat /sys/class/drm/card*/device/power_state\n```\n\n- Generalmente no es necesaria ninguna configuración para Ampere ya que está habilitada por defecto. Para algunos usuarios de Ampere, las reglas udev pueden ser necesarias.\n- Algunos usuarios con gráficos híbridos informan de que sus GPUs discretas NVIDIA Ampere no permanecen en el estado de energía D3Cold después de actualizar a los controladores NVIDIA más recientes (aparentemente >525) [1].\n\nEn el caso de las tarjetas de la generación Turing con CPU Intel Coffee Lake o superiores, así como algunas CPU Ryzen como la 5800H, es posible apagar completamente la GPU cuando no se utiliza.\n\nNote: **Este artículo o sección necesita ser traducido.** Este artículo o sección necesita ser traducido.\n\nEste artículo o sección necesita ser traducido.\n\nSe necesitan las siguientes reglas udev:\n\n```\n/etc/udev/rules.d/80-nvidia-pm.rules\n```\n\n```\n# Enable runtime PM for NVIDIA VGA/3D controller devices on driver bind\nACTION==\"bind\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x030000\", TEST==\"power/control\", ATTR{power/control}=\"auto\"\nACTION==\"bind\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x030200\", TEST==\"power/control\", ATTR{power/control}=\"auto\"\n\n# Disable runtime PM for NVIDIA VGA/3D controller devices on driver unbind\nACTION==\"unbind\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x030000\", TEST==\"power/control\", ATTR{power/control}=\"on\"\nACTION==\"unbind\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x030200\", TEST==\"power/control\", ATTR{power/control}=\"on\"\n```\n\njunto con los siguientes parametros del modulo:\n\n```\n/etc/modprobe.d/nvidia-pm.conf\n```\n\n```\noptions nvidia \"NVreg_DynamicPowerManagement=0x02\"\n```\n\nAlternativamente, puede instalar nvidia-prime-rtd3pmAUR que proporciona estos dos archivos de configuración.\n\nDespués de configurar las reglas udev y el parámetro del modulo manualmente o usando el paquete AUR, necesitarás reiniciar tu Laptop.\n\nPara comprobar si la GPU NVIDIA está apagada puedes utilizar este comando:\n\n```\n$ cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status\n```\n\nVerás suspended o running, si se muestra suspended, la GPU está apagada. Ahora el consumo de energía será de 0 vatios haciendo que la batería dure más.\n\nEn algunos casos, puede que no aparezca ninguna de las opciones anteriores y en su lugar el resultado sea active. Esto no significa que la GPU esté en estado running. En este caso, puedes comprobar el estado utilizando este comando:\n\n```\n$ cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_suspended_time\n```\n\nMientras la GPU esté en estado suspended, el contador se incrementará cada vez que ejecutes el comando. Cuando el estado de la GPU pase a ser running, dejará de incrementarse.\n\nTambién necesitamos habilitar nvidia-persistenced.service para evitar que el kernel destruya el estado del dispositivo cada vez que los recursos del dispositivo NVIDIA ya no estén en uso. [2]\n\n"
+    },
+    {
+      "title": "Configurar aplicaciones para renderizar utilizando la GPU",
+      "level": 4,
+      "content": "Incluso sin activar la gestión dinámica de energía, el renderizado offload de aplicaciones es necesario [3].\n\nPara ejecutar una aplicación offloaded en la GPU NVIDIA con la gestión dinámica de la energía activada, añada las siguientes variables de entorno: [4]\n\n```\n__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia command\n```\n\nCuando se utiliza en un juego de Steam, la línea de comandos del lanzador se puede establecer en:\n\n```\n__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia %command%\n```\n\n"
+    },
+    {
+      "title": "Integración con Gnome",
+      "level": 4,
+      "content": "Para la integración con GNOME, instale switcheroo-control y active switcheroo-control.service.\n\nGNOME respetará la propiedad PrefersNonDefaultGPU en la entrada del escritorio. Alternativamente, puede ejecutar aplicaciones con GPU haciendo clic derecho sobre el icono y eligiendo Iniciar con tarjeta gráfica discreta o Launch using Discrete Graphics Card si la opción le aparece en ingles.\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 4,
+      "content": "Si tienes bumblebee instalado, deberías quitarlo porque pone en la lista negra el controlador nvidia_drm que es necesario para cargar el controlador NVIDIA por el servidor X para offloading.\n\n"
+    },
+    {
+      "title": "Sincronización PRIME",
+      "level": 3,
+      "content": "Cuando se utiliza PRIME, la GPU primaria renderiza el contenido de la pantalla / aplicaciones, y lo pasa a la GPU secundaria para su visualización. Citando un hilo de NVIDIA, \"El vsync tradicional puede sincronizar el renderizado de la aplicación con la copia en la memoria del sistema, pero es necesario un mecanismo adicional para sincronizar la copia en la memoria del sistema con el motor de visualización de la iGPU. Dicho mecanismo tendría que implicar la comunicación entre los controladores de la dGPU y de la iGPU, a diferencia del vsync tradicional\".\n\nEsta sincronización se consigue utilizando PRIME sync. Para comprobar si la sincronización PRIME está activada para su pantalla, compruebe la salida de xrandr --prop.\n\nPara habilitarlo ejecute:\n\n```\n$ xrandr --output <output-name> --set \"PRIME Synchronization\" 1\n```\n\n- Un requisito previo para la sincronización de PRIME con el controlador NVIDIA es tener habilitado kernel modesetting.\n- La sincronización PRIME no está disponible con el controlador AMDGPU (Español) DDX (xf86-video-amdgpu).\n\n"
+    },
+    {
+      "title": "Configuración específica para Wayland",
+      "level": 3,
+      "content": "Wayland necesita menos configuración que Xorg. Parece que también hay soporte preliminar para GPU hotplugging en KDE's KWin y GNOME's Mutter (Incidencia 17 y Merge request 1562).\n\nPara utilizar su tarjeta discreta, añada la variable de entorno DRI_PRIME=. Los siguientes ejemplos suponen un sistema con una tarjeta integrada Intel, una GPU interna NVIDIA y una GPU externa AMD.\n\nPara utilizar el chip Intel integrado, no es necesario realizar ninguna modificación, puesto que ya es el predeterminado:\n\n```\nglxinfo | grep 'OpenGL renderer'\n```\n\n```\nOpenGL renderer string: Mesa Intel(R) Xe Graphics (TGL GT2)\n```\n\nPara la tarjeta AMD con controladores de código abierto:\n\n```\nDRI_PRIME=pci-0000_06_00_0 glxinfo | grep 'OpenGL renderer'\n```\n\n```\nOpenGL renderer string: AMD Radeon RX 5700 XT (navi10, LLVM 14.0.6, DRM 3.46, 5.18.17-hardened1-1-hardened)\n```\n\nPara la tarjeta NVIDIA con controladores propietarios:\n\n```\nDRI_PRIME=pci-0000_01_00_0 __VK_LAYER_NV_optimus=NVIDIA_only __GLX_VENDOR_LIBRARY_NAME=nvidia glxinfo | grep 'OpenGL renderer string'\n```\n\n```\nOpenGL renderer string: NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2\n```\n\nCon Wayland se pueden utilizar varias GPU al mismo tiempo en la misma máquina.\n\nConsulte la documentación de mesa3d para PRIME: https://docs.mesa3d.org/envvars.html\n\nTodas las aplicaciones Xwayland deberían funcionar desde el principio como lo hacen en Xorg. Sin embargo, a partir de la versión 525.85 del controlador, para las aplicaciones nativas de Wayland, sólo funciona OpenGL, siempre que tengas modesetting activado.\n\nLas aplicaciones Wayland que usan Vulkan mostrarán una ventana invisible o incluso podrían bloquearse, ya que el controlador NVIDIA utiliza una distribución de píxeles específica del hardware que las GPU Intel o AMD no entienden. Más información en la Incidencia 72 de GitHub.\n\n"
+    },
+    {
+      "title": "Reverse PRIME",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n- Reverse PRIME no es compatible con AMDGPU + NVIDIA en el controlador NVIDIA anterior a la versión beta 470. Consulta [5] para obtener más detalles. Una alternativa para versiones anteriores es usar NVIDIA como tarjeta principal tal y como se describe en #Tarjeta discreta como GPU principal.\n- Actualmente cuando sólo está activada la pantalla externa, sólo obtendrás 1 FPS. Vea [6] para más detalles.\n\nSi la segunda GPU tiene salidas a las que no puede acceder la GPU primaria, puedes utilizar Reverse PRIME para hacer uso de ellas. Esto implica utilizar la GPU primaria para renderizar las imágenes y, a continuación, pasarlas a la segunda GPU.\n\nEs posible que funcione desde el primer momento, pero si no es así, siga los pasos que se indican a continuación.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nEn primer lugar, identifique el BusID de la GPU integrada.\n\n```\nlspci | grep VGA\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation UHD Graphics 630 (Mobile)\n01:00.0 VGA compatible controller: NVIDIA Corporation TU117M [GeForce GTX 1650 Mobile / Max-Q] (rev a1)\n```\n\nEn el ejemplo anterior la tarjeta Intel tiene 00:02.0 que se traduce a PCI:0:2:0.\n\nConfigura tu xorg.conf como sigue y ajusta BusID.\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"ServerLayout\"\n        Identifier \"layout\"\n        Screen 0 \"intel\"\n        Inactive \"nvidia\"\n        Option \"AllowNVIDIAGPUScreens\"\nEndSection\n\nSection \"Device\"\n        Identifier \"nvidia\"\n        Driver \"nvidia\"\nEndSection\n\nSection \"Screen\"\n        Identifier \"nvidia\"\n        Device \"nvidia\"\nEndSection\n\nSection \"Device\"\n        Identifier \"intel\"\n        Driver \"modesetting\"\n        BusID \"PCI:0:2:0\"\nEndSection\n\nSection \"Screen\"\n        Identifier \"intel\"\n        Device \"intel\"\nEndSection\n```\n\nEl comando xrandr --setprovideroutputsource proveedor fuente establece el proveedor como salida para la fuente. Por ejemplo:\n\n```\n$ xrandr --setprovideroutputsource radeon Intel\n```\n\nUna vez hecho esto, las salidas de la tarjeta discreta deberían estar disponibles en xrandr, y podrías hacer algo como:\n\n```\n$ xrandr --output HDMI-1 --auto --above LVDS1\n```\n\npara configurar tanto las pantallas internas como las externas.\n\n"
+    },
+    {
+      "title": "Problemas",
+      "level": 3,
+      "content": "Si después de reiniciar sólo tienes un proveedor, puede ser porque cuando se inicia Xorg, el módulo nvidia no está cargado todavía. Necesitas habilitar la carga temprana del módulo. Ver NVIDIA (Español)#Carga temprana para más detalles.\n\n"
+    },
+    {
+      "title": "Tarjeta discreta como GPU principal",
+      "level": 3,
+      "content": "Imagina el siguiente escenario: Las salidas LVDS1 (pantalla interna del portátil) y VGA sólo son accesibles a través de la GPU Intel integrada. Las salidas HDMI y Display Port están conectadas a la tarjeta discreta NVIDIA. Es posible utilizar las cuatro salidas haciendo uso de la tecnología #Reverse PRIME descrita anteriormente. Sin embargo, el rendimiento puede ser lento, porque todo el renderizado para todas las salidas se realiza por la tarjeta Intel integrada. Para mejorar esta situación es posible hacer el renderizado por la tarjeta NVIDIA discreta, que luego copia los framebuffers para las salidas LVDS1 y VGA a la tarjeta Intel.\n\nCree la siguiente configuración Xorg:\n\n```\n/etc/X11/xorg.conf.d/10-gpu.conf\n```\n\n```\nSection \"ServerLayout\"\n    Identifier \"layout\"\n    Screen 0 \"nouveau\"\n    Inactive \"intel\"\nEndSection\n\nSection \"Device\"\n    Identifier  \"nouveau\"\n    Driver      \"nouveau\"\n    BusID       \"PCI:x:x:x\" # Sample: \"PCI:1:0:0\"\nEndSection\n\nSection \"Screen\"\n    Identifier \"nouveau\"\n    Device \"nouveau\"\nEndSection\n\nSection \"Device\"\n    Identifier  \"intel\"\n    Driver      \"intel\"\n    BusID       \"PCI:x:x:x\"  # Sample: \"PCI:0:2:0\"\nEndSection\n\nSection \"Screen\"\n    Identifier \"intel\"\n    Device \"intel\"\nEndSection\n```\n\nReinicie Xorg. La tarjeta discreta NVIDIA va a ser la que se usara ahora. Las salidas HDMI y Display Port son las principales. Las salidas LVDS1 y VGA están desactivadas. Para habilitarlas ejecute:\n\n```\n$ xrandr --setprovideroutputsource Intel nouveau\n```\n\nLas salidas de la tarjeta interna ya deberían estar disponibles en xrandr.\n\nSi se utiliza NVIDIA para renderizar la pantalla, es posible que el desplazamiento se ralentice o que se produzca screen tearing. Consulta NVIDIA/Solución de Problemas#Evitar el Screen Tearing para saber cómo mitigarlo.\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n"
+    },
+    {
+      "title": "XRandR especifica sólo 1 proveedor de salida",
+      "level": 3,
+      "content": "Borra/move el archivo /etc/X11/xorg.conf y cualquier otro archivo relacionado con GPUs en /etc/X11/xorg.conf.d/. Reinicie el servidor X después de este cambio.\n\nSi el controlador de vídeo está en la lista negra de /etc/modprobe.d/ o /usr/lib/modprobe.d/, cargue el módulo y reinicie X. Este puede ser el caso si utiliza el módulo bbswitch para GPUs NVIDIA.\n\nOtro posible problema es que Xorg intente asignar automáticamente monitores a su segunda GPU. Compruebe los logs:\n\n```\n$ grep \"No modes\" ~/.local/share/xorg/Xorg.0.log\n```\n\n```\nAMDGPU(0): No modes.\n```\n\nPara solucionar esto añade la sección ServerLayout con dispositivo inactivo a tu xorg.conf:\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"ServerLayout\"\n  Identifier     \"X.org Configured\"\n  Screen      0  \"Screen0\" 0 0 # Screen for your primary GPU\n  Inactive       \"Card1\"       # Device for your second GPU\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Cuando una aplicación se renderiza con la tarjeta discreta, sólo renderiza una pantalla negra",
+      "level": 3,
+      "content": "En algunos casos PRIME necesita un gestor de composición para funcionar correctamente. Si tu gestor de ventanas no hace composición, puedes usar xcompmgr sobre él.\n\nSi usas Xfce, puedes ir a Menu > Ajustes > Ajustes del gestor de ventanas > Compositor y habilitar la composición, luego intenta abriendo de nuevo tu aplicación.\n\n"
+    },
+    {
+      "title": "Pantalla negra con compositores basados en GL",
+      "level": 4,
+      "content": "Actualmente hay problemas con los compositores basados en GL y la descarga de PRIME. Mientras que los compositores basados en Xrender (xcompmgr, xfwm, el backend predeterminado de compton, cairo-compmgr, y algunos otros) funcionarán sin problemas, los compositores basados en GL (Mutter/muffin, Compiz, compton con GLX backend, Kwin's OpenGL backend, etc) mostrarán inicialmente una pantalla negra, como si no hubiera ningún compositor en ejecución. Aunque puede forzar la aparición de una imagen redimensionando la ventana offloaded, esta no es una solución práctica ya que no funcionará para cosas como aplicaciones Wine a pantalla completa. Esto significa que los entornos de escritorio como GNOME3 y Cinnamon tienen problemas con el uso de PRIME offloading.\n\nAdemás, si utiliza una IGP Intel, puede solucionar el problema de la composición GL ejecutando la IGP como UXA en lugar de SNA, aunque esto puede causar problemas con el proceso de offloading (es decir, xrandr --listproviders puede que no liste la GPU discreta).\n\nPara más información vea el Bug FDO #69101.\n\nOtra forma de abordar este problema es habilitando DRI3 en el controlador Intel. Consulte la siguiente incidencia para ver un ejemplo de configuración.\n\nPuede encontrar que desactivar la pantalla completa no directa permite que PRIME offloading funcione correctamente para aplicaciones a pantalla completa.\n\n"
+    },
+    {
+      "title": "Bloqueos de Kernel al usar PRIME y cambiar de ventana/espacios de trabajos.",
+      "level": 3,
+      "content": "El uso de DRI3 CON un archivo de configuración para la tarjeta integrada parece solucionar este problema.\n\nPara habilitar DRI3, es necesario crear una configuración para la tarjeta integrada añadiendo la opción DRI3:\n\n```\nSection \"Device\"\n    Identifier \"Intel Graphics\"\n    Driver \"intel\"\n    Option \"DRI\" \"3\"\nEndSection\n```\n\nDespués de esto puedes usar DRI_PRIME=1 SIN tener que ejecutar xrandr --setprovideroffloadsink radeon Intel ya que DRI3 se encargará de el offloading.\n\n"
+    },
+    {
+      "title": "Problema de sincronización de Glitches/Ghosting en el segundo monitor al utilizar reverse PRIME.",
+      "level": 3,
+      "content": "Este problema puede afectar a los usuarios que no utilicen un gestor compuesto, como por ejemplo con i3. [8]\n\nSi experimenta este problema en Gnome, una posible solución es establecer algunas variables de entorno en /etc/environment. [9]\n\n```\nCLUTTER_PAINT=disable-clipped-redraws:disable-culling\nCLUTTER_VBLANK=True\n```\n\n"
+    },
+    {
+      "title": "Error \"radeon: Failed to allocate virtual address for buffer:\" al iniciar una aplicación GL",
+      "level": 3,
+      "content": "Este error se produce cuando se está ejecutando la gestión de energía en el controlador del kernel. Puede corregir este error añadiendo radeon.runpm=0 a los parámetros del kernel en el gestor de arranque.\n\n"
+    },
+    {
+      "title": "Constantes cuelgues/congelaciones con aplicaciones/juegos Vulkan usando VSync con drivers de código cerrado y reverse PRIME.",
+      "level": 3,
+      "content": "Algunas aplicaciones Vulkan (en particular las que utilizan VK_PRESENT_MODE_FIFO_KHR y/o VK_PRESENT_MODE_FIFO_RELAXED_KHR, incluidos los juegos de Windows ejecutados con DXVK) provocan el bloqueo constante de la GPU (~5-10 segundos de congelación, ~1 segundo de funcionamiento correcto)[10] cuando se ejecutan en un sistema que utiliza reverse PRIME.\n\nUn bloqueo de la GPU inutilizará cualquier entrada (esto incluye el cambio de TTY y el uso de funciones SysRq).\n\nNo se conoce ninguna solución para este error de NVIDIA, pero existen algunas alternativas:\n\n- Desactivar Vsync (no es posible en algunas aplicaciones).\n- Desactivar la sincronización PRIME[11] (provocará screen tearing):\n\n```\nxrandr --output HDMI-0 --set \"PRIME Synchronization\" 0 #replace HDMI-0 with your xrandr output ID\n```\n\nPuede verificar si su configuración está afectada por el problema simplemente ejecutando vkcube desde el paquete vulkan-tools.\n\n"
+    },
+    {
+      "title": "Algunos programas se abren con retraso en Wayland",
+      "level": 3,
+      "content": "Si tienes RTD3 funcionando (de la sección #NVIDIA), cuando uses Wayland experimentarás cierto retraso cuando se abra un programa, esto es porque primero intenta encender la GPU discreta (lo que tarda ~1 segundo o más) y luego intenta abrir el programa, perdiendo tiempo y batería. Este es un problema del driver de NVIDIA. Más detalles aquí\n\nPara solucionarlo, añade estas 2 líneas en tu archivo /etc/environment:\n\n```\n/etc/environment\n```\n\n```\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\n__GLX_VENDOR_LIBRARY_NAME=mesa\n```\n\n"
+    },
+    {
+      "title": "Error al ejecutar juegos Wine con DXVK",
+      "level": 3,
+      "content": "Cuando se utiliza PRIME offloading, se produce el problema conocido Major opcode of failed request: 156 (NV-GLX). La única solución conocida es iniciar la sesión X totalmente en la GPU NVIDIA. Una forma fácil de cambiar entre el método de descarga NVIDIA y PRIME es la utilidad optimus-manager o escribir algunos scripts de automatización.\n\n"
+    },
+    {
+      "title": "Vease también",
+      "level": 2,
+      "content": "- Nouveau Optimus\n\n"
+    }
+  ]
+}

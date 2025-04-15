@@ -1,0 +1,96 @@
+{
+  "title": "Network configuration (Italiano)/Ethernet (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Network_configuration_(Italiano)/Ethernet_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article describes Ethernet specifics, general network configuration is covered in Network configuration.\n\n"
+    },
+    {
+      "title": "Check the status",
+      "level": 3,
+      "content": "udev should detect your network interface controller (NIC) and automatically load the necessary kernel module at startup. Check the \"Ethernet controller\" entry (or similar) from the lspci -v -d ::0200 output. It should tell you which kernel module contains the driver for your network device. For example:\n\n```\n$ lspci -v -d ::0200\n```\n\n```\n02:00.0 Ethernet controller: Attansic Technology Corp. L1 Gigabit Ethernet Adapter (rev b0)\n \t...\n \tKernel driver in use: atl1\n \tKernel modules: atl1\n```\n\nNext, check that the driver was loaded by running dmesg | grep module_name as root. For example:\n\n```\n# dmesg | grep atl1\n```\n\n```\n...\natl1 0000:02:00.0: eth0 link is up 1000 Mbps full duplex\n```\n\nSkip the next section if the driver was loaded successfully. Otherwise, you will need to know which module is needed for your particular model.\n\n"
+    },
+    {
+      "title": "Load the module",
+      "level": 3,
+      "content": "Search the internet for the right module/driver for your chipset. Some common modules are 8139too for cards with a Realtek chipset, or sis900 for cards with a SiS chipset. Once you know which module to use, try to load it manually. If you get an error saying that the module was not found, verify first if you recently upgraded the kernel (see General troubleshooting#Cannot use some peripherals after kernel upgrade). Alternatively, it is possible that the driver is not included in the Arch kernel. You may search the AUR for the module name.\n\nIf udev is not detecting and loading the proper module automatically during bootup, you can explicitly load the module at boot.\n\n"
+    },
+    {
+      "title": "ifplugd for laptops",
+      "level": 3,
+      "content": "ifplugd is a daemon which will automatically configure your Ethernet device when a cable is plugged in and automatically unconfigure it if the cable is pulled. This is useful on laptops with onboard network adapters, since it will only configure the interface when a cable is really connected. Another use is when you just need to restart the network but do not want to restart the computer or do it from the shell.\n\nBy default it is configured to work for the eth0 device. This and other settings like delays can be configured in /etc/ifplugd/ifplugd.conf.\n\n"
+    },
+    {
+      "title": "Reduce link speed",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nForcing 100Mbps or 10Mbps full-duplex speed on a gigabit ethernet NIC can save a lot of power (~1W) on most network workloads. This also reduces components temperature.\n\nUsing ethtool -s eth0 autoneg off speed 100 on every boot is inconvenient.\n\nBoot time initialization of lower ethernet NIC speed is possible through systemd.link files. The actual setup is performed by the net_setup_link udev builtin. Add the AutoNegotiation option to the network link file:\n\n```\n/etc/systemd/network/50-wired.link\n```\n\n```\n[Match]\nMACAddress=aa:bb:cc:dd:ee:ff\n\n[Link]\nNamePolicy=kernel database onboard slot path\nAutoNegotiation=no\nDuplex=full\nBitsPerSecond=100M\n```\n\nAlso see systemd.link(5) for more information.\n\n- AutoNegotiation must be set, to no, otherwise there will be a Speed/Duplex setting not supported error and the link will not initialize.\n- Only the first matching file is applied. The content of the default link file /usr/lib/systemd/network/99-default.link shipped with systemd has to be included, otherwise the interface might be misconfigured.\n- To be considered, the file name should alphabetically come before the default 99-default.link. For example 50-wired.link works.\n- This configuration applies only to the link-level, and is independent of network-level daemons such as NetworkManager or systemd-networkd.\n- In the Match section, OriginalName= can also be used to identify the interface.\n\n"
+    },
+    {
+      "title": "Swapping computers on the cable modem",
+      "level": 3,
+      "content": "Some cable ISPs (Vidéotron for example) have the cable modem configured to recognize only one client PC, by the MAC address of its network interface. Once the cable modem has learned the MAC address of the first PC or equipment that talks to it, it will not respond to another MAC address in any way. Thus if you swap one PC for another (or for a router), the new PC (or router) will not work with the cable modem, because the new PC (or router) has a MAC address different from the old one. To reset the cable modem so that it will recognise the new PC, you must power the cable modem off and on again. Once the cable modem has rebooted and gone fully online again (indicator lights settled down), reboot the newly connected PC so that it makes a DHCP request, or manually make it request a new DHCP lease.\n\nIf this method does not work, you will need to clone the MAC address of the original machine. See also MAC address spoofing.\n\n"
+    },
+    {
+      "title": "Explicit Congestion Notification",
+      "level": 3,
+      "content": "Explicit Congestion Notification (ECN) may cause traffic problems with old/bad routers [1]. As of systemd 240, it is enabled for incoming connections that request it (kernel default).\n\nTo enable ECN for both incoming and outgoing connections:\n\n```\n# sysctl net.ipv4.tcp_ecn=1\n```\n\nTo enable ECN only when requested by incoming connections (the reasonably safe, kernel default):\n\n```\n# sysctl net.ipv4.tcp_ecn=2\n```\n\nTo disable ECN completely (to e.g. test whether ECN was causing problems):\n\n```\n# sysctl net.ipv4.tcp_ecn=0\n```\n\nSee also the kernel documentation.\n\n"
+    },
+    {
+      "title": "Broadcom BCM57780",
+      "level": 3,
+      "content": "This Broadcom chipset sometimes does not behave well unless you specify the order of the modules to be loaded. The modules are broadcom and tg3, the former needing to be loaded first.\n\nThese steps should help if your computer has this chipset:\n\n- Find your NIC in lspci output:\n\n```\n$ lspci -d ::0200\n```\n\n```\n02:00.0 Ethernet controller: Broadcom Corporation NetLink BCM57780 Gigabit Ethernet PCIe (rev 01)\n```\n\n- If your wired networking is not functioning in some way or another, unplug your cable then do the following:\n\n```\n# modprobe -r tg3\n# modprobe broadcom\n# modprobe tg3\n```\n\n- Plug your network cable back in and check whether the module succeeded with:\n\n```\n# dmesg | grep tg3\n```\n\n- If this procedure solved the issue you can make it permanent by adding broadcom and tg3 (in this order) to the MODULES array:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(.. broadcom tg3 ..)\n```\n\n- Regenerate the initramfs\n- Alternatively, you can create an /etc/modprobe.d/broadcom.conf:\n\n```\nsoftdep tg3 pre: broadcom\n```\n\n"
+    },
+    {
+      "title": "Realtek no link / WOL problem",
+      "level": 3,
+      "content": "Users with Realtek 8168 8169 8101 8111(C) 8156B based NICs (cards / and on-board) may notice a problem where the NIC seems to be disabled on boot and has no Link light. This can usually be found on a dual boot system where Windows is also installed. It seems that using the official Realtek drivers (dated anything after May 2007) under Windows is the cause. These newer drivers disable the Wake-On-LAN feature by disabling the NIC at Windows shutdown time, where it will remain disabled until the next time Windows boots. You will be able to notice if this problem is affecting you if the Link light remains off until Windows boots up; during Windows shutdown the Link light will switch off. Normal operation should be that the link light is always on as long as the system is on, even during POST. This problem will also affect other operating systems without newer drivers (eg. Live CDs). Here are a few fixes for this problem.\n\n"
+    },
+    {
+      "title": "Enable the NIC directly in Linux",
+      "level": 4,
+      "content": "Follow Network configuration#Enabling and disabling network interfaces to enable the interface.\n\n"
+    },
+    {
+      "title": "Rollback/change Windows driver",
+      "level": 4,
+      "content": "You can roll back your Windows NIC driver to the Microsoft provided one (if available), or roll back/install an official Realtek driver pre-dating May 2007 (may be on the CD that came with your hardware).\n\n"
+    },
+    {
+      "title": "Enable WOL in Windows driver",
+      "level": 4,
+      "content": "Probably the best and the fastest fix is to change this setting in the Windows driver. This way it should be fixed system-wide and not only under Arch (eg. live CDs, other operating systems). In Windows, under Device Manager, find your Realtek network adapter and double-click it. Under the \"Advanced\" tab, change \"Wake-on-LAN after shutdown\" to \"Enable\".\n\n"
+    },
+    {
+      "title": "Enable LAN Boot ROM in BIOS/CMOS",
+      "level": 4,
+      "content": "It appears that setting Integrated Peripherals > Onboard LAN Boot ROM > Enabled in BIOS/CMOS reactivates the Realtek LAN chip on system boot-up, despite the Windows driver disabling it on OS shutdown.\n\n"
+    },
+    {
+      "title": "Disable USB AutoSuspend",
+      "level": 4,
+      "content": "When using power saving features, specifically USB autosuspend, the device can fail to load correctly, resulting in a NO-CARRIER state (tested with RT8156B), and no established link.\n\nTo resolve, see Power management#USB autosuspend for details on blacklisting a device for USB autosuspend manually, or TLP documentation on USB devices if using TLP; then reconnect the device.\n\n"
+    },
+    {
+      "title": "Realtek RTL8111/8168B",
+      "level": 3,
+      "content": "```\n# lspci -d ::0200\n```\n\n```\n03:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev 02)\n```\n\nThe adapter should be recognized by the r8169 module. However, with some chip revisions the connection may go off and on all the time. The alternative r8168AUR should be used for a reliable connection in this case. Blacklist r8169, if r8168AUR is not automatically loaded by udev, you can explicitly load the module at boot.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nAnother fault in the drivers for some revisions of this adapter is poor IPv6 support. IPv6#Disable functionality can be helpful if you encounter issues such as hanging webpages and slow speeds.\n\n"
+    },
+    {
+      "title": "Gigabyte Motherboard with Realtek 8111/8168/8411",
+      "level": 3,
+      "content": "With motherboards such as the Gigabyte GA-990FXA-UD3, booting with IOMMU off (which can be the default) will cause the network interface to be unreliable, often failing to connect or connecting but allowing no throughput. This will apply to the onboard NIC and to any other pci-NIC in the box because the IOMMU setting affects the entire network interface on the board. Enabling IOMMU and booting with the install media will throw AMD I-10/xhci page faults for a second, but then boots normally, resulting in a fully functional onboard NIC (even with the r8169 module).\n\nWhen configuring the boot process for your installation, add iommu=soft as a kernel parameter to eliminate the error messages on boot and restore USB3.0 functionality.\n\n"
+    },
+    {
+      "title": "MicroStar Motherboard with Realtek 8111/8168/8411",
+      "level": 3,
+      "content": "With motherboards such as the \"MicroStar B450M MORTAR TITANIUM\", unpluging/pluging Ethernet cables or restarting router's DHCP server would cause r8169 to enter a downshifted status, and downgrade the 1000 Mbit/s Ethernet speed to 100 Mbit/s. The kernel log will show:\n\n```\n# dmesg | grep r8169\n```\n\n```\nGeneric FE-GE Realtek PHY r8169-2200:00: Downshift occurred from negotiated speed 1Gbps to actual speed 100Mbps, check cabling!\nr8169 0000:22:00.0 enp34s0: Link is Up - 100Mbps/Full (downshifted) - flow control rx/tx\n```\n\nIn this case, restart the adapter (set it down and up). For example:\n\n```\n# ip link set dev enp34s0 down\n# ip link set dev enp34s0 up\n```\n\n"
+    },
+    {
+      "title": "Realtek RTL8153 Tx timeout",
+      "level": 3,
+      "content": "USB Network Adapters with the following controller will often hang and stop transmit until its link is reset. This is accompanied with Tx status -2 or Tx status -71 errors in the kernel log. This can be fixed by setting USB_QUIRK_NO_LPM.\n\nThe quirk can be set at boot by adding the kernel parameter usbcore.quirks=2357:0601:k. It can also be set immediately via the sysfs by\n\n```\n# echo 2357:0601:k > /sys/module/usbcore/parameters/quirks\n```\n\nNote that 2357:0601 should be replaced with your own device's USB ID which can be found using lsusb.\n\n"
+    }
+  ]
+}

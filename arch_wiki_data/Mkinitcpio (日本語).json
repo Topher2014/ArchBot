@@ -1,0 +1,176 @@
+{
+  "title": "Mkinitcpio (日本語)",
+  "url": "https://wiki.archlinux.org/title/Mkinitcpio_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Booster\n- ブートデバッグ\n- dracut\n- カーネルモジュール\n- mkinitcpio/Initramfs の最小化\n- systemd\n- ユニファイドカーネルイメージ\n\nmkinitcpio は初期 RAM ディスク環境を作成するために使われる Bash スクリプトです。mkinitcpio(8) man ページより:\n\n伝統的には、ブートプロセスの初めにハードウェアを検知したりタスクの初期化を行うのはカーネルで、それから root ファイルシステムがマウントされ init にコントロールが移されます。しかしながら、先端技術が生まれるにつれ、こういった作業は複雑になりつつあります。\n\n今日、root ファイルシステムが載るハードウェアは SCSI から SATA、USB ドライブまで様々にわたり、それらハードウェアはそれぞれのメーカーによって作られたいろんなドライブコントローラによってコントロールされています。しかも、root ファイルシステムは暗号化されたり圧縮されたりする可能性もあります; ソフトウェア RAID アレイや論理ボリュームグループに含まれるかもしれません。複雑になったものをシンプルに扱う方法はユーザースペース (初期RAMディスク) へ管理を譲渡することです。参照: /dev/brain0 » Blog Archive » Early Userspace in Arch Linux。\n\nmkinitcpio は Arch Linux デベロッパーとコミュニティの貢献によって開発されています。public Git リポジトリを見て下さい。\n\n初期 ramdisk フェーズ中に行われる様々なタスクがどのように実行されるかには、2つの異なるアプローチがあることに注意が必要です。\n\n具体的なバリアントは、/etc/mkinitcpio.conf 内の HOOKS 配列に systemd フックが存在するかどうかによって決まります。より詳細については、#通常のフック を参照してください。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 イメージ作成とアクティベーション 2.1 自動生成 2.2 手動生成 2.3 生成のカスタマイズ 2.4 ユニファイドカーネルイメージ\n- 3 設定 3.1 MODULES 3.2 BINARIES と FILES 3.3 HOOKS 3.3.1 ビルドフック 3.3.2 ランタイムフック 3.3.3 通常のフック 3.3.4 ポストフック 3.4 COMPRESSION 3.5 COMPRESSION_OPTIONS 3.6 MODULES_DECOMPRESS\n- 4 ランタイムのカスタマイズ 4.1 base フックの init 4.2 RAID を使う 4.3 net を使う 4.4 LVM を使う 4.5 暗号化されたルートを使う 4.6 /usr を別のパーティションに分割する\n- 5 ヒントとテクニック 5.1 フォールバック initramfs の生成を無効化する\n- 6 トラブルシューティング 6.1 イメージの展開 6.2 展開して修正を加えたイメージの再圧縮 6.3 マウントされているのに \"/dev must be mounted\" と表示される 6.4 Possibly missing firmware for module XXXX 6.5 No PS/2 controller found 6.6 標準的なレスキュー手順 6.6.1 あるマシンでは起動できるが他のマシンでは起動できない\n- 7 参照\n\n- 2.1 自動生成\n- 2.2 手動生成\n- 2.3 生成のカスタマイズ\n- 2.4 ユニファイドカーネルイメージ\n\n- 3.1 MODULES\n- 3.2 BINARIES と FILES\n- 3.3 HOOKS 3.3.1 ビルドフック 3.3.2 ランタイムフック 3.3.3 通常のフック 3.3.4 ポストフック\n- 3.4 COMPRESSION\n- 3.5 COMPRESSION_OPTIONS\n- 3.6 MODULES_DECOMPRESS\n\n- 3.3.1 ビルドフック\n- 3.3.2 ランタイムフック\n- 3.3.3 通常のフック\n- 3.3.4 ポストフック\n\n- 4.1 base フックの init\n- 4.2 RAID を使う\n- 4.3 net を使う\n- 4.4 LVM を使う\n- 4.5 暗号化されたルートを使う\n- 4.6 /usr を別のパーティションに分割する\n\n- 5.1 フォールバック initramfs の生成を無効化する\n\n- 6.1 イメージの展開\n- 6.2 展開して修正を加えたイメージの再圧縮\n- 6.3 マウントされているのに \"/dev must be mounted\" と表示される\n- 6.4 Possibly missing firmware for module XXXX\n- 6.5 No PS/2 controller found\n- 6.6 標準的なレスキュー手順 6.6.1 あるマシンでは起動できるが他のマシンでは起動できない\n\n- 6.6.1 あるマシンでは起動できるが他のマシンでは起動できない\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "mkinitcpio パッケージをインストールしてください。このパッケージは linux の依存パッケージとなっているので、大抵すでにインストールされているでしょう。\n\n上級者は mkinitcpio-gitAUR パッケージで mkinitcpio の最新開発バージョンをインストールできます。\n\n"
+    },
+    {
+      "title": "自動生成",
+      "level": 3,
+      "content": "カーネルがインストールまたはアップグレードされるたびに、pacman フックは /etc/mkinitcpio.d/ 内に保存される .preset ファイルを自動的に生成します。例えば、公式の安定版 linux カーネルパッケージの場合は linux.preset です。プリセットは、様々なパラメーターや出力ファイルの場所を手動で指定する手間を省き、初期 RAM ディスクイメージを作成するために必要な情報のリストです。 デフォルトでは、2つのイメージを生成するための命令が含まれています:\n\n1. default RAM ディスクイメージ。このイメージの内容は、mkinicpio の #設定 で指定されたディレクティブに従って生成されます。\n1. fallback RAM ディスクイメージ。作成時に autodetect フックがスキップされることを除いて上記と同じであるため、ほとんどのシステムをサポートするすべてのモジュールが含まれます。\n\nプリセットを作成した後、pacman フックは、プリセットで提供された情報を使用して2つのイメージを生成する mkinitcpio スクリプトを呼び出します。\n\n"
+    },
+    {
+      "title": "手動生成",
+      "level": 3,
+      "content": "スクリプトを手動で実行するには、マニュアルページ mkinitcpio(8) で手順を確認してください。特に、カーネルパッケージによって提供されるプリセットに基づく initramfs イメージを(再)生成するには、使用するプリセットを -p/--preset オプションで指定してください。例えば、linux パッケージの場合、次のコマンドを使用してください:\n\n```\n# mkinitcpio -p linux\n```\n\n既存のすべてのプリセットに基づく initramfs イメージを(再)生成するには、-P/--allpresets スイッチを使用してください。これは通常、グローバルな #設定 の変更後にすべての initramfs イメージを再生成するために使用されます:\n\n```\n# mkinitcpio -P\n```\n\nユーザーは、さまざまな構成で initramfs イメージをいくつでも作成できます。生成したいイメージは、それぞれのブートローダーの設定ファイルで指定する必要があります。\n\n"
+    },
+    {
+      "title": "生成のカスタマイズ",
+      "level": 3,
+      "content": "ユーザーは、代替の設定ファイルを使用してイメージを生成できます。次の例では、/etc/mkinitcpio-custom.conf に記述されている指示に従って初期 RAM ディスクイメージを生成し、/boot/initramfs-custom.img として保存します。\n\n```\n# mkinitcpio --config /etc/mkinitcpio-custom.conf --generate /boot/initramfs-custom.img\n```\n\n現在実行中のカーネル以外のカーネルのイメージを生成する場合は、カーネルリリースバージョンをコマンドラインに追加してください。インストールされているカーネルリリースは /usr/lib/modules/ にあり、構文は各カーネルのコマンド uname -r の出力と一致しています。\n\n```\n# mkinitcpio --generate /boot/initramfs-custom2.img --kernel 5.7.12-arch1-1\n```\n\n"
+    },
+    {
+      "title": "ユニファイドカーネルイメージ",
+      "level": 3,
+      "content": "mkinitcpio は、それ自体または systemd-ukify 経由でユニファイドカーネルイメージ (UKI) を作成することができます。systemd-ukify が存在しないか、--no-ukify によって明示的に無効化されている場合、UKI は mkinitcpio 自体によって構築されます。この場合、ukify の高度な機能は利用できません。\n\nUKI 生成については ユニファイドカーネルイメージ を参照してください。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "mkinitcpio のプライマリ設定ファイルは、/etc/mkinitcpio.conf です。ドロップインの設定ファイル (例: /etc/mkinitcpio.conf.d/myhooks.conf) もサポートされています (ドロップインファイルは、mkinitcpio が -c オプションと共に実行された場合や、ALL_config を含んでいるプリセットを使用した場合には使用されません)。さらに、カーネルパッケージによって提供されるプリセット定義が /etc/mkinitcpio.d ディレクトリにあります (例: /etc/mkinitcpio.d/linux.preset)。\n\nユーザーは、設定ファイルの中にある7つの変数を変更できます (詳細は mkinitcpio.conf(5) § VARIABLES を見てください):\n\n- システムが必要とする場合があるフックのいくつか (lvm2、mdadm_udev、encrypt など) は、デフォルトで有効化されていません。これに関する指示は #HOOKS セクションを注意深く読んでください。\n- バージョン 36 より前の mkinitcpio によって作成されたプリセットファイルでは、ALL_config 変数が定義されており、この変数が存在しているとドロップインの設定ファイルが読み込まれません。ドロップインファイルを有効化するには、古いプリセットファイルにある ALL_config=\"/etc/mkinitcpio.conf\" 行をコメントアウトしてください。\n\n"
+    },
+    {
+      "title": "MODULES",
+      "level": 3,
+      "content": "MODULES 配列では、何か他のことが行われる前にロードするモジュールを指定します。\n\nモジュールの後ろに ? を付けると、モジュールが見つからなかったときでもエラーを投げません。これは、フックや設定ファイルにリストアップされたモジュールを含んでコンパイルするカスタムカーネルで有益かもしれません。\n\n- Out-of-tree のファイルシステムを初期ユーザー空間でマウントするつもりであるならば (例えば、そのようなファイルシステムをルートファイルシステムとしてを使用する場合)、そのファイルシステムのモジュール (reiser4 など) を MODULES 配列に追加しておかなければなりません。\n- encrypt や sd-encrypt を使用し、かつ mkinitcpio が実行されるシステムと生成されたイメージが使用されるシステムが異なる場合、システムの起動中に LUKS デバイスをアンロックするために必要なキーボードモジュールやファイルシステムを MODULES 配列に追加する必要があります。例えば、使用するキーファイルが ext2 ファイルシステム上にあるが、mkinitcpio が実行されたときには ext2 ファイルシステムがマウントされていなかった場合、ext2 を追加してください。詳細は Dm-crypt/システム設定#cryptkey を見てください。\n- LUKS デバイスをアンロックするために USB 3 ハブのキーボードを使いたい場合、usbhid xhci_hcd を追加してください。\n- ドッキングステーションに接続されているディスプレイを使用する場合、initrd の出力を見えるようにするためにあなたのグラフィックカードのモジュールを追加する必要があるかもしれません (例: ほとんどの Intel カードでは i915)。\n\n"
+    },
+    {
+      "title": "BINARIES と FILES",
+      "level": 3,
+      "content": "以下のオプションを使ってイメージにファイルを追加することができます。BINARIES と FILES はフックが実行される前に追加され、フックによって使用/提供されるファイルを上書きすることがあります。BINARIES は標準の PATH に自動で配置され、依存関係がパースされます。つまり必要なライブラリも全て追加されます。FILES はそのままの状態で追加されます。例:\n\n```\nFILES=(/etc/modprobe.d/modprobe.conf)\n```\n\n```\nBINARIES=(kexec)\n```\n\nBINARIES と FILES は両方とも Bash 配列です。なので、スペースで区切ることで複数のエントリを追加することができます。\n\n"
+    },
+    {
+      "title": "HOOKS",
+      "level": 3,
+      "content": "HOOKS 配列は設定ファイルの中で一番重要な設定です。フックはイメージに追加されるものを記述する小さなスクリプトです。フックによっては、デーモンを起動したりスタックしたブロックデバイスを集めたりするためのランタイムコンポーネントを含んでいるものもあります。フックは名前によって参照され、設定ファイルの HOOKS にある順番通りに実行されます。\n\nほとんどのシンプルな単一ディスク環境では、デフォルトの HOOKS 設定で十分なはずです。LVM、RAID、dm-crypt などのスタックルートデバイスやマルチブロックデバイスを使う時は、関連する wiki ページを見て必要な設定を調べて下さい。\n\n"
+    },
+    {
+      "title": "ビルドフック",
+      "level": 4,
+      "content": "ビルドフックは /usr/lib/initcpio/install/ にあります。カスタムビルドフックは /etc/initcpio/install/ に配置します。これらのファイルは mkinitcpio の実行時に bash シェルによって実行されます。ビルドフックには２つの関数が含まれています: build と help。build 関数にはイメージに追加するモジュール、ファイル、バイナリを記述します。これらのアイテムの追加を容易にする mkinitcpio(8) による API が用意されています。help 関数はフックの役割を出力します。\n\nすべてのフックを一覧するには:\n\n```\n$ mkinitcpio -L\n```\n\n特定のフックのヘルプを出力するには mkinitcpio の -H/--hookhelp オプションを使って下さい、例えば:\n\n```\n$ mkinitcpio -H udev\n```\n\n"
+    },
+    {
+      "title": "ランタイムフック",
+      "level": 4,
+      "content": "ランタイムフックは /usr/lib/initcpio/hooks/ にあります。カスタムランタイムフックは /etc/initcpio/hooks/ に配置します。全てのランタイムフックには同じ名前のビルドフックが存在している必要があり、そのビルドフックは add_runscript をコールしてランタイムフックをイメージに追加します。これらのファイルは初期ユーザ空間で busybox の ash シェルによって実行されます。cleanup フックを除いて全てのフックは HOOKS 設定の順番で実行されます。ランタイムフックには複数の関数を含めることができます:\n\nrun_earlyhook: API ファイルシステムがマウントされカーネルコマンドラインがパースされたときに、この名前の関数が実行されます。一般的に udev など初期ユーザ空間が始まったときに必要になる追加のデーモンはこの関数に置きます。\n\nrun_hook: 初期のフックの後すぐに、この名前の関数が実行されます。一番一般的なフックポイントで、スタックブロックデバイスのアセンブリなどのオペレーションはここで行なって下さい。\n\nrun_latehook: root デバイスがマウントされた後、この名前の関数が実行されます。root デバイスの後のセットアップや /usr など他のファイルシステムのマウントなどに控えめに使われます。\n\nrun_cleanuphook: できる限り最後に、この名前の関数が実行されます。設定ファイルの HOOKS の順番とは逆に実行されます。これらのフックは初期のフックによって起動したデーモンのシャットダウンなど、最後のクリーンアップに使われます。\n\n"
+    },
+    {
+      "title": "通常のフック",
+      "level": 4,
+      "content": "以下は、通常のフックとイメージ生成への影響と関連するランタイムを示した表です。パッケージにカスタムフックを入れることができるので、この表は完全ではないことに注意してください。\n\nTable content:\nbusybox init | systemd init | ビルドフック | ランタイムフック (busybox init のみ)\nbase | 任意 | 全ての初期ディレクトリをセットアップし、基本のユーティリティとライブラリをインストールします。systemd フックを使用していない場合、このフックは重要な busybox init を提供するので、何をしようとしているか理解していない限りはこのフックを常に1番最初に置いてください。systemd フックを使用する場合、base フックは busybox のリカバリシェルを提供するだけなので、base の追加は任意となります。 ノート: initramfs の root アカウントがロックされているため、リカバリシェルは使用できません。FS#70408 を見てください。 | –\nudev | systemd | イメージに udevd, udevadm, そして udev ルールの小さなサブセットを追加します。 | udev デーモンを起動して、カーネルからの uevent を処理します; デバイスノードを作成します。ブートプロセスの単純化として、必要なモジュールを明示的に指定する必要をなくすため、udev フックの使用が推奨されています。\nusr | /usr の分割パーティションのサポートを追加します。詳細は #/usr を別のパーティションに分割する を見てください。 | 本物のルートファイルシステムがマウントされた後に /usr パーティションをマウントします。\nresume | ハイバネートイメージにカーネルのコンパイル時デフォルト以外の圧縮アルゴリズムを使用する際に復帰できるようにするために、lzo と lz4 カーネルモジュールを (initramfs に) 追加します。HibernateLocation UEFI 変数で指定されたハイバネートイメージから復帰できるようにするために systemd-hibernate-resume(8) バイナリを追加します。 | \"ハイバネート\" (suspend to disk) 状態からの復帰を試みます。詳しい設定方法は ハイバネート を見てください。\nbtrfs | – | Btrfs を有効にして、Btrfs でフォーマットされた複数のデバイスを使用するために必要なモジュールを設定します。このフックを使うには、btrfs-progs をインストールする必要があります。単一のデバイスで Btrfs を使うだけならこのフックは不要であり、filesystems フックで十分です。 | udev フックが存在しないときに btrfs device scan を実行してマルチデバイスの Btrfs root ファイルシステムを構築します。このフックを使うには btrfs-progs パッケージが必要です。\nautodetect | sysfs のスキャンによってモジュールのホワイトリストを作成して initramfs を小さくします。含まれているモジュールが正しく、欠けているものがないか確認してください。自動検知の利点を活かすためにこのフックは他の subsystem フックより前に実行してください。'autodetect' より前に置かれたフックは完全にインストールされます。 | –\nmicrocode | Intel 及び AMD プロセッサ向けのマイクロコード早期アップデートファイルを未圧縮 initramfs イメージの先頭に埋め込みます。これは、利用可能であれば /usr/lib/firmware/amd-ucode/ と /usr/lib/firmware/intel-ucode/ にあるマイクロコードファイルを使用します。これらのファイルが利用できない場合は、/boot/amd-ucode.img と /boot/intel-ucode.img を展開して使用します。 autodetect フックがこのフックより前に実行される場合、イメージをビルドする際に使用したシステムに搭載されているプロセッサ向けのマイクロコードの早期アップデートファイルのみが追加されます。 このフックは、非推奨となっている --microcode フラグと、プリセットファイルの microcode オプションの機能を置き換えるものです。また、このフックによって、メインの initramfs イメージにマイクロコードのアップデートが埋め込まれるようになるため、マイクロコードを読み込む initrd 行をブートローダーの設定に追加する必要が無くなります。 | –\nmodconf | /etc/modprobe.d/ と /usr/lib/modprobe.d/ から modprobe 設定ファイルをロードします。 | –\nkms | KMS の早期開始 を提供する GPU モジュールを追加します。加えて、一部のノート PC の LCD パネルに組み込まれているプライバシースクリーンに必要なモジュールも追加します。 | –\nkeyboard | キーボードデバイスに必要なモジュールを追加します。あなたが USB キーボードを使っていて、それを初期ユーザ空間で使う必要があるとき (暗号化のパスフレーズを入力したりインタラクティブシェルを使う場合) はこのフックを使って下さい。副作用としてキーボード以外の入力デバイス用のモジュールが追加されることがありますが、困ることはないはずです。 ノート: 異なるハードウェア構成で起動されるシステム(たとえば、外部キーボードと内部キーボードを備えたラップトップまたは ヘッドレスシステム) の場合、起動時にキーボードを利用できるようにするために (例えば、encrypt フックが使用されている場合に暗号化済みデバイスをアンロックするために)、このフックを autodetect の前に配置する必要があります。 | –\nkeymap | sd-vconsole | /etc/vconsole.conf から initramfs に、指定したコンソールキーマップを追加します。システム暗号化を使用する場合 (特にフルディスク暗号化) 、encrypt フックよりも前に追加するようにしてください。 | 初期ユーザ空間で /etc/vconsole.conf から指定されたキーマップをロードします。\nconsolefont | /etc/vconsole.conf から initramfs に、指定したコンソールフォントを追加します。 | 初期ユーザ空間で /etc/vconsole.conf から指定されたコンソールフォントをロードします。\nblock | ブロックデバイスのモジュールを追加します。autodetect フックがこのフックより前に実行される場合、このフックはシステム上で使用されているブロックデバイスのモジュールのみを追加します。例外は ahci、sd_mod、usb_storage、uas、mmc_block、nvme、virtio_scsi、virtio_blk モジュールで、これらは無条件に必ず追加されます。 | –\nnet | 未実装 | ネットワークデバイスに必要なモジュールを追加します。このフックを使うには mkinitcpio-nfs-utils をインストールしなければなりません。詳細は #net を使う を見てください。 | NFS の root ファイルシステムの管理を提供します。\ndmraid | ? | fakeRAID root デバイスのサポートを提供します。これを使うには dmraid をインストールする必要があります。コントローラがサポートしている場合、fakeRAID では mdadm_udev フックと一緒に mdadm を使うことが推奨されます。詳細は #RAID を使う を見てください。 | dmraid を使用して fakeRAID ブロックデバイスを検索・構築します。\nmdadm_udev | udev を使って RAID アレイの構築をサポートします。このフックを使うには mdadm をインストールする必要があります。詳細は RAID#mkinitcpio を設定する を見てください。 | –\nencrypt | sd-encrypt | dm_crypt カーネルモジュールと cryptsetup ツールをイメージに追加します。これを使うには cryptsetup をインストールする必要があります。 ノート: 暗号化されたデバイスを起動時にアンロックするための keyboard フックの注意書きや、ファイルをアンロックする際はファイルシステムについての #MODULES にある注意書きを見てください。 | 暗号化された root パーティションを検知してアンロックします。設定については #ランタイムのカスタマイズ を見て下さい。 sd-encrypt については Dm-crypt/システム設定#sd-encrypt フックを使うを見てください。\nlvm2 | device mapper カーネルモジュールと lvm ツールをイメージに追加します。これを使うには lvm2 をインストールする必要があります。ルートファイルシステムを LVM 上に置いている場合、このフックは必須です。 | –\nfilesystems | イメージに必要なファイルシステムモジュールを含めます。ファイルシステムモジュールを MODULES で指定していない限りこのフックが必要になります。 | –\nfsck | fsck バイナリとファイルシステム固有のヘルパーを追加し、マウント前にルードデバイスに対して fsck を実行できるようにします。autodetect フックの後ろにこのフックを追加した場合、root ファイルシステムのヘルパーだけが追加されます。このフックの使用は強く推奨されており、/usr パーティションを分割する場合は必須です。このフックを含める場合、初期ユーザ空間でキーボードが動作することを保証するために必要なモジュールも追加することを強く推奨します。このフックを使用するには、カーネルコマンドラインにパラメータ rw を設定する必要があります (議論)。詳細は fsck#ブート時のチェック を見てください。 | –\nacpi_override | /usr/initcpio/acpi_override/ と /etc/initcpio/acpi_override/ ディレクトリ内にある ACPI Machine Language (.aml) ファイルを未圧縮早期 initramfs イメージに追加します。そうすることで、カーネルがブートの非常に早い段階で ACPI テーブル (例えば DSDT) をオーバーライドできるようにします。[1] | –\n\nsd-encrypt については Dm-crypt/システム設定#sd-encrypt フックを使うを見てください。\n\n"
+    },
+    {
+      "title": "ポストフック",
+      "level": 4,
+      "content": "ポストフックは /usr/lib/initcpio/post/ (パッケージによって提供されているフック) と /etc/initcpio/post/ (カスタムのフック) に配置されている実行ファイルまたはシェルスクリプトです。これらのファイルは、署名などの追加のタスクを実行するために、イメージが生成された後に実行されます。\n\n各実行ファイルに対して以下の引数が以下の順番で渡されます:\n\n1. (イメージに) 使用されているカーネル (状況によってはこの引数が空になる場合があります)\n1. 生成された initramfs イメージ\n1. (オプション) 生成されたユニファイドカーネルイメージ\n\nさらに、次の環境変数が設定されます: カーネルの完全なバージョン KERNELVERSION、起動するためにカーネルを配置する必要のある場所のデフォルト KERNELDESTINATION。\n\n"
+    },
+    {
+      "title": "COMPRESSION",
+      "level": 3,
+      "content": "カーネルは、initramfs の圧縮にいくつかの形式をサポートしています: gzip、bzip2、lzma (xz)、xz、lzo (lzop)、lz4、zstd。mkinitcpio はデフォルトで zstd 圧縮イメージを使用します。mkinitcpio は デフォルトで、カーネル 5.9 及びそれ以降に対しては zstd 圧縮を、5.9 より前のカーネルバージョンに対しては gzip を使用します。\n\n提供されている mkinitcpio.conf には、さまざまな COMPRESSION オプションがコメントアウトされています。別の圧縮方法に切り替える場合は、コメントを解除し、対応する圧縮ユーティリティがインストールされていることを確認してください。何も指定しない場合は、デフォルトのメソッドが使用されます。非圧縮イメージを作成する場合は、設定ファイルで COMPRESSION=cat を指定するか、コマンドラインで -z cat を使用します。\n\n- lz4 と xz 圧縮ユーティリティはデフォルトでマルチスレッド化されており、zstd はマルチスレッドモードで実行されます (-T0 オプションが使用され、検出されたコアと同じ数のスレッドを作成しようと試みます)。\n- lz4 は、高圧縮モード (-9) のイメージの圧縮率は通常約2.5で、最速の解凍速度を達成しています。zstd は、マルチスレッド圧縮と、オプションによる幅広い圧縮レベルにより、多用途のソリューションを提供します - zstd(1) § Operation Modifiers を参照。xz は、その高圧縮プリセット (-9) で約5の縮小率により最小サイズを実現しますが、その代償として展開速度がかなり遅くなります。\n\n"
+    },
+    {
+      "title": "COMPRESSION_OPTIONS",
+      "level": 3,
+      "content": "COMPRESSION で指定したプログラムに渡す追加のフラグを記述します、例:\n\n```\nCOMPRESSION_OPTIONS=(-9)\n```\n\nこのオプションは空のままにしておくことができます。mkinitcpio は、サポートされている圧縮メソッドに、機能するイメージを生成するために必須なフラグを渡すことを保証しています。\n\nデフォルトの zstd 圧縮では、カスタムカーネルのスペースを節約するために (特にデュアルブート環境で、EFI システムパーティションを /boot として使用する場合)、--long オプションは非常に効果的です。ただし、RAM の限られたシステムは、このオプションをした場合に initramfs を解凍できない場合があります。また、-v オプションは、initramfs の生成中に詳細を見たい場合に必要になるかもしれません。例:\n\n```\nCOMPRESSION=\"zstd\"\nCOMPRESSION_OPTIONS=(-v -5 --long)\n```\n\nxz で圧縮レベル -9e を使用し、ローダブルなカーネルモジュールとファームウェアを解凍しておくことで、圧縮速度が最も遅くなりますが、圧縮率を最大に高めることができます:\n\n```\nCOMPRESSION=\"xz\"\nCOMPRESSION_OPTIONS=(-9e)\nMODULES_DECOMPRESS=\"yes\"\n```\n\n"
+    },
+    {
+      "title": "MODULES_DECOMPRESS",
+      "level": 3,
+      "content": "MODULES_DECOMPRESS は、initramfs の作成時にカーネルモジュールとファームウェアのファイルを解凍しておくかを決めます。デフォルトは no です。\n\nArch ではカーネルモジュールと linux-firmware を zstd でレベル 19 で圧縮しています。Initramfs でより高い圧縮率を使用する場合、MODULES_DECOMPRESS=\"yes\" を設定することで、initramfs のサイズをさらに小さくすることができます。しかし、カーネルが個々のモジュールとファームウェアをロード時に解凍する場合よりも、initramfs イメージ全体を解凍するのにより多くの時間が掛かるようになるため、ブートの初期段階で RAM と CPU の使用率を増加させ、RAM 容量が限られていて CPU の性能が低いシステムで悪影響を及ぼします。\n\n"
+    },
+    {
+      "title": "ランタイムのカスタマイズ",
+      "level": 2,
+      "content": "ランタイム設定オプションはカーネルコマンドラインを通して init や特定のフックに渡すことができます。カーネルコマンドラインパラメータはブートローダによって与えられることがほとんどです。下で書かれているオプションをカーネルコマンドラインに追加することでデフォルトの挙動を変えることができます。詳しくは カーネルパラメータ や Arch ブートプロセス を見て下さい。\n\n"
+    },
+    {
+      "title": "base フックの init",
+      "level": 3,
+      "content": "```\ndisablehooks=resume\n```\n\n他のパラメータについては ブートデバッグ や mkinitcpio(8) を見て下さい。\n\n"
+    },
+    {
+      "title": "RAID を使う",
+      "level": 3,
+      "content": "RAID#mkinitcpio の設定 を見てください。\n\n"
+    },
+    {
+      "title": "net を使う",
+      "level": 3,
+      "content": "必要なパッケージ\n\nnet は mkinitcpio-nfs-utils パッケージを必要とします。\n\nカーネルパラメータ\n\n公式のカーネルドキュメントに包括的で最新の情報が載っています。\n\nip=\n\nこのパラメータはカーネルに、デバイスの IP アドレスの設定方法と、IP ルーティングテーブルの設定方法を指定します。コロンで区切った9つまでの引数を指定できます: ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>。\n\nカーネルコマンドラインにこのパラメータが存在しなかった場合、全てのフィールドが空とされて、カーネルドキュメントに書かれているデフォルト設定が適用されます。一般的にはカーネルは自動設定を使って全てを設定しようとします。\n\n<autoconf> パラメータは ip パラメータの唯一の値として指定できます (前の全ての : 文字を排除)。値が ip=off や ip=none の場合、自動設定は行われません。そうでないなら、自動的に設定されます。最も一般的な使い方は ip=dhcp です。\n\nパラメータの説明は、カーネルドキュメントを参照してください。\n\n例:\n\n```\nip=127.0.0.1:::::lo:none  --> ループバックインターフェイスを有効化。\nip=192.168.1.1:::::eth2:none --> 静的 eth2 インターフェイスを有効化。\nip=:::::eth0:dhcp --> eth0 構成に対して dhcp プロトコルを有効化。\n```\n\nBOOTIF=\n\n複数のネットワークカードを使っているときは、このパラメータに起動するインターフェイスの MAC アドレスを含めることができます。インターフェイスの数字が変わってしまったり、pxelinux の IPAPPEND 2 や IPAPPEND 3 オプションを使うときに便利です。指定しなかった場合、eth0 が使われます。\n\n例:\n\n```\nBOOTIF=01-A1-B2-C3-D4-E5-F6  # 先頭の \"01-\" と大文字に注意\n```\n\nnfsroot=\n\nnfsroot パラメータがコマンドラインで指定されなかった場合、デフォルトで /tftpboot/%s が使われます。\n\n```\nnfsroot=[<server-ip>:]<root-dir>[,<nfs-options>]\n```\n\nパラメータの説明を見るには mkinitcpio -H net を実行してください。\n\n"
+    },
+    {
+      "title": "LVM を使う",
+      "level": 3,
+      "content": "root デバイスを LVM 上に置く場合は、LVM に Arch Linux をインストールする#mkinitcpio フックを追加する を見てください。\n\n"
+    },
+    {
+      "title": "暗号化されたルートを使う",
+      "level": 3,
+      "content": "root を暗号化している場合、どのフックを含めるべきかに関する詳細な情報は Dm-crypt/システム設定#mkinitcpio を見て下さい。\n\n"
+    },
+    {
+      "title": "/usr を別のパーティションに分割する",
+      "level": 3,
+      "content": "/usr のパーティションを別にする場合、以下を行う必要があります:\n\n- 起動時にこのパーティションのチェックを実行するために、fsck フックを追加して、/etc/fstab で /usr の passno を 2 にする。起動時に /usr を fsck したい場合は必須です (これはすべてのユーザに推奨されます)。このフックが存在しないと、/usr は永遠に fsck されません。\n- systemd フックを使っていない場合、usr フックを追加する。ルートがマウントされた後に /usr パーティションがマウントされるようになります。\n\n"
+    },
+    {
+      "title": "フォールバック initramfs の生成を無効化する",
+      "level": 3,
+      "content": "フォールバックイメージの生成は以下の方法で無効化できます:\n\n- /etc/mkinitcpio.d/ 内の対応する .preset ファイル内の PRESETS=('default' 'fallback') 行を PRESETS=('default') に変更する。\n- /boot/ 内のフォールバック initramfs イメージを削除する。\n- ブートローダーの設定を更新する。\n\n"
+    },
+    {
+      "title": "イメージの展開",
+      "level": 3,
+      "content": "initramfs イメージの中に何が入っているか気になるときは、イメージを展開して中に入っているファイルを調べることができます。\n\ninitramfs イメージは SVR4 CPIO アーカイブであり、find と bsdcpio コマンドによって生成されています。また、任意で、カーネルが対応した圧縮方法によって圧縮されています。圧縮方法について詳しくは #COMPRESSION を見て下さい。\n\nmkinitcpio には lsinitcpio(1) というユーティリティが含まれており initramfs イメージの中身を一覧・展開することができます。\n\nイメージ内のファイルを一覧するには:\n\n```\n# lsinitcpio /boot/initramfs-linux.img\n```\n\nカレントディレクトリにファイルを全て展開するには:\n\n```\n# lsinitcpio -x /boot/initramfs-linux.img\n```\n\nイメージの重要なパーツについて読みやすいリストを取得することもできます:\n\n```\n# lsinitcpio -a /boot/initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "展開して修正を加えたイメージの再圧縮",
+      "level": 3,
+      "content": "/usr/bin/mkinitcpio スクリプトの build_image 関数を以下のパラメータで実行してください:\n\n```\nbuild_image 出力ファイル 圧縮方式\n```\n\nbuild_image 関数の内容で新しいスクリプトを作成することでこれを実行できます。 これはカレントディレクトリ内の内容を 出力ファイル というファイルに圧縮します。\n\n"
+    },
+    {
+      "title": "マウントされているのに \"/dev must be mounted\" と表示される",
+      "level": 3,
+      "content": "/dev がマウントされているかどうか確認するために mkinitcpio は /dev/fd/ が存在するかどうかを確かめます。問題がないようでしたら、手動で作成することができます:\n\n```\n# ln -s /proc/self/fd /dev/\n```\n\n(当然 /proc のマウントも必要です。mkinitcpio によって次にチェックされます。)\n\n"
+    },
+    {
+      "title": "Possibly missing firmware for module XXXX",
+      "level": 3,
+      "content": "カーネルのアップデート後に initramfs を再生成する際、以下のような警告が表示されることがあります:\n\n```\n==> WARNING: Possibly missing firmware for module: 'module_name'\n```\n\ndefault initramfs イメージを生成するときに同じようなメッセージが表示される場合、警告メッセージが言っている通り、追加のファームウェアをインストールする必要があるかもしれません。ほとんどの一般的なファームウェアファイルは linux-firmware パッケージをインストールすることで入手できます。ファームウェアを提供する他のパッケージについては、以下の表を見るか、公式リポジトリや AUR でモジュール名を検索してみてください。\n\nメッセージが fallback initramfs イメージの生成時にのみ表示される場合は、以下の2つの選択肢があります:\n\n- 影響を受けるハードウェアを使用しないことがわかっている場合は、警告を安全に無視できます。\n- 警告を抑制したい場合、不足しているファームウェアをインストールできます。メタパッケージ mkinitcpio-firmwareAUR には、ほどんどのオプションのファームウェアが含まれています。あるいは、手動で必要なパッケージをインストールしてください:\n\nTable content:\nモジュール | パッケージ\naic94xx | aic94xx-firmwareAUR\nast | ast-firmwareAUR\nbfa | linux-firmware-qlogic\nbnx2x | linux-firmware-bnx2x\nliquidio | linux-firmware-liquidio\nmlxsw_spectrum | linux-firmware-mellanox\nnfp | linux-firmware-nfp\nqat_420xx | ファームウェアはまだ利用できません。[2] を参照。\nqed | linux-firmware-qlogic\nqla1280 | linux-firmware-qlogic\nqla2xxx | linux-firmware-qlogic\nwd719x | wd719x-firmwareAUR\nxhci_pci | upd72020x-fwAUR\n\n- 警告を取り除きたいが、必要ないファームウェアパッケージのためにシステムの空き領域を無駄にしたくない場合、フォールバック initramfs の生成を無効化することができます。\n\n利用できないファームウェアに関しては、ダミーのファイルを作成することで警告を消すことができます。例えば:\n\n```\n# echo \"Device not available\" > /usr/lib/firmware/qat_420xx.bin\n# echo \"Device not available\" > /usr/lib/firmware/qat_420xx_mmp.bin\n```\n\n"
+    },
+    {
+      "title": "No PS/2 controller found",
+      "level": 3,
+      "content": "一部のマザーボードで (ほとんどの場合、古いもの。しかし、一部の新しいものでも起こります)、i8042 コントローラが自動検出できません。稀なケースですが、キーボードが使えなくなってしまうことがあります。この状況を事前に察知することができます。PS/2 ポートがあり、i8042: PNP: No PS/2 controller found. Probing ports directly というメッセージが表示される場合、MODULES 配列に atkbd を追加してください。[3]\n\n"
+    },
+    {
+      "title": "標準的なレスキュー手順",
+      "level": 3,
+      "content": "不適切な初期 RAM ディスクを使用すると、システムが起動できなくなることがよくあります。 したがって、以下のようなシステムレスキュー手順に従ってください:\n\n"
+    },
+    {
+      "title": "あるマシンでは起動できるが他のマシンでは起動できない",
+      "level": 4,
+      "content": "mkinitcpio の autodetect フックは /sys をスキャンして、ロードされているカーネルモジュールを確認して不要なカーネルモジュールを排除します。/boot ディレクトリを他のマシンに移動して、初期ユーザー空間でブートが失敗する場合、カーネルモジュールが存在しないために新しいハードウェアが検出されていないのが原因かもしれません。USB 2.0 と 3.0 では必要なカーネルモジュールが異なるので注意してください。\n\n修正するには、ブートローダーから fallback イメージを選択してください (fallback は autodetect によるフィルタリングがされていません)。起動したら、新しいマシンで mkinitcpio を実行して適切なモジュールでイメージを再生成してください。fallback イメージで起動できない場合、Arch Linux のライブ CD/USB で起動して、chroot し、新しいマシンで mkinitcpio を実行して下さい。それでも駄目な場合、initramfs にモジュールを手動で追加します。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Linux カーネルドキュメント initramfs, \"What is rootfs?\"\n- Linux カーネルドキュメント initrd\n- Wikipedia 記事 initrd\n\n"
+    }
+  ]
+}

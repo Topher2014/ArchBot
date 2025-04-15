@@ -1,0 +1,66 @@
+{
+  "title": "Splunk",
+  "url": "https://wiki.archlinux.org/title/Splunk",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Splunk is a proprietary data mining product. From Wikipedia:\n\nSplunk is licensed based on MB of data indexed per day. The free license allows up to 500 MB of data per day, but it is missing a few features such as access control, alerts / monitoring and PDF generation\n\nSplunk provides a fairly high-level search interface to data. Raw data is parsed by sets of regular expressions (many of them built-in) to extract fields; these fields then allow a query language that has fairly unique semantics but will be recognisable to user familiar with SQL or other structured data querying languages.\n\nSplunk's online documentation is open to the public and reasonably comprehensive. Much of it is in Unix-like man pages, particularly for the search and configuration reference files. This article will focus on lesser known features or failures of Splunk, and how to run it healthily in Arch Linux.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "There is now a splunkAUR package to install which will create the splunk user and group, install Splunk, and install a systemd unit file.\n\nThere is also a splunkforwarderAUR package which will install the Splunk Universal Forwarder.\n\n"
+    },
+    {
+      "title": "Manual",
+      "level": 3,
+      "content": "Log into splunk.com to get the download link for Splunk or the Splunk Universal Forwarder and wget it:\n\n```\n$ wget -O splunk.tgz <url goes here>\n```\n\nExtract the tarball:\n\n```\n$ tar -xvf splunk.tgz\n```\n\nFor a simple deployment, it is conventional to move the extracted directory to /opt/.\n\nSplunk's installation directory is commonly referred to as $SPLUNKHOME. You may set it in .bashrc and add it to your path:\n\n```\nexport SPLUNK_HOME=/opt/splunk\nexport PATH=$PATH:$SPLUNK_HOME/bin\n```\n\nIt has a reasonably robust CLI interface, and all the configuration is stored in .ini style configuration files.\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 2,
+      "content": "Splunk has two main components: the splunkd daemon and the splunkweb service, a cherrypy web application.\n\nIf using the AUR package, you can run both by starting the systemd splunk service.\n\nAlternatively run with the Splunk binary:\n\n```\n# splunk start\n```\n\n"
+    },
+    {
+      "title": "Performance",
+      "level": 2,
+      "content": "The conventional wisdom in the Splunk community is that Splunk's performance is heavily IO-bound, but this may be an assumption based on traditional use cases for Splunk. There are certain powerful operations with a single-threaded implementation that spend most of their time occupying a single core while barely hitting the disk.\n\nIt is easy to see what Splunk is doing if you monitor these:\n\n```\n$ iostat -d -x 5\n$ top\n```\n\nA sign that you have a bottleneck caused by Splunk's implementation details - rather than your own hardware - is a pattern where you mostly see a single core at 100% with little-to-no disk usage, with sporadic spikes of activity by splunkd on an extra core as it hits the disk for more events.\n\nIf you are having trouble getting Splunk to utilise your hardware, consider the following factors:\n\n"
+    },
+    {
+      "title": "Search semantics",
+      "level": 3,
+      "content": "Much of Splunk's search functionality is powered a MapReduce implementation. It is powerful and very useful in a distributed environment, but the high-level search language abstractions can mask a number of mistakes that essentially force a reduce operation early in the pipeline, which removes Splunk's ability to parallelise its operations, whether in a distributed environment or on a single instance.\n\nA simple rule of thumb is that any operation which (in a naive implementation) would need to see every 'event' to do its work will not be parallelised. This applies particularly to the transaction command, which is one of Splunk's most useful features.\n\n"
+    },
+    {
+      "title": "Distributed environment",
+      "level": 3,
+      "content": "Splunk is designed to be run in a distributed environment; the assumption is generally that each instance is on a separate machine, but on a machine with four or more logical cores and a fast disk (such as a solid-state drive), it is possible to improve performance significantly by setting up several Splunk instances.\n\nIf you run multiple Splunk instances on a single machine, there are a couple of settings you need to pay attention to:\n\n- serverName - in the [general] stanza of server.conf\n- mgmthostport and httpport for splunkd and splunkweb respectively - in the [settings] stanza of web.conf\n\nYou may set up a third instance as a 'search head' which dispatches searches to the indexers ('search peers'), or you can set both indexers to be aware of the other.\n\nIf you are using a dedicated search head, you may as well disable the web interface on the indexers:\n\n```\n# splunk disable webserver\n # splunk restart\n```\n\n"
+    },
+    {
+      "title": "Indexing",
+      "level": 3,
+      "content": "Multiple indexers means splitting the data between them. Either set up their inputs.conf to monitor different subsets of your source data, or set up a separate 'forwarder' instance that uses the auto load-balancing features to round-robin between them.\n\nDo not try to make two indexers read from the same index via a static path in indexes.conf or a symlink - this will push responsibility for deduplicating results onto the search head and mitigate the advantage of distributing the work in the first place.\n\n"
+    },
+    {
+      "title": "Debugging and administration",
+      "level": 2,
+      "content": "Splunk's CLI is under-utilised.\n\nIt is very useful for debugging your configuration files:\n\n```\n# splunk btool props list\n```\n\nOr for adding one-off files for testing, rather than having to configure inputs.conf to monitor a directory:\n\n```\n# splunk add oneshot <file> -sourcetype mysourcetype -host myhost -index myindex\n```\n\nTake care to use a special test index when testing - it is generally not possible to remove data from an indexing once it has been added without wiping it entirely.\n\n"
+    },
+    {
+      "title": "Custom commands",
+      "level": 2,
+      "content": "Per this, Splunk allows the user to call out to arbitary Python or Perl scripts during the search pipeline. This is useful for overcoming the limitations of Splunk's framework, looking up external data sources, and so on. It is also a shortcut to building macros that will automatically push data to other locations or perform arbitrary jobs outside of what Splunk is capable of.\n\nThe Splunk documentation, as well as the interface, is sprinkled with warnings that using custom commands will seriously affect search performance. In reality, as long as the search command is not doing something stupid, a custom command generally has a very low footprint, and is executed in a separate process that can use CPU and memory resources while Splunk is mostly bound to a single core. Splunk will repeatedly spawn custom commands with chunks of the data (unless streaming = false, in which case the command gets the entire data set) and do its own work while waiting for the external script to output its results and exit.\n\nSplunk comes with a pre-packaged Python 2.7.2 binary, and will not execute commands with the system Python installation. This can make it difficult to use packages installed via pip or easy_install, or your own libraries.\n\nThere is nothing to stop you from using calls like fork and/or execv to get around this limitation and load the system Python installation. Alternatively, use it to process the data in a faster environment, whether with a compiled program or just a faster Python interpreter such as pypy.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "The guide to commands.conf is somewhat misleading. In particular:\n\n```\nstreaming = [true|false]\n * Specify whether the command is streamable.\n * Defaults to false.\n```\n\nThe 'streaming' here actually just tells Splunk whether it is safe for it to repeatedly spawn your command with arbitrarily-sized (often in the realm of 50K rows) discrete chunks of the data it is passing through; it will not tell the default splunk.Intersplunk library to actually provide a streaming interface to the data as you work with it.\n\n"
+    },
+    {
+      "title": "Library API",
+      "level": 3,
+      "content": "There is no real documentation for the Splunk library available to the built-in interpreter. Try inspecting the module directly:\n\n```\n$SPLUNK_HOME/bin/splunk cmd python\n#(in python interpreter)\nimport splunk.Intersplunk\nhelp(splunk.Intersplunk)\n```\n\nThe source for splunk.Intersplunk shows that it essentially parses the entire set of input from the process' stdin before offering the data to the command as such. Unless the command needs to have the entire data set to do its work - generally only a small subset of use cases - this is extremely inefficient.\n\nThe library is easy to replace. The data passed in from Splunk contains several header lines with key:value pairs, followed by a newline, followed by a header row and the data proper. In Python, read in the header rows and store or discard them then use a csv.Reader or csv.DictReader object - to handle the data a row at a time, with a csv.Writer or csv.DictWriter to push resulting rows back into the Splunk search pipeline.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "title": "Mullvad",
+  "url": "https://wiki.archlinux.org/title/Mullvad",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Mullvad is a VPN service based in Sweden which uses OpenVPN and WireGuard.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Note: **Download and import the signing key** \n\nThe official GUI client is available as mullvad-vpnAUR and mullvad-vpn-binAUR.\n\nAfter installation, you will only have to start/enable mullvad-daemon.service.\n\nAlternatively, see #Manual configuration for manually setting up a Mullvad VPN connection without the official GUI.\n\n"
+    },
+    {
+      "title": "Manual configuration",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf you do not want to use the official application, you can manually set up a Mullvad VPN connection with either OpenVPN or WireGuard, both of which Mullvad officially supports. WireGuard is recommended by Mullvad, as it is more modern protocol and is deeply integrated to the kernel, allowing for better performance and a more reliable connection.\n\nIf you use NetworkManager you may want to set up dnsmasq to decrease DNS lookup times and decrease the risk of DNS leakages. Follow the steps under DNS_caching_and_conditional_forwarding.\n\n"
+    },
+    {
+      "title": "Using OpenVPN",
+      "level": 3,
+      "content": "First make sure the packages openvpn and openresolv are installed, then proceed to download Mullvad's OpenVPN configuration file package from their website and unzip the downloaded file to /etc/openvpn/client/. From here you can either use the NetworkManager front-ends, if using NetworkManager, or you can use systemd to start openvpn automatically at boot.\n\nAlternatively, after downloading the configuration file package, change directories into the directory where you unzipped your files to and run:\n\n```\n# openvpn --config mullvad_<LOCATION>.conf\n```\n\nThen check your connection here: https://mullvad.net/en/check\n\n"
+    },
+    {
+      "title": "Using NetworkManager front-ends",
+      "level": 4,
+      "content": "See OpenVPN#NetworkManager-native VPN configuration.\n\n"
+    },
+    {
+      "title": "Using systemd",
+      "level": 4,
+      "content": "Rename mullvad_linux.conf for a shorter name to be used with the systemd service later:\n\n```\n# mv /etc/openvpn/client/mullvad_linux.conf /etc/openvpn/client/mullvad.conf\n```\n\nIn order to use the nameservers supplied by Mullvad, update-resolv-conf script is being called upon starting and stopping the connection with OpenVPN to modify resolv.conf to include the correct IP addresses. This script is also included in the Mullvad configuration zipfile, but should be moved to /etc/openvpn/ to match the path specified in the Mullvad configuration file:\n\n```\n# mv /etc/openvpn/client/update-resolv-conf /etc/openvpn/\n```\n\nEnsure that the script is executable.\n\nThe script can be kept updated with the openvpn-update-resolv-conf script, which also contains a fix for DNS leaks.\n\nAfter configuration the VPN connection can be managed with openvpn-client@mullvad.service. If the service fails to start with an error like Cannot open TUN/TAP dev /dev/net/tun: No such device (errno=19), you might need to reboot the system to enable OpenVPN creating the correct network device for the task.\n\n"
+    },
+    {
+      "title": "Enabling a Kill Switch",
+      "level": 4,
+      "content": "To enable a Kill Switch function to prevent data leakage in case the VPN connection goes down, you can use iptables as explained in the Mullvad OpenVPN on Linux page, under Enabling a Kill Switch.\n\n"
+    },
+    {
+      "title": "Using WG-Quick",
+      "level": 4,
+      "content": "Install the wireguard-tools and openresolv packages. Log in to Mullvad with your account and then go to the WireGuard configuration file generator. Under Generate a WireGuard key, click generate key to generate a private key, or you can issue the following command to generate a private key and import it.\n\n```\n# wg genkey\n```\n\nFill out the next step under Select one or multiple exit locations on the generator and download the file. Extract the file you downloaded to get one or several configuration files depending on your selections. Move the configuration files into /etc/wireguard.\n\nFor this example, we have selected Malmö, Sweden (se-mma-wg-001), as our server location, so the downloaded configuration file is named se-mma-wg-001.conf.\n\nAs root, run the following command. Replace se-mma-wg-001 with your selected server.\n\n```\n# wg-quick up se-mma-wg-001\n```\n\nTo stop it, run the following command.\n\n```\n# wg-quick down se-mma-wg-001\n```\n\nTo automatically have it run at boot, enable/start wg-quick@se-mma-wg-001.service.\n\n"
+    },
+    {
+      "title": "With NetworkManager",
+      "level": 4,
+      "content": "To add a WireGuard connection from a config-file, issue following command in terminal:\n\n```\n# nmcli connection import type wireguard file configuration_file\n```\n\nIf the file was called WG1.conf a connection called WG1 should have been added.\n\nIf you at any point want to delete the connection, issue the command:\n\n```\n# nmcli connection delete connection_name\n```\n\nTo actually start the WireGuard tunnel, issue command:\n\n```\n# nmcli connection up connection_name\n```\n\nMake sure the connection is listed when you run nmcli:\n\n```\n# nmcli\n```\n\nYou might want to verify that the private and public keys are correct and corresponds with what you got from your VPN provider:\n\n```\n# WG_HIDE_KEYS=never wg\n```\n\nMullvad has provided a shell script to automate this process - with a caveat: the automatically generated configuration files do not contain kill switches, which need to be manually added if you so desire.\n\nNote: **This article or section is a candidate for merging with Wireguard.** This article or section is a candidate for merging with Wireguard.\n\nThis article or section is a candidate for merging with Wireguard.\n\nKDE settings (`systemsettings kcm_networkmanagement`), which is a frontend for Network Manager, can either import individual files that you download from mullvad's website (linux configuration), or you can open those files and manually add the values.\n\nThe required fields are:\n\nTable content:\nsettings tab | field | mullvad config file\nIP V4 | Method: Manual | n/a\nIP V4 | Address/Netmask | Interface.Address (must split on `,` and interpret the mask value. Same for IPV6)\nIP V6 | Method: Manual (or ignored) | n/a\nWireguard Interface | Private Key | Interface.PrivateKey\nPeers | Public Key | Peer.PublicKey\nPeers | Allowed IPs | Peer.AllowedIPs\nPeers | Endpoint address | Peer.Endpoing (must split on `:`)\nPeers | Endpoint port | Peer.Endpoing (must split on `:`)\n\nNote that there's an easy to miss \"Peers\" button in the \"Wireguard Interface\" tab to open the Peers section.\n\nTo use multiple peers, you will have to open the `zip` file, and add one peer from each individual file on the Peers dialog. Note that the \"Wireguard Interface\" and IP tabs will be the same for all the files inside the `zip` archive you got from mullbad.\n\n"
+    },
+    {
+      "title": "With systemd-networkd",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/99-wg0.netdev\n```\n\n```\n[NetDev]\nName=wg0\nKind=wireguard\nDescription=WireGuard VPN\n\n[WireGuard]\nFirewallMark=0x8888\nListenPort=51820\nRouteTable=off\nPrivateKey=<private key>                               \n\n[WireGuardPeer]\nPublicKey=<public key>                                \nAllowedIPs=0.0.0.0/0  \nAllowedIPs=::0/0\nEndpoint=<ip>:<port>\n```\n\n```\n/etc/systemd/network/99-wg0.network\n```\n\n```\n[Match]\nName=wg0\n\n[Network]\nAddress=<ipv4 addr>/32\nAddress=<ipv6 addr>/128\nDNS=<dns>\nDNSDefaultRoute=yes\nDomains=~.\n\n[RoutingPolicyRule]\nFamily=both\nSuppressPrefixLength=0\nPriority=999\nTable=main\n\n[RoutingPolicyRule]\nFamily=both\nFirewallMark=0x8888\nInvertRule=true\nTable=1000\nPriority=1000\n\n[Route]\nGateway=0.0.0.0\nTable=1000\n\n[Route]\nGateway=::\nTable=1000\n```\n\nFor basic kill-switch functionality you can use iptables to block all outgoing connections except those with fwmark 0x8888:\n\n```\niptables incomplete example\n```\n\n```\n-A OUTPUT -m mark --mark 0x8888 -j ACCEPT\n-A OUTPUT -j DROP\n```\n\n"
+    },
+    {
+      "title": "DNS leaks",
+      "level": 2,
+      "content": "By default, the Mullvad OpenVPN configurations allow DNS leaks and for usual VPN use cases this is an unfavorable privacy defect. Mullvad's GUI client automatically stops DNS leaks by removing every DNS server IP from the system configuration and replacing them with an IP pointing out to Mullvad's own non-logging DNS server, valid during the VPN connection. This fix can also be applied with the plain OpenVPN method by configuring resolv.conf to use only the Mullvad DNS server IP specified on their website.\n\nThe resolv.conf update script version in openvpn-update-resolv-conf implements a different fix for the leaks by using the exclusive interface switch -x when running the resolvconf command, but this might cause another form of DNS leakage by making even every local network address resolve via the DNS server provided by Mullvad, as noted in the script's GitHub issue page.\n\nIf you use Mullvad with wireguard remember to install the openresolv package to prevent DNS leaks.\n\n"
+    },
+    {
+      "title": "IPv6",
+      "level": 2,
+      "content": "Mullvad's Wireguard servers fully support IPv6, both inside and outside the tunnel. Users of the GUI app can enable tunneling IPv6 in VPN settings, and enable running the tunnel itself over IPv6 in VPN settings > WireGuard settings > IP version. This may improve performance somewhat by allowing/encouraging larger packet sizes in the WireGuard tunnel. These preferences can be chosen on the WireGuard config generator for manual users.\n\n"
+    },
+    {
+      "title": "Preferring IPv6 inside the tunnel",
+      "level": 3,
+      "content": "Because the VPN assigns a unique local address and performs network address translation (an unusual way to configure IPv6 connections to the public Internet), getaddrinfo(3) de-prioritizes IPv6 within the tunnel and will only use it when it is the only available option for a connection. To solve this and prefer IPv6 within the tunnel (as is the default on a standard connection), edit the gai.conf(5) file and add the following line:\n\n```\n/etc/gai.conf\n```\n\n```\nlabel fc00:bbbb:bbbb::/48 1\n```\n\n"
+    },
+    {
+      "title": "Automatic configuration",
+      "level": 2,
+      "content": "vopono supports automatically generating configuration files for Mullvad, allowing you to instantly run applications via Mullvad connections in temporary network namespaces.\n\nBoth OpenVPN and Wireguard connections are supported. Shadowsocks is supported for OpenVPN connections, and port forwarding is supported for Wireguard connections.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Mullvad client source code\n- Mullvad FAQ\n- vopono\n\n"
+    }
+  ]
+}

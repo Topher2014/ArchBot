@@ -1,0 +1,66 @@
+{
+  "title": "DokuWiki (Español)",
+  "url": "https://wiki.archlinux.org/title/DokuWiki_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-11-24** \n\n«DokuWiki es un wiki que cumple con los estándares, simple de usar y que permite a los usuarios crear ricos repositorios de documentación. Proporciona un entorno para que personas, equipos y empresas creen y colaboren utilizando una sintaxis sencilla pero potente que garantiza que los archivos de datos permanezcan estructurados y legibles fuera de la wiki».\n\n«Las revisiones ilimitadas de cada página permiten la restauración de cualquier versión anterior de dichas páginas, y con los datos almacenados en archivos de texto plano, no se requiere ninguna base de datos. Una poderosa arquitectura de complementos permite la extensión y la mejora del sistema central. Vea la sección de características para obtener una descripción completa de lo que DokuWiki puede ofrecer.» [1]\n\nEn otras palabras, DokuWiki es una Wiki escrita en PHP y que no requiere base de datos.\n\n"
+    },
+    {
+      "title": "Notas iniciales",
+      "level": 2,
+      "content": "DokuWiki debería funcionar en cualquier servidor web que soporte PHP 5.6 o posterior. Como los requisitos pueden cambiar con el tiempo, debe consultar la página de requisitos de DokuWiki para obtener más detalles.\n\nSe recomienda encarecidamente leer las secciones apropiadas de la página de seguridad de DokuWiki para su servidor web. La mayoría de los servidores web más populares están cubiertos, pero también hay instrucciones genéricas.\n\nEl paquete descomprime DokuWiki en /usr/share/webapps/dokuwiki con los archivos de configuración en /etc/webapps/dokuwiki y los archivos de datos en /var/lib/dokuwiki/data. También cambia la propiedad de los archivos relevantes al usuario «http». Esto debería funcionar bien para la mayoría de los servidores web más populares, tal como están empaquetados por Arch.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "1. Instale un servidor web de su elección (por ejemplo, Apache, nginx o lighttpd) y configúrelo para PHP. Como se mencionó anteriormente, DokuWiki no tiene necesidad de un servidor de base de datos por lo que puede saltarse ese paso al configurar su servidor web.\n1. Instale dokuwiki.\n1. Configure el servidor web para DokuWiki (consulte la sección siguiente).\n1. Con el navegador web de su elección, abra http://<your-server>/dokuwiki/install.php y continúe la instalación desde allí. Para nginx la URL es http://<your-server>/install.php.\n\nAlternativamente, si desea instalar desde un archivo tarball, puede informarse en https://www.dokuwiki.org/Install. Generalmente el procedimiento es el mismo que el anterior. En lugar de usar pacman, necesitará descargar el tarball, descomprimirlo en la raíz del documento del servidor (por ejemplo, /srv/http/dokuwiki), y cambiar los permisos al usuario apropiado (por ejemplo, «http»).\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "Si está utilizando lighttpd o nginx y la versión de PHP es inferior a 7, debe ajustar open_basedir en /etc/php/php.ini para incluir los directorios dokuwiki (php prohíbe seguir enlaces simbólicos fuera del ámbito permitido):\n\n```\n/etc/php/php.ini\n```\n\n```\nopen_basedir = /srv/http/:/home/:/tmp/:/usr/share/pear/:/usr/share/webapps/:/etc/webapps/dokuwiki/:/var/lib/dokuwiki/\n```\n\nTambién descomente la siguiente línea:\n\n```\n/etc/php/php.ini\n```\n\n```\nextension=gd\n```\n\nDokuwiki necesita esta biblioteca para cambiar el tamaño de las imágenes.\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "El paquete debe tener el archivo /etc/httpd/conf/extra/dokuwiki.conf con el siguiente contenido:\n\n```\nAlias /dokuwiki /usr/share/webapps/dokuwiki\n<Directory /usr/share/webapps/dokuwiki/>\n    Options +FollowSymLinks\n    AllowOverride All\n    order allow,deny\n    allow from all\n    php_admin_value open_basedir \"/tmp/:/usr/share/pear/:/usr/share/webapps/:/etc/webapps/dokuwiki/:/var/lib/dokuwiki/\"\n</Directory>\n```\n\nSi está ejecutando Apache 2.4 o posterior, tendrá que cambiar las siguientes líneas:\n\n```\norder allow,deny\n    allow from all\n```\n\npara que lea:\n\n```\nRequire all granted\n```\n\nIncluya el archivo recién creado en la configuración de Apache colocando la siguiente línea al final de /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/dokuwiki.conf\n```\n\nAsegúrese de que las carpetas /etc/webapps/dokuwiki y /var/lib/dokuwiki sean propiedad del usuario y del grupo «http». Puede reubicar estos directorios si lo desea, siempre que actualice las referencias en /etc/httpd/conf/extra/dokuwiki.conf respectivamente, para que DokuWiki encuentre los complementos y la carpeta tpl.\n\nDespués reinicie Apache:\n\n```\n# systemctl restart httpd.service\n```\n\nPara terminar la instalación, ejecute el script dokuwiki/install.php en su navegador.\n\n"
+    },
+    {
+      "title": "lighttpd",
+      "level": 3,
+      "content": "Edite el archivo /etc/lighttpd/lighttpd.conf de acuerdo con las instrucciones dokuwiki (puede contener información actualizada).\n\nAsegúrese de que los módulos mod_access y mod_alias están cargados. Si no, carguelos, añadiendo lo siguiente a:\n\n/etc/lighttpd/lighttpd.conf:\n\n```\nserver.modules += (\"mod_access\")\nserver.modules += (\"mod_alias\")\n```\n\nmod_access proporciona la orden url.access-deny que estamos utilizando desde este punto.\n\nBajo la línea:\n\n```\n$HTTP[\"url\"] =~ \"\\.pdf$\" {\n  server.range-requests = \"disable\"\n}\n```\n\nañada esto:\n\n```\n# subdirectorio de dokuwiki\n# compuesto por el subdirectorio del directorio raíz donde está instalado dokuwiki\n# en este caso el directorio raíz es el directorio base /htdocs/\n# Nota: tenga cuidado con las barras inclinadas al unir cadenas.\n# Todo el contenido de este servidor de ejemplo se sirve desde htdocs/ hacia arriba.\n#var.dokudir = var.basedir + \"/dokuwiki\"\nvar.dokudir = server.document-root + \"/dokuwiki\"\n\n# asegúrese de que siempre se sirvan a través de fastcgi fastcgi y nunca como archivos estáticos\n# denegar completamente el acceso a estos\n$HTTP[\"url\"] =~ \"/(\\.|_)ht\" { url.access-deny = ( \"\" ) }\n$HTTP[\"url\"] =~ \"^\" + var.dokudir + \"/(bin|data|inc|conf)/\"  { url.access-deny = ( \"\" ) }\n```\n\nEstas entradas dan alguna seguridad básica a DokuWiki. Lighttpd no utiliza archivos .htaccess como Apache. PUEDE hacer la instalación sin esto, pero NUNCA es recomendable.\n\nAñada alias en algún lugar del archivo de configuración de lighttpd o fastcgi:\n\n```\nalias.url += (\"/dokuwiki\" => \"/usr/share/webapps/dokuwiki/\")\n```\n\nReinicie lighttpd:\n\n```\n# systemctl restart lighttpd\n```\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 3,
+      "content": "Asegúrese de que php-fpm esté instalado e iniciado.\n\nAñada el siguiente bloque de «server», pero cambie el nombre del servidor por el suyo y comente el bloque install.php hasta que haya terminado de instalar DokuWiki. Este bloque se supone que utiliza TLS. [2]\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nserver {\n        listen 443 ssl http2;\n        listen [::]:443 ssl http2;\n        server_name wiki.example.com;\n         \n        root /usr/share/webapps/dokuwiki;\n        index doku.php;\n\n        #Recuerde comentar lo siguiente cuando esté instalando DokuWiki, y descomentarlo cuando haya terminado.\n        location ~ /(data/|conf/|bin/|inc/|install.php) { deny all; } # secure Dokuwiki\n\n        location ~^/\\.ht { deny all; } # also secure the Apache .htaccess files\n        location @dokuwiki {\n            #rewrites \"doku.php/\" out of the URLs if you set the userewrite setting to .htaccess in dokuwiki config page\n            rewrite ^/_media/(.*) /lib/exe/fetch.php?media=$1 last;\n            rewrite ^/_detail/(.*) /lib/exe/detail.php?media=$1 last;\n            rewrite ^/_export/([^/]+)/(.*) /doku.php?do=export_$1&id=$2 last;\n            rewrite ^/(.*) /doku.php?id=$1&$args last;\n        }\n\n        location / { try_files $uri $uri/ @dokuwiki; }\n        location ~ \\.php$ {\n            try_files $uri =404;\n            fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n            fastcgi_index index.php;\n            include fastcgi.conf;\n        }\n\n    }\n```\n\nReinicie nginx:\n\n```\n# systemctl restart nginx\n```\n\n"
+    },
+    {
+      "title": "Activar la carga y visualización de archivos SVG",
+      "level": 3,
+      "content": "DokuWiki admite archivos SVG pero los tiene desactivados de forma predeterminada.\n\nSi desea activarlos, cree el siguiente archivo:\n\n```\n/etc/webapps/dokuwiki/mime.local.conf\n```\n\n```\nsvg image/svg+xml\n```\n\nEsto tiene implicaciones de seguridad: mire aquí\n\n"
+    },
+    {
+      "title": "Limpiar",
+      "level": 3,
+      "content": "Después de configurar el servidor, quite el archivo install.php o asegúrese de que esté inaccesible en la configuración de su servidor web\n\n```\n# rm /usr/share/webapps/dokuwiki/install.php\n```\n\n"
+    },
+    {
+      "title": "Instalar complementos",
+      "level": 3,
+      "content": "Muchos complementos creados por la comunidad se pueden encontrar aquí\n\nSe pueden agregar a través de la interfaz web (así como actualizarla) a través del menú Admin. Algunos plugins no se pueden descargar, si se hace mediante ssl (por ejemplo, git).\n\n"
+    },
+    {
+      "title": "Realizar copias de seguridad",
+      "level": 3,
+      "content": "Es muy trivial hacer una copia de seguridad de DokuWiki, ya que no hay base de datos. Todas las páginas están en texto plano, y requieren solo un tar simple, o rsync\n\nUn desglose rápido de los directorios de interés en la versión actual (2015-08-10a):\n\n```\n/usr/share/webapps/dokuwiki/data/  =>  Todos los datos creados por el usuario\n  /usr/share/webapps/dokuwiki/conf/  =>  Ajustes de configuración\n```\n\nEsto puede cambiar en versiones futuras, por favor consulte las FAQ de DokuWiki para comprobarlo.\n\n"
+    },
+    {
+      "title": "Lecturas recomendadas",
+      "level": 2,
+      "content": "La página principal de DokuWiki tiene toda la información y ayuda que pueda necesitar.\n\n"
+    }
+  ]
+}

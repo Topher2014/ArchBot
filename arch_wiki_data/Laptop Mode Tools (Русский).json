@@ -1,0 +1,106 @@
+{
+  "title": "Laptop Mode Tools (Русский)",
+  "url": "https://wiki.archlinux.org/title/Laptop_Mode_Tools_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- acpid (Русский)\n- systemd (Русский)\n- cpufrequtils (Русский)\n- Ноутбук\n- Powertop\n- TLP\n\nLaptop Mode Tools — набор инструментов управления энергосбережением на Linux-системах. Это основной способ включить функцию Laptop Mode ядра Linux, которая позволяет жёсткому диску останавливать своё вращение. Кроме того, он позволяет настроить ряд других параметров энергопотребления с помощью простого конфигурационного файла.\n\nВ сочетании с acpid и изменением частоты процессора LMT предоставляет большинству пользователей полный набор средств управления питанием ноутбука.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет laptop-mode-toolsAUR или laptop-mode-tools-gitAUR.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Настройка выполняется через:\n\n- /etc/laptop-mode/laptop-mode.conf — основной файл конфигурации.\n- /etc/laptop-mode/conf.d/* — десятки специфических «модулей».\n\nКаждый модуль может быть явно включен, отключен или установлен в авторежим путём изменения аргумента CONTROL_* любого файла в conf.d/. LMT попытается включить все модули, для которых CONTROL_* установлен в auto, если ENABLE_AUTO_MODULES включен в /etc/laptop-mode/laptop-mode.conf. Из этого правила есть два исключения: auto-hibernate.conf и battery-level-polling.conf используют переменную ENABLE_* вместо CONTROL_*.\n\nЧтобы быстро проверить, какие модули включены, отключены или находятся в автоматическом режиме, выполните команду:\n\n```\n$ grep -r '^\\(CONTROL\\|ENABLE\\)_' /etc/laptop-mode/conf.d\n```\n\nПосле настройки включите службу laptop-mode.service.\n\nВо всех конфигурационных файлах пары опция=значение представлены следующим образом:\n\n- CONTROL_чтонибудь=0/1/auto — определяет, должен ли соответствующий модуль быть включен.\n- LM_чтонибудь=значение — значение опции, когда LMT активен.\n- NOLM_чтонибудь=значение — значение опции, когда LMT неактивен.\n- AC_чтонибудь=значение — значение опции при работе от сети.\n- BATT_чтонибудь=значение — значение опции при работе от батареи.\n\n"
+    },
+    {
+      "title": "laptop-mode.conf",
+      "level": 3,
+      "content": "Здесь приведён адаптированный перевод комментариев к некоторым настройкам, на которые стоит обратить внимание. Список всех настроек и более подробные комментарии на английском языке вы можете прочитать непосредственно в файле /etc/laptop-mode/laptop-mode.conf.\n\n```\n# Включение/выключение LMT\n# Выберите 0, чтобы полностью отключить LMT.\nENABLE_LAPTOP_MODE_TOOLS=1\n\n# Выберите 1, если хотите получить дополнительную отладочную информацию, когда\n# запускается/останавливается laptop_mode.\nVERBOSE_OUTPUT=0\n\n# Выберите 1 если хотите, чтобы лог писался в syslog\nLOG_TO_SYSLOG=0\n\n# Запуск в оболочке (shell) в режиме отладки.\n# Отладку отдельных модулей можно включить в соответствующих файлах в conf.d\nDEBUG=0\n\n# Включать ли LMT при работе от батареи\nENABLE_LAPTOP_MODE_ON_BATTERY=1\n\n# Включать ли LMT при работе от сети\nENABLE_LAPTOP_MODE_ON_AC=0\n\n# Включать ли LMT, пока крышка ноутбука закрыта (даже если он подключён к сети)\nENABLE_LAPTOP_MODE_WHEN_LID_CLOSED=0\n\n# Автоматическое включение некоторых модулей\nENABLE_AUTO_MODULES=1\n\n# Отключить функции, которые могут привести к потере данных, когда уровень\n# заряда батареи (в процентах) опустится до этого значения:\nMINIMUM_BATTERY_CHARGE_PERCENT=3\n```\n\n"
+    },
+    {
+      "title": "Жёсткие диски",
+      "level": 3,
+      "content": "Вам нужно установить hdparm и/или sdparm. Смотрите статью hdparm.\n\nОстановка вращения жёсткого диска через hdparm -S экономит энергию и уменьшает шум. Используя функцию readahead, вы можете разрешить дискам останавливаться чаще, даже если вы используете компьютер. LMT также может устанавливать hdparm -B. Максимальное значение энергосбережения жёсткого диска равно 1, а минимальное — 254. Например, установите значение 254 при работе от сети переменного тока и 20 при работе от батареи. Если вы обнаружили, что работа на ноутбуке часто подвисает в ожидании раскрутки диска, возможно, имеет смысл установить более высокое значение (например, 128), что заставит диск останавливаться реже. Значения hdparm -S и hdparm -B настраиваются в файле /etc/laptop-mode/laptop-mode.conf.\n\nС помощью переменной CONTROL_MOUNT_OPTIONS (по умолчанию включена) laptop-mode-tools автоматически перемонтирует ваши разделы, добавляя commit=600,noatime к параметрам монтирования. Это не позволяет журналированию jbd2 обращаться к диску каждые несколько секунд, вместо этого журнал диска обновляется каждые 10 минут.\n\n"
+    },
+    {
+      "title": "Твердотельные накопители",
+      "level": 4,
+      "content": "Из официального FAQ:\n\nВопрос: В моей машине установлен твердотельный диск (SSD). Должен ли я включить какие-либо связанные с дисками части laptop-mode-tools, или они не имеют значения?\n\nОтвет: Они могут иметь значение, поскольку (а) laptop mode уменьшает количество записей, что увеличивает срок службы SSD, и (б) laptop mode делает записи прерывистыми, что позволяет задействовать механизмы энергосбережения, такие как ALPM. Тем не менее, выигрыш может варьироваться в зависимости от конкретного оборудования. На некоторых устройствах вы вообще не получите никакого выигрыша, а на некоторых выигрыш может быть значительным.\n\n"
+    },
+    {
+      "title": "Частота процессора",
+      "level": 3,
+      "content": "Необходим драйвер управления частотой процессора. Смотрите Управление частотой процессора.\n\n```\n# cpufreq.conf\n# Пример для ThinkPad T40/T42/T60\n#\nCONTROL_CPU_FREQUENCY=1\nBATT_CPU_MAXFREQ=fastest\nBATT_CPU_MINFREQ=slowest\nBATT_CPU_GOVERNOR=ondemand\nBATT_CPU_IGNORE_NICE_LOAD=1\nLM_AC_CPU_MAXFREQ=fastest\nLM_AC_CPU_MINFREQ=slowest\nLM_AC_CPU_GOVERNOR=ondemand\nLM_AC_CPU_IGNORE_NICE_LOAD=1\nNOLM_AC_CPU_MAXFREQ=fastest\nNOLM_AC_CPU_MINFREQ=slowest\nNOLM_AC_CPU_GOVERNOR=ondemand\nNOLM_AC_CPU_IGNORE_NICE_LOAD=0\nCONTROL_CPU_THROTTLING=0\n```\n\n"
+    },
+    {
+      "title": "Intel SATA",
+      "level": 4,
+      "content": "Включите функцию Aggressive Link Power Management контроллера Intel SATA AHCI, чтобы перевести дисковый канал в режим очень низкого энергопотребления при отсутствии дисковых операций ввода-вывода.\n\n```\n# intel-sata-powermgmt.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_INTEL_SATA_POWER=1\nBATT_ACTIVATE_SATA_POWER=1\nLM_AC_ACTIVATE_SATA_POWER=1\nNOLM_AC_ACTIVATE_SATA_POWER=0\n```\n\n"
+    },
+    {
+      "title": "Автоматическое отключение USB",
+      "level": 4,
+      "content": "```\n# runtime-pm.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_RUNTIME_AUTOSUSPEND=1\nBATT_SUSPEND_RUNTIME=1\nLM_AC_SUSPEND_RUNTIME=1\nNOLM_AC_SUSPEND_RUNTIME=1\nAUTOSUSPEND_TIMEOUT=2\n```\n\n"
+    },
+    {
+      "title": "Яркость LCD",
+      "level": 4,
+      "content": "На некоторых ноутбуках доступные значения яркости можно узнать следующей командой:\n\n```\n$ cat /proc/acpi/video/VID/LCD/brightness\n```\n\nНа ноутбуках ThinkPad T40/T42 минимальную и максимальную яркость можно узнать так:\n\n```\n$ cat /sys/class/backlight/acpi_video0/brightness\n$ cat /sys/class/backlight/acpi_video0/max_brightness\n```\n\n```\n# lcd-brightness.conf\n# Пример для ThinkPad T40/T42\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 0\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nBRIGHTNESS_OUTPUT=\"/sys/class/backlight/thinkpad_screen/brightness\"\n```\n\nНа ноутбуках ThinkPad T60 минимальную и максимальную яркость можно узнать так:\n\n```\n$ cat /sys/class/backlight/thinkpad_screen/max_brightness\n$ cat /sys/class/backlight/thinkpad_screen/brightness\n```\n\n```\n# lcd-brightness.conf\n# Пример для ThinkPad T60\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 0\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nBRIGHTNESS_OUTPUT=\"/sys/class/backlight/acpi_video0/brightness\"\n```\n\n"
+    },
+    {
+      "title": "Затемнение терминала",
+      "level": 4,
+      "content": "```\n# terminal-blanking.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_TERMINAL=1\n# Файлы терминалов, на которые распространяются настройки. (Достаточно указать\n# один терминал — настройки сработают для всех консолей.)\nTERMINALS=\"/dev/tty1\"\n# BLANK — таймаут затемнения в минутах; POWERDOWN — таймаут отключения питания в минутах.\n# Отсчёт таймаута POWERDOWN начинается после BLANK, то есть BLANK_MINUTES=1 и POWERDOWN_MINUTES=2\n# означают, что экран отключится через 3 минуты неактивности.\n# Значение 0 отключает таймаут.\nBATT_TERMINAL_BLANK_MINUTES=1\nBATT_TERMINAL_POWERDOWN_MINUTES=2\nLM_AC_TERMINAL_BLANK_MINUTES=10\nLM_AC_TERMINAL_POWERDOWN_MINUTES=10\nNOLM_AC_TERMINAL_BLANK_MINUTES=10\nNOLM_AC_TERMINAL_POWERDOWN_MINUTES=10\n```\n\n"
+    },
+    {
+      "title": "Ethernet",
+      "level": 4,
+      "content": "```\n# ethernet.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_ETHERNET=1\nLM_AC_THROTTLE_ETHERNET=0\nNOLM_AC_THROTTLE_ETHERNET=0\n# Полное отключение Wake-on-LAN, даже при работе от сети\nDISABLE_WAKEUP_ON_LAN=1\n# Полное отключение Ethernet при работе от батареи. Полезно, если\n# при работе от батареи используется только беспроводная сеть\nDISABLE_ETHERNET_ON_BATTERY=1\nETHERNET_DEVICES=\"eth0\"\n```\n\n"
+    },
+    {
+      "title": "Wireless LAN",
+      "level": 4,
+      "content": "Управление питанием беспроводного интерфейса зависит от конкретного оборудования, поэтому настраивать их немного сложнее. В зависимости от беспроводного чипсета, настройки управляются в одном из следующих трёх файлов:\n\n1. /etc/laptop-mode/conf.d/wireless-power.conf — базовый метод экономии энергии (с помощью команды \"iwconfig wlan0 power on/off\"). Это относится к большинству чипсетов (то есть ко всем, кроме чипсетов Intel, перечисленных ниже).\n1. /etc/laptop-mode/conf.d/wireless-ipw-power.conf — для чипсетов Intel, управляемых старым драйвером ipw. Это относится к IPW3945, IPW2200 и IPW2100. В настоящее время (по состоянию на LMT 1.55-1) используется iwpriv для IPW3945 и комбинация настроек iwconfig и iwpriv для IPW2100 и IPW220. Подробности смотрите в файле /usr/share/laptop-mode-tools/modules/wireless-ipw-power. (обратите внимание, что ipw3945 больше не используется, смотрите ниже)\n1. /etc/laptop-mode/conf.d/wireless-iwl-power.conf — для чипсетов Intel, управляемых модулями iwl4965, iwl3945 и iwlagn (последний поддерживает чипсеты 4965, 5100, 5300, 5350, 5150, 1000 и 6000)\n\nАктивация всех трёх не должна представлять особой проблемы, поскольку LMT определяет модуль, используемый интерфейсом, и действует соответствующим образом.\n\nУказанные выше поддерживаемые модули для каждого файла взяты непосредственно из LMT. Однако, похоже, это немного устарело, поскольку текущее ядро 2.6.34 больше не предоставляет модули ipw3945 и iwl4965 (чипсет 3945 использует iwl3945, а 4965 — общий модуль iwlagn). Это приведено здесь только для информации, так как это не влияет (или не должно влиять) на работу LMT.\n\nЕсть известная проблема с некоторыми чипсетами, работающими с модулем iwlagn (а именно, чипсет 5300 и, возможно, другие). На этих чипсетах следующие настройки /etc/laptop-mode/conf.d/wireless-iwl-power.conf:\n\n```\nIWL_AC_POWER\nIWL_BATT_POWER\n```\n\nигнорируются, потому что файл /sys/class/net/wlan*/device/power_level не существует. Вместо этого будет использован стандартный метод (через iwconfig wlan0 power on/off).\n\n"
+    },
+    {
+      "title": "AC97",
+      "level": 4,
+      "content": "```\n# ac97-powersave.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_AC97_POWER=1\n```\n\n"
+    },
+    {
+      "title": "Intel HDA",
+      "level": 4,
+      "content": "```\n# intel-hda-powersave.conf\n# Пример для ThinkPad T40/T42/T60\n#\nDEBUG=0\nCONTROL_INTEL_HDA_POWER=1\nBATT_INTEL_HDA_POWERSAVE=1\nLM_AC_INTEL_HDA_POWERSAVE=1\nNOLM_AC_INTEL_HDA_POWERSAVE=0\n# Таймаут (в секундах) перед включением режима экономии энергии.\nINTEL_HDA_DEVICE_TIMEOUT=10\n# Значение 1 приведёт к полному отключению контроллера по таймауту,\n# но это может привести к щелчкам в динамиках\nINTEL_HDA_DEVICE_CONTROLLER=0\n```\n\n"
+    },
+    {
+      "title": "Laptop-mode-tools не обрабатывает события",
+      "level": 3,
+      "content": "Установите пакет acpid и включите службу acpid.service.\n\nЕсли это не помогло, просмотрите файлы конфигурации laptop-mode и убедитесь, что для службы, которую вы хотите включить, установлено значение 1. Многие службы (включая cpufreq control) по умолчанию установлены на \"auto\", что может не включить их.\n\nПроблемы с неработающим bluetooth при запуске ноутбука от батареи решаются отключением runtime-pm.\n\n"
+    },
+    {
+      "title": "USB-мышь засывает спустя 5 секунд при работе от батареи",
+      "level": 3,
+      "content": "Сперва найдите ID нужного устройства (выглядит примерно так: 046d:c534):\n\n```\n$ lsusb\n```\n\nДобавьте его в переменную AUTOSUSPEND_DEVID_BLACKLIST в файле /etc/laptop-mode/conf.d/runtime-pm.conf, например:\n\n```\n/etc/laptop-mode/conf.d/runtime-pm.conf\n```\n\n```\n...\nAUTOSUSPEND_DEVID_BLACKLIST=\"046d:c534\"\n...\n```\n\nМожно указать несколько ID через пробел.\n\n"
+    },
+    {
+      "title": "Чёрный экран в KDE",
+      "level": 4,
+      "content": "Когда включен режим ноутбука, KDE не запускается. Причина в том, что стандартный менеджер отображения KDE (SDDM) запускается раньше драйвера NVIDIA. Чтобы этого не произошло, удалите параметр ядра nomodeset.\n\n"
+    },
+    {
+      "title": "Замедлилась загрузка после включения laptop-mode.service",
+      "level": 4,
+      "content": "Как упоминалось ранее, laptop-mode-tools влияет на драйвер NVIDIA. Добавление параметра ядра nvidia-drm.modeset=1 значительно сокращает время загрузки.\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Laptop Mode Tools wiki\n- FAQ\n- Mailing List\n\n"
+    }
+  ]
+}

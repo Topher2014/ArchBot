@@ -1,0 +1,96 @@
+{
+  "title": "Zabbix (日本語)",
+  "url": "https://wiki.archlinux.org/title/Zabbix_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Zabbix は大規模ネットワークのためのフル機能の監視ソリューションです。様々な方法のあらゆるネットワークデバイスを嗅ぎ分けて、マシンの状態とアプリケーションをチェックし、事前に設定したアラームメッセージを送信したり複雑なデータの相関関係を視覚化することができます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 サーバーのセットアップ 1.1 インストール 1.1.1 サーバーのインストール 1.1.2 データベースのインストール 1.1.3 フロントエンドのインストール 1.2 設定 1.3 データベースの初期化 1.3.1 MariaDB 1.3.2 PostgreSQL 1.4 データベースの設定 1.5 ICMP/ping の検出 1.6 起動\n- 2 エージェント (クライアント) のセットアップ 2.1 インストール 2.2 設定 2.3 起動\n- 3 ヒントとテクニック 3.1 Zabbix エージェントのデバッグ 3.2 ArchLinux のシステムアップデートの監視\n- 4 トラブルシューティング 4.1 Error \"Specified key was too long; max key length is 767 bytes\"\n- 5 参照\n\n- 1.1 インストール 1.1.1 サーバーのインストール 1.1.2 データベースのインストール 1.1.3 フロントエンドのインストール\n- 1.2 設定\n- 1.3 データベースの初期化 1.3.1 MariaDB 1.3.2 PostgreSQL\n- 1.4 データベースの設定\n- 1.5 ICMP/ping の検出\n- 1.6 起動\n\n- 1.1.1 サーバーのインストール\n- 1.1.2 データベースのインストール\n- 1.1.3 フロントエンドのインストール\n\n- 1.3.1 MariaDB\n- 1.3.2 PostgreSQL\n\n- 2.1 インストール\n- 2.2 設定\n- 2.3 起動\n\n- 3.1 Zabbix エージェントのデバッグ\n- 3.2 ArchLinux のシステムアップデートの監視\n\n- 4.1 Error \"Specified key was too long; max key length is 767 bytes\"\n\n"
+    },
+    {
+      "title": "サーバーのインストール",
+      "level": 4,
+      "content": "zabbix-server パッケージをインストールします。これには、MariaDB または PostgreSQL で使用するために必要なスクリプトが含まれています。\n\n"
+    },
+    {
+      "title": "データベースのインストール",
+      "level": 4,
+      "content": "mariadb パッケージまたは postgresql パッケージのいずれかをインストールします。\n\n"
+    },
+    {
+      "title": "フロントエンドのインストール",
+      "level": 4,
+      "content": "zabbix-frontend-php パッケージをインストールします。PHP をサポートする Web サーバーを選択する必要があります。例:\n\n- Apache HTTP Server\n- Lighttpd\n- nginx\n\nカテゴリ:ウェブサーバー にあるサーバーの 1 つを選択することもできます。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 3,
+      "content": "Zabbix のウェブアプリケーションディレクトリから http のドキュメントルートへシンボリックリンクを作成してください、例:\n\n```\n$ ln -s /usr/share/webapps/zabbix /srv/http/zabbix\n```\n\nApache をそのまま動作させるには、PHP 統合を有効にする必要があります:\n\n- 参照 php-fpm と mod_proxy_fcgi を使う\n\n/etc/php/php.ini で次の変数を調整します:\n\n```\nextension=bcmath\nextension=gd\nextension=sockets\nextension=mysqli\nextension=gettext\npost_max_size = 16M\nmax_execution_time = 300\nmax_input_time = 300\ndate.timezone = \"UTC\"\n```\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 4,
+      "content": "この例では、パスワード test で識別されるユーザー zabbix 用に zabbix という MariaDB データベースをローカルホスト上に作成し、データベーステンプレートをインポートします。この接続は、後で Zabbix サーバーと Web アプリケーションによって使用されます。\n\nMariaDB インストールでパスワード付きの root アカウントを使用する場合は、次を使用します:\n\n```\n$ mariadb -u root -p -e \"create database zabbix character set utf8 collate utf8_bin\"\n$ mariadb -u root -p -e \"grant all on zabbix.* to zabbix@localhost identified by 'test'\"\n```\n\nMariaDB インストールでパスワードなしの root アカウントを使用する場合は、次を使用します:\n\n```\n# mariadb -e \"create database zabbix character set utf8 collate utf8_bin\"\n# mariadb -e \"grant all on zabbix.* to zabbix@localhost identified by 'test'\"\n```\n\n以下を使用してデータベーステンプレートをインポートします:\n\n```\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/schema.sql\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/images.sql\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/data.sql\n```\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "PostgreSQL の場合、これらのコマンドはユーザー zabbix のデータベース zabbix を作成します。これは zabbix_server.conf のデフォルト設定であり、スキーマと初期データをインポートします:\n\n```\n$ createuser zabbix\n$ createdb zabbix -O zabbix\n$ cat /usr/share/zabbix-server/postgresql/{schema,images,data}.sql | psql -U zabbix -d zabbix\n```\n\n"
+    },
+    {
+      "title": "データベースの設定",
+      "level": 3,
+      "content": "次に、データベース設定を使用して /etc/zabbix/zabbix_server.conf を編集します:\n\n```\n/etc/zabbix/zabbix_server.conf\n```\n\n```\nDBName=zabbix\nDBUser=zabbix\nDBPassword=test\nLogType=system\n```\n\n"
+    },
+    {
+      "title": "ICMP/ping の検出",
+      "level": 3,
+      "content": "Zabbix で ICMP 検出 (ping など) を使用するには、fping パッケージを インストール します。\n\n"
+    },
+    {
+      "title": "起動",
+      "level": 3,
+      "content": "MariaDB を使用する場合 zabbix-server-mysql.service ユニットを起動/有効化してください。PostgreSQL を使用している場合は、zabbix-server-pgsql.service ユニットを有効化して起動します\n\n最後に、ローカルウェブサーバーを通して Zabbix にアクセスできるので (例: http://localhost/zabbix/)、インストールウィザードを完了してフロントエンドにアクセスしてください。\n\nデフォルトのユーザー名は Admin でパスワードは zabbix です。\n\n手順が全て説明されている公式ドキュメントへのリンクは下の参照を見て下さい。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 3,
+      "content": "各監視先マシンに zabbix-agent パッケージをインストールしてください。zabbix-server をインストールした監視サーバーにもインストールしてください。zabbix-server には zabbix-agent は含まれていません。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 3,
+      "content": "zabbix_agentd.conf を編集して server 変数をあなたの監視サーバーの IP に置き換えてください。この IP のサーバーだけがエージェントにアクセスできるように許可されます。\n\n```\n/etc/zabbix/zabbix_agentd.conf\n```\n\n```\nServer=<IP of Zabbix server>\nServerActive=<IP of Zabbix server>\n```\n\nさらに監視するデバイスのポート 10050 がブロックされていないこと、適切に開かれていることを確認してください。\n\n"
+    },
+    {
+      "title": "起動",
+      "level": 3,
+      "content": "zabbix-agent サービスを起動・有効化してください。\n\n"
+    },
+    {
+      "title": "Zabbix エージェントのデバッグ",
+      "level": 3,
+      "content": "クライアント側で、次のようにアイテムの状態を確認できます:\n\n```\n$ zabbix_agentd -t hdd.smart[sda,Temperature_Celsius]\n```\n\nサーバー・監視側では、次を試してみて下さい:\n\n```\n$ zabbix_get -s host -k hdd.smart[sda,Temperature_Celsius]\n```\n\n"
+    },
+    {
+      "title": "ArchLinux のシステムアップデートの監視",
+      "level": 3,
+      "content": "以下は UserParameter パラメータを使って ArchLinux クライアントのシステムアップデートを監視する方法です:\n\n```\n/etc/zabbix/zabbix_agentd.conf\n```\n\n```\nInclude=/etc/zabbix/zabbix_agentd.conf.d/*.conf\n```\n\n```\n/etc/zabbix/zabbix_agentd.conf.d/archlinuxupdates.conf\n```\n\n```\nUserParameter=archlinuxupdates,checkupdates | wc -l\n```\n\nzabbix-agentd を再起動して設定を適用してください。後でウェブフロントエンドで使用するアイテムのキーワードは archlinuxupdates です。利用可能なアップデートの数が返ってきます。\n\n"
+    },
+    {
+      "title": "Error \"Specified key was too long; max key length is 767 bytes\"",
+      "level": 3,
+      "content": "データベースのインポート時にこのエラーが表示されることがあります。MariaDB データベースのコードページ設定を変更することで解決できます: MariaDB#UTF8MB4 を使う\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- 公式マニュアル\n- Zabbix Share – Zabbix テンプレート、モジュールなど\n\n"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Full system backup with SquashFS (Español)",
+  "url": "https://wiki.archlinux.org/title/Full_system_backup_with_SquashFS_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-11-15** \n\nArtículos relacionados\n\n- Full system backup with tar (Español)\n\n"
+    },
+    {
+      "title": "Descripción general",
+      "level": 2,
+      "content": "SquashFS [1] crea archivos de copia de seguridad de solo lectura altamente comprimidos de sistemas completos. Es conveniente ya que puede montarlo y realizar find/grep/cp/tree en él sin descomprimir todo el archivo SquashFS. La copia de seguridad lleva menos tiempo y la sobrecarga de recuperación/recorrido de archivos es menor en comparación con tar, pero modificar un archivo existente es imposible como contrapartida.\n\n"
+    },
+    {
+      "title": "Preparar CD/DVD/USB live",
+      "level": 2,
+      "content": "Debería tener squashfs-tools instalado en el CD/DVD/USB live para crear archivos SquashFS. Remítase a Archiso#Profile structure sobre cómo configurar packages.x86_64 y construir un CD/DVD/USB live con squashfs-tools instalado.\n\n"
+    },
+    {
+      "title": "Realizar copia de seguridad en entorno live",
+      "level": 2,
+      "content": "Inicie en un CD/DVD/USB en vivo y monte los sistemas de archivos que desea respaldar.\n\n```\n# fsck /dev/sdb2\n# fsck /dev/sdb1\n# mount /dev/sdb2 /mnt\n# mount /dev/sdb1 /mnt/boot/efi\n# /ruta/mksquashfs.sh DIRECTORIO_ORIGEN DIRECTORIO_PARA_ARCHIVAR_RESPALDO\n```\n\ndonde\n\n```\n/ruta/mksquashfs.sh\n```\n\n```\n#!/usr/bin/env bash\n\n# Precaución\nif [ $# -ne 2 ]; then\n  echo \"invoque: mksquashfs.sh DIRECTORIO_ORIGEN DIRECTORIO_PARA_ARCHIVAR_RESPALDO\"\n  exit 1\nfi\necho -ne \"\\n\\n¿Tiene fsck? \"\nread\n\n# Respaldo\nmksquashfs \\\n  \"$1\" \"$2/$(date +%Y%m%d_%a).sfs\" \\\n  -comp gzip \\\n  -xattrs \\\n  -progress \\\n  -mem 5G \\\n  -wildcards \\\n  -e \\\n  boot/efi \\\n  boot/grub \\\n  boot/initramfs-linux\"*\".img\n```\n\n"
+    },
+    {
+      "title": "Restaurar (descomprimir)",
+      "level": 2,
+      "content": "```\n#!/bin/bash\n\n# Ruta donde extraer archivos\ntarget=/mnt\n\n# Ruta al archivo de respaldo SquashFS\narchive=/ruta/backup.sfs\n\nunsquashfs -stat $archive\nunsquashfs -force -dest $target $archive\n```\n\n1. Arreglar fstab\n1. arch-chroot mkinitcpio -p linux grub-install grub-mkconfig\n\n1. mkinitcpio -p linux\n1. grub-install\n1. grub-mkconfig\n\n"
+    },
+    {
+      "title": "Restaurar (montar y copiar)",
+      "level": 2,
+      "content": "1. mount somewhere/backup.sfs /mnt\n1. cp /mnt/archivo /ruta/archivo-dañado\n\n"
+    }
+  ]
+}

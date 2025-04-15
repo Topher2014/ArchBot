@@ -1,0 +1,71 @@
+{
+  "title": "Network Security Services",
+  "url": "https://wiki.archlinux.org/title/Network_Security_Services",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Network Security Services (NSS) is a set of libraries designed to support cross-platform development of security-enabled client and server applications.\n\nApplications built with NSS can support SSL v2 and v3, TLS, PKCS #5, PKCS #7, PKCS #11, PKCS #12, S/MIME, X.509 v3 certificates, and other security standards.\n\nNSS is required by many packages, including, for example, Chromium and Firefox.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the nss package.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "NSS is implemented in terms of operations on a dynamically configured list of PKCS #11 modules. Each module provides access to tokens, which can execute cryptographic operations and store cryptographic objects. The configured list of modules is usually stored in an arbitrary directory, provided by a user at initialization of NSS, in the file pkcs11.txt. The list always contains a built-in module \"NSS Internal PKCS #11 Module\" with tokens \"NSS Generic Crypto Services\" and \"NSS Certificate DB\". The first token provides cryptographic mechanisms such as RSA, SHA256, TLS etc. The second token stores certificates and private keys in the same user-provided directory in the files cert9.db and key4.db. The files pkcs11.txt, cert9.db and key4.db are also called \"NSS databases\". Paths to NSS databases for some applications are listed in the table below. You should provide some path for each operation. Examples below will use ~/.pki/nssdb/.\n\nTable content:\nApplication | Path to NSS databases\nchromium, evolution | ~/.pki/nssdb/\nfirefox | ~/.mozilla/firefox/<profile>/\nthunderbird | ~/.thunderbird/<profile>/\nlibreoffice-fresh | configurable via Options [1]\n\nFor managing PKCS #11 modules NSS provides the modutil(1) utility, for managing certificates and private keys — the certutil(1) utility.\n\n"
+    },
+    {
+      "title": "List certificate DB",
+      "level": 3,
+      "content": "To get list of all certificates:\n\n```\n$ certutil -d ~/.pki/nssdb/ -L\n```\n\nTo get details about certificate:\n\n```\n$ certutil -d ~/.pki/nssdb/ -L -n certificate_nickname\n```\n\n"
+    },
+    {
+      "title": "Generate an RSA private key",
+      "level": 3,
+      "content": "```\n$ certutil -d ~/.pki/nssdb/ -G -g keysize -n nickname\n```\n\n"
+    },
+    {
+      "title": "Generate a certificate signing request",
+      "level": 3,
+      "content": "```\n$ certutil -d ~/.pki/nssdb/ -R -k key-id -s subject -o file\n```\n\n"
+    },
+    {
+      "title": "Generate a self-signed certificate",
+      "level": 3,
+      "content": "```\n$ certutil -d ~/.pki/nssdb/ -S -s subject -n nickname -x -t C,C,C -o file\n```\n\n"
+    },
+    {
+      "title": "Generate a self-signed certificate with the assistance of OpenSSL",
+      "level": 4,
+      "content": "Using OpenSSL allows you to have an interactive prompt that's easier to format than using the certutil subject format. Instructions below were adapted from [2] and [3].\n\nCreate a key pair and a certificate (-noenc disables encryption of a private key with a password):\n\n```\n$ openssl req -x509 -newkey rsa:4096 -keyout myKey.pem -out cert.pem -days 365 -noenc\n```\n\nCreate a pkcs12 file:\n\n```\n$ openssl pkcs12 -export -out keyStore.p12 -inkey myKey.pem -in cert.pem\n```\n\nCreate NSS databases if they do not exist yet:\n\n```\n$ certutil -d ~/.pki/nssdb -N --empty-password\n```\n\nImport your key to the database:\n\n```\n$ pk12util -d ~/.pki/nssdb -i keyStore.p12\n```\n\n"
+    },
+    {
+      "title": "Import certificate",
+      "level": 3,
+      "content": "To add a certificate specify the -A option:\n\n```\n$ certutil -d ~/.pki/nssdb/ -A -t \"TRUSTARGS\" -n certificate_nickname -i /path/to/cert/filename\n```\n\nThe TRUSTARGS are three strings of zero or more alphabetic characters, separated by commas, for example: \"TCu,Cu,Tuw\". They define how the certificate should be trusted for SSL, email, and object signing, and are explained in the certutil(1) manual or Meena's blog post on trust flags.\n\nTo add a personal certificate and private key for SSL client authentication use the command:\n\n```\n$ pk12util -d ~/.pki/nssdb/ -i /path/to/PKCS12/cert/filename.p12\n```\n\nThis will import a personal certificate and private key stored in a PKCS #12 file. The TRUSTARGS of the personal certificate will be set to \"u,u,u\".\n\n"
+    },
+    {
+      "title": "Edit certificate",
+      "level": 3,
+      "content": "Call certutil with -M option to edit the certificate. For example, to edit the TRUSTARGS:\n\n```\n$ certutil -d ~/.pki/nssdb/ -M -t \"TRUSTARGS\" -n certificate_nickname\n```\n\n"
+    },
+    {
+      "title": "Delete certificate",
+      "level": 3,
+      "content": "Use -D option to remove the certificate:\n\n```\n$ certutil -d ~/.pki/nssdb/ -D -n certificate_nickname\n```\n\n"
+    },
+    {
+      "title": "Adding a trusted CA certificate",
+      "level": 3,
+      "content": "A system-wide trust store /usr/lib/pkcs11/p11-kit-trust.so is usually automatically added to the list of PKCS #11 modules. See Transport Layer Security#Trust management for system-wide configuration. For application-specific configuration use such a command to add a CA certificate:\n\n```\ncertutil -d ~/.pki/nssdb/ -A -i /path/to/certificate -n certificate_nickname -t C,,\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Network Security Services - Mozilla\n- Managing Certificate Trust flags in NSS Database - Meena Vyas, Oracle\n\n"
+    }
+  ]
+}

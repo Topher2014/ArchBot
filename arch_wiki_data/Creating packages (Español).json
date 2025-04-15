@@ -1,0 +1,111 @@
+{
+  "title": "Creating packages (Español)",
+  "url": "https://wiki.archlinux.org/title/Creating_packages_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-10-10** \n\nArtículos relacionados\n\n- Arch Build System\n- Estándares de empaquetado en Arch\n- Repositorio de usuarios de Arch\n- Creating packages for other distributions\n- makepkg\n- pacman\n- Patching in ABS\n- PKGBUILD\n- DeveloperWiki:Building in a Clean Chroot\n\nEste artículo tiene como objetivo ayudar a los usuarios a crear sus propios paquetes utilizando el sistema de compilación de Arch Linux, asi como subirlos en AUR. Cubre la creación de un PKGBUILD - un archivo de descripción de compilación de paquetes originado por makepkg para crear un paquete binario desde los archivos fuentes. Si ya está posee un archivo PKGBUILD, vea makepkg. Para obtener instrucciones sobre las normas existentes y las formas de mejorar la calidad del paquete, consulte Arch packaging standards\n\n"
+    },
+    {
+      "title": "Resumen",
+      "level": 2,
+      "content": "Los paquetes en Arch Linux se construyen utilizando la utilidad makepkg y la información almacenada en un archivo PKGBUILD. Cuando makepkg se ejecuta, busca un archivo PKGBUILD en el directorio actual y sigue las instrucciones en él para adquirir los archivos requeridos y/o copilarlos para empaquetarlos en un archivo de paquete(nombredelpaquete.pkg.tar.xz). El paquete resultante contiene archivos binarios e instrucciones de instalación listas para ser instaladas por pacman.\n\nUn paquete de Arch no es más que un archivo tar o 'tarball', comprimido usando xz, que contiene los siguientes archivos generados por makepkg:\n\n- Archivos binarios a instalar.\n\n- .PKGINFO: contiene todos los metadatos requeridos por pacman para tratar con paquetes, dependencias, etc.\n\n- .MTREE: contiene hashes y marcas de tiempo de los archivos que se incluyen en la base de datos local para que pacman pueda verificar la integridad del paquete.\n\n- .INSTALL: un archivo opcional utilizado para ejecutar comandos después de la fase de instalación/actualización/eliminación. (Este archivo sólo está presente si se especifica en el .PKGBUILD).\n\n- Changelog: un archivo opcional guardado por el responsable del paquete documentando los cambios del paquete. (No está presente en todos los paquetes.)\n\n"
+    },
+    {
+      "title": "Metapaquetes y grupos",
+      "level": 3,
+      "content": "Un grupo de paquetes es un conjunto de paquetes relacionados, definido por el empaquetador, que se pueden instalar o desinstalar simultáneamente utilizando el nombre de grupo como un sustituto para cada nombre de paquete individual. Si bien un grupo no es un paquete, puede instalarse de manera similar a un paquete, véase Pacman (Español)#Instalar grupos de paquetes y PKGBUILD (Español)#groups.\n\nUn metapaquete a menudo (aunque no siempre) titulado con -meta sufijo, proporciona funcionalidad similar a un grupo de paquetes que permite que se instalen o desinstalen simultáneamente varios paquetes relacionados. Los metapaquetes pueden ser instalados como cualquier otro paquete, vea Pacman#Installing specific packages. La única diferencia entre un paquete meta y un paquete regular es que una metapaquete está vacío y existe puramente para vincular paquetes relacionados a través de dependencias.\n\nLa ventaja de un metapaquete, en comparación con un grupo, es que cualquier nuevo miembro del paquete se instalará cuando el propio metapaquete sea actualizado con un nuevo conjunto de dependencias. Esto contrasta con un grupo en el que los nuevos miembros del grupo no se instalarán automáticamente. La desventaja de un metapaquete es que no es tan flexible como un grupo - puede elegir los miembros del grupo que desea instalar pero no puede elegir qué dependencias del metapaquete desea instalar. Asimismo, puede desinstalar los miembros del grupo sin tener que quitar el grupo entero, sin embargo no se pueden quitar dependencias del metapaquete sin tener que desinstalar el metapaquete en sí mismo.\n\n"
+    },
+    {
+      "title": "Programas necesarios",
+      "level": 3,
+      "content": "Asegúrese primero de que las herramientas necesarias estén instaladas. Instalando el grupo de paquetes base-devel debe ser suficiente; incluye make y herramientas adicionales necesarias para compilar desde el codigo fuente.\n\nUna de las herramientas clave para la construcción de paquetes es makepkg (proporcionado por pacman), que hace lo siguiente:\n\n1. Comprueba que las dependencias del paquete están instaladas.\n1. Descarga el(los) archivo(s) fuente desde el(los) servidor(es) especificado(s).\n1. Desempaque el(los) archivo(s) fuente(s).\n1. Compila el software y lo instala en un entorno fakeroot.\n1. Despojar los símbolos innecesarios de los binarios y las bibliotecas.\n1. Genera el archivo del metapaquete que se incluye con cada paquete.\n1. Comprime el entorno fakeroot en un archivo de paquete.\n1. Almacena el archivo de paquete en el directorio de destino configurado, que es el directorio de trabajo actual de forma predeterminada.\n\n"
+    },
+    {
+      "title": "Descargar y probar la instalación",
+      "level": 3,
+      "content": "Descargue el tarball con el codigo fuente del software que desea empaquetar, extráigalo, y siga los pasos del autor para instalar el programa. Anote todos los comandos y/o pasos necesarios para compilarlo e instalarlo. Usted repetirá los mismos comandos en el archivo PKGBUILD. La mayoría de los autores de software se adhieren al ciclo de compilación de 3 pasos:\n\n```\n./configure\nmake\nmake install\n```\n\nEste es un buen momento para asegurarse de que el programa funciona correctamente.\n\n"
+    },
+    {
+      "title": "Creando el PKGBUILD",
+      "level": 2,
+      "content": "Cuando usted ejecuta makepkg, buscará un archivo PKGBUILD en el directorio de trabajo actual. Si se encuentra un archivo PKGBUILD se descargará el código fuente del software y compilará de acuerdo con las instrucciones especificadas en el archivo PKGBUILD. Las instrucciones deben ser completamente interpretables por el shell Bash. Después de la finalización satisfactoria, los binarios y metadatos resultantes del paquete, i.e. versión del paquete y dependencias, se empaquetan en un archivo de paquete pkgname.pkg.tar.xz que se puede instalar con pacman -U <Archivo paquete>.\n\nPara comenzar con un nuevo paquete, primero debe crear un directorio de trabajo vacío, entre en ese directorio y cree un archivo PKGBUILD. Puede copiar el PKGBUILD de ejemplo desde el directorio /usr/share/pacman/ a su directorio de trabajo o copiar un PKGBUILD de un paquete similar. Este último puede ser útil si sólo necesita cambiar algunas opciones.\n\n"
+    },
+    {
+      "title": "Definiendo las variables del PKGBUILD",
+      "level": 3,
+      "content": "Ejemplos de archivos PKGBUILD se encuentran en /usr/share/pacman/. Se puede encontrar una explicación de las posibles variables PKGBUILD en el artículo PKGBUILD.\n\nmakepkg define dos variables que se debe utilizar como parte del proceso de creación e instalación:\n\nTodos ellos contienen rutas absolutas, lo que significa que no tiene que preocuparse por su directorio de trabajo si utiliza estas variables correctamente.\n\n"
+    },
+    {
+      "title": "Funciones PKGBUILD",
+      "level": 3,
+      "content": "Hay cinco funciones, enumeradas aquí en el orden en que se ejecutan si todas existen. Si una no existe, simplemente se omite.\n\n"
+    },
+    {
+      "title": "prepare()",
+      "level": 4,
+      "content": "Esta función, utiliza comandos para preparar las fuentes para la construcción que se ejecuta, como parches. Esta función se ejecuta justo después de la extracción del paquete, antes de pkgver() y la función de build. Si la extracción se omite (makepkg -e), entonces prepare() no se ejecuta.\n\n"
+    },
+    {
+      "title": "pkgver()",
+      "level": 4,
+      "content": "pkgver() se ejecuta después de la obtención de las fuentes, la extracción y la ejecución de prepare(). Así que uested puede actualizar la variable pkgver durante la etapa makepkg.\n\nEsto es particularmente útil si está haciendo making git/svn/hg/etc. paquetes, donde el proceso de construcción puede seguir siendo el mismo, pero el codigo fuente podría ser actualizado todos los días, incluso cada hora. La vieja manera de hacer esto era poner la fecha en el campo del pkgver, donde si el Software no se actualizaba, makepkg aún así lo reconstruiría pensando que la versión había cambiado. Algunos comandos útiles para esto son git describe, hg identify -ni, etc. Por favor pruebe estos antes de enviar un PKGBUILD, ya que un error en la función pkgver() puede detener la compilación.\n\nNota: pkgver no puede contener espacios ni guiones (-). El uso de sed para corregir esto es común.\n\n"
+    },
+    {
+      "title": "build()",
+      "level": 4,
+      "content": "Ahora necesita implementar la función build() en el archivo PKGBUILD. Esta función utiliza comandos de shell comunes en la sintaxis de Bash para compilar automáticamente el software y crear un directorio pkg para instalar el software. Esto permite a makepkg empaquetar archivos sin tener sin tener que filtrar el sistema de archivos.\n\nEl primer paso en la función build() es cambiar al directorio creado descomprimiendo el tarball de origen. makepkg cambiará el directorio actual a $srcdir antes de ejecutar la función build(). Por lo tanto, en la mayoría de los casos, como se sugiere en /usr/share/pacman/PKGBUILD.proto, el primer comando se verá así:\n\n```\ncd \"$pkgname-$pkgver\"\n```\n\nAhora, necesita listar los mismos comandos que utilizó cuando compiló manualmente el software. La función build() en esencia automatiza todo lo que hizo a mano y compila el software en el entorno de compilación fakeroot. Si el software que está empaquetando utiliza un script, es una buena práctica usar --prefix=/usr al crear paquetes para pacman. Una gran cantidad de software instala archivos relativos al directorio /usr/local, que sólo se debe hacer si se está generando manualmente desde el codigo fuente. Todos los paquetes Arch Linux deben usar el directorio /usr. Como se ve en el archivo /usr/share/pacman/PKGBUILD.proto, las siguientes dos líneas suelen tener este aspecto:\n\n```\n./configure --prefix=/usr\nmake\n```\n\n"
+    },
+    {
+      "title": "check()",
+      "level": 4,
+      "content": "Momento para llamar a make check para hacer chequeos y rutinas similares de prueba. Es muy recomendable tener check(), ya que ayuda a asegurar que el software se ha construido correctamente y funciona bien con sus dependencias.\n\nUsuarios que no lo necesitan (Y ocasionalmente los mantenedores que no pueden arreglar un paquete para que esto pase) puede inhabilitarlo usando BUILDENV+=('!check') en el PKGBUILD/makepkg.conf o llamar makepkg con flag --nocheck.\n\n"
+    },
+    {
+      "title": "package()",
+      "level": 4,
+      "content": "El paso final es poner los archivos compilados en un directorio donde makepkg puede recuperarlos para crear un paquete. Por defecto es el directorio pkg - un simple entorno fakeroot. El directorio pkg replica la jerarquía del sistema de archivos raíz de las rutas de instalación del software. Si tiene que colocar manualmente los directorios raíz de su sistema de archivos, debe instalarlos en el directorio pkg bajo la misma estructura de directorios. Por ejemplo, si desea instalar un archivo en /usr/bin, debe colocarse en $pkgdir/usr/bin. Muy pocos procedimientos de instalación requieren que el usuario copie docenas de archivos manualmente. En su lugar, la mayoría de software make install lo hará. La última línea debe ser similar a la siguiente para poder instalar correctamente el software en el directorio pkg:\n\n```\nmake DESTDIR=\"$pkgdir/\" install\n```\n\nEn algunos casos raros, el software espera ejecutarse desde un único directorio. En tales casos, es aconsejable simplemente copiarlos $pkgdir/opt.\n\nA menudo, el proceso de instalación del software creará subdirectorios debajo del directorio pkg. Si no lo hace, makepkg generará muchos errores y necesitará crear manualmente subdirectorios añadiendo los comandos apropiados de mkdir -p en la función build() antes de ejecutar el procedimiento de instalación.\n\nEn los paquetes antiguos, no había ninguna función package(). Por lo tanto, los archivos se colocaban en el directorio pkg al final de la función build(). Si package() no está presente, build() se ejecuta a través de fakeroot. En paquetes nuevos, package() es necesario y se ejecuta a través de fakeroot en su lugar, y build() se ejecuta sin privilegios especiales.\n\nmakepkg --repackage ejecuta sólo la función package(), por lo que crea un archivo *.pkg.* archivo sin compilar el paquete. Esto puede ahorrar tiempo, e.g. si acaba de cambiar las variables depends del paquete.\n\n"
+    },
+    {
+      "title": "Prueba del PKGBUILD y del paquete",
+      "level": 2,
+      "content": "Al escribir la función build(), querrá probar sus cambios frecuentemente para asegurarse de que no haya errores. Puedes hacerlo usando el comando makepkg en el directorio que contiene el archivo PKGBUILD. Con un PKGBUILD correctamente formateado, makepkg creará un paquete; con un PKGBUILD roto o inacabado, provocará un error.\n\nSi makepkg finaliza correctamente, colocará un archivo denominado pkgname-pkgver.pkg.tar.xz en su directorio de trabajo. Este paquete puede ser instalado con el comando pacman -U. Sin embargo, sólo porque un archivo de paquete fue construido no implica que es totalmente funcional. Eso 11 Posiblemente sólo contenga el directorio y ningún archivo en si, por ejemplo, un prefijo se especificó incorrectamente. Puedes usar las funciones de consulta de pacman para mostrar una lista de archivos contenidos en el paquete y las dependencias que requiere con ppacman -Qlp [package file] y pacman -Qip [package file], respectivamente.\n\n¡Si el paquete parece sano, entonces usted a terminado! Sin embargo, si planea liberar el archivo PKGBUILD, es imperativo que compruebe y compruebe de nuevo el contenido de la matriz de dependencias.\n\nTambién asegúrese de que los binarios del paquete realmente funcionan perfectamente! Es molesto liberar un paquete que contiene todos los archivos necesarios, pero se bloquea Debido a alguna opción de configuración poco clara que no funciona bien con el resto del sistema. Si solo va a compilar paquetes para su propio sistema, entonces usted no necesita preocuparse demasiado sobre este paso de aseguramiento de calidad, después de todo es la única persona que sufre de errores.\n\n"
+    },
+    {
+      "title": "Comprobación de la sanidad del paquete",
+      "level": 3,
+      "content": "Después de comprobar la funcionalidad del paquete, compruebe si hay errores con namcap:\n\n```\n$ namcap PKGBUILD\n$ namcap <package file name>.pkg.tar.xz\n```\n\nNamcap deberá:\n\n1. Comprobar el contenido de PKGBUILD para buscar errores comunes y la jerarquía de archivos de paquetes para archivos innecesarios/extraviados.\n1. Escanea todos los archivos ELF en el paquete usando ldd, informando automáticamente qué paquetes con las bibliotecas compartidas requeridas faltan de las dependencias y que se pueden omitir como dependencias transitivas.\n1. Búsqueda heurística de dependencias perdidas y redundantes.\n\ny mucho más. Adquiera el hábito de revisar sus paquetes con namcap para evitar tener que arreglar los errores más simples después de la subida del paquete.\n\n"
+    },
+    {
+      "title": "Subir paquetes a AUR",
+      "level": 2,
+      "content": "Por favor lea Arch User Repository#Submitting packages de la guía de AUR. Para una descripción detallada del proceso.\n\n"
+    },
+    {
+      "title": "Resumen",
+      "level": 2,
+      "content": "1. Descargue el código fuente del software que quiera empaquetar.\n1. Trate de compilar e instalar el software en un directorio arbitrario\n1. Copie el prototipo de /usr/share/pacman/PKGBUILD.proto y renómbrelo como PKGBUILD en un directorio de trabajo, preferiblemente ~/abs\n1. Edite el PKGBUILD de acuerdo a las necesidades de su paquete\n1. Ejecute makepkg para verificar si el paquete se construye correctamente\n1. Si no es así, repita los últimos dos pasos\n\n"
+    },
+    {
+      "title": "Advertencias",
+      "level": 3,
+      "content": "- Antes de automatizar el proceso de construcción de paquetes, deberá haberlo hecho por lo menos una vez de manera manual para saber de antemano exactamente lo que esta haciendo. Desafortunadamente muchos autores de paquetes se apegan al proceso de 3 pasos de ./configure, make y make install, este no es siempre el caso y puede quedar un paquete en muy malas condiciones si no aplica el cuidado necesario para que todo funcione bien.\n- En algunos pocos casos, los paquetes no son disponibles en código fuente y habrá que recurrir a scripts como sh instalador.run para poder ejecutarlo, habrá de hacer una extensa investigación acerca de otros PKGBUILD, leer los README, buscar información del creador del programa, o buscar EBUILDS de Gentoo para poder ejecutar la instalación, recuerde que makepkg debe ser completamente automático y sin intervención del usuario.\n\n"
+    },
+    {
+      "title": "Directrices más detalladas",
+      "level": 2,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\n"
+    },
+    {
+      "title": "Generadores de PKGBUILD",
+      "level": 2,
+      "content": "Los PKGBUILD para algunos paquetes se pueden generar automáticamente.\n\n- Go: go-makepkg\n- Haskell: cblrepo\n- Python: pipman-gitAUR, pip2arch-gitAUR, python-pypi2pkgbuildAUR\n- Ruby: gem2archAUR, pacgemAUR\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- How to correctly create a patch file.\n- Arch Linux Classroom IRC Logs of classes about creating PKGBUILDs.\n- Fakeroot approach for package installation\n\n"
+    }
+  ]
+}

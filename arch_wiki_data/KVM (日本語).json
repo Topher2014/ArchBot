@@ -1,0 +1,76 @@
+{
+  "title": "KVM (日本語)",
+  "url": "https://wiki.archlinux.org/title/KVM_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- QEMU\n- Libvirt\n- VirtualBox\n- Xen\n- VMware\n\nKVM (Kernel-based Virtual Machine) は Linux カーネルに搭載されているハイパーバイザです。意図しているところは Xen と似ていますがもっとシンプルに動作します。エミュレーションを使うネイティブの QEMU と違って、KVM は仮想化のための CPU 拡張命令 (HVM) をカーネルモジュールを介して利用する QEMU の特殊なオペレーティングモードです。\n\nKVM を使用することで、修正を加えずに GNU/Linux や Windows などのオペレーティングシステムが動作する仮想マシンを複数動かすことができます (詳しくは Guest Support Status を見て下さい)。それぞれの仮想マシンには専用の仮想化されたハードウェアが使われます: ネットワークカード、ディスク、グラフィックカードなど。\n\nKVM と Xen, VMware, QEMU の違いについては KVM FAQ で説明されています。\n\nこの記事では KVM をバックエンドに使うエミュレータに共通の機能は扱いません。そのような情報は各々の該当する記事を見て下さい。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 KVM サポートの確認 1.1 ハードウェアのサポート 1.2 カーネルのサポート 1.2.1 KVM モジュール\n- 2 準仮想化デバイス 2.1 VIRTIO モジュール 2.2 カーネルモジュールのロード 2.3 準仮想化デバイスの一覧\n- 3 KVM の使い方\n- 4 ヒントとテクニック 4.1 仮想化のネスト 4.2 手軽なネットワーク 4.3 ヒュージページの有効化\n- 5 参照\n\n- 1.1 ハードウェアのサポート\n- 1.2 カーネルのサポート 1.2.1 KVM モジュール\n\n- 1.2.1 KVM モジュール\n\n- 2.1 VIRTIO モジュール\n- 2.2 カーネルモジュールのロード\n- 2.3 準仮想化デバイスの一覧\n\n- 4.1 仮想化のネスト\n- 4.2 手軽なネットワーク\n- 4.3 ヒュージページの有効化\n\n"
+    },
+    {
+      "title": "ハードウェアのサポート",
+      "level": 3,
+      "content": "KVM を使うには仮想マシンのホストのプロセッサが仮想化をサポートしている必要があります (Intel のプロセッサでは VT-x、AMD のプロセッサでは AMD-V という名前が付けられています)。あなたの使っているプロセッサがハードウェア仮想化をサポートしているかは次のコマンドで確認できます:\n\n```\n$ LC_ALL=C lscpu | grep Virtualization\n```\n\nプロセッサが仮想化をサポートしていれば、それを示す行があるはずです。\n\n次を実行することでも確認できます:\n\n```\n$ grep -E --color=auto 'vmx|svm|0xc0f' /proc/cpuinfo\n```\n\nこのコマンドを実行しても何も表示されない場合、あなたのプロセッサはハードウェア仮想化をサポートしていないため、KVM を使用することはできません。\n\n"
+    },
+    {
+      "title": "カーネルのサポート",
+      "level": 3,
+      "content": "Arch Linux のカーネルは KVM と VIRTIO をサポートする適切なカーネルモジュールを提供しています。\n\n"
+    },
+    {
+      "title": "KVM モジュール",
+      "level": 4,
+      "content": "あなたの使っているカーネルで必要なカーネルモジュール (kvm と、kvm_amd か kvm_intel のどちらか) が使えるようになっているかは次のコマンドで確認できます (カーネルが CONFIG_IKCONFIG_PROC を有効にしてビルドされたことが前提です):\n\n```\n$ zgrep CONFIG_KVM /proc/config.gz\n```\n\nモジュールが y か m に設定されていない場合、そのモジュールは利用できないことを意味します。\n\n"
+    },
+    {
+      "title": "準仮想化デバイス",
+      "level": 2,
+      "content": "ゲストがホストマシンのデバイスを使えるように、準仮想化は高速で効率的な通信手段を提供します。KVM はハイパーバイザとゲスト間のレイヤーとして Virtio API を使って仮想マシンに準仮想化デバイスを提供します。\n\nvirtio デバイスは全て2つに分けることができます: ホストのデバイスとゲストのドライバーです。\n\n"
+    },
+    {
+      "title": "VIRTIO モジュール",
+      "level": 3,
+      "content": "Virtio はネットワークやディスクデバイスドライバーの仮想化規格です。これによってゲストはネットワークやディスク操作の高いパフォーマンスを得ることが可能になり、準仮想化で役に立ちます。次のコマンドで必要なモジュールが使用可能か確認します:\n\n```\n$ zgrep VIRTIO /proc/config.gz\n```\n\n"
+    },
+    {
+      "title": "カーネルモジュールのロード",
+      "level": 3,
+      "content": "まず、カーネルモジュールが自動でロードされているか確認してください。最新の udev ではそうなっているはずです。\n\n```\n$ lsmod | grep kvm\n$ lsmod | grep virtio\n```\n\n上記のコマンドが何もメッセージを返さない場合、カーネルモジュールをロードする必要があります。\n\n"
+    },
+    {
+      "title": "準仮想化デバイスの一覧",
+      "level": 3,
+      "content": "- ネットワークデバイス (virtio-net)\n- ブロックデバイス (virtio-blk)\n- コントローラデバイス (virtio-scsi)\n- シリアルデバイス (virtio-serial)\n- バルーンデバイス (virtio-balloon)\n\n"
+    },
+    {
+      "title": "KVM の使い方",
+      "level": 2,
+      "content": "次の記事を参照してください: QEMU。\n\n"
+    },
+    {
+      "title": "仮想化のネスト",
+      "level": 3,
+      "content": "Nested Virtualization を使うことで、元の仮想マシンやネットワークに修正を加えることなく、既存の仮想マシンを別のハイパーバイザや他のクラウド上で動作させることができるようになります。\n\nホスト側で、kvm_intel の nested 機能を有効にしてください:\n\n```\n# modprobe -r kvm_intel\n# modprobe kvm_intel nested=1\n```\n\n永続化させるには (カーネルモジュール#モジュールオプションを設定するを参照):\n\n```\n/etc/modprobe.d/kvm_intel.conf\n```\n\n```\noptions kvm_intel nested=1\n```\n\n機能が有効になっているか確認:\n\n```\n$ systool -m kvm_intel -v | grep nested\n```\n\n```\nnested              = \"Y\"\n```\n\n全ての CPU の機能をゲスト環境に転送するために\"ホストパススルー\"モードを有効化:\n\n- QEMU を使用する場合、次のコマンドでゲスト VM を実行してください: qemu-system-x86_64 -enable-kvm -cpu host。\n- virt-manager を使用する場合、CPU モデルを host-passthrough に変更してください (リストに存在しない場合はボックスに直接書き出してください)。\n- virsh を使用する場合、virsh edit vm-name を使って CPU 行を <cpu mode='host-passthrough' check='partial'/> に変更してください。\n\nVM を起動したら vmx フラグが存在するか確認:\n\n```\n$ grep -E --color=auto 'vmx|svm' /proc/cpuinfo\n```\n\n"
+    },
+    {
+      "title": "手軽なネットワーク",
+      "level": 3,
+      "content": "ブリッジネットワークの設定は少し厄介です。実験目的で VM を使いたいのであれば、SSH トンネリングを使ってホストとゲストを接続するという方法があります。\n\n基本的な手順は以下の通りです:\n\n- ホスト OS で SSH サーバーをセットアップ\n- (任意) トンネリング用のユーザーを作成 (例: tunneluser)\n- VM に SSH をインストール\n- セットアップ認証\n\nSSH のセットアップについては SSH の記事、特に SSH#他のポートのフォワーディングを参照してください。\n\nデフォルトのユーザーネットワークスタックを使用する場合、ホストには 10.0.2.2 アドレスでアクセスできます。\n\n全てが動作しホストに SSH できるようになったら、/etc/rc.local に以下を追加してください:\n\n```\n# Local SSH Server\necho \"Starting SSH tunnel\"\nsudo -u vmuser ssh tunneluser@10.0.2.2 -N -R 2213:127.0.0.1:22 -f\n# Random remote port (e.g. from another VM)\necho \"Starting random tunnel\"\nsudo -u vmuser ssh tunneluser@10.0.2.2 -N -L 2345:127.0.0.1:2345 -f\n```\n\n上記の例では VM の SSH サーバーのトンネルを作成してホストの任意のポートを VM に引き入れています。\n\nVM における基礎的なネットワークですが、堅牢であり大抵の場合はこれで上手く行きます。\n\n"
+    },
+    {
+      "title": "ヒュージページの有効化",
+      "level": 3,
+      "content": "ヒュージページを有効にすることで仮想マシンのパフォーマンスを向上させることができます。最新の Arch Linux と KVM ならおそらく必要条件はすべて満たされているはずです。/dev/hugepages ディレクトリが存在しているかどうかチェックしてください。ディレクトリが存在しなかったら、作成してください。そしてこのディレクトリに適切なパーミッションを設定します。\n\n/etc/fstab に以下を追加:\n\n```\nhugetlbfs       /dev/hugepages  hugetlbfs       mode=1770,gid=78        0 0\n```\n\nもちろん gid は kvm グループに一致している必要があります。1770 ではグループの誰でもファイルを作成することができますが、他人のファイルを消去することはできません。/dev/hugepages が正しくマウントされていることを確認してください:\n\n```\n# umount /dev/hugepages\n# mount /dev/hugepages\n$ mount | grep huge\n```\n\n```\nhugetlbfs on /dev/hugepages type hugetlbfs (rw,relatime,mode=1770,gid=78)\n```\n\nそれから必要なヒュージページの数を計算します。ヒュージページの大きさを確認するには:\n\n```\n$ grep Hugepagesize /proc/meminfo\n```\n\n通常は 2048 kB ≙ 2 MB です。仮想マシンを 1024 MB で動作させたい場合、1024 / 2 = 512 となり少し追加して550まで丸めることができます。必要とするヒュージページをマシンに設定:\n\n```\n# echo 550 > /proc/sys/vm/nr_hugepages\n```\n\n十分な空きメモリがあれば以下のように表示されるはずです:\n\n```\n$ grep HugePages_Total /proc/meminfo\n```\n\n```\nHugesPages_Total:  550\n```\n\n数字がさらに小さい場合、アプリケーションを閉じるか少ないメモリで仮想マシンを起動してください (number_of_pages x 2):\n\n```\n$ qemu-system-x86_64 -enable-kvm -m 1024 -mem-path /dev/hugepages -hda <disk_image> [...]\n```\n\nそして -mem-path パラメータを使うことでヒュージページが利用されます。\n\n仮想マシンの実行中に、使われているヒュージページを確認するには:\n\n```\n$ grep HugePages /proc/meminfo\n```\n\n```\nHugePages_Total:     550\nHugePages_Free:       48\nHugePages_Rsvd:        6\nHugePages_Surp:        0\n```\n\n問題がないようでしたらデフォルトでヒュージページを有効にすることができます。以下を /etc/sysctl.d/40-hugepage.conf に追加してください:\n\n```\nvm.nr_hugepages = 550\n```\n\n参照:\n\n- Linux カーネルの hugetlbpage サポートの概要\n- https://wiki.debian.org/Hugepages\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- KVM Howto\n- KVM FAQ\n\n"
+    }
+  ]
+}

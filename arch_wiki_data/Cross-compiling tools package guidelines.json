@@ -1,0 +1,71 @@
+{
+  "title": "Cross-compiling tools package guidelines",
+  "url": "https://wiki.archlinux.org/title/Cross-compiling_tools_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis page describes how to create packages for cross-compiler toolchains. Another method to cross-compile makes use of distcc on mixed architectures. See Distcc#Cross compiling with distcc.\n\n"
+    },
+    {
+      "title": "Important note",
+      "level": 2,
+      "content": "This page describes the new way of doing things, inspired by the following packages:\n\n- mingw-w64-gcc and other packages from mingw-w64-* series\n- arm-none-eabi-gcc and other packages from arm-none-eabi-* series\n- Other packages from arm-wince-cegcc-* series\n\n"
+    },
+    {
+      "title": "Version compatibility",
+      "level": 2,
+      "content": "Note: **all** \n\nThe following strategies allows you to select compatible versions of gcc, binutils, kernel and C library:\n\n- General rules: there is a correlation between gcc and binutils releases, use simultaneously released versions; it is better to use latest kernel headers to compile libc but use --enable-kernel switch (specific to glibc, other C libraries may use different conventions) to enforce work on older kernels;\n- Official repositories: you may have to apply additional fixes and hacks, but versions used by Arch Linux (or its architecture-specific forks) most probably can be made to work together;\n- Software documentation: all GNU software have README and NEWS files, documenting things like minimal required versions of dependencies;\n- Other distributions: they too do cross-compilation\n- https://trac.clfs.org covers steps, necessary for building cross-compiler and mentions somewhat up-to-date versions of dependencies.\n\n- there is a correlation between gcc and binutils releases, use simultaneously released versions;\n- it is better to use latest kernel headers to compile libc but use --enable-kernel switch (specific to glibc, other C libraries may use different conventions) to enforce work on older kernels;\n\n"
+    },
+    {
+      "title": "Building a cross compiler",
+      "level": 2,
+      "content": "The general approach to building a cross compiler is:\n\n1. binutils: Build a cross-binutils, which links and processes for the target architecture\n1. headers: Install a set of C library and kernel headers for the target architecture use linux-api-headers as reference and pass ARCH=target-architecture to make create libc headers package (process for Glibc is described here)\n1. gcc-stage-1: Build a basic (stage 1) gcc cross-compiler. This will be used to compile the C library. It will be unable to build almost anything else (because it cannot link against the C library it does not have).\n1. libc: Build the cross-compiled C library (using the stage 1 cross compiler).\n1. gcc-stage-2: Build a full (stage 2) C cross-compiler\n\n1. use linux-api-headers as reference and pass ARCH=target-architecture to make\n1. create libc headers package (process for Glibc is described here)\n\nThe source of the headers and libc will vary across platforms.\n\n"
+    },
+    {
+      "title": "Package naming",
+      "level": 2,
+      "content": "The package name shall not be prefixed with the word cross- (it was previously proposed, but was not adopted in official packages, probably due to additional length of names), and shall consist of the package name, prefixed by GNU triplet without vendor field or with \"unknown\" in vendor field; example: arm-linux-gnueabihf-gcc. If shorter naming convention exists (e.g. mips-gcc), it may be used, but this is not recommended.\n\n"
+    },
+    {
+      "title": "File placement",
+      "level": 2,
+      "content": "Latest versions of gcc and binutils use non-conflicting paths for sysroot and libraries. Executables shall be placed into /usr/bin/, to prevent conflicts here, prefix all of them with architecture name.\n\nTypically, ./configure would have at least following parameters:\n\n```\n_target=your_target\n_sysroot=/usr/lib/${_target}\n...\n./configure \\\n    --prefix=${_sysroot} \\\n    --sysroot=${_sysroot} \\\n    --bindir=/usr/bin\n```\n\nwhere your_target can be, e.g., \"i686-pc-mingw32\".\n\n"
+    },
+    {
+      "title": "Example",
+      "level": 2,
+      "content": "This is PKGBUILD for binutils for MinGW. Things worth noticing are:\n\n- specifying root directory of the cross-environment\n- usage of ${_pkgname} , ${_target} and ${_sysroot} variables to make the code more readable\n- removal of the duplicated/conflicting files\n\n```\n# Maintainer: Allan McRae <allan@archlinux.org>\n\n# cross toolchain build order: binutils, headers, gcc (pass 1), w32api, mingwrt, gcc (pass 2)\n\n_target=i686-pc-mingw32\n_sysroot=/usr/lib/${_target}\n\npkgname=${_target}-binutils\n_pkgname=binutils\npkgver=2.19.1\npkgrel=1\npkgdesc=\"MinGW Windows binutils\"\narch=('i686' 'x86_64')\nurl=\"http://www.gnu.org/software/binutils/\"\nlicense=('GPL')\ndepends=('glibc>=2.10.1' 'zlib')\noptions=('!libtool' '!distcc' '!ccache')\nsource=(http://ftp.gnu.org/gnu/${_pkgname}/${_pkgname}-${pkgver}.tar.bz2)\nmd5sums=('09a8c5821a2dfdbb20665bc0bd680791')\n\nbuild() {\n  cd ${_pkgname}-${pkgver}\n  mkdir binutils-build && cd binutils-build\n\n  ../configure --prefix=${_sysroot} --bindir=/usr/bin \\\n    --with-sysroot=${_sysroot} \\\n    --build=$CHOST --host=$CHOST --target=${_target} \\\n    --with-gcc --with-gnu-as --with-gnu-ld \\\n    --enable-shared --without-included-gettext \\\n    --disable-nls --disable-debug --disable-win32-registry\n  make\n  make DESTDIR=${pkgdir}/ install\n  \n  # clean-up cross compiler root\n  rm -r ${pkgdir}/${_sysroot}/{info,man}\n}\n```\n\nNote: **make** \n\n"
+    },
+    {
+      "title": "Why not installing into /opt",
+      "level": 3,
+      "content": "Two reasons:\n\n1. First, according to File Hierarchy Standard, these files just belong somewhere to /usr. Period.\n1. Second, installing into /opt is a last measure when there is no other option.\n\n"
+    },
+    {
+      "title": "What is that \"out-of-path executables\" thing?",
+      "level": 3,
+      "content": "This weird thing allows easier cross-compiling. Sometimes, project Makefiles do not use CC & co. variables and instead use gcc directly. If you just want to try to cross-compile such project, editing the Makefile could be a very lengthy operation. However, changing the $PATH to use \"our\" executables first is a very quick solution. You would then run PATH=/usr/arch/bin/:$PATH make instead of make.\n\n"
+    },
+    {
+      "title": "What to do if compilation fails without clear message?",
+      "level": 3,
+      "content": "For error, occurred during running configure, read $srcdir/pkgname-build/config.log. For error, occurred during compilation, scroll console log up or search for word \"error\".\n\n"
+    },
+    {
+      "title": "What does this error [error message] means?",
+      "level": 3,
+      "content": "Most probably you made some of non-obvious errors:\n\n- Too many or too few configuration flags. Try to use already proven set of flags.\n- Dependencies are corrupted. For example misplaced or missing binutils files may result in cryptic error during gcc configuration.\n- You did not add export CFLAGS=\"\" to your build() function (see bug 25672 in GCC Bugzilla).\n- Some --prefix/--with-sysroot combination may require directories to be writable (non-obvious from clfs guides).\n- sysroot does nor yet has kernel/libc headers.\n- If google-fu does not help, immediately abandon current configuration and try more stable/proven one.\n\n"
+    },
+    {
+      "title": "Why do files get installed in wrong places?",
+      "level": 3,
+      "content": "Various methods of running generic make install line results in different results. For example, some make targets may not provide DESTDIR support and instead require install_root usage. The same for tooldir, prefix and other similar arguments. Sometimes providing parameters as arguments instead of environment variables, e.g\n\n```\n./configure CC=arm-elf-gcc\n```\n\ninstead of\n\n```\nCC=arm-elf-gcc ./configure\n```\n\nand vice versa may result in different outcomes (often caused by recursive self-invocation of configure/make).\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://wiki.osdev.org/GCC_Cross-Compiler\n\n"
+    }
+  ]
+}

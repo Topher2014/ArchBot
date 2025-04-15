@@ -1,0 +1,96 @@
+{
+  "title": "Udisks (日本語)",
+  "url": "https://wiki.archlinux.org/title/Udisks_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- udev\n- マウント\n- Polkit\n- ファイルマネージャの機能\n\nudisks には、ストレージデバイスに問い合わせたり制御を行うために使われる D-Bus インターフェイスを実装した udisksd というデーモンと、デーモンを利用したりクエリを送るのに使われる udisksctl というコマンドラインツールが含まれています。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 パーミッション 2.2 デフォルトのマウントオプション\n- 3 使用方法\n- 4 ヒントとテクニック 4.1 マウントヘルパー 4.1.1 udevadm モニター 4.2 /media にマウント 4.3 ループデバイスのマウント 4.4 特定のパーティションを隠匿する 4.5 ATA 設定の適用\n- 5 トラブルシューティング 5.1 非表示のデバイス 5.2 スタンバイタイマーの破損 5.3 NTFS のマウントに失敗する 5.4 NTFS ファイルの作成に失敗する (ファイル名に依存) 5.5 シャットダウン時に自動で外部 HDD の電源を切る\n- 6 参照\n\n- 2.1 パーミッション\n- 2.2 デフォルトのマウントオプション\n\n- 4.1 マウントヘルパー 4.1.1 udevadm モニター\n- 4.2 /media にマウント\n- 4.3 ループデバイスのマウント\n- 4.4 特定のパーティションを隠匿する\n- 4.5 ATA 設定の適用\n\n- 4.1.1 udevadm モニター\n\n- 5.1 非表示のデバイス\n- 5.2 スタンバイタイマーの破損\n- 5.3 NTFS のマウントに失敗する\n- 5.4 NTFS ファイルの作成に失敗する (ファイル名に依存)\n- 5.5 シャットダウン時に自動で外部 HDD の電源を切る\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "udisks2 パッケージを インストール します。\n\nudisksd(8) は D-Bus によってオンデマンドで起動するので、明示的に有効化する必要はありません。コマンドラインから udisksctl(1) で制御することができます。\n\n"
+    },
+    {
+      "title": "パーミッション",
+      "level": 3,
+      "content": "ユーザーが udisk を使用して実行できるアクションは、polkit で制限されます。ユーザーセッション が有効でない、または存在しない場合 (例えば systemd/ユーザー サービスから udisk を制御する場合)、polkit ルールを調整してください。\n\nstorage グループに対する一般的な udisks のパーミッションについては https://github.com/coldfix/udiskie/wiki/Permissions を、より限定的な例については [1] を参照してください。Dolphin を使用している場合は、[2] を参照してください。\n\n"
+    },
+    {
+      "title": "デフォルトのマウントオプション",
+      "level": 3,
+      "content": "/etc/udisks2/mount_options.conf でデフォルトのマウントオプションを定義できます。ファイルが存在しない場合は作成します。組み込みのデフォルトといくつかの例は、/etc/udisks2/mount_options.conf.example で確認できます。[3]\n\nオプションは、特定のファイルシステムタイプをターゲットにすることができます。たとえば、zstd 圧縮を有効にして btrfs ファイルシステムをマウントします。\n\n```\n[defaults]\nbtrfs_defaults=compress=zstd\n```\n\n"
+    },
+    {
+      "title": "使用方法",
+      "level": 2,
+      "content": "リムーバブルドライブを手動でマウントする場合、例えば /dev/sdc のようにします。\n\n```\n$ udisksctl mount -b /dev/sdc1\n```\n\nアンマウントするには\n\n```\n$ udisksctl unmount -b /dev/sdc1\n```\n\n詳しくは udisksctl help をご覧ください。\n\n"
+    },
+    {
+      "title": "マウントヘルパー",
+      "level": 3,
+      "content": "デバイスの自動マウントは、udisks のラッパーを使えば簡単に実現できます。アプリケーション一覧/ユーティリティ#マウントツールもご覧ください。\n\n- bashmount — リムーバブルメディアを一般ユーザーとして udisks2 でマウント・管理する bash スクリプトです。\n\n- udiskie — udisks2 オートカウンター。オプションで通知機能、トレイアイコン、パスワード保護された LUKS デバイス のサポートを提供。詳しくは udiskie wiki を見てください\n\n- udiskie-dmenu — udiskie の dmenu インターフェイス。\n\n- udisksvm — GUI udisks2 のラッパーで Python3 で書かれ、Qt5 フレームワークを使用しています。リムーバブルデバイスのマウント、アンマウント、CD/DVD のイジェクトをマウスクリックで行えます。詳しくは README ファイルを見てください。\n\n- udevil — Includes devmon, が含まれており、udisksとudisks2に互換性があります。\n\n"
+    },
+    {
+      "title": "udevadm モニター",
+      "level": 4,
+      "content": "udevadm monitor を使ってブロックイベントを監視し、新しいブロックデバイスが作成されたときにドライブをマウントすることができます。古いマウントポイントは udisksd によって自動的に削除されるので、削除の際に特別な操作は必要ありません。\n\n```\n#!/bin/sh\n\npathtoname() {\n    udevadm info -p /sys/\"$1\" | awk -v FS== '/DEVNAME/ {print $2}'\n}\n\nstdbuf -oL -- udevadm monitor --udev -s block | while read -r -- _ _ event devpath _; do\n        if [ \"$event\" = add ]; then\n            devname=$(pathtoname \"$devpath\")\n            udisksctl mount --block-device \"$devname\" --no-user-interaction\n        fi\ndone\n```\n\n"
+    },
+    {
+      "title": "/media にマウント",
+      "level": 3,
+      "content": "デフォルトで、udisks2 はリムーバブルドライブを /media/ ではなく ACL によって制御される /run/media/$USER/ ディレクトリにマウントします。/media にマウントしたい場合は、このルールを使って下さい:\n\n```\n/etc/udev/rules.d/99-udisks2.rules\n```\n\n```\n# UDISKS_FILESYSTEM_SHARED\n# ==1: mount filesystem to a shared directory (/media/VolumeName)\n# ==0: mount filesystem to a private directory (/run/media/$USER/VolumeName)\n# See udisks(8)\nENV{ID_FS_USAGE}==\"filesystem|other|crypto\", ENV{UDISKS_FILESYSTEM_SHARED}=\"1\"\n```\n\n/media は /run とは異なり、デフォルトでは、tmpfs としてマウントされないため、不要なマウントポイントをブート時に自動的にクリーンアップするために tmpfiles.d スニペットを作成することもお勧めします:\n\n```\n/etc/tmpfiles.d/media.conf\n```\n\n```\nD /media 0755 root root 0 -\n```\n\n"
+    },
+    {
+      "title": "ループデバイスのマウント",
+      "level": 3,
+      "content": "ISO イメージを簡単にマウントするには、以下のコマンドを使用します:\n\n```\n$ udisksctl loop-setup -r -f image.iso\n```\n\nこれにより、読み取り専用のループデバイスが作成され、マウント可能な ISO イメージが表示されます。書き込みを可能にするには、-r フラグを削除してください。作成されたループデバイスの名前は、上記の loop-setup コマンドによって出力されます。\n\n特定のループデバイスが存在している限り、イメージをアンマウントして再マウントすることができます。使用が終わったら、次のコマンドを実行してください。\n\n```\n$ udisksctl loop-delete -b /dev/loop0\n```\n\n削除するには、/dev/loop0 を特定のループデバイスの名前に置き換えて実行してください。\n\nループデバイスは軽量なため、サービス拒否の問題を心配せずに多数作成することができます。詳しくは [4] を参照してください。\n\n"
+    },
+    {
+      "title": "特定のパーティションを隠匿する",
+      "level": 3,
+      "content": "デスクトップ上に特定のパーティションまたはドライブを表示しないようにするには、udev ルール を作成します (例: /etc/udev/rules.d/10-local.rules):\n\n```\nKERNEL==\"sda1\", ENV{UDISKS_IGNORE}=\"1\"\nKERNEL==\"sda2\", ENV{UDISKS_IGNORE}=\"1\"\n```\n\nデスクトップ上に sda1 と sda を除くすべてのパーティションを表示します。\n\nブロックデバイスの名前は再起動のたびに変わる可能性があるため、パーティションやデバイス全体を非表示にする際に UUID を使用することもできます。UUID によるマッチングは /usr/lib/udev/rules.d/60-persistent-storage.rules が処理された後でのみ可能なので、それより後に処理されるファイル名を選択してください。例えば:\n\n```\n/etc/udev/rules.d/61-hide-partitions.rules\n```\n\n```\nSUBSYSTEM==\"block\", ENV{ID_FS_UUID}==\"XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXXX\", ENV{UDISKS_IGNORE}=\"1\"\n```\n\n上記の行は、マルチデバイスの Btrfs ファイルシステムを非表示にする際にも便利です。単一の Btrfs ファイルシステムに属するすべてのデバイスは同じ UUID を共有しますが、各デバイスには異なる SUB_UUID が割り当てられます。\n\n"
+    },
+    {
+      "title": "ATA 設定の適用",
+      "level": 3,
+      "content": "起動時とドライブ接続時に、udisksd はファイル /etc/udisks2/IDENTIFIER.conf に保存されている設定を適用します。ここで IDENTIFIER はそのドライブの Drive:Id プロパティの値です。現在、ATA 設定がサポートされています。利用可能なオプションについては、udisks(8) を参照してください。これらの設定は基本的に hdparm と同じ効果を持ちますが、 udisks デーモンが自動起動されている間は永続的になります。\n\n例えば、ドライブのスタンバイ・タイムアウトを 240 (20 分) に設定するには、以下を追加します。\n\n```\n/etc/udisks2/DriveId.conf\n```\n\n```\n[ATA]\nStandbyTimeout=240\n```\n\nドライブの DriveId を取得するには、 udevadm info --query=all --name=sdx | grep ID_SERIAL | sed \"s/_/-/g\" を使用してください。\n\nまた、gnome-disk-utility などの GUI ユーティリティを使用して設定ファイルを管理することもできます。\n\n"
+    },
+    {
+      "title": "非表示のデバイス",
+      "level": 3,
+      "content": "Udisks2 はデフォルトで特定のデバイスをユーザーから遮蔽します。この挙動が望ましくない、または問題になる場合は、/usr/lib/udev/rules.d/80-udisks2.rules を /etc/udev/rules.d/80-udisks2.rules にコピーしてから、ファイルを編集し以下のセクションを削除してください:\n\n```\n# ------------------------------------------------------------------------\n# ------------------------------------------------------------------------\n# ------------------------------------------------------------------------\n# Devices which should not be display in the user interface\n[...]\n```\n\n"
+    },
+    {
+      "title": "スタンバイタイマーの破損",
+      "level": 3,
+      "content": "udisks デーモンは、ドライブから定期的に S.M.A.R.T. データをポーリングしています。ポーリング間隔よりも長いスタンバイタイムアウトを持つハードディスクは、スタンバイに失敗することがあります。すでにスピンダウンしているドライブは、通常、影響を受けません。現在、udisks2 のようにポーリングを無効化したり間隔を変更する方法はないようです。[5], [6] を参照してください。\n\nただし、udisks2 が適用しているスタンバイタイムアウトには影響がないようです。udisks でスタンバイタイムアウトを設定するには、ATA 設定の適用 (udisks2) を参照してください。\n\n他の回避策として、タイムアウトをポーリング間隔 (10分) 以下に設定するか、 hdparm -y /dev/sdx を使って手動でスピンダウンを強制的に実行することも考えられます。\n\n"
+    },
+    {
+      "title": "NTFS のマウントに失敗する",
+      "level": 3,
+      "content": "ntfs パーティションのマウントに失敗し、エラーが発生した場合。\n\n```\nError mounting /dev/sdXY at [...]: wrong fs type, bad option, bad superblock on /dev/sdXY, missing codepage or helper program, or other error.\n```\n\nと、root で実行した journalctl/dmesg のカーネルログに記載されています。\n\n```\nntfs: (device sdXY): parse_options(): Unrecognized mount option windows_names.\n```\n\nこの問題は、udisks がカーネルの ntfs ドライバを使おうとしていることで、この (デフォルトの) マウントオプションを認識していないことです。 これを動作させるには、オプションの依存関係 NTFS-3G がインストールされている必要があります。\n\n"
+    },
+    {
+      "title": "NTFS ファイルの作成に失敗する (ファイル名に依存)",
+      "level": 3,
+      "content": "udisks 2.8.2 では NTFS マウントオプションに windows_names が追加され、nul や screenshot 23-08-21 19:22.jpg のような Win32 と互換性のないファイル名が作成できないようになりました。特に、Steam Proton が初期化されなくなる 原因となります。この動作を元に戻すには\n\n```\n/etc/udisks2/mount_options.conf\n```\n\n```\n[defaults]\nntfs:ntfs_defaults=uid=$UID,gid=$GID\n```\n\n通常、ファイル名が間違っていても、アクセスしない限り Windows で問題が発生することはありません。chkdsk はこれらの名前をエラーとして扱い、名前を変更したファイルをファイルシステムのルートの下にある found.nnn フォルダーに移動します。\n\n"
+    },
+    {
+      "title": "シャットダウン時に自動で外部 HDD の電源を切る",
+      "level": 3,
+      "content": "もしシステムのシャットダウン時に外部 HDD の電源が正常に切れない場合は、その問題を修正することが望ましいでしょう。電源を切る最も便利な方法は udisks を使用することです。\n\nudisks2.service を 有効化 します。\n\nスクリプトを実行するサービスは以下のようになります。\n\n```\n/etc/systemd/system/handle_external_hdds.service\n```\n\n```\n[Unit]\nRequires=udisks2.service\nRequires=graphical.target\nAfter=graphical.target\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStop=/usr/local/bin/handle_external_hdds.sh\n[Install]\nWantedBy=graphical.target\n```\n\nhandle_external_hdds.service を 有効化 します。\n\nsystemd の daemon-reload を実行して、新しい設定を適用します。\n\n再起動するか graphical.target をリスタートして、正常に動作するか確認します。\n\n1つのディスクの任意の量のパーティションを扱うスクリプトの例は以下のようになります。\n\n```\n/usr/local/bin/handle_external_hdds.sh\n```\n\n```\n#!/bin/bash -u\n\ndeclare -a uuids=(uuid_list)\n\n# Only proceed if the drive is present.\nif [[ ! -L \"/dev/disk/by-uuid/${uuids[0]}\" ]]; then\n  exit 0\nfi\n\nfor uuid in \"${uuids[@]}\"; do\n  if findmnt \"/dev/disk/by-uuid/$uuid\"; then\n    umount \"/dev/disk/by-uuid/$uuid\"\n  fi\ndone\n\n# udisksctl powers off proper drive even if its partition is supplied\nudisksctl power-off -b \"/dev/disk/by-uuid/${uuids[0]}\"\n```\n\nuuid_list はスペース区切りの UUID リストで、例えば \"uuid_1\" \"uuid_2\" のように、チェックするデバイスのパーティションに対応します。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- gentoo wiki: udisks\n\n"
+    }
+  ]
+}

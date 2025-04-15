@@ -1,0 +1,56 @@
+{
+  "title": "Map scancodes to keycodes",
+  "url": "https://wiki.archlinux.org/title/Map_scancodes_to_keycodes",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Xorg/Keyboard configuration\n- Linux console/Keyboard configuration\n\nThis page assumes that you have read Keyboard input, which provides wider context.\n\nMapping scancodes to keycodes is achieved in a layer lower than Xorg and Linux console, which means that changes to this mapping will be effective in both. [1][2][3] Note that this method can only be used for simple 1:1 key remaps; see Input remap utilities for programs which allow more complex remaps at the same low level.\n\nThere are two ways of mapping scancodes to keycodes:\n\n- Using udev\n- Using setkeycodes(8)\n\nThe preferred method is to use udev because it uses hardware information (which is a quite reliable source) to choose the keyboard model in a database. It means that if your keyboard model has been found in the database, your keys are recognized out of the box.\n\n"
+    },
+    {
+      "title": "Identifying scancodes",
+      "level": 2,
+      "content": "You need to know the scancodes of keys you wish to remap. See Keyboard input#Identifying scancodes for details.\n\n"
+    },
+    {
+      "title": "Using udev",
+      "level": 2,
+      "content": "udev provides a builtin function called hwdb to maintain the hardware database index in /etc/udev/hwdb.bin. The database is compiled from files with .hwdb extension located in directories /usr/lib/udev/hwdb.d/, /run/udev/hwdb.d/ and /etc/udev/hwdb.d/. The default scancodes-to-keycodes mapping file is /usr/lib/udev/hwdb.d/60-keyboard.hwdb. See hwdb(7) for details.\n\nThe .hwdb file can apply key mappings to one or more keyboards based on hardware ID glob patterns. You may obtain device identification info by running evemu-describe(1) as the root user. This command is provided by the evemu package.\n\nThe evdev: prefix is used to match hardware against a block of mappings. The following hardware matches are supported:\n\n- Generic input devices (also USB keyboards) identified by the usb kernel modalias:\n\n```\nevdev:input:b<bus_id>v<vendor_id>p<product_id>e<version_id>-<input_modalias>\n```\n\n- <vendor_id>, <product_id> and <version_id>: vendor, product and version IDs matching the output of the lsusb command.\n- <bus_id> is the 4-digit hex bus id and should be 0003 for usb devices. The possible <bus_id> values are defined in /usr/include/linux/input.h (you can run awk '/BUS_/ {print $2, $3}' /usr/include/linux/input.h to get a list).\n- <input_modalias> is an arbitrary length input-modalias describing the device capabilities. The other fields are sufficient to uniquely identify the device, so you can use a glob here.\n\n- Input driver device name and DMI data match: evdev:name:<input device name>:dmi:bvn*:bvr*:bd*:svn<vendor>:pn* where <input_device_name> is the name device specified by the driver and <vendor> is the firmware-provided string exported by the kernel DMI modalias.\n\n```\nevdev:name:<input device name>:dmi:bvn*:bvr*:bd*:svn<vendor>:pn*\n```\n\nThe format of each line in the block body is KEYBOARD_KEY_<scancode>=<keycode>. The value of <scancode> is hexadecimal, but without the leading 0x (i.e. specify a0 instead of 0xa0), whereas the value of <keycode> is the lower-case keycode name string as listed in /usr/include/linux/input-event-codes.h (see the KEY_<KEYCODE> variables), a sorted list is available at [4]. It is not possible to specify decimal value in <keycode>.\n\n"
+    },
+    {
+      "title": "Remap all devices",
+      "level": 4,
+      "content": "Suppose we want to remap a couple of common keys for all AT keyboards:\n\n```\n/etc/udev/hwdb.d/90-custom-keyboard.hwdb\n```\n\n```\nevdev:atkbd:*\n KEYBOARD_KEY_10=suspend\n KEYBOARD_KEY_a0=search\n```\n\n"
+    },
+    {
+      "title": "Remap specific device",
+      "level": 4,
+      "content": "Suppose we want to remap a device that you happen to currently have plugged in. You should already have the evdev path (e.g. /dev/input/event17) as well as the scancode (e.g. 70039 for caps lock). Now, using the event number, you can query sysfs for the modalias:\n\n```\ncat /sys/class/input/event17/device/modalias\n```\n\n```\ninput:b0003v32ACp0012e0111-e0,1,4,1...\n```\n\nThis device could be matched with the following hwdb rule:\n\n```\n/etc/udev/hwdb.d/90-remap.hwdb\n```\n\n```\nevdev:input:b0003v32ACp0012e0111*\n KEYBOARD_KEY_70039=rightctrl # This example maps the 70039 scancode to the \"rightctrl\" keycode.\n```\n\n"
+    },
+    {
+      "title": "Disable key",
+      "level": 4,
+      "content": "To block the Sleep key, bind it to the \"reserved\" keyword. Alternatively, you can use \"unknown\" to map it to the NoSymbol key. For example:\n\n```\n/etc/udev/hwdb.d/90-block-sleep.hwdb\n```\n\n```\nevdev:input:b0003v03F0p020C* # hp 5308 keyboard controller\n KEYBOARD_KEY_10082=reserved\n```\n\n"
+    },
+    {
+      "title": "Updating the Hardware Database Index",
+      "level": 3,
+      "content": "After changing the configuration files, the hardware database index, hwdb.bin needs to be rebuilt.\n\n- Update hwdb.bin manually by running\n\n```\n# systemd-hwdb update\n```\n\n- Update automatically on each reboot by commenting out ConditionNeedsUpdate in systemd-hwdb-update.service using a replacement unit file\n\n```\n/etc/systemd/system/systemd-hwdb-update.service\n```\n\n```\n#  This file is part of systemd.\n.\n.\n#ConditionNeedsUpdate=/etc\n.\n.\n```\n\nAfter systemd-hwdb-update.service finished loading systemd-trigger.service will reload the changes from hwdb.bin.\n\n- Automatically after systemd upgrade.\n\nOn each upgrade of systemd, the 30-systemd-hwdb.hook rebuilds hwdb.bin by running systemd-hwdb --usr update as the root user, so we do not need to care about it.\n\n"
+    },
+    {
+      "title": "Reloading the Hardware Database Index",
+      "level": 3,
+      "content": "The kernel loads hwdb.bin as part of the boot process, rebooting the system will promise the loading of the updated hwdb.bin.\n\nWith udevadm it is possible to load new key mapping from the updated hwdb.bin by running\n\n```\n# udevadm trigger\n```\n\nBe aware that with udevadm only added or changed key mapping are loaded so if we delete a mapping from the configuration file, rebuild hwdb.bin and run udevadm trigger as the root user, then the deleted mapping still kept by the kernel, at least until a reboot.\n\n"
+    },
+    {
+      "title": "Querying the database",
+      "level": 3,
+      "content": "You can check that your configuration was loaded either by pressing keys, or by running udevadm info. For the USB keyboard in the above example, this outputs the mapping we configured as follows:\n\n```\n# udevadm info /dev/input/by-path/*-usb-*-kbd | grep KEYBOARD_KEY\nE: KEYBOARD_KEY_70039=leftalt\nE: KEYBOARD_KEY_700e2=leftctrl\n```\n\n"
+    },
+    {
+      "title": "Using setkeycodes",
+      "level": 2,
+      "content": "setkeycodes is a tool to load scancodes-to-keycodes mapping table into Linux kernel. Its usage is:\n\n```\n# setkeycodes scancode keycode ...\n```\n\nIt is possible to specify multiple pairs at once. Scancodes are given in hexadecimal, keycodes in decimal.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nApparently setkeycodes does not work with USB keyboards (Linux 3.14.44-1-lts):\n\n```\n# setkeycodes 45 30     # bind NumLock (0x45) to KEY_A (30) on AT keyboard\n(successful)\n# setkeycodes 70053 30  # bind NumLock (0x70053) to KEY_A (30) on USB keyboard\nKDSETKEYCODE: Invalid argument\nfailed to set scancode 620d3 to keycode 31\n```\n\nIf using this simple command, changes will be lost after reboot. The changes can be made permanent by creating a new service:\n\n```\n/etc/systemd/system/setkeycodes.service\n```\n\n```\n[Unit]\nDescription=Change keycodes at boot\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/setkeycodes [scancode] [keycode] [scancode] [keycode] [...]\n\n[Install]\nWantedBy=multi-user.target\n```\n\nand enabling setkeycodes.service.\n\n"
+    }
+  ]
+}

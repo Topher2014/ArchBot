@@ -1,0 +1,66 @@
+{
+  "title": "Pluggable",
+  "url": "https://wiki.archlinux.org/title/Pluggable",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Security\n- pam_mount\n- pam_usb\n- pam_abl\n- pam_oath\n- Universal 2nd Factor\n- Identity management\n\nThe Linux Pluggable Authentication Modules (PAM) provides a framework for system-wide user authentication. To quote the project:\n\nThis article explains the Arch Linux base set-up defaults for PAM to authenticate local and remote users. Applying changes to the defaults is subject of crosslinked specialized per topic articles.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The pam package is a dependency of the base meta package and, thereby, normally installed on an Arch system. The PAM modules are installed into /usr/lib/security exclusively.\n\nThe repositories contain a number of optional PAM packages, the #Configuration How-Tos show examples.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "A number of /etc paths are relevant for PAM; execute pacman --query --list pam | grep /etc to see the default configuration files created. They relate to either #Security parameters for the modules, or the #PAM base-stack configuration.\n\n"
+    },
+    {
+      "title": "Security parameters",
+      "level": 3,
+      "content": "The path /etc/security contains system-specific configuration for variables the authentication methods offer. The base install populates it with default upstream configuration files.\n\nNote Arch Linux does not provide distribution-specific configuration for these files. For example, the /etc/security/pwquality.conf file can be used to define system-wide defaults for password quality. Yet, to enable it, the pam_pwquality.so module has to be added to the #PAM base-stack of modules, which is not the case per default.\n\nSee #Security parameter configuration for some of the possibilities.\n\n"
+    },
+    {
+      "title": "PAM base-stack",
+      "level": 3,
+      "content": "The /etc/pam.d/ path is exclusive for the PAM configuration to link the applications to the individual systems' authentication schemes. During installation of the system base, it is populated by:\n\n- the pambase package, which contains the base-stack of Arch Linux specific PAM configuration to be used by applications, and\n- other base packages. For example, util-linux adds configuration for the central login and other programs, the shadow package adds the Arch Linux defaults to secure and modify the user database (see Users and groups).\n\nThe different configuration files of the base installation link together and are stacked during runtime. For example, on a local user logon, the login application sources the system-local-login policy, which in turn sources others:\n\n```\n/etc/pam.d/\n```\n\n```\nlogin -> system-local-login -> system-login -> system-auth\n```\n\nFor a different application, a different path may apply. For example, openssh installs its sshd PAM policy:\n\n```\n/etc/pam.d/\n```\n\n```\nsshd -> system-remote-login -> system-login -> system-auth\n```\n\nConsequently, the choice of the configuration file in the stack matters. For the above example, a special authentication method could be required for sshd only, or all remote logins by changing system-remote-login; both changes would not affect local logins. Applying the change to system-login or system-auth instead would affect local and remote logins.\n\nLike the example of sshd, any pam-aware application is required to install its policy to /etc/pam.d in order to integrate and rely on the PAM stack appropriately. If an application fails to do it, the /etc/pam.d/other default policy to deny and log a warning is applied.\n\nNote: **must** PAM is dynamically linked at runtime. For example:\n\nPAM is dynamically linked at runtime. For example:\n\n```\n$ ldd /usr/bin/login | grep pam\n```\n\n```\nlibpam.so.0 => /usr/lib/libpam.so.0 (0x000003d8c32d6000)\nlibpam_misc.so.0 => /usr/lib/libpam_misc.so.0 (0x000003d8c30d2000)\n```\n\nthe login application is pam-aware and must, therefore, have a policy.\n\nThe PAM package manual pages pam(8) and pam.d(5) describe the standardized content of the configuration files. In particular, they explain the four PAM groups: account, authentication, password, and session management, as well as the control values that may be used to configure stacking and behavior of the modules.\n\nAdditionally, extensive documentation is installed to /usr/share/doc/Linux-PAM/index.html which, among various guides, contains browsable man pages for each of the standard modules.\n\nNote: **no user** \n\n"
+    },
+    {
+      "title": "Examples",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nTwo short examples to illustrate the above warning.\n\nFirst, we take the following two lines from a historic Arch default:\n\n```\n/etc/pam.d/system-auth\n```\n\n```\nauth      required  pam_unix.so     try_first_pass nullok\nauth      optional  pam_permit.so\n```\n\nFrom pam_unix(8):\n\n- the latter being what pam_permit.so is used for. Simply swapping the control values required and optional for both lines is enough to disable password authentication, i.e. any user may logon without providing a password.\n\nSecond, as the contrary example, per default configuration of pam_nologin.so in /etc/pam.d/login, creating the following file:\n\n```\n# touch /etc/nologin\n```\n\nresults in that no user other than root may login (if root logins are allowed, see Security#Restricting root login). To allow logins again, remove the file again before your logout from the console you created it with.\n\nWith that as background, see #PAM stack and module configuration for particular use-case configuration.\n\n"
+    },
+    {
+      "title": "Configuration How-Tos",
+      "level": 2,
+      "content": "This section provides an overview of content detailing how to apply changes to the PAM configuration and how to integrate special new PAM modules into the PAM stack. Note the man pages for the modules can generally be reached dropping the .so extension.\n\n"
+    },
+    {
+      "title": "Security parameter configuration",
+      "level": 3,
+      "content": "The following sections describe examples to change the default PAM parameter configuration:\n\n- Security#Enforcing strong passwords with pam_pwquality\n\n- Security#Lock out user after three failed login attempts\n\n- Security#Allow only certain users\n\n- Realtime process management#Configuring PAM and Security#Limit amount of processes\n\n- Environment variables#Using pam_env\n\n"
+    },
+    {
+      "title": "PAM stack and module configuration",
+      "level": 3,
+      "content": "The following articles detail how to change the #PAM base-stack for special use-cases.\n\n"
+    },
+    {
+      "title": "Further PAM packages",
+      "level": 2,
+      "content": "Other than those packages mentioned so far, the Arch User Repository contains a number of additional PAM modules and tools.\n\nA general purpose utility relating to PAM is:\n\n- Pamtester — Program to test the pluggable authentication modules (PAM) facility\n\nNote the AUR features a keyword tag for PAM, but not all available packages are updated to include it. Hence, searching the package description may be necessary.\n\n"
+    },
+    {
+      "title": "Locked out",
+      "level": 3,
+      "content": "If PAM has locked you out, perhaps by typing the wrong password too many times, see Security#Lock out user after three failed login attempts.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- linux-pam.org - The project homepage\n- Understanding and configuring PAM - An introductory article\n- Login managers: An introduction - Motivates PAM in the context of a login manager\n\n"
+    }
+  ]
+}

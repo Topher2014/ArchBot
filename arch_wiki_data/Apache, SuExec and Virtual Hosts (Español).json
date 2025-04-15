@@ -1,0 +1,126 @@
+{
+  "title": "Apache, SuExec and Virtual Hosts (Español)",
+  "url": "https://wiki.archlinux.org/title/Apache,_SuExec_and_Virtual_Hosts_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-02** \n\nArtículos relacionados\n\n- XAMPP (Español)\n- /mod_perl (Español)\n- /mod_fcgid (Español)\n- /mod_gnutls (Español)\n- /mod_python (Español)\n- /mod_wsgi (Español)\n\nEl Servidor HTTP Apache o solamente Apache, es un servidor web muy popular, desarrollado por la Apache Software Foundation.\n\nEste articulo describe como configurar Apache y como integrarlo opcionalmente con PHP.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete apache.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "Los archivos de configuración de Apache están ubicados en /etc/httpd/conf. El archivo de configuración principal es /etc/httpd/conf/httpd.conf, el cual incluye varios otro archivos de configuración. El archivo de configuración por defecto debiera servir para una configuración simple. Por defecto, servirá el directorio /srv/http a cualquiera que visite su pagina.\n\nPara iniciar Apache, inicie el httpd.service usando systemd.\n\nAhora, Apache debería estar ejecutándose. Pruebelo visitando http://localhost/ en un navegador web. Debería mostrar una pagina simple de indice.\n\nPara una configuración opcional adicional, véase las siguientes secciones.\n\n"
+    },
+    {
+      "title": "Opciones avanzadas",
+      "level": 3,
+      "content": "Véase la lista completa de directivas de configuración de Apache y la guía rápida de referencias de directivas.\n\nEstas opciones en /etc/httpd/conf/httpd.conf pueden serle de interés:\n\n```\nUser http\n```\n\n```\nListen 80\n```\n\n```\nServerAdmin you@example.com\n```\n\n```\nDocumentRoot \"/srv/http\"\n```\n\n```\nAllowOverride None\n```\n\nPuede encontrar más opciones de configuración en /etc/httpd/conf/extra/httpd-default.conf:\n\nPara desactivar la firma del servidor:\n\n```\nServerSignature Off\n```\n\nPara ocultar información como las versiones de Apache y PHP:\n\n```\nServerTokens Prod\n```\n\n"
+    },
+    {
+      "title": "Directorios de usuario",
+      "level": 3,
+      "content": "Los directorios de usuario están disponibles por defecto a través de http://localhost/~tunombredeusuario/ y muestran los contenidos de ~/public_html (esto puede ser cambiado en /etc/httpd/conf/extra/httpd-userdir.conf).\n\nSi no quiere que los directorios de usuario estén disponibles en la web, comente la siguiente linea en /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/httpd-userdir.conf\n```\n\nDebe asegurarse que los permisos en su directorio home estén correctamente establecidos para que Apache pueda accederlo. Su directorio home y ~/public_html deben ser ejecutables para otros («el resto del mundo»):\n\n```\n$ chmod o+x ~\n$ chmod o+x ~/public_html\n$ chmod -R o+r ~/public_html\n```\n\nReinicie httpd.service para aplicar los cambios. Véase también Umask#Set the mask value.\n\n"
+    },
+    {
+      "title": "TSL",
+      "level": 3,
+      "content": "Primero obtenga un certificado. Si posee un dominio publico, puede usar Let's Encrypt.\n\nEn /etc/httpd/conf/httpd.conf, saque las marcas de comentario en las siguientes tres lineas:\n\n```\nLoadModule ssl_module modules/mod_ssl.so\nLoadModule socache_shmcb_module modules/mod_socache_shmcb.so\nInclude conf/extra/httpd-ssl.conf\n```\n\nSi esta usando certbot --apache, la siguiente linea tampoco debe comentarse:\n\n```\nLoadModule rewrite_module modules/mod_rewrite.so\n```\n\nDespués de obtener una llave y un certificado, asegúrese que las lineas SSLCertificateFile y SSLCertificateKeyFile en /etc/httpd/conf/extra/httpd-ssl.conf apunten a la llave y el certificado. Si también es generada una cadena concatenada de certificados CA, añada el nombre del archivo a SSLCertificateChainFile.\n\nFinalmente, reinicie httpd.service para aplicar los cambios.\n\n"
+    },
+    {
+      "title": "Hosts virtuales",
+      "level": 3,
+      "content": "Si quiere tener más de un host, saque las marcas de comentario en la siguiente linea en /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/httpd-vhosts.conf\n```\n\nEstablezca sus hosts virtuales en /etc/httpd/conf/extra/httpd-vhosts.conf. El archivo por defecto contiene un elaborado ejemplo que debería ayudarle al iniciar.\n\nPara probar los hosts virtuales en su maquina local, añada los nombres virtuales a su archivo /etc/hosts:\n\n```\n127.0.0.1 domainname1.dom\n127.0.0.1 domainname2.dom\n```\n\nReinicie httpd.service para aplicar los cambios.\n\n"
+    },
+    {
+      "title": "Administrar varios hosts virtuales",
+      "level": 4,
+      "content": "Si tiene una gran cantidad de hosts virtuales, puede querer activarlos y desactivarlos fácilmente. Es recomendado crear un archivo de configuración por host virtual y guardarlos en una sola carpeta, ej. /etc/httpd/conf/vhosts.\n\nPrimero cree la carpeta:\n\n```\n# mkdir /etc/httpd/conf/vhosts\n```\n\nY guarde cada archivo de configuración en ella:\n\n```\n# nano /etc/httpd/conf/vhosts/domainname1.dom\n# nano /etc/httpd/conf/vhosts/domainname2.dom\n...\n```\n\nEn el ultimo paso, Include (Incluya) los archivos de configuración en su /etc/httpd/conf/httpd.conf:\n\n```\n#Vhosts permitidos:\nInclude conf/vhosts/domainname1.dom\nInclude conf/vhosts/domainname2.dom\n```\n\nPuede activar o desactivar cada host virtual comentándolo o no comentándolo.\n\nUn archivo vhost básico se parecerá a esto:\n\n```\n/etc/httpd/conf/vhosts/domainname1.dom\n```\n\n```\n<VirtualHost *:80>\n    ServerAdmin webmaster@domainname1.dom\n    DocumentRoot \"/home/user/http/domainname1.dom\"\n    ServerName domainname1.dom\n    ServerAlias domainname1.dom\n    ErrorLog \"/var/log/httpd/domainname1.dom-error_log\"\n    CustomLog \"/var/log/httpd/domainname1.dom-access_log\" common\n\n    <Directory \"/home/user/http/domainname1.dom\">\n        Require all granted\n    </Directory>\n</VirtualHost>\n\n<VirtualHost *:443>\n    ServerAdmin webmaster@domainname1.dom\n    DocumentRoot \"/home/user/http/domainname1.dom\"\n    ServerName domainname1.dom:443\n    ServerAlias domainname1.dom:443\n    SSLEngine on\n    SSLCertificateFile \"/etc/httpd/conf/server.crt\"\n    SSLCertificateKeyFile \"/etc/httpd/conf/server.key\"\n    ErrorLog \"/var/log/httpd/domainname1.dom-error_log\"\n    CustomLog \"/var/log/httpd/domainname1.dom-access_log\" common\n\n    <Directory \"/home/user/http/domainname1.dom\">\n        Require all granted\n    </Directory>\n</VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "Primero instale PHP, después, siga alguna de las tres subsecciones siguientes. Finalmente, pruebe la instalación como se describe en la subsección final.\n\n"
+    },
+    {
+      "title": "Usando libphp",
+      "level": 4,
+      "content": "Este método es probablemente el más fácil, pero el menos escalable: es apropiado para una carga de solicitudes ligera. También requiere que cambie el modulo mpm, lo cual puede causar problemas con otras extensiones (ej. no es compatible con #HTTP2).\n\nInstale php-apache.\n\nEn /etc/httpd/conf/httpd.conf comente la linea:\n\n```\n#LoadModule mpm_event_module modules/mod_mpm_event.so\n```\n\ny no comente la linea:\n\n```\nLoadModule mpm_prefork_module modules/mod_mpm_prefork.so\n```\n\nNote: Si no, obtendrá el siguiente error:\n\nSi no, obtendrá el siguiente error:\n\n```\nApache is running a threaded MPM, but your PHP Module is not compiled to be threadsafe.  You need to recompile PHP.\nAH00013: Pre-configuration failed\nhttpd.service: control process exited, code=exited status=1\n```\n\nPara habilitar PHP, añada estas lineas a /etc/httpd/conf/httpd.conf:\n\n- Ponga esto al final de la lista LoadModule:\n\n```\nLoadModule php_module modules/libphp.so\nAddHandler php-script .php\n```\n\n- Ponga esto al final de la lista Include:\n\n```\nInclude conf/extra/php_module.conf\n```\n\nReinicie httpd.service usando systemd.\n\n"
+    },
+    {
+      "title": "Utilizando apache2-mpm-worker y mod_fcgid",
+      "level": 4,
+      "content": "Este método provee un uso de memoria y rendimiento mejorado al servir múltiples peticiones.\n\nInstale mod_fcgidAUR y php-cgi.\n\nCree el directorio necesario y enlacelo (symlink) a el wrapper de PHP:\n\n```\n# mkdir /srv/http/fcgid-bin\n# ln -s /usr/bin/php-cgi /srv/http/fcgid-bin/php-fcgid-wrapper\n```\n\nCree /etc/httpd/conf/extra/php-fcgid.conf con el siguiente contenido:\n\n```\n/etc/httpd/conf/extra/php-fcgid.conf\n```\n\n```\n# Modulos requeridos: fcgid_module\n\n<IfModule fcgid_module>\n    AddHandler php-fcgid .php\n    AddType application/x-httpd-php .php\n    Action php-fcgid /fcgid-bin/php-fcgid-wrapper\n    ScriptAlias /fcgid-bin/ /srv/http/fcgid-bin/\n    SocketPath /var/run/httpd/fcgidsock\n    SharememPath /var/run/httpd/fcgid_shm\n        # Si no permite peticiones más grandes, varias aplicaciones pueden fallar (como el WordPress login)\n        FcgidMaxRequestLen 536870912\n        # Ruta a php.ini – por defecto en /etc/phpX/cgi\n        DefaultInitEnv PHPRC=/etc/php/\n        # Numero de hijos de PHP a ejecutar. No lo defina para dejar que PHP decida.\n        #DefaultInitEnv PHP_FCGI_CHILDREN 3\n        # Peticiones máximas antes que un proceso sea detenido y uno nuevo sea iniciado\n        #DefaultInitEnv PHP_FCGI_MAX_REQUESTS 5000\n    <Location /fcgid-bin/>\n        SetHandler fcgid-script\n        Options +ExecCGI\n    </Location>\n</IfModule>\n```\n\nEdite /etc/httpd/conf/httpd.conf:\n\n- Quite las marcas de comentario en la carga del modulo actions:\n\n```\nLoadModule actions_module modules/mod_actions.so\n```\n\n- Cargue el modulo FCGID después de haber cargado el modulo unixd (de el cual es dependiente) — ubiquelo en el bloque <IfModule unixd_module> —:\n\n```\nLoadModule fcgid_module modules/mod_fcgid.so\n```\n\n- Asegúrese que el Include de la configuración de MPM no este comentado (no esta comentado por defecto en la versión instalada de este archivo):\n\n```\nInclude conf/extra/httpd-mpm.conf\n```\n\n- Incluya su nueva configuración de FCGID:\n\n```\nInclude conf/extra/php-fcgid.conf\n```\n\nReinicie httpd.service.\n\n"
+    },
+    {
+      "title": "Utilizando php-fpm y mod_proxy_fcgi",
+      "level": 4,
+      "content": "Este método provee «una implementación alternativa al PHP FastCGI con algunas características adicionales (la mayoría) útiles para sitios web con mucho tráfico.» [1].\n\nNote: Si aun quiere probar ProxyPass, experimente con una linea como esta:\n\nSi aun quiere probar ProxyPass, experimente con una linea como esta:\n\n```\nProxyPassMatch ^/(.*\\.php(/.*)?)$ unix:/run/php-fpm/php-fpm.sock|fcgi://localhost/srv/http/$1\n```\n\nInstale php-fpm.\n\nHabilite los módulos de proxy:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nLoadModule proxy_module modules/mod_proxy.so\nLoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so\n```\n\nCree /etc/httpd/conf/extra/php-fpm.conf con el siguiente contenido:\n\n```\nDirectoryIndex index.php index.html\n<FilesMatch \\.php$>\n    SetHandler \"proxy:unix:/run/php-fpm/php-fpm.sock|fcgi://localhost/\"\n</FilesMatch>\n```\n\nE incluyalo al final de /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/php-fpm.conf\n```\n\nPuede configurar PHP-FPM en /etc/php/php-fpm.d/www.conf, pero la configuración por defecto debería funcionar bien.\n\nInicie y habilite php-fpm.service. Reinicie httpd.service.\n\n"
+    },
+    {
+      "title": "Pruebe si PHP funciona",
+      "level": 4,
+      "content": "Para probar si PHP fue correctamente configurado, cree un archivo llamado prueba.php en su directorio DocumentRoot de Apache (ej. /srv/http/ o ~<username>/public_html/) con los siguientes contenidos:\n\n```\n<?php phpinfo(); ?>\n```\n\nY vaya a http://localhost/prueba.php o http://localhost/~<username>/prueba.php.\n\n"
+    },
+    {
+      "title": "HTTP2",
+      "level": 3,
+      "content": "Para habilitar el soporte a HTTP/2, saque las marcas de comentario de la siguiente linea en httpd.conf:\n\n```\nLoadModule http2_module modules/mod_http2.so\n```\n\nY añada la siguiente linea:\n\n```\nProtocols h2 http/1.1\n```\n\nPara más información, véase la documentación de mod_http2.\n\nTome en cuenta que http2_module no es compatible con mpm_prefork_module que es ampliamente usado en la configuración de PHP. Considere usar php-fpm.\n\n"
+    },
+    {
+      "title": "Estado de Apache y registros",
+      "level": 3,
+      "content": "Vea el estado del demonio de Apache con systemctl.\n\nLos registros de Apache pueden ser encontrados en /var/log/httpd/.\n\n"
+    },
+    {
+      "title": "Error:PID file /run/httpd/httpd.pid not readable (yet?) after start",
+      "level": 3,
+      "content": "Comente la linea unique_id_module en httpd.conf: #LoadModule unique_id_module modules/mod_unique_id.so\n\n"
+    },
+    {
+      "title": "/run/httpd no es creado al arrancar",
+      "level": 3,
+      "content": "Si al ejecutar systemd-tmpfiles --create como root arroja «unsafe path transition», compruebe la posesión de su directorio raíz.\n\n```\nls -la /\nchown root:root /\n```\n\n"
+    },
+    {
+      "title": "Apache is running a threaded MPM, but your PHP Module is not compiled to be threadsafe.",
+      "level": 3,
+      "content": "Si al cargar php7_module el httpd.service falla, y obtiene un error como este en el journal:\n\n```\nApache is running a threaded MPM, but your PHP Module is not compiled to be threadsafe.  You need to recompile PHP.\n```\n\nEs porque PHP incluye soporte para un modulo que no es threadsafe, y usted esta intentando usar un MPM hilado. Una solución para esto es usar un MPM no hilado. Intente remplazar mpm_event_module con mpm_prefork_module:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nLoadModule mpm_event_module modules/mod_mpm_event.so\nLoadModule mpm_prefork_module modules/mod_mpm_prefork.so\n```\n\nY reinicie httpd.service.\n\n"
+    },
+    {
+      "title": "AH00534: httpd: Configuration error: No MPM loaded.",
+      "level": 3,
+      "content": "Puede encontrar este error después de una actualización reciente. Esto es solo el resultado de un cambio reciente en httpd.conf que no ha reproducido en su configuración local. Para arreglarlo, no comente la siguiente linea:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nLoadModule mpm_prefork_module modules/mod_mpm_prefork.so\n```\n\nY reinicie httpd.service.\n\n"
+    },
+    {
+      "title": "AH00072: make_sock: could not bind to address",
+      "level": 3,
+      "content": "Esto puede ser causado por varias cosas. El problema más común es que algo ya esta escuchando en el puerto dado, compruebe que no este sucediendo con netstat:\n\n```\n# netstat -lnp | grep -e :80 -e :443\n```\n\nSi obtiene alguna salida, detenga el servicio que esta ocupando el puerto o mate el proceso desbocado (runaway) que esta causando que el puerto este ocupado, e intente de nuevo.\n\nOtro problema puede ser que Apache no esta iniciando como root por alguna razón — intente iniciarlo manualmente y vea si aun obtiene el error AH0072 —.\n\n```\n# httpd -k start\n```\n\nFinalmente, también puede tener un error con su configuración y esté escuchando dos veces en el puerto dado. Lo siguiente es un ejemplo de una mala configuración que puede desencadenar este problema:\n\n```\nListen 0.0.0.0:80\nListen [::]:80\n```\n\n"
+    },
+    {
+      "title": "AH01071: Got error 'Primary script unknown",
+      "level": 3,
+      "content": "Este error puede ser causado por ProtectHome=true en el archivo de unidad de systemd de php-fpm si esta sirviendo archivos en /home como es un entorno de host virtual. Puede desactivar esta característica con editando el archivo de unidad de php-fpm y reiniciandolo. Alternativamente, mueva su raíz de documento.\n\n"
+    },
+    {
+      "title": "Cambiar el valor de max_execution_time en php.ini no tiene efecto",
+      "level": 3,
+      "content": "Si cambió el valor de max_execution_time en php.ini a un valor mayor de 30 (segundos), aun puede que obtenga una respuesta de 503 Service Unavailable de Apache después de treinta segundos. Para arreglarlo, añada una directiva ProxyTimeout a su configuración http justo después del bloque <FilesMatch \\.php$>:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nProxyTimeout 300\n```\n\nY reinicie httpd.service.\n\n"
+    },
+    {
+      "title": "PHP-FPM: los errores de cada host virtual no son registrados por separado",
+      "level": 3,
+      "content": "Si tiene múltiples hosts virtuales, puede ser deseable que cada uno registre sus errores en archivos separados (usando la directiva de Apache ErrorLog). Si esto no le esta funcionando, confirmen que PHP-FPM esta configurado para que registre los errores a syslog:\n\n```\n/etc/php/php-fpm.conf\n```\n\n```\nerror_log = syslog\n```\n\nTambién es posible que la configuración de reserva la haya anulado. Asegúrese que la siguiente linea este comentada:\n\n```\n/etc/php/php-fpm.d/www.conf\n```\n\n```\n;php_admin_value[error_log] = /var/log/fpm-php.www.log\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Pagina oficial de Apache\n- Documentación en español de Apache\n- Apache Wiki\n- Documentacion de Apache - Consejos de seguridad\n- Apache Wiki - Solución de problemas\n- Apache en wiki.debian.org\n\n"
+    }
+  ]
+}

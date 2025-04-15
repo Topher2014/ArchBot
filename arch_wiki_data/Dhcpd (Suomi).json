@@ -1,0 +1,51 @@
+{
+  "title": "Dhcpd (Suomi)",
+  "url": "https://wiki.archlinux.org/title/Dhcpd_(Suomi)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Aiheeseen liittyen\n\n- dhcpcd\n\ndhcpd on Internet Systems Consortiumin kehittämä DHCP palvelin. Se on käytännöllinen esimerkiksi laitteelle joka toimii reitittimenä LAN verkossa.\n\nNote: **(server)** \n\n"
+    },
+    {
+      "title": "Asennus",
+      "level": 2,
+      "content": "Asenna dhcp paketti, joka löytyy virallisista pakettilähteistä.\n\n"
+    },
+    {
+      "title": "Käyttö",
+      "level": 2,
+      "content": "dhcpd sisältää kaksi yksikkötiedostoa dhcpd4.service ja dhcpd6.service, joita voidaan käyttää hallitsemaan taustaprosessia. Ne käynnistävät taustaprosessin kaikki verkkokäyttöliittymät IPv4 ja IPv6 vastaavasti. Katso #Vain yhden käyttöliittymän kuuntelu vaihtoehtoiselle ratkaisulle.\n\n"
+    },
+    {
+      "title": "Konfiguraatio",
+      "level": 2,
+      "content": "Ohje staattisen IPv4 osoitteen asettamiseen käyttöliittymään, jota halutaan käyttää (tässä esimerkissä eth0). Ensimmäiset 3 tavua tästä osoitteesta eivät saa vastata muiden käyttöliittymien osoitteiden ensimmäisiä tavuja.\n\n```\n# ip link set up dev eth0\n# ip addr add 139.96.30.100/24 dev eth0 # arbitrary address\n```\n\n- 192.168/16 (subnet 192.168.0.0, netmask 255.255.0.0)\n- 172.16/12 (subnet 172.16.0.0, netmask 255.240.0.0)\n- 10/8 (suurille verkoille; subnet 10.0.0.0, netmask 255.0.0.0)\n\nAsettaaksesi staattisen ip osoitteen bootissa, katso Network configuration (Suomi)#Staattinen IP osoite.\n\nOletus dhcpd.conf sisältää monia kommentoimattomia esimerkkejä, joten kopioi se:\n\n```\n# cp /etc/dhcpd.conf /etc/dhcpd.conf.example\n```\n\nMinimi konfiguraatio tiedosto voi näyttää tältä:\n\n```\n/etc/dhcpd.conf\n```\n\n```\noption domain-name-servers 8.8.8.8, 8.8.4.4;\noption subnet-mask 255.255.255.0;\noption routers 139.96.30.100;\nsubnet 139.96.30.0 netmask 255.255.255.0 {\n  range 139.96.30.150 139.96.30.250;\n}\n```\n\nJos kiinteälle IP osoitteelle on tarve yhdessä erityisessä laitteessa, voit määrittää isäntä osat:\n\n```\n/etc/dhcpd.conf\n```\n\n```\noption domain-name-servers 8.8.8.8, 8.8.4.4;\noption subnet-mask 255.255.255.0;\noption routers 139.96.30.100;\nsubnet 139.96.30.0 netmask 255.255.255.0 {\n  range 139.96.30.150 139.96.30.250;\n}\nhost macbookpro{\n  hardware ethernet 70:56:81:22:33:44;\n  fixed-address 139.96.30.199;\n}\n```\n\ndomain-name-servers vaihtoehto sisältää DNS palvelimien osotteita joita syötetään asiakasohjelmille (client). Tässä esimerkissä käytetään Googlen julkisia DNS palvelimia. Jos tiedät paikallisia DNS palvelimia (kuten esimerkiksi palveluntarjoajan omia), voit käyttää myös niitä. Jos olet konfiguroinut oman DNS paikallisessa koneessa, käytä sen osoitetta subnetissä (kuten 139.96.30.100 aikaisemmassa esimerkissä).\n\nsubnet-mask ja routers määrittää subnet peitteen ja listan käytettävistä reitittimistä subnetissä. Valtaosassa tapauksia pienissä verkoissa voidaan käyttää 255.255.255.0 peitteenä ja määrittää IP osoite koneesta missä ollaan konfiguroimassa DHCP palvelinta reitittimenä.\n\nsubnet osat määrittää vaihtoehdot muille subneteille, jotka on kartoitettu verkonkäyttöliittymiin, missädhcpd on käynnissä. Meidän esimerkissä tämä subnet 139.96.30.0/24 on tälle käyttöliittymälle eth0, mille määriteltiin joukko valittavia IP osoitteita. Osoitteet tästä joukosta asetetaan liittyville asiakasohjelmille.\n\n"
+    },
+    {
+      "title": "Vain yhden käyttöliittymän kuuntelu",
+      "level": 3,
+      "content": "Jos tietokone on jo osana yhtä tai useampaa verkkoa, se voi ilmentyä ongelmana jos koneesi rupeaa antamaan IP osoitteita muille laitteille muista verkoista. Se voidaan tehdä joko konfiguroimalla dhcpd tai käynnistämällä se taustaprosessina systemctl:än avulla.\n\n"
+    },
+    {
+      "title": "dhcpd:n konfigurointi",
+      "level": 4,
+      "content": "Käyttöliittymän torjumiseen täytyy luoda tyhjä esittely subnetille, joka konfiguroidaan siinä käyttöliittymässä.\n\nTämä tehdään muokkaamalla konfiguraatio tiedosto (esimerkiksi):\n\n```\n/etc/dhcpd.conf\n```\n\n```\n# No DHCP service in DMZ network (192.168.2.0/24)\nsubnet 192.168.2.0 netmask 255.255.255.0 {\n}\n```\n\n"
+    },
+    {
+      "title": "Palvelu tiedosto",
+      "level": 4,
+      "content": "Ei ole olemassa palvelu tiedostoja oletukselta, jotka käyttävät dhcpd:tä vain yhdessä käyttöliittymässä, jolloin sellainen pitää luoda. Aloita kopioimalla jo olemassa oleva palvelu:\n\n```\n# cp /usr/lib/systemd/system/dhcpd4.service /etc/systemd/system/dhcpd4@.service\n```\n\nSen jälkeen muokkaa ExecStart riviä sisältämään käyttöliittymä:\n\n```\n/etc/systemd/system/dhcpd4@.service\n```\n\n```\n...\n[Service]\n...\nExecStart=/usr/bin/dhcpd -4 -q -cf /etc/dhcpd.conf -pf /run/dhcpd4/dhcpd.pid %I\n...\n```\n\nTämä on mallinne yksikkö, joka sitoo sen erityiseen käyttöliittymään, esimerkiksi dhcpd4@eth0.service missä eth0 on käyttöliittymä, jonka näkee komennolla ip link.\n\n"
+    },
+    {
+      "title": "Käyttö PXE:lle",
+      "level": 3,
+      "content": "PXE konfiguraatio tehdään kahdella seuraavalla asetuksella:\n\n```\n/etc/dhcpd.conf\n```\n\n```\nnext-server 192.168.0.2;\ntiedostonimi \"/pxelinux.0\";\n```\n\nTämä osa voi olla kokonaisuudessa subnet tai vain host määritelmässä. next-server on TFTP palvelimen IP, ja tiedostonimi on tiedoston nimi kuvasta josta bootataan. Enemmän tietoa löytyy PXE artikkelista.\n\n"
+    },
+    {
+      "title": "Katso myös",
+      "level": 2,
+      "content": "- ISC DHCP Dokumentaatio\n\n"
+    }
+  ]
+}

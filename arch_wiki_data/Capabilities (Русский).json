@@ -1,0 +1,76 @@
+{
+  "title": "Capabilities (Русский)",
+  "url": "https://wiki.archlinux.org/title/Capabilities_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Привилегии (POSIX 1003.1e, capabilities(7)) позволяют предоставить программам доступ к определённым возможностям, которые обычно есть только у суперпользователя, позволяя избежать запуска программ от имени root. Разработчикам программ рекомендуется заменить использование мощного атрибута setuid в системных исполняемых файлах на минимально необходимый программе набор привилегий. Многие пакеты используют привилегии; например, привилегия CAP_NET_RAW используется в fping. Это позволяет запускать fping от имени обычного пользователя (как при использовании метода setuid), но при этом процесс не получает root-права, что ограничивает возможность эксплуатации потенциальных уязвимостей в fping.\n\n"
+    },
+    {
+      "title": "Реализация",
+      "level": 2,
+      "content": "Для реализации привилегий в Linux используются расширенные атрибуты (xattr(7)) в пространстве имён security. Расширенные атрибуты поддерживаются всеми основными файловыми системами Linux, в том числе Ext2, Ext3, Ext4, Btrfs, JFS, XFS и Reiserfs. Следующий пример выводит привилегии fping с помощью getcap, а затем выводит те же данные в закодированном виде с помощью getfattr:\n\n```\n$ getcap /usr/bin/fping\n```\n\n```\n/usr/bin/fping cap_net_raw=ep\n```\n\n```\n$ getfattr -d -m \"^security\\\\.\" /usr/bin/fping\n```\n\n```\n# file: usr/bin/fping\nsecurity.capability=0sAQAAAgAgAAAAAAAAAAAAAAAAAAA=\n```\n\nРасширенные атрибуты копируются автоматически при использовании cp -a, но некоторые другие программы требуют специального флага: например, rsync -X.\n\nПривилегии устанавливаются install-скриптами в пакетах Arch (например, fping.install).\n\n"
+    },
+    {
+      "title": "Администрирование и обслуживание",
+      "level": 2,
+      "content": "Если у пакета слишком много ненужных привилегий — это считается ошибкой, о которой стоит сообщить. Использование привилегий, фактически эквивалентных root-доступу (CAP_SYS_ADMIN) или позволяющих легко получить root-доступ (CAP_DAC_OVERRIDE), ошибкой не считается, так как Arch не поддерживает какую-либо систему мандатного управления доступом.\n\n"
+    },
+    {
+      "title": "Программы, для которых удобно использовать привилегии",
+      "level": 2,
+      "content": "Перечисленные ниже пакеты не имеют файлов с атрибутом setuid и для работы требуют права root. Для них можно добавить привилегии, чтобы обычные пользователи могли использовать программу без получения root-доступа.\n\nСимволы +ep означают «effective permitted», подробнее в man-странице capabilities(7) § File capabilities.\n\n"
+    },
+    {
+      "title": "beep",
+      "level": 3,
+      "content": "```\n# setcap cap_dac_override,cap_sys_tty_config+ep /usr/bin/beep\n```\n\n"
+    },
+    {
+      "title": "chvt",
+      "level": 3,
+      "content": "```\n# setcap cap_dac_read_search,cap_sys_tty_config+ep /usr/bin/chvt\n```\n\n"
+    },
+    {
+      "title": "iftop",
+      "level": 3,
+      "content": "```\n# setcap cap_net_raw+ep /usr/bin/iftop\n```\n\n"
+    },
+    {
+      "title": "mii-tool",
+      "level": 3,
+      "content": "```\n# setcap cap_net_admin+ep /usr/bin/mii-tool\n```\n\n"
+    },
+    {
+      "title": "mtr",
+      "level": 3,
+      "content": "```\n# setcap cap_net_raw+ep /usr/bin/mtr-packet\n```\n\n"
+    },
+    {
+      "title": "nethogs",
+      "level": 3,
+      "content": "```\n# setcap cap_net_admin,cap_net_raw+ep /usr/bin/nethogs\n```\n\n"
+    },
+    {
+      "title": "wavemon",
+      "level": 3,
+      "content": "```\n# setcap cap_net_admin+ep /usr/bin/wavemon\n```\n\n"
+    },
+    {
+      "title": "Полезные команды",
+      "level": 2,
+      "content": "Поиск файлов с setuid-root:\n\n```\n$ find /usr/bin /usr/lib -perm /4000 -user root\n```\n\nПоиск файлов с setgid-root:\n\n```\n$ find /usr/bin /usr/lib -perm /2000 -group root\n```\n\n"
+    },
+    {
+      "title": "Временная выдача привилегий",
+      "level": 2,
+      "content": "С помощью capsh(1) можно запустить программу с указанными привилегиями без редактирования расширенных атрибутов исполняемого файла. Следующий пример демонстрирует, как подключиться к процессу через GDB с помощью привилегии CAP_SYS_PTRACE:\n\n```\n$ sudo -E capsh --caps=\"cap_setpcap,cap_setuid,cap_setgid+ep cap_sys_ptrace+eip\" --keep=1 --user=\"$USER\" --addamb=\"cap_sys_ptrace\" --shell=/usr/bin/gdb -- -p <pid>\n```\n\nПример прослушивания привилегированного порта с помощью netcat:\n\n```\n$ sudo -E capsh --caps=\"cap_setpcap,cap_setuid,cap_setgid+ep cap_net_bind_service+eip\" --keep=1 --user=\"$USER\" --addamb=\"cap_net_bind_service\" --shell=/usr/bin/nc -- -lvtn 123\nListening on 0.0.0.0 123\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Man-страницы: capabilities(7), setcap(8), getcap(8)\n- Wikibooks:Grsecurity/Appendix/Capability Names and Descriptions\n- Seccomp BPF (SECure COMPuting with filters)\n\n"
+    }
+  ]
+}

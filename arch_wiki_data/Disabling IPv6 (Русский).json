@@ -1,0 +1,166 @@
+{
+  "title": "Disabling IPv6 (Русский)",
+  "url": "https://wiki.archlinux.org/title/Disabling_IPv6_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- IPv6 tunnel broker setup\n\nВ Arch Linux протокол IPv6 включён по умолчанию.\n\nСтатья Linux IPv6 HOWTO[устаревшая ссылка 2024-10-12 ⓘ], хоть и давно не обновлялась, содержит подробную информацию об IPv6, от основ до более сложных тем. Если вы слабо знакомы с данным протоколом, то стоит сначала прочесть её.\n\n"
+    },
+    {
+      "title": "Обнаружение соседей",
+      "level": 2,
+      "content": "Пинг по адресу многоадресной рассылки ff02::1 заставит все хосты в локальной сети ответить. При этом нужно указать сетевой интерфейс:\n\n```\n$ ping ff02::1%eth0\n```\n\nПосле этого список «соседей» по локальной сети можно вывести командой\n\n```\n$ ip -6 neigh\n```\n\nАналогично, если сделать пинг по адресу ff02::2, то ответят только маршрутизаторы локальной сети.\n\nЕсли добавить опцию -I ваш-глобальный-ipv6 в пинг-запрос, хосты локальной сети (link-local) ответят с использованием глобальных адресов (link-global). В этом случае сетевой интерфейс можно не указывать:\n\n```\n$ ping -I 2001:4f8:fff6::21 ff02::1\n```\n\nЧтобы пропинговать всех на всех интерфейсах и сообщить всем свой адрес, используйте скрипт.\n\n```\n#!/usr/bin/bash\ndeclare -a l_ifs\nreadarray l_ifs < <(/sbin/ip -6 -j address | jq -r '.[] | .ifname ')\nfor l_if in ${l_ifs[@]} ; do\n echo $l_if\n declare -a l_addrs\n readarray l_addrs < <(/sbin/ip -6 -j address show dev \"$l_if\" | \\\n                        jq -r  '.[0].addr_info[].local')\n for l_addr in ${l_addrs[@]} ; do\n   echo $l_addr\n   ping -c 4 -6 -I \"$l_addr\" ff02::1%\"$l_if\"\n done\ndone\n```\n\n"
+    },
+    {
+      "title": "Автоконфигурация узла (SLAAC)",
+      "level": 2,
+      "content": "Простейший способ получения IPv6-адреса в уже настроенной сети — автоконфигурация узла (SLAAC, Stateless address autoconfiguration). При этом адрес автоматически вычисляется на основании объявленного маршрутизатором префикса сети. Никакие дальнейшие настройки или использование специализированного ПО вроде DHCP-клиента не требуются.\n\n"
+    },
+    {
+      "title": "Клиент",
+      "level": 3,
+      "content": "Если вы используете netctl, то нужно только добавить одну строку в файл настроек вашей проводной или беспроводной сети.\n\n```\nIP6=stateless\n```\n\nЕсли вы используете NetworkManager, то он автоматически включит использование IPv6-адресов, если таковые объявлены в сети.\n\nНужно также заметить, что для нормальной работы автоконфигурации должны быть разрешены пакеты ICMP для IPv6. Поэтому необходимо добавить разрешения для пакетов ipv6-icmp в настройки межсетевого экрана. Если вы используете брандмауэр на основе iptables, то добавьте следующее правило:\n\n```\n-A INPUT -p ipv6-icmp -j ACCEPT\n```\n\nЕсли вы используете другой интерфейс межсетевого экрана (ufw, shorewall и т.д.), то инструкции по разрешению пакетов ipv6-icmp нужно искать в его документации.\n\nЕсли вы выбрали сетевой менеджер, который не поддерживает разрешение DNS с бесконтекстным (stateless) IPv6 (например, netctl), то для этих целей можно воспользоваться демоном rdnssd(8) из пакета ndisc6.\n\n"
+    },
+    {
+      "title": "Шлюз",
+      "level": 3,
+      "content": "Чтобы соответствующим образом работать с адресами IPv6 клиентских устройств вашей сети, нужно настроить демон объявлений (advertisement daemon). Для этой задачи используется radvd. Его настройка довольно проста. Добавьте следующие строки в файл /etc/radvd.conf, заменив LAN на название вашего сетевого интерфейса:\n\n```\ninterface LAN {\n  AdvSendAdvert on;\n  MinRtrAdvInterval 3;\n  MaxRtrAdvInterval 10;\n  prefix ::/64 {\n    AdvOnLink on;\n    AdvAutonomous on;\n    AdvRouterAddr on;\n  };\n};\n```\n\nТакая настройка скажет клиентам выбрать адреса из объявленного блока /64. Обратите внимание, что эта настройка объявляет все доступные префиксы, привязанные к сетевому интерфейсу. Если вы хотите указать конкретные префиксы, то замените ::/64 на необходимый, например, 2001:DB8::/64. Блок настроек prefix можно повторять для добавления нескольких префиксов.\n\nЧтобы объявить DNS-сервера клиентам вашей локальной сети, можно использовать предлагаемую протоколом обнаружения соседей функциональность RDNSS. Например, добавьте следующие строки к файлу /etc/radvd.conf, чтобы объявить DNSv6-сервер Google:\n\n```\nRDNSS 2001:4860:4860::8888 2001:4860:4860::8844 {\n};\n```\n\nШлюз должен также разрешать трафик ipv6-icmp во всех основных цепочках межсетевого экрана. Для Simple stateful firewall/iptables добавьте правила:\n\n```\n-A INPUT -p ipv6-icmp -j ACCEPT\n-A OUTPUT -p ipv6-icmp -j ACCEPT\n-A FORWARD -p ipv6-icmp -j ACCEPT\n```\n\nДля других интерфейсов межсетевого экрана выполните аналогичные настройки и в конце не забудьте включить radvd.service.\n\n"
+    },
+    {
+      "title": "Privacy Extensions",
+      "level": 2,
+      "content": "Когда устройство-клиент получает адрес посредством SLAAC, его IPv6-адрес вычисляется на основании префикса сети и MAC-адреса сетевого интерфейса. Это может иметь определённые последствия с точки зрения приватности, поскольку MAC-адрес компьютера теперь можно узнать по IPv6-адресу. Для решения этой проблемы был разработан стандарт IPv6 Privacy Extensions (RFC 4941). В соответствии с ним ядро видоизменяет исходный адрес, генерируя вместо него временный. Такой подход используется, когда необходимо скрыть настоящий адрес при подключении к удалённому серверу.\n\nЧтобы включить Privacy Extensions, добавьте следующие параметры sysctl:\n\n```\n/etc/sysctl.d/40-ipv6.conf\n```\n\n```\n# Enable IPv6 Privacy Extensions\nnet.ipv6.conf.all.use_tempaddr = 2\nnet.ipv6.conf.default.use_tempaddr = 2\nnet.ipv6.conf.nic.use_tempaddr = 2\n```\n\nЗдесь nic — имя сетевого интерфейса. В статье Настройка сети#Обнаружение сетевых интерфейсов описано, как узнать имена сетевых интерфейсов на вашей машине. Параметры all.use_tempaddr и default.use_tempaddr не будут применены к сетевым интерфейсам, которые уже определены в системе на момент выполнения файла настроек sysctl.\n\nПосле перезагрузки Privacy Extensions будут включены.\n\n"
+    },
+    {
+      "title": "dhcpcd",
+      "level": 3,
+      "content": "Стандартная конфигурация dhcpcd содержит опцию slaac private (RFC 7217), которая включает назначение стабильных приватных адресов вместо вычисления оных на основе аппаратных параметров. Дополнительная настройка не требуется, если, конечно, вы не хотите изменять адрес IPv6 чаще, чем в начале каждого нового подключения к сети. Если задать опцию slaac hwaddr, то будут назначаться постоянные адреса.\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "NetworkManager использует IPv6 Privacy Extensions в соответствии с настройкой ipv6.ip6-privacy в файле NetworkManager.conf(5) или в профиле соединения. Если параметр не задан ни глобально, ни для соединения, NetworkManager будет использовать /proc/sys/net/ipv6/conf/default/use_tempaddr.\n\nЧтобы включить IPv6 Privacy Extensions явно, добавьте следующие строки в файл NetworkManager.conf(5):\n\n```\n/etc/NetworkManager/conf.d/ip6-privacy.conf\n```\n\n```\n[connection]\nipv6.ip6-privacy=2\n```\n\nПримените настройки и переподключитесь ко всем активным соединениям.\n\nЧтобы включить IPv6 Privacy Extensions для отдельных соединений под управлением NetworkManager, отредактируйте соответствующий нужному соединения файл в каталоге /etc/NetworkManager/system-connections/, добавив к разделу [ipv6] пару ключ-значение ip6-privacy=2:\n\n```\n/etc/NetworkManager/system-connections/соединение.nmconnection\n```\n\n```\n...\n[ipv6]\nmethod=auto\nip6-privacy=2\n...\n```\n\nПерезагрузите соединение и подключитесь к нему снова.\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "systemd-networkd не включает IPv6 Privacy Extensions по умолчанию. Для включения добавьте параметр IPv6PrivacyExtensions=yes в секции [Network] в файле .network соответствующего соединения. Также можно включить глобально для всех соединений с помощью файла в каталоге /etc/systemd/networkd.conf.d/, например:\n\n```\n/etc/systemd/networkd.conf.d/ipv6-privacy-extensions.conf\n```\n\n```\n[Network]\nIPv6PrivacyExtensions=yes\n```\n\nsystemd-networkd не учитывает sysctl-параметр net.ipv6.conf.nicN.use_tempaddr, если оцпия IPv6PrivacyExtensions не установлена в значение kernel.\n\nТем не менее, учитываются некоторые другие опции[1]:\n\nTable content:\nНазвание | Описание\nnet.ipv6.conf.nicN.temp_prefered_lft | Предпочтительное время жизни временного адреса в секундах. (В названии допущена грамматическая ошибка, но так и должно быть.)\nnet.ipv6.conf.nicN.temp_valid_lft | Максимальное время жизни временного адреса в секундах.\n\nСм. также systemd-networkd и systemd.network(5).\n\n"
+    },
+    {
+      "title": "ConnMan",
+      "level": 3,
+      "content": "Добавьте следующую строку в файл службы:\n\n```\n/var/lib/connman/название_службы/settings\n```\n\n```\nIPv6.privacy=preferred\n```\n\nПодробнее смотрите ConnMan.\n\n"
+    },
+    {
+      "title": "Постоянный приватный адрес",
+      "level": 2,
+      "content": "Другой полезной возможностью являются описанные в RFC 7217 постоянные приватные IP-адреса (stable private addresses). Эта технология позволяет назначать интерфейсам постоянные адреса, для вычисления которых вместо MAC-адреса устройства используется специально сгенерированный ключ.\n\nЧтобы заставить ядро сгенерировать ключ (например, для интерфейса wlan0), необходимо задать параметр ядра:\n\n```\n# sysctl net.ipv6.conf.wlan0.addr_gen_mode=3\n```\n\nВыключив/включив интерфейс и выполнив ip addr show dev wlan0 вы увидите флаг stable-privacy рядом с каждым адресом IPv6. Ядро должно было создать 128-битный ключ для генерирования адресов этого интерфейса. Чтобы увидеть сам ключ, выполните команду sysctl net.ipv6.conf.wlan0.stable_secret. Чтобы ключ сохранялся после перезагрузок и был постоянным, нужно добавить в файл /etc/sysctl.d/40-ipv6.conf следующие строки:\n\n```\n# Enable IPv6 stable privacy mode\nnet.ipv6.conf.wlan0.stable_secret = ключ\nnet.ipv6.conf.wlan0.addr_gen_mode = 2\n```\n\nNote: **не** \n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "Описанные выше настройки не работают для NetworkManager, но он использует постоянные приватные адреса по умолчанию [2],[3].\n\n"
+    },
+    {
+      "title": "Статический адрес",
+      "level": 2,
+      "content": "Иногда использование статического адреса может быть применено в качестве одной из мер обеспечения безопасности. Например, если ваш локальный маршрутизатор использует обнаружение соседей (Neighbor Discovery) или radvd (RFC 2461), вашему интерфейсу будет автоматически присвоен адрес, который содержит часть MAC-адреса сетевого интерфейса (используя SLAAC). Это может быть не слишком хорошо для безопасности, так как позволяет без труда отслеживать систему, даже если часть IPv6-адреса сменилась.\n\nЧтобы присвоить статический IP-адрес при помощи netctl, используйте шаблон профиля /etc/netctl/examples/ethernet-static. Следующие строки особенно важны:\n\n```\n...\n# For IPv6 static address configuration\nIP6=static\nAddress6=('1234:5678:9abc:def::1/64' '1234:3456::123/96')\nRoutes6=('abcd::1234')\nGateway6='1234:0:123::abcd'\n```\n\n```\nDNS=('6666:6666::1' '6666:6666::2')\n```\n\n"
+    },
+    {
+      "title": "IPv6 и PPPoE",
+      "level": 2,
+      "content": "Стандартный инструмент для PPPoE, pppd(8), позволяет использовать IPv6 в PPPoE, если это поддерживается вашим провайдером и модемом. Добавьте одну строку в файл /etc/ppp/options:\n\n```\n+ipv6\n```\n\nЕсли вы используете netctl для PPPoE, тогда вместо этого добавьте следующую строку в файл настроек netctl:\n\n```\nPPPoEIP6=yes\n```\n\n"
+    },
+    {
+      "title": "Делегирование префикса (DHCPv6-PD)",
+      "level": 2,
+      "content": "Делегирование префикса (prefix delegation) — широко распространённая технология развёртывания IPv6, используемая многими интернет-провайдерами. Представляет собой метод назначения сетевого префикса пользователю (например, локальной сети). Маршрутизатор может быть настроен на привязку разных сетевых префиксов к различным подсетям. Провайдер выдаёт префикс с помощью DHCPv6 (обычно это префикс /56 или /64), а dhcp-клиент назначает префикс локальной сети. В случае простого шлюза с двумя интерфейсами клиент обычно получает адрес через WAN-интерфейс (или псевдоинтерфейс вроде ppp) и на его основании присваивает IPv6-префикс интерфейсу, обращённому к локальной сети.\n\nКлиент DHCPv6 принимает входящие соединения на UDP-порт 546. Чтобы настроить доступ к этому порту в межсетевом экране nftables, в файле /etc/nftables.conf добавьте следующее правило в цепочку input:\n\n```\ntable inet filter {\n  chain input {\n    udp dport dhcpv6-client accept\n    ...\n  }\n...\n}\n```\n\n"
+    },
+    {
+      "title": "dhcpcd",
+      "level": 3,
+      "content": "dhcpcd помимо поддержки dhcp для IPv4 также предлагает полноценную реализацию протокола DHCPv6 (включая DHCPv6-PD). Если вы используете dhcpcd, отредактируйте файл /etc/dhcpcd.conf. Скорее всего, вы уже используете dhcpcd для IPv4, поэтому просто обновите существующую конфигурацию.\n\n```\nduid\nnoipv6rs\nwaitip 6\n# Uncomment this line if you are running dhcpcd for IPv6 only.\n#ipv6only\n\n# use the interface connected to WAN\ninterface WAN\nipv6rs\niaid 1\n# use the interface connected to your LAN\nia_pd 1 LAN\n#ia_pd 1/::/64 LAN/0/64\n```\n\nЭта конфигурация запросит префикс на WAN-интерфейсе (WAN) и делегирует его внутреннему интерфейсу (LAN). Если вдруг с диапазоном /64 возникнут проблемы, то нужно использовать вторую инструкцию ia_pd, которая в примере выше закомментирована. Кроме того, приведённая конфигурация также отключит вызовы маршрутизатора (router solicitation) для всех интерфейсов, кроме WAN.\n\n"
+    },
+    {
+      "title": "WIDE-DHCPv6",
+      "level": 3,
+      "content": "WIDE-DHCPv6 — свободная реализация протокола DHCP для IPv6 (DHCPv6), первоначально разработанная проектом KAME. Установите его с пакетом wide-dhcpv6AUR.\n\nЕсли вы используете wide-dhcpv6, отредактируйте файл /etc/wide-dhcpv6/dhcp6c.conf, заменив WAN и LAN названиями соответствующих интерфейсов:\n\n```\n# use the interface connected to your WAN\ninterface WAN {\n  send ia-pd 0;\n};\n\nid-assoc pd 0 {\n  # use the interface connected to your LAN\n  prefix-interface LAN {\n    sla-id 1;\n    sla-len 8;\n  };\n};\n```\n\nКлиент wide-dhcpv6 можно запустить/включить с помощью systemd-юнита dhcp6c@интерфейс.service, где интерфейс — название интерфейса в файле настроек, то есть, например, для интерфейса «WAN» используйте dhcp6c@WAN.service.\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "Настройте внешний (wan) и внутренний (lan) интерфейсы. Это включит DHCPv6-PD для интерфейса с запущенным DHCPv6-клиентом. Делегированные префиксы предоставляются посредством IPv6 Router Advertisement во внутренней (локальной) сети.\n\n```\n/etc/systemd/network/wan.network\n```\n\n```\n[Network]\n# Укажите 'yes' вместо 'ipv6' для одновременной работы и ipv4, и ipv6.\nDHCP=ipv6\n```\n\n```\n/etc/systemd/network/lan.network\n```\n\n```\n[Network]\nIPv6SendRA=yes\nDHCPv6PrefixDelegation=yes\n```\n\n"
+    },
+    {
+      "title": "Другие клиенты",
+      "level": 3,
+      "content": "dhclient также может запрашивать сетевой префикс, но для присваивания этого префикса или его части нужно использовать специальный скрипт. Пример программы: https://github.com/jaymzh/v6-gw-scripts/blob/master/dhclient-ipv6.\n\n"
+    },
+    {
+      "title": "NAT64",
+      "level": 2,
+      "content": "NAT64 — это механизм перехода на IPv6, при котором хосты, поддерживающие только IPv6, могут взаимодействовать с хостами IPv4 с помощью NAT.\n\nЯдро Linux не поддерживает NAT64 нативно, но есть пакеты, добавляющие поддержку NAT64.\n\n- Jool — SIIT и NAT64 для Linux\n\n- TAYGA — Демон NAT64 (не поддерживается)\n\n"
+    },
+    {
+      "title": "Отключение IPv4 в systemd-networkd",
+      "level": 3,
+      "content": "Пример конфигурации только IPv6-интерфейса в systemd-networkd (однако это по сути только отключает DHCPv4, но не весь протокол IPv4 целиком).\n\n```\n/etc/systemd/network/lan.network\n```\n\n```\n[Match]\nName=eno0\n\n[Link]\nRequiredForOnline=routable\n\n[Network]\n# Enable IPv6 only\nDHCP=ipv6\n# Enable SLAAC\nIPv6AcceptRA=true\n```\n\n"
+    },
+    {
+      "title": "Отключение функциональности",
+      "level": 3,
+      "content": "Параметр ядра ipv6.disable=1 отключает весь стек IPv6, что в большинстве случаев помогает добиться желаемого результата.\n\nДругой параметр, ipv6.disable_ipv6=1, оставит стек IPv6 работающим, но адреса IPv6 не будут присваиваться сетевым интерфейсам.\n\nТакже вы можете отключить присвоение адреса IPv6 всем или определённым сетевым интерфейсам, добавив следующие параметры sysctl в файл /etc/sysctl.d/40-ipv6.conf:\n\n```\n# Disable IPv6\nnet.ipv6.conf.all.disable_ipv6 = 1\nnet.ipv6.conf.nic0.disable_ipv6 = 1\n...\nnet.ipv6.conf.nicN.disable_ipv6 = 1\n```\n\nПерезапустите юнит systemd-sysctl.service, чтобы изменения вступили в силу.\n\n"
+    },
+    {
+      "title": "Другие программы",
+      "level": 3,
+      "content": "Отключение IPv6 в ядре не избавит от попыток программ использовать IPv6. В большинстве случаев это не приводит к проблемам, однако, если они всё-таки появляются, вам остаётся лишь искать в man-страницах или на просторах сети способ отключить эту функциональность.\n\n"
+    },
+    {
+      "title": "dhcpcd",
+      "level": 4,
+      "content": "Например, dhcpcd будет продолжать пытаться запрашивать настройки сети у маршрутизаторов IPv6 (т.н. Router solicitation). Чтобы отключить это, добавьте следующие строки в файл /etc/dhcpcd.conf:\n\n```\nnoipv6rs\nnoipv6\n```\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 4,
+      "content": "Чтобы отключить IPv6 в NetworkManager, вызовите контекстное меню значка статуса сети и выберите Параметры соединений > Ethernet > Название соединения > Изменить выбранное соединение > Параметры IPv6 > Метод > Игнорировать. Затем нажмите Сохранить.\n\nЭто также можно сделать с помощью команды:\n\n```\n# nmcli connection modify НазваниеСоединения ipv6.method \"disabled\"\n```\n\nПосле этого нужно перезапустить соединение:\n\n```\n# nmcli connection up НазваниеСоединения\n```\n\nЧтобы убедиться, что настройки применились, используйте команду ip address show и проверьте, что запись inet6 не отображается. Также можно проверить, что /proc/sys/net/ipv6/conf/интерфейс/disable_ipv6 имеет значение 1.\n\n"
+    },
+    {
+      "title": "ntpd",
+      "level": 4,
+      "content": "Чтобы определить, как systemd должен запускать службу ntpd, необходимо внести изменения в файл ntpd.service.\n\nСоздайте drop-in файл, который будет запускать другую команду вместо стандартной. Флаг -4 отключает использование IPv6 демоном ntp.\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/ntpd -4 -g -u ntp:ntp\n```\n\nЗдесь сначала очищается значение ExecStart, а затем устанавливается новая команда.\n\n"
+    },
+    {
+      "title": "GnuPG",
+      "level": 4,
+      "content": "Отключите IPv6 в настройках dirmngr:\n\n```\n~/.gnupg/dirmngr.conf\n```\n\n```\ndisable-ipv6\n```\n\nПосле этого перезапустите пользовательскую службу dirmngr.service.\n\n"
+    },
+    {
+      "title": "sshd",
+      "level": 4,
+      "content": "Добавьте следующие строки в файл sshd_config, чтобы убедиться, что sshd использует IPv4-адрес:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nAddressFamily inet\n```\n\nПосле этого перезапустите службу sshd.service.\n\n"
+    },
+    {
+      "title": "systemd-timesyncd",
+      "level": 4,
+      "content": "Иногда systemd-timesyncd пытается отправлять запросы IPv6-серверу времени, даже если IPv6 отключён. Это может привести к тому, что системные часы не будут обновляться, а в журнале появятся сообщения об ошибках следующего вида:\n\n```\nsystemd-timesyncd[336]: Failed to set up connection socket: Address family not supported by protocol\n```\n\nЕсли посмотреть статус юнита systemd-timesyncd в пункте Status будет виден IPv6-адрес целевого сервера:\n\n```\nStatus: \"Connecting to time server [2001:19f0:8001:afd:5400:1ff:fe9d:cba]:123 (2.pool.ntp.org)\"\n```\n\nКак видно из FS#59806, по протоколу IPv6 работают \"2.\"-сервера ntp.org. Чтобы запретить подключение к ним, удалите в файле /etc/systemd/timesyncd.conf записи 2.arch.pool.ntp.org и 2.pool.ntp.org из параметров NTP and FallbackNTP соответственно.\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "networkd позволяет отключить IPv6 для отдельного интерфейса. Когда в разделе [Network] сетевого юнита указан параметр LinkLocalAddressing=ipv4 или LinkLocalAddressing=no, networkd не будет настраивать IPv6 на соответствующих сетевых интерфейсах.\n\nОднако нужно отметить, что даже при использовании указанных выше опций networkd всё ещё будет ожидать получения «объявлений маршрутизатора» (router advertisements, RA), если IPv6 не был отключён глобально для всей системы. Если трафик IPv6 не будет доходить до интерфейса (например, из-за настроек sysctl или ip6tables), то интерфейс останется в состоянии настройки и потенциально может стать причиной превышения времени ожидания (timeout) для служб, требующих полной настройки сети. Чтобы этого избежать, добавьте опцию IPv6AcceptRA=no в раздел [Network].\n\n"
+    },
+    {
+      "title": "Использование IPv4 вместо IPv6",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nРаскомментируйте следующую строку в файле /etc/gai.conf:\n\n```\n#\n#    For sites which prefer IPv4 connections change the last line to\n#\nprecedence ::ffff:0:0/96  100\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- IPv6 — документация на kernel.org.\n- IPv6 temporary addresses — временные адреса и расширения приватности.\n- IPv6 prefixes — о типах префиксов.\n- net.ipv6 options[устаревшая ссылка 2024-10-12 ⓘ] — документация параметров ядра.\n\n"
+    }
+  ]
+}

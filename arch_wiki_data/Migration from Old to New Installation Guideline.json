@@ -1,0 +1,131 @@
+{
+  "title": "Migration from Old to New Installation Guideline",
+  "url": "https://wiki.archlinux.org/title/Migration_from_Old_to_New_Installation_Guideline",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Moving an existing install into (or out of) a virtual machine\n\nThis article discusses the steps required for moving an Arch Linux system to new hardware. The goal is to achieve the same Arch Linux installation, in terms of the installed software and configuration that is independent of the hardware.\n\nThere are two different approaches to migrating an installation:\n\n1. Bottom to top: Install a fresh Arch Linux system on the new hardware, afterwards restore the installed packages and configuration files, e.g. as described in dotfiles.\n1. Top to bottom: Clone the old harddrive to the new harddrive, or place the old harddrive into the new system; modify configuration files where necessary.\n\nThe top to bottom approach gives a more exact reproduction of the original system than the bottom to top approach.\n\n"
+    },
+    {
+      "title": "Adapt to new hardware",
+      "level": 2,
+      "content": "Before you begin, research aspects of the new hardware and make a list of differences. Common differences are\n\n"
+    },
+    {
+      "title": "Hard drive vs. SSD",
+      "level": 3,
+      "content": "See the article SSD.\n\n"
+    },
+    {
+      "title": "CPU vendor",
+      "level": 3,
+      "content": "If you switch the CPU, to a CPU from another vendor (e.g. Intel to AMD), change the Microcode configuration.\n\n"
+    },
+    {
+      "title": "GPU vendor",
+      "level": 3,
+      "content": "If you changed the GPU to a GPU from another vendor (e.g. from AMD to NVIDIA) change the graphics driver.\n\n"
+    },
+    {
+      "title": "UEFI vs. MBR boot code booting",
+      "level": 3,
+      "content": "If you switch to a more recent mainboard with UEFI, it might be preferable or required to switch from \"MBR boot code\" booting to UEFI booting. In this case a new EFI system partition is needed.\n\n"
+    },
+    {
+      "title": "On the old system",
+      "level": 3,
+      "content": "We define here a minimal configuration that carries over from the old to the new system which differentiates this approach from the Installation guide. Think about the configuration files from /etc and dotfiles in /home that you want to copy to the new system, as well as user data files. If you will not have access to the old system from the new system then backup up all the files that you want to copy over.\n\n"
+    },
+    {
+      "title": "List of installed packages",
+      "level": 4,
+      "content": "```\n$ pacman -Qqen > pkglist.txt\n$ pacman -Qqem > pkglist_aur.txt\n```\n\ngives you a nice list of explicitly installed packages from the repositories and from the AUR. Include it in your backup if you make one.\n\nYou may also use the following script to give you a better overview of the binaries and libraries installed unbeknownst to pacman (e. g. installed via Steam, Desura or using their own install methods):\n\n```\nfind / -regextype posix-extended -regex \"/(sys|srv|proc)|.*/\\.ccache/.*\" -prune -o -type f \\\n-exec bash -c 'file \"{}\" | grep -E \"(32|64)-bit\"' \\; | \\\nawk -F: '{print $1}' | \\\nwhile read -r bin; \\\ndo pacman -Qo \"$bin\" &>/dev/null || echo \"$bin\"; \\\ndone\n```\n\n"
+    },
+    {
+      "title": "pacman cache",
+      "level": 4,
+      "content": "Consider backing up /var/cache/pacman/pkg/.\n\n"
+    },
+    {
+      "title": "Installation guide first half",
+      "level": 4,
+      "content": "For basics about installing a new system, refer to the Installation guide. Follow the first half of the installation guide up to but excluding the pacstrap command.\n\n"
+    },
+    {
+      "title": "Copy pacman cache",
+      "level": 4,
+      "content": "Copy the pacman cache found at /var/cache/pacman/pkg/ from the old to the new system, or from the backup to the new system.\n\n"
+    },
+    {
+      "title": "Installation guide second half",
+      "level": 4,
+      "content": "Continue with the installation guide from, and including the pacstrap command, up to the end, but do not reboot. Do not skip the pacstrap command as it does additional work besides the installation of packages.\n\n"
+    },
+    {
+      "title": "Install previously installed software",
+      "level": 4,
+      "content": "Edit pkglist.txt (and pkglist_aur.txt) and remove drivers that are not needed on the new system. Then install any other previously installed software with\n\n```\n# pacman -S --needed - < pkglist.txt\n```\n\n"
+    },
+    {
+      "title": "Top to bottom",
+      "level": 2,
+      "content": "There are two options for the Top to Bottom approach, you can either keep the drive where the system is already installed, and modify its contents, or you can copy the system to a new drive. If you keep the drive, and modify it, then place it back into the old system, the modifications will likely prevent the old system from booting.\n\n"
+    },
+    {
+      "title": "Clean up the old system",
+      "level": 3,
+      "content": "It is also worth to clean up your system before cloning it, as described in System maintenance#Clean the filesystem. Make sure that the old system is still working as expected after the cleanup before moving on.\n\n"
+    },
+    {
+      "title": "Copy the system to a new drive",
+      "level": 3,
+      "content": "There are two fundamental methods for copying the system to a new drive, disk cloning and file copying.\n\n"
+    },
+    {
+      "title": "Disk cloning",
+      "level": 4,
+      "content": "For disk cloning, it is required to use a live linux system rather than the old Arch Linux system. For example, you could use the Arch Linux USB flash installation media. The partition layout and file systems of the old system will be reproduced and therefore, if you migrated to a bigger drive and want to use all available space, e.g. for the root partition, you must resize the partition.\n\n"
+    },
+    {
+      "title": "File copying",
+      "level": 4,
+      "content": "- Create new partitions and file systems on the new drive. You can use the opportunity to choose a different partition layout and/or file systems than before.\n- For each file system, copy the files from the old to the new drive, using rsync or other tools that preserve permissions, attributes, etc., see rsync#Full system backup, rsync#File system cloning for further details. This process should be completed before entering arch-chroot.\n\n"
+    },
+    {
+      "title": "Transport options",
+      "level": 4,
+      "content": "There are many different methods for how to transport the data between the two drives:\n\n- Connect origin and destination HDDs to the same computer, either the old or the new one. Data link: old HDD -> computer -> new HDD.\n- Make use of temporary storage devices like external HDDs, or cloud backups. Data link: old HDD -> old computer -> storage -> new computer -> new HDD. For an overview see the article System backup.\n- Transfer data over network, for example with rsync. Data link: old HDD -> old computer -> network -> new computer -> new HDD.\n\nFor the first two options, consider that you might need adapters to connect the HDDs (PATA->SATA, USB-HDD-Cases, etc.), and choose a connection that is sufficiently fast.\n\nThe last two options require you to use a live linux system on the new computer, as it is not possible to boot from the new hard drive at this point.\n\n"
+    },
+    {
+      "title": "Update fstab",
+      "level": 3,
+      "content": "- Before doing this step please make sure that you do not wish to use this drive in the old system, as changing the fstab file will likely prevent the system from booting in the old configuration.\n- If you used disk cloning and are using the recently cloned drive in the same machine as the drive it was cloned from, the partition table UUID, partition UUIDs and file system UUIDs will cause conflict between the drives. Make sure to change all of these on the cloned drive to new random values. For GPT and its partitions, use sgdisk, for the file systems use the appropriate userspace utility.\n\nIf you are using an Arch Linux Installation Image, mount the new root partition to /mnt, and any other partitions required like you would in a normal install (see Installation guide#Mount the file systems).\n\nInsert an arbitrary comment such as #end of old fstab at the end of your /mnt/etc/fstab. Generate a new fstab file as indicated on Installation guide#Fstab, appending it to the current fstab file. In general, always review the fstab file created by genfstab. In this case, check the older fstab entries before the comment, if they are outdated or duplicates then delete them, and if the old entries remain useful then keep them. For example, mount entries for network drives can be kept. In general it is recommended to use Persistent block device naming.\n\n"
+    },
+    {
+      "title": "Reinstall the boot loader",
+      "level": 3,
+      "content": "You might need to reinstall and/or reconfigure the boot loader for the following reasons:\n\n- Different disks, partition layout, or file system\n- Adding UEFI boot entries into the new mainboard NVRAM\n- Migration from \"MBR boot code\" booting to UEFI booting\n- Migration from USB to SATA/NVMe\n- Updating the kernel commandline In case of a different GPU, update the framebuffer mode Update the Microcode initramfs image\n\n- In case of a different GPU, update the framebuffer mode\n- Update the Microcode initramfs image\n\nIf you are using a Arch Linux live environment, then before reinstalling the boot loader, change root into the new system:\n\n```\n# arch-chroot /mnt\n```\n\nRefer to the article on your boot loader for instructions on how to (re)install it.\n\n"
+    },
+    {
+      "title": "Regenerate kernel image",
+      "level": 3,
+      "content": "It is recommended to regenerate the initramfs image, although initially the fallback initramfs image may work.\n\n"
+    },
+    {
+      "title": "Reconfigure audio",
+      "level": 3,
+      "content": "- alsamixer(1) volume save settings\n\n- save settings\n\n"
+    },
+    {
+      "title": "Reconfigure network",
+      "level": 3,
+      "content": "If the old installation and the migrated installation shall coexist in the same network, set a new hostname with hostnamectl.\n\nAlso consider configuration changes that are required after a change in hostname:\n\n- /etc/hosts\n- other applications using hostname: synergy, nut (network ups tools)\n- grep -Ri 'hostname' /etc (as the root user) should give some hints on the files to be updated\n\nThe network interface names may change and if they were hardcoded in your network manager configuration, its configuration will need updating. Find out the new network interface names with:\n\n```\n# journalctl -k --grep='renamed from eth'\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Howto clone a linux system\n- [1]\n- [2]\n\n"
+    }
+  ]
+}

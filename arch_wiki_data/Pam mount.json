@@ -1,0 +1,46 @@
+{
+  "title": "Pam mount",
+  "url": "https://wiki.archlinux.org/title/Pam_mount",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- dm-crypt/Mounting at login\n- PAM\n\npam_mount can be used to automatically mount an encrypted home partition (encrypted with, for example, LUKS or ECryptfs) on user log in. It will mount your /home (or whatever mount point you like) when you log in using your login manager or when logging in on console. The encrypted drive's passphrase should be the same as your linux user's password, so you do not have to type in two different passphrases to login.\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Install the pam_mount package.\n\n"
+    },
+    {
+      "title": "Global (system) configuration",
+      "level": 3,
+      "content": "The module is configured in /etc/security/pam_mount.conf.xml, see pam_mount.conf(5) for details. Edit the file as follows:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<!-- Generic encrypted partition example -->\n  <volume user=\"USERNAME\" fstype=\"auto\" path=\"/dev/sdaX\" mountpoint=\"/home\" options=\"fsck,noatime\" />\n  \n  <!-- Example using CIFS -->\n  <volume\n      fstype=\"cifs\"\n      server=\"server.example.com\"\n      path=\"share_name\"\n      mountpoint=\"~/mnt/share_name\"\n      uid=\"10000-19999\"\n      options=\"sec=krb5i,vers=3.0,cruid=%(USERUID)\"\n  />\n  <mkmountpoint enable=\"1\" remove=\"true\" />\n\n</pam_mount>\n```\n\nNotes:\n\n- Insert 2 new lines at the end of the file, but before the last closing tag, </pam_mount>.\n- USERNAME should be replaced with your user name.\n- /dev/sdaX should be replaced with the corresponding device or container file.\n- fstype=\"auto\" can be changed to any type that is present in /usr/bin/mount.type. \"auto\" should work fine in most cases. Use fstype=\"crypt\" so that the loop device gets closed at logout for volumes needing it.\n- Add mount options, if needed. Note that mount.cifs does not read smb.conf and so all options must be specified. In the example, uid matches the local smb.conf parameter idmap config ... : range = so that pam_mount is not called for a Unix only user. Kerberos is indicated by krb5, SMB3.0 is specified because the other end may not support SMB1 which is the default. Signing is enabled with the i on the end of krb5i. See mount.cifs(8) for more details.\n\n"
+    },
+    {
+      "title": "Local (per-user) configuration",
+      "level": 3,
+      "content": "pam_mount also supports allowing users to define their own mounts on login in files inside their home directories. Please consider the potential security implications of this change. To enable it, make sure the following line is present and active in /etc/security/pam_mount.conf.xml:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<luserconf name=\".pam_mount.conf.xml\" />\n```\n\nIt will have the effect of allowing each user to set their mounts in ~/.pam_mount.conf.xml. The per-user config files only support <volume> keywords, e.g.:\n\n```\n~/.pam_mount.conf.xml\n```\n\n```\n<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<!DOCTYPE pam_mount SYSTEM \"pam_mount.conf.xml.dtd\">\n\n<pam_mount>\n    <volume user=\"alex\" fstype=\"tmpfs\" path=\"tmpfs\" mountpoint=\"~/test\" options=\"nodev,nosuid\" /> \n</pam_mount>\n```\n\nThere are also some restrictions with regards to the mount options that you can and cannot select and some of them are mandatory (nosuid, nodev, size, uid, these can be lifted by editing /etc/security/pam_mount.conf.xml). Bind mounts appear to be unsupported. Ownership checks are also performed on the mountpoints.\n\n"
+    },
+    {
+      "title": "LUKS volumes",
+      "level": 3,
+      "content": "LUKS encrypted volumes can be configured simply as follows:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<volume user=\"username\" fstype=\"crypt\" path=\"/dev/disk/by-partuuid/partition_uuid\" mountpoint=\"~\" options=\"crypto_name=volume_name,allow_discard,fstype=btrfs,compress=zstd\" />\n```\n\nThe volume is unlocked and mounted with mount.crypt, see mount.crypt(8) § Mount options for details about the options.\n\n"
+    },
+    {
+      "title": "Veracrypt volumes",
+      "level": 3,
+      "content": "pam_mount does not support Veracrypt volumes natively, but there is a workaround:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<volume user=\"username\" fstype=\"crypt\" path=\"/dev/disk/by-partuuid/partition_uuid\" mountpoint=\"vcrypt\"/>\n<volume user=\"username\" fstype=\"auto\" path=\"/dev/mapper/vcrypt\" mountpoint=\"/media/mountpoint\"/>\n\n<cryptmount>cryptsetup --veracrypt open --type tcrypt %(VOLUME) %(MNTPT)</cryptmount>\n<cryptumount>cryptsetup close %(MNTPT)</cryptumount>\n```\n\nIf you also have LUKS volumes, you can use a different fstype for Veracrypt volume instead of crypt with cryptmount/cryptumount, for example ncpfs with ncpmount/ncpumount. Just make sure you do not use NCP filesystem.\n\n"
+    },
+    {
+      "title": "F2FS encryption",
+      "level": 3,
+      "content": "There is a trick to make pam_mount add a F2FS decryption key to your session keyring. The salt you chose when encrypting directory(es) with f2fscrypt needs to match the one in /etc/security/pam_mount.conf.xml (0x1111 in below example) and passphrase needs to match the user's login password. This example assumes you are not mounting FUSE filesystems with pam_mount. If you do, choose a different <*mount> tag pairs instead of <fusemount> and <fuseumount>, like <ncpmount>/<ncpumount>.\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<fusemount>f2fscrypt add_key -S 0x1111</fusemount>\n<fuseumount>f2fscrypt new_session</fuseumount>\n<volume noroot=\"1\" ssh=\"0\" fstype=\"fuse\" path=\"/tmp/not-a-real-path-0\" mountpoint=\"/tmp/not-a-real-path-1\"/>\n```\n\n<volume> does not do anything except trigger the commands in <fusemount> and <fuseumount>. After login you can verify that your session keyring has a F2FS decryption key:\n\n```\n$ keyctl show\n```\n\n```\nSession Keyring\n 910133222 --alswrv   1000   100  keyring: _ses\n 301049775 --alswrv   1000 65534   \\_ keyring: _uid.1000\n 013481035 --alsw-v   1000   100   \\_ logon: f2fs:2e64cf4a5bafcd7\n```\n\n"
+    },
+    {
+      "title": "Login manager configuration",
+      "level": 2,
+      "content": "In general, you have to edit configuration files in /etc/pam.d so that pam_mount will be called on login. The correct order of entries in each file is important. It is necessary to edit /etc/pam.d/system-login as shown below. If you use a display manager make sure its file includes system-login. Example configuration files follow, with the added lines in bold.\n\nThe pam_succeed_if line before pam_mount in session skips pam_mount (success=n means skip the next n lines) if the systemd-user service is running through the PAM stack (i.e. /etc/pam.d/systemd-user). This avoids double mount attempts and errors relating to dropped privileges when the systemd --user instance is starting up. See [1] and [2] for details.\n\n```\n/etc/pam.d/system-login\n```\n\n```\n#%PAM-1.0\n\nauth       required   pam_shells.so\nauth       requisite  pam_nologin.so\nauth       optional   pam_mount.so\nauth       include    system-auth\n\naccount    required   pam_access.so\naccount    required   pam_nologin.so\naccount    include    system-auth\n\npassword   optional   pam_mount.so\npassword   include    system-auth\n\nsession    optional   pam_loginuid.so\nsession    optional   pam_keyinit.so       force revoke\nsession [success=1 default=ignore]  pam_succeed_if.so  service = systemd-user quiet\nsession    optional   pam_mount.so\nsession    include    system-auth\nsession    optional   pam_motd.so          motd=/etc/motd\nsession    optional   pam_mail.so          dir=/var/spool/mail standard quiet\n-session   optional   pam_systemd.so\nsession    required   pam_env.so\n```\n\n"
+    }
+  ]
+}

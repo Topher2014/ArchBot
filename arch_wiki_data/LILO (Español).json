@@ -1,0 +1,51 @@
+{
+  "title": "LILO (Español)",
+  "url": "https://wiki.archlinux.org/title/LILO_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-04-26** \n\nArtículos relacionados\n\n- Arch boot process\n\nLInux LOader, o LILO para abreviar, es un cargador multiarranque legacy para sistemas Linux. A pesar de haber sido la opción estándar durante varios años, se ha ido retirando gradualmente. Desde enero de 2016, LILO ya no está en desarrollo.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "LILO está disponible como liloAUR y como lilo-gitAUR (su versión de desarrollo). Sólo funciona en sistemas BIOS.\n\nAl ejecutar la orden lilo como root, se instalará LILO en el MBR. Antes de ejecutar la orden, es necesario editar /etc/lilo.conf para asegurarse de que la entrada de root apunta hacia la partición raíz. Si la partición raíz se encuentra en /dev/sda1, entonces la entrada raíz debería ser tal que: root=/dev/sda1. Recuerde cambiar la línea de raíz tanto para las entradas 'arch' como 'arch-fallback'.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "LILO se configura editando el archivo /etc/lilo.conf y ejecutando posteriormente la orden lilo para aplicar la nueva configuración.\n\nRecuerde que LILO necesita ser ejecutado después de cada actualización del kernel, de lo contrario, el sistema puede quedar en un estado en el que posiblemente no pueda ser arrancado.\n\nPuede encontrar más ayuda sobre la configuración de LILO en LILO-mini-HOWTO.\n\n"
+    },
+    {
+      "title": "Ejemplo de configuración",
+      "level": 3,
+      "content": "He aquí una configuración típica de LILO:\n\n```\n/etc/lilo.conf\n```\n\n```\n#\n# /etc/lilo.conf\n#\n\nboot=/dev/hda\n# This line often fixes L40 errors on bootup\n# disk=/dev/hda bios=0x80\n\ndefault=Arch\ntimeout=100\nlba32\nprompt\ncompact\n\nimage=/boot/vmlinuz-linux\n        label=Arch\n\tappend=\"devfs=nomount\"\n\tvga=788\n        root=/dev/hda2\n        read-only\n\nimage=/boot/vmlinuz-linux\n        label=ArchRescue\n        root=/dev/hda8\n        read-only\n\nother=/dev/hda1\n        label=Windows\n\n# End of file\n```\n\nPuedes usar hwinfo --framebuffer para determinar qué modos vga se pueden utilizar.\n\n"
+    },
+    {
+      "title": "Usar una imagen como fondo",
+      "level": 3,
+      "content": "Primero prepare la imagen de fondo:\n\n- Abra el archivo en GIMP.\n- Ajuste la imagen a 640x480.\n- Cámbielo a modo indexado (Imagen-->Modo-->indexado).\n- Seleccione \"Crear paleta óptima\" y ajústela a 16 colores. Elija el método de difuminado que más le guste.\n- Abra el cuadro de diálogo \"Paleta indexada\". Tome nota de los colores que desea utilizar para las entradas del menú de texto, reloj, etc. En su archivo lilo.conf, se hace referencia a los colores por su índice.\n- Exporte la imagen como bmp y guárdela en el directorio /boot. En el diálogo de exportación marque la opción \"No escribir información del espacio de color\"\n\nAhora edite lilo.conf. Hay algunas opciones que pueden establecerse para su menú gráfico. Véase man lilo.conf para más información.\n\n- bitmap=<bitmap-file> Establezca esto en el archivo que guardó anteriormente.\n- bmp-colors=<fg>,<bg>,<sh>,<hfg>,<hbg>,<hsh>\n\nEstos son los colores de las entradas del menú. Hacen referencia a los colores en primer plano, los colores de fondo y colores de la sombra, respectivamente, seguidos por los mismos pero para el texto resaltado. No use espacios. Los valores a utilizar son los índices de la paleta de colores mencionados anteriormente. Si lo desea, puede dejar un valor en blanco (pero no olvide la coma). El fondo por defecto es transparente, la sombra predeterminada no debe tener ninguna.\n\n- bmp-table=<x>,<y>,<ncol>,<nrow>,<xsep>,<spill> Esta opción especifica dónde se coloca el menú. x e y son las coordenadas del caracter. También puede añadir una p como sufijo para especificar las coordenadas de los píxeles.\n- bmp-timer=<x>,<y>,<fg>,<bg>,<sh> Esta opción especifica las coordenadas y el color del temporizador que cuenta el tiempo de espera antes de iniciar una entrada por defecto. Utiliza índices para los colores, y coordenadas de caracteres (o píxeles).\n\nPor ejemplo:\n\n```\nbitmap=/boot/arch-lilo.bmp\nbmp-colors=1,0,8,3,8,1\nbmp-table=250p,150p,1,18\nbmp-timer=250p,350p,3,8,1\n```\n\nGuarde lilo.conf, ejecute lilo como root ¡y reinicie para ver cómo queda!\n\n"
+    },
+    {
+      "title": "Pacman hook",
+      "level": 2,
+      "content": "LILO necesita ser ejecutado después de cada actualización del kernel. Puedes usar un pacman hook para automatizarlo. Véase Pacman (Español)#Hooks o alpm-hooks(5).\n\nCree el directorio /etc/pacman.d/hooks si aún no existe.\n\n```\n/etc/pacman.d/hooks/lilo.hook\n```\n\n```\n[Trigger]\nOperation = Install\nOperation = Upgrade\nOperation = Remove\nType = Package\nTarget = linux\nTarget = linux-lts\n\n[Action]\nDescription= Run lilo after kernel update\nWhen = PostTransaction\nDepends = lilo\nExec = /usr/bin/lilo\n```\n\n"
+    },
+    {
+      "title": "Mensaje de error de lectura escritura durante el arranque",
+      "level": 3,
+      "content": "Este mensaje de error es causado por un cambio en mkinitcpio que se realizó en respuesta a este commit de Systemd . El cambio hace que en las particiones se ejecute fsck dos veces cuando se montan como sólo lectura. Para arreglar este error edite /etc/lilo.conf y cambie la línea 'read only' a 'read write' para ambas entradas de arch.\n\nVéase este hilo del foro para más información.\n\n"
+    },
+    {
+      "title": "Mensaje de error Devmapper not found después de actualizar el kernel",
+      "level": 3,
+      "content": "Es posible que al ejecutar el comando lilo después de una actualización del kernel se produzca el error devmapper not found. Si este es el caso, ejecute modprobe dm-mod antes de ejecutar lilo después de una actualización del kernel.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Lista de parámetros del kernel que se pueden utilizar en el arranque\n- Lista de parámetros del kernel con más explicaciones y agrupados por opciones similares ('Kernel Boot Command-Line Parameter Reference', Linux Kernel In A Nutshell)\n\n"
+    }
+  ]
+}

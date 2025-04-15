@@ -1,0 +1,196 @@
+{
+  "title": "Active Directory Integration (Español)",
+  "url": "https://wiki.archlinux.org/title/Active_Directory_Integration_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-07-19** \n\nArtículos relacionados\n\n- Samba\n- Samba/Controlador del dominio de Active Directory\n- SOGo\n\nDe Wikipedia:\n\nEste artículo describe cómo integrar el sistema Arch Linux con un dominio de red Window utilizando Samba.\n\nAntes de continuar tiene que existir un dominio de Active Directory y tener un usuario con los permisos apropiados en el dominio para: listar usuarios y añadir cuentas en el ordenador (Unirse al dominio).\n\nEste documento no tiene la intención de hacer una guía completa de Active Directory o Samba. Consulte en la sección de recursos para información adicional.\n\nEl servidor Active Directory es una localización central para la administración de la red y seguridad. Es el responsable de autentificar y autorizar todos los usuarios y ordenadores a través de la red de dominio de Window asignando y forzando políticas de seguridad para todos los ordenadores en una red e instalar o actualizar software en la red de ordenadores. Por ejemplo, cuando un usuario inicia sesión en un ordenador que es parte de un dominio Window su Active Directory es el que verifica la contraseña y especifíca si es un administrador del sistema o un usuario normal. Los ordenadores servidores en los cuales se está ejecutando el Active Directory son llamados controladores de dominio.\n\nActive Directory utiliza las versiones dos y tres del protocolo ligero de acceso a directorios (LDAP), una versión de Microsoft de Kerberos y DNS.\n\n"
+    },
+    {
+      "title": "Terminología",
+      "level": 2,
+      "content": "Si no está familiarizado con la terminología de Active Directory aquí tiene algunas palabras que son de ayuda conocer.\n\n- Dominio : El nombre usado para agrupar ordenadores y cuentas.\n- SID : Casa ordenador que se une al dominio como miembro tiene que tener un único SID o identificador del sistema.\n- SMB : Servidor de mensajes en bloque (Server Message Block).\n- NETBIOS: Protocolo de nombres de red (Network naming protocol) utilizado como alternativa a DNS. Más antiguo pero todavía utilizado en la red de Window.\n- WINS: Servicio de información de nombres de Windows (Windows Information Naming Service). Utilizado para resolver nombres Netbios a hosts Windows.\n- Winbind: Protocolo de autentificación de Windows.\n\n"
+    },
+    {
+      "title": "Configuración de Active Directory",
+      "level": 2,
+      "content": "Esta sección funciona con las configuraciones por defecto en Windows Server 2012 R2.\n\n"
+    },
+    {
+      "title": "Consideraciones GPO",
+      "level": 3,
+      "content": "La firma digital esta activada por defecto en Windows Server y tiene que estar activada en los niveles cliente y servidor. Para ciertas versiones de Samba los clientes Linux pueden experimentar problemas conectando al dominio y/o a recursos compartidos. Se recomienda que añada los siguientes parámetros a su archivo smb.conf:\n\n```\nclient signing = auto \nserver signing = auto\n```\n\nSi esto no lo soluciona puede desactivar Firmar digitalmente las comunicaciones (Siempre) en las directivas de grupo AD (Active Directory). En su editor de directivas de grupo AD localice:\n\nEn Directivas locales > Directivas de seguridad > Servidor de red Microsoft > Firmar digitalmente las comunicaciones (Siempre) activar Definir esta directiva y utilice el botón de selección desactivar.\n\nSi utiliza Windows Server 2008 R2 necesita modificar esto en GPO para directivas de controlador de dominio por defecto > Ajustes del ordenador > Directivas > Ajustes de Windows > Ajustes de Seguridad > Directivas locales > Opciones de seguridad > Cliente de red Microsoft: Firmar digitalmente las comunicaciones (Siempre).\n\nPor favor tenga en cuenta que desactivando esta GPO (Objeto directiva de grupo) afecta a la seguridad de todos los miembros del dominio.\n\n"
+    },
+    {
+      "title": "Configuración del anfitrión Linux",
+      "level": 2,
+      "content": "Los siguientes pasos son para comenzar a configurar el anfitrión. Necesitará root o acceso sudo para completar estos pasos.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale los siguientes paquetes:\n\n- samba, vea también Samba\n- pam-krb5\n- ntp or openntpd, vea también NTPd o OpenNTPD\n\n"
+    },
+    {
+      "title": "Actualizar DNS",
+      "level": 3,
+      "content": "Active Directory es muy dependiente de DNS. Necesitará actualizar /etc/resolv.conf para utilizar uno o más controladores de dominio de Active Directory:\n\n```\n/etc/resolv.conf\n```\n\n```\nnombreServidor <IP1>\nnombreServidor <IP2>\n```\n\nReemplaze <IP1> y <IP2> con unas direcciones IP válidas para los servidores de AD. Si su dominio de AD no permite reenvio de DNS o recursión puede necesitar añadir resolutores adicionales.\n\n"
+    },
+    {
+      "title": "Configurar NTP",
+      "level": 3,
+      "content": "Lea Sincronización del reloj para configurar el servicio NTP.\n\nEn la configuración del servidor NTP utilice la dirección IP del los servidores AD que normalmente ejecutan NTP como servicio. Otra manera es utilizar otros servidores NTP conocidos proporcionados por la sincronización de los servidores de Active directory a la misma capa.\n\nAsegúrese que el servicio está configurado para sincronizar la hora automáticamente bastante pronto en el inicio.\n\n"
+    },
+    {
+      "title": "Kerberos",
+      "level": 3,
+      "content": "Supongamos que su AD se llama ejemplo.com y que su AD está controlado por dos controladores de dominio, el primario y el secundario que se llaman PDC (Primary Domain Controler) y BDC, pdc.ejemplo.com y bdc.ejemplo.com respectivamente. Las direcciones IP serán 192.168.1.2 y 192.168.1.3 en este ejemplo. Tenga en cuenta la sintaxis, las mayúsculas son muy importantes aquí.\n\n```\n/etc/krb5.conf\n```\n\n```\n[libdefaults]\n        default_realm \t= \tEJEMPLO.COM\n\tclockskew \t= \t300\n\tticket_lifetime\t=\t1d\n        forwardable     =       true\n        proxiable       =       true\n        dns_lookup_realm =      true\n        dns_lookup_kdc  =       true\n\t\n[realms]\n\tEJEMPLO.COM = {\n\t\tkdc \t= \tPDC.EJEMPLO.COM\n                admin_server = PDC.EJEMPLO.COM\n\t\tdefault_domain = EJEMPLO.COM\n\t}\n\t\n[domain_realm]\n        .kerberos.server = EJEMPLO.COM\n\t.ejemplo.com = EJEMPLO.COM\n\tejemplo.com = EJEMPLO.COM\n\tejemplo\t= EJEMPLO.COM\n\n[appdefaults]\n\tpam = {\n\tticket_lifetime \t= 1d\n\trenew_lifetime \t\t= 1d\n\tforwardable \t\t= true\n\tproxiable \t\t= false\n\tretain_after_close \t= false\n\tminimum_uid \t\t= 0\n\tdebug \t\t\t= false\n\t}\n\n[logging]\n\tdefault \t\t= FILE:/var/log/krb5libs.log\n\tkdc \t\t\t= FILE:/var/log/kdc.log\n        admin_server            = FILE:/var/log/kadmind.log\n```\n\n```\nallow_weak_crypto = true\n```\n\n"
+    },
+    {
+      "title": "Crear un ticket de Kerberos",
+      "level": 4,
+      "content": "Ahora puede buscar los controladores del dominio de AD y pedir a un ticket a kerberos (las mayúsculas son necesarias):\n\n```\nkinit administrator@EJEMPLO.COM\n```\n\nPuede utilizar cualquier usuario que tenga permisos como Administrador de Dominio.\n\n"
+    },
+    {
+      "title": "Validar el ticket",
+      "level": 4,
+      "content": "Ejecute klist para verificar que recibiste el token. Debe de ver algo similar a:\n\n```\n# klist\n```\n\n```\nTicket cache: FILE:/tmp/krb5cc_0\n Default principal: administrator@EJEMPLO.COM\n \n Valid starting    Expires           Service principal \n 02/04/12 21:27:47 02/05/12 07:27:42 krbtgt/EJEMPLO.COM@EJEMPLO.COM\n         renew until 02/05/12 21:27:47\n```\n\n"
+    },
+    {
+      "title": "pam_winbind.conf",
+      "level": 3,
+      "content": "Si recibe errores de estado diciendo que el archivo /etc/security/pam_winbind.conf no se encuentra cree el archivo y añada lo siguiente:\n\n```\n/etc/security/pam_winbind.conf\n```\n\n```\n[global]\n  debug = no\n  debug_state = no\n  try_first_pass = yes\n  krb5_auth = yes\n  krb5_ccache_type = FILE\n  cached_login = yes\n  silent = no\n  mkhomedir = yes\n```\n\nCon estos ajustes winbind creará fichas de usuario sobre la marcha (krb5_ccache_type = FILE) en el inicio de sesión y los mantiene. Puede verificar esto ejecutando simplemente klist en una consola después de iniciar sesión con un usuario de AD pero sin necesidad de ejecutar kinit. Puede necesitar permisos adicionales en /etc/krb5.keytab por ejemplo 640 en vez de 600 para hacer que funcione (vea este ejemplo FS#52621).\n\n"
+    },
+    {
+      "title": "Samba",
+      "level": 3,
+      "content": "Samba es un programa de software libre que re-implementa el protocolo de red SMB/CIFS. También incluye utilidades para las máquinas Linux para actuar como servidores de red Windows y clientes.\n\nEn esta sección nos centraremos primero en hacer que la autentificación funcione editando primero la sección 'Global'. Más tarde volveremos atrás y añadiremos comparticiones.\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[Global]\n  netbios name = MYARCHLINUX\n  workgroup = EJEMPLO\n  realm = EJEMPLO.COM\n  server string = %h Arch Linux Host\n  security = ads\n  encrypt passwords = yes\n  password server = pdc.ejemplo.com\n  client signing = auto\n  server signing = auto\n\n  idmap config * : backend = tdb\n  idmap config * : range = 10000-20000\n\n  winbind use default domain = Yes\n  winbind enum users = Yes\n  winbind enum groups = Yes\n  winbind nested groups = Yes\n  winbind separator = +\n  winbind refresh tickets = yes\n  winbind offline logon = yes\n  winbind cache time = 300\n\n  template shell = /bin/bash\n  template homedir = /home/%D/%U\n   \n  preferred master = no\n  dns proxy = no\n  wins server = pdc.ejemplo.com\n  wins proxy = no\n\n  inherit acls = Yes\n  map acl inherit = Yes\n  acl group control = yes\n\n  load printers = no\n  debug level = 3\n  use sendfile = no\n```\n\n"
+    },
+    {
+      "title": "Unirse al dominio",
+      "level": 3,
+      "content": "Necesita una cuenta de AD con permisos de administrados para hacer esto. Supongamos que la cuenta se llama Administrador. El comando es 'net ads join'.\n\n```\n# net ads join -U Administrador\n```\n\n```\nAdministrador's password: xxx\nUsing short domain name -- EJEMPLO\nJoined 'MYARCHLINUX' to realm 'EJEMPLO.COM'\n```\n\n"
+    },
+    {
+      "title": "Iniciar Samba",
+      "level": 3,
+      "content": "¡Milagrosamente no habrá reiniciado aún! Bien. Si esta en una sesión X quitela, de esta forma podrá probar iniciar sesión en otra consola mientras que esté aún con la sesión iniciada.\n\nActive e inicie los demonios individuales de Samba smbd.service, nmbd.service, y winbindd.service.\n\nLo siguiente que necesitará es modificar la configuración NSSwitch que es la que le dice a Linux como obtener la información de varias fuentes y en qué orden. En este caso dependemos del Active Directory como fuentes adicionales para Usuarios, Grupos, y Hosts.\n\n```\n/etc/nsswitch.conf\n```\n\n```\npasswd:            files winbind\n shadow:            files winbind\n group:             files winbind \n \n hosts:             files dns wins\n```\n\n"
+    },
+    {
+      "title": "Comprobar Winbind",
+      "level": 3,
+      "content": "Vamos a comprobar si winbind es capaz de listar el AD. El siguiente comando debe de devolver una lista de usuarios de AD:\n\n```\n# wbinfo -u\n```\n\n```\nadministrator\nguest\nkrbtgt\ntest.user\n```\n\n- Note que creamos un usuario de Active Directory llamado 'test.user' en el controlador de dominio.\n\nPodemos hacer lo mismo para grupos de AD:\n\n```\n# wbinfo -g\n```\n\n```\ndomain computers\ndomain controllers\nschema admins\nenterprise admins\ncert publishers\ndomain admins\ndomain users\ndomain guests\ngroup policy creator owners\nras and ias servers\nallowed rodc password replication group\ndenied rodc password replication group\nread-only domain controllers\nenterprise read-only domain controllers\ndnsadmins\ndnsupdateproxy\n```\n\n"
+    },
+    {
+      "title": "Comprobar nsswitch",
+      "level": 3,
+      "content": "Para asegurarse que su host es capaz de listar el domino para usuarios y grupos podemos comprobar los ajustes nsswitch utilizando el comando 'getent'.\n\nSi los usuarios de su Controlador de Dominio no se ven pruebe añadir las siguiente línea a su archivo smb.conf:\n\n```\n/etc/samba/smb.conf\n```\n\n```\nwinbind trusted domains only = no\n```\n\nLa siguiente salida muestra como se ve una instalación de Arch Linux:\n\n```\n# getent passwd\n```\n\n```\nroot:x:0:0:root:/root:/bin/bash\nbin:x:1:1:bin:/bin:/bin/false\ndaemon:x:2:2:daemon:/sbin:/bin/false\nmail:x:8:12:mail:/var/spool/mail:/bin/false\nftp:x:14:11:ftp:/srv/ftp:/bin/false\nhttp:x:33:33:http:/srv/http:/bin/false\nnobody:x:99:99:nobody:/:/bin/false\ndbus:x:81:81:System message bus:/:/bin/false\nntp:x:87:87:Network Time Protocol:/var/empty:/bin/false\navahi:x:84:84:avahi:/:/bin/false\nadministrador:*:10001:10006:Administrador:/home/EJEMPLO/administrador:/bin/bash\nguest:*:10002:10007:Guest:/home/EJEMPLO/guest:/bin/bash\nkrbtgt:*:10003:10006:krbtgt:/home/EJEMPLO/krbtgt:/bin/bash\ntest.user:*:10000:10006:Test User:/home/EJEMPLO/test.user:/bin/bash\n```\n\nY para los grupos:\n\n```\n# getent group\n```\n\n```\nroot:x:0:root\nbin:x:1:root,bin,daemon\ndaemon:x:2:root,bin,daemon\nsys:x:3:root,bin\nadm:x:4:root,daemon\ntty:x:5:\ndisk:x:6:root\nlp:x:7:daemon\nmem:x:8:\nkmem:x:9:\nwheel:x:10:root\nftp:x:11:\nmail:x:12:\nuucp:x:14:\nlog:x:19:root\nutmp:x:20:\nlocate:x:21:\nrfkill:x:24:\nsmmsp:x:25:\nhttp:x:33:\ngames:x:50:\nnetwork:x:90:\nvideo:x:91:\naudio:x:92:\noptical:x:93:\nfloppy:x:94:\nstorage:x:95:\nscanner:x:96:\npower:x:98:\nnobody:x:99:\nusers:x:100:\ndbus:x:81:\nntp:x:87:\navahi:x:84:\ndomain computers:x:10008:\ndomain controllers:x:10009:\nschema admins:x:10010:administrador\nenterprise admins:x:10011:administrador\ncert publishers:x:10012:\ndomain admins:x:10013:test.user,administrador\ndomain users:x:10006:\ndomain guests:x:10007:\ngroup policy creator owners:x:10014:administrador\nras and ias servers:x:10015:\nallowed rodc password replication group:x:10016:\ndenied rodc password replication group:x:10017:krbtgt\nread-only domain controllers:x:10018:\nenterprise read-only domain controllers:x:10019:\ndnsadmins:x:10020:\ndnsupdateproxy:x:10021:\n```\n\n"
+    },
+    {
+      "title": "Comprobar comandos de Samba",
+      "level": 3,
+      "content": "Pruebe algunos comandos net para ver si Samba se puede comunicar con el AD:\n\n```\n# net ads info\n```\n\n```\n[2012/02/05 20:21:36.473559,  0] param/loadparm.c:7599(lp_do_parameter)\n  Ignoring unknown parameter \"idmapd backend\"\nLDAP server: 192.168.1.2\nLDAP server name: PDC.ejemplo.com\nRealm: EJEMPLO.COM\nBind Path: dc=EJEMPLO,dc=COM\nLDAP port: 389\nServer time: Sun, 05 Feb 2012 20:21:33 CST\nKDC server: 192.168.1.2\nServer time offset: -3\n```\n\n```\n# net ads lookup\n```\n\n```\n[2012/02/05 20:22:39.298823,  0] param/loadparm.c:7599(lp_do_parameter)\n  Ignoring unknown parameter \"idmapd backend\"\nInformation for Domain Controller: 192.168.1.2\n\nResponse Type: LOGON_SAM_LOGON_RESPONSE_EX\nGUID: 2a098512-4c9f-4fe4-ac22-8f9231fabbad\nFlags:\n        Is a PDC:                                   yes\n        Is a GC of the forest:                      yes\n        Is an LDAP server:                          yes\n        Supports DS:                                yes\n        Is running a KDC:                           yes\n        Is running time services:                   yes\n        Is the closest DC:                          yes\n        Is writable:                                yes\n        Has a hardware clock:                       yes\n        Is a non-domain NC serviced by LDAP server: no\n        Is NT6 DC that has some secrets:            no\n        Is NT6 DC that has all secrets:             yes\nForest:                 ejemplo.com\nDomain:                 ejemplo.com\nDomain Controller:      PDC.ejemplo.com\nPre-Win2k Domain:       EJEMPLO\nPre-Win2k Hostname:     PDC\nServer Site Name :              Office\nClient Site Name :              Office\nNT Version: 5\nLMNT Token: ffff\nLM20 Token: ffff\n```\n\n```\n# net ads status -U administrador%password | less\n```\n\n```\nobjectClass: top\nobjectClass: person\nobjectClass: organizationalPerson\nobjectClass: user\nobjectClass: computer\ncn: myarchlinux\ndistinguishedName: CN=myarchlinux,CN=Computers,DC=leafscale,DC=inc\ninstanceType: 4\nwhenCreated: 20120206043413.0Z\nwhenChanged: 20120206043414.0Z\nuSNCreated: 16556\nuSNChanged: 16563\nname: myarchlinux\nobjectGUID: 2c24029c-8422-42b2-83b3-a255b9cb41b3\nuserAccountControl: 69632\nbadPwdCount: 0\ncodePage: 0\ncountryCode: 0\nbadPasswordTime: 0\nlastLogoff: 0\nlastLogon: 129729780312632000\nlocalPolicyFlags: 0\npwdLastSet: 129729764538848000\nprimaryGroupID: 515\nobjectSid: S-1-5-21-719106045-3766251393-3909931865-1105\n...<snip>...\n```\n\n"
+    },
+    {
+      "title": "Configurar PAM",
+      "level": 2,
+      "content": "Ahora cambiaremos varias reglas en PAM para permitir que los usuarios de Active Directory puedan utilizar el sistema para cosas como iniciar sesión y acceso sudo. Cuando se cambian estas reglas note que el orden de estos elementos y cualquier cosa que este marcado como required (requerido) o sufficient (suficiente) es crítico para que funcione como se espera. No debe desviarse de estas reglas a no haya ser que sepa como escribir reglas PAM.\n\nEn el caso de inicios de sesión primero PAM debe de preguntar por las cuentas AD y por las cuentas locales si no encuentra ninguna cuenta de AD. Por lo tanto añadiremos entradas para incluir pam_winbind.so en el proceso de autentificación.\n\nLa configuración PAM de Arch Linux mantiene el proceso central de autentificación en /etc/pam.d/system-auth. Iniciando con la configuración de stock de pambase, cambiela como prosigue:\n\n"
+    },
+    {
+      "title": "Sección \"auth\"",
+      "level": 4,
+      "content": "Encuentre la línea:\n\n```\nauth required pam_unix.so ...\n```\n\nElimínela y reemplacela con:\n\n```\nauth [success=1 default=ignore] pam_localuser.so\nauth [success=2 default=die] pam_winbind.so\nauth [success=1 default=die] pam_unix.so nullok\nauth requisite pam_deny.so\n```\n\n"
+    },
+    {
+      "title": "Sección \"account\"",
+      "level": 4,
+      "content": "Encuentre la línea:\n\n```\naccount required pam_unix.so\n```\n\nMantenla y añada esto debajo:\n\n```\naccount [success=1 default=ignore] pam_localuser.so\naccount required pam_winbind.so\n```\n\n"
+    },
+    {
+      "title": "Sección \"password\"",
+      "level": 4,
+      "content": "Encuentre la línea:\n\n```\npassword required pam_unix.so ...\n```\n\nElimínela y reemplacela con:\n\n```\npassword [success=1 default=ignore] pam_localuser.so\npassword [success=2 default=die] pam_winbind.so\npassword [success=1 default=die] pam_unix.so sha512 shadow\npassword requisite pam_deny.so\n```\n\n"
+    },
+    {
+      "title": "Sección \"session\"",
+      "level": 4,
+      "content": "Encuentre la línea:\n\n```\nsession required pam_unix.so\n```\n\nMantenla y añada esta línea justo encima de ella:\n\n```\nsession required pam_mkhomedir.so skel=/etc/skel/ umask=0022\n```\n\nDebajo de la línea pam_unix añada esto:\n\n```\nsession [success=1 default=ignore] pam_localuser.so\nsession required pam_winbind.so\n```\n\n"
+    },
+    {
+      "title": "Sección \"password\"",
+      "level": 4,
+      "content": "Para que los usuarios de Active Directory que han iniciado sesión puedan cambiar sus contraseñas con el comando 'passwd' el archivo /etc/pam.d/passwd tiene que incluir información de system-auth.\n\nEncuentre la línea:\n\n```\npassword required pam_unix.so sha512 shadow nullok\n```\n\nElimínela y reemplacela con:\n\n```\npassword include system-auth\n```\n\n"
+    },
+    {
+      "title": "Comprobar inicio de sesión",
+      "level": 3,
+      "content": "Ahora inicie una nueva sesión con consola (o ssh) e intente iniciar sesión con las credenciales de AD. El nombre del dominio es opcional como se establece en la configuración de Winbind como 'default realm'. Por favor tenga en cuenta que en el caso de ssh necesitará modificar el archivo /etc/ssh/sshd_config para permitir la autentificación kerberos (KerberosAuthentication yes).\n\n```\ntest.user\nEJEMPLO+test.user\n```\n\nAmbos comandos deben funcionar. Debe notar que /home/example/test.user se creará automáticamente. Inicie sesión utilizando una cuenta de Linux. Compruebe si puede iniciar sesión como root - ¡pero tenga en cuenta que tiene que iniciar sesión como root en al menos una sesión!\n\n"
+    },
+    {
+      "title": "Configurar recursos compartidos",
+      "level": 2,
+      "content": "Antes se omitió la configuración de recursos compartidos. Ahora que todo funciona vuelva a /etc/samba/smb.conf y añada los recursos del host que quiere que estén disponibles en la red de Windows.\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[MyShare]\n  comment = Ejemplo de recurso compartido\n  path = /srv/exports/myshare\n  read only = no\n  browseable = yes\n  valid users = @NETWORK+\"Domain Admins\" NETWORK+test.user\n```\n\nEn el ejemplo anterior la palabra NETWORK se tiene que utilizar. No lo sustituya erróneamente por su nombre de dominio. Para añadir grupos preceda el símbolo '@' del grupo. Note que Domain Admins está entre comillas para que Samba lo sustituya cuando lea el archivo de configuración.\n\n"
+    },
+    {
+      "title": "Añadir un ordenador al archivo keytab y activar ssh kerberizado sin contraseña al ordenador",
+      "level": 2,
+      "content": "Esto explica cómo generar un ordenador al archivo keytab por el cual puede necesitar, por ejemplo, activar ssh kerberizado sin contraseña a tu ordenador desde otros ordenadores del dominio. El escenario que se plantea es que tenga un grupo de sistemas en su dominio y solo añadió un servidor/espacio de trabajo utilizando la descripción de arriva a su dominio del cual muchos usuarios necesitan ssh para trabajar, por ejemplo, con un espacio de trabajo GPU o con un nodo computacional OpenMP, etc. En este caso puede que no quiera introducir la contraseña cada vez que entre al servidor. Por otra parte muchos usuarios utilizan la autentificación por llave, en este supuesto a lo mejor no puede darle las credenciales necesarias para montar recursos compartidos kerberizados NFSv4, por ejemplo. Esto le ayudará activar los accesos sin contraseña desde sus clientes a la maquina en cuestion utilizando seguimiento de ticket kerberos.\n\n"
+    },
+    {
+      "title": "Crear un archivo keytab del ordenador",
+      "level": 3,
+      "content": "Ejecute 'net ads keytab create -U administrador' como root para crear el archivo keytab del ordenador en /etc/krb5.keytab. Mostrará una advertencia de que necesita activar la autentificación keytab en su archivo de configuración, por tanto hágalo en el paso siguiente. En este caso específico hubo problemas cuando se creó el archivo keytab porque ya existía. En este caso el comando se queda sin responder. Para solucionarlo renombre el archivo /etc/krb5.keytab existente y ejecute el comando de nuevo, debería funcionar.\n\n```\n# net ads keytab create -U administrador\n```\n\nverifique el contenido de su keytab ejecutando:\n\n```\n# klist -k /etc/krb5.keytab\n```\n\n```\nKeytab name: FILE:/etc/krb5.keytab\nKVNO Principal\n---- --------------------------------------------------------------------------\n   4 host/myarchlinux.ejemplo.com@EJEMPLO.COM\n   4 host/myarchlinux.ejemplo.com@EJEMPLO.COM\n   4 host/myarchlinux.ejemplo.com@EJEMPLO.COM\n   4 host/myarchlinux.ejemplo.com@EJEMPLO.COM\n   4 host/myarchlinux.ejemplo.com@EJEMPLO.COM\n   4 host/MYARCHLINUX@EJEMPLO.COM\n   4 host/MYARCHLINUX@EJEMPLO.COM\n   4 host/MYARCHLINUX@EJEMPLO.COM\n   4 host/MYARCHLINUX@EJEMPLO.COM\n   4 host/MYARCHLINUX@EJEMPLO.COM\n   4 MYARCHLINUX$@EJEMPLO.COM\n   4 MYARCHLINUX$@EJEMPLO.COM\n   4 MYARCHLINUX$@EJEMPLO.COM\n   4 MYARCHLINUX$@EJEMPLO.COM\n   4 MYARCHLINUX$@EJEMPLO.COM\n```\n\n"
+    },
+    {
+      "title": "Activar la autentificación keytab",
+      "level": 3,
+      "content": "Ahora necesita decirle a winbind que utilice el archivo añadiendo estas lineas a /etc/samba/smb.conf:\n\n```\nkerberos method = secrets and keytab\n dedicated keytab file = /etc/krb5.keytab\n```\n\nSe verá algo parecido a esto:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[Global]\n  netbios name = MYARCHLINUX\n  workgroup = EJEMPLO\n  realm = EJEMPLO.COM\n  server string = %h Arch Linux Host\n  security = ads\n  encrypt passwords = yes\n  password server = pdc.ejemplo.com\n  kerberos method = secrets and keytab\n  dedicated keytab file = /etc/krb5.keytab\n\n  idmap config * : backend = tdb\n  idmap config * : range = 10000-20000\n\n  winbind use default domain = Yes\n  winbind enum users = Yes\n  winbind enum groups = Yes\n  winbind nested groups = Yes\n  winbind separator = +\n  winbind refresh tickets = yes\n\n  template shell = /bin/bash\n  template homedir = /home/%D/%U\n   \n  preferred master = no\n  dns proxy = no\n  wins server = pdc.ejemplo.com\n  wins proxy = no\n\n  inherit acls = Yes\n  map acl inherit = Yes\n  acl group control = yes\n\n  load printers = no\n  debug level = 3\n  use sendfile = no\n```\n\nReinicie el demonio winbind utilizando 'systemctl restart winbindd.service' con privilegios root.\n\n```\n# systemctl restart winbindd.service\n```\n\nCompruebe que todo funciona obteniendo un ticket del ordenador desde su sistema ejecutando\n\n```\n# kinit MYARCHLINUX$ -kt /etc/krb5.keytab\n```\n\nNo debe de devolver ningún resultado pero ejecutando 'klist' debe mostrarse su sth así:\n\n```\n# klist\n```\n\n```\nTicket cache: FILE:/tmp/krb5cc_0\n Default principal: MYARCHLINUX$@EJEMPLO.COM\n \n Valid starting    Expires           Service principal \n 02/04/12 21:27:47 02/05/12 07:27:42 krbtgt/EJEMPLO.COM@EJEMPLO.COM\n         renew until 02/05/12 21:27:47\n```\n\nAlgunos errores comunes aquí son\n\n- Olvidar los $ finales o\n- Ignorar la sensibilidad de mayúsculas que son necesarias para las entradas en el keytab (en general no puede haber muchos fallos con todas las mayúsculas).\n\n"
+    },
+    {
+      "title": "Preparar sshd en el servidor",
+      "level": 3,
+      "content": "Todo lo que necesita hacer es añadir algunas opciones a su configuración sshd_config y reiniciar sshd.service.\n\nEdite /etc/ssh/sshd_config como sigue en los lugares adecuados:\n\n```\n# /etc/ssh/sshd_config\n```\n\n```\n...\n\n# Cámbiela a no para desactivar las contraseñas s/key\nChallengeResponseAuthentication no\n\n# Opciones Kerberos\nKerberosAuthentication yes\n#KerberosOrLocalPasswd yes\nKerberosTicketCleanup yes\nKerberosGetAFSToken yes\n\n# Opciones GSSAPI\nGSSAPIAuthentication yes\nGSSAPICleanupCredentials yes\n\n...\n```\n\nReinicie el sshd.service utilizando:\n\n```\n# systemctl restart sshd.service\n```\n\n"
+    },
+    {
+      "title": "Añadir las opciones necesarias en el cliente",
+      "level": 3,
+      "content": "Primero necesita asegurarse que los tickets de su cliente se puede transferir. Esto normalmente es un estándar pero es mejor comprobarlo de todas formas. Tiene que mirar la opción transferible y establecerlo a 'true' en el archivo /etc/krb5.conf.\n\n```\nforwardable     =       true\n```\n\nDespués añada las siguientes opciones\n\n```\nGSSAPIAuthentication yes\n GSSAPIDelegateCredentials yes\n```\n\na su archivo .ssh/config para decirle a ssh que utilice estas opciones. Alternativamente se puede invocar directamente con la opción -o en el comando ssh (vea 'man ssh' para más información).\n\n"
+    },
+    {
+      "title": "Comprobar la ejecución",
+      "level": 3,
+      "content": "En el cliente:\n\nAsegúrese que tiene un ticket válido - si tiene dudas ejecute 'kinit'.\n\nDespués utilice ssh para conectarse a su ordenador.\n\n```\nssh myarchlinux.ejemplo.com\n```\n\nDebe comprobar que se conecta sin necesidad de introducir su contraseña.\n\nSi tiene una llave de autentificación adicional debe realizar\n\n```\nssh -v myarchlinux.ejemplo.com\n```\n\npara ver cual método de autentificación utiliza actualmente.\n\nPara depuración puede activar en el servidor DEBUG3 y mirar en el journal utilizando journalctl.\n\n"
+    },
+    {
+      "title": "Ajuste preciso para un manejo completo de kerberos sin contraseña.",
+      "level": 3,
+      "content": "En el caso de que sus clientes no estén utilizando cuentas de dominio en sus ordenadores locales (por cualquier razón) puede ser difícil decirle a kinit antes que a ssh el espacio de trabajo. Sin embargo una solución posible es la que se propone en el siguiente apartado.\n\n"
+    },
+    {
+      "title": "Generar Keytabs de usuarios que sean aceptados por AD",
+      "level": 2,
+      "content": "En el sistema deje que el usuario ejecute:\n\n```\nktutil\naddent -password -p username@EJEMPLO.COM -k 1 -e RC4-HMAC\n- introduzca la contraseña del usuario -\nwkt username.keytab\nq\n```\n\nAhora compruebe el archivo con:\n\n```\nkinit username@EJEMPLO.COM -kt username.keytab\n```\n\nNo debe pedirle contraseña y no debe devolverle ningún comentario. Si funcionó ya estaría hecho; simplemente añada la linea de arriba en su ~./bashrc - ahora puede obtener tickets de kerberos sin escribir ninguna contraseña y puede conectar a su espacio de trabajo sin escribir la contraseña mientras este completamente kerberizado y habilitado para la autentificación a través de NFSv4 y CIFS via tickets.\n\n"
+    },
+    {
+      "title": "Es bueno conocer",
+      "level": 3,
+      "content": "El archivo 'username.keytab' no es exclusivo del ordenador y puede copiarse. Ej. se copio archivos desde un ordenador Linux a un ordenador Mac ya que los comandos de Mac son diferentes.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Wikipedia - Active Directory\n- Wikipedia - Samba\n- Wikipedia - Kerberos\n- Samba - Documentation\n- Samba Wiki - Samba, Active Directory & LDAP\n- smb.conf(5)\n\n"
+    },
+    {
+      "title": "Soluciones comerciales",
+      "level": 3,
+      "content": "- Centrify\n- Likewise\n\n"
+    },
+    {
+      "title": "Versiones de código abierto",
+      "level": 3,
+      "content": "- PowerBroker Identity Services Open: anteriormente también adquirida por BeyondTrust\n- Centrify Express para Linux\n\n"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "title": "Wine package guidelines (Português)",
+  "url": "https://wiki.archlinux.org/title/Wine_package_guidelines_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nMuitos programas do Windows ainda podem ser úteis no Linux e, portanto, podemos querer ter um pacote para eles. As diferenças entre os dois sistemas operacionais tornam essa tarefa um pouco complexa. Nesta diretriz, falaremos sobre binários do Win32, já que os projetos em que a origem está disponível geralmente são portados para o Linux.\n\n"
+    },
+    {
+      "title": "Coisas para verificar imediatamente",
+      "level": 2,
+      "content": "- Licença: a licença permite que o programa seja reempacotada?\n- Instalador: é possível instalar o programa silenciosamente? Melhor ainda, existe uma versão sem instalador?\n- Portabilidade e limpeza: é o programa portátil? É limpo?\n\nAqui dizemos que um programa é portátil se nunca escreve no registro ou fora de seu diretório; dizemos que um programa é limpo se nunca escreve em seu diretório, mas pode gravar suas configurações na pasta do usuário. Um programa também pode ser ambos (por exemplo, nunca escreve configurações) ou nem (por exemplo, ele escreve em seu diretório, escreve em volta, escreve no registro ...)\n\n"
+    },
+    {
+      "title": "Licença",
+      "level": 3,
+      "content": "Geralmente, as licenças estão em um arquivo de texto no diretório de instalação. Se você não conseguir encontrá-los, tente seguir as telas durante a instalação. Se nada for dito sobre reempacotamento, vá em frente. O autor não se importa. Caso contrário, a licença geralmente não permite a remoção de arquivos ou não permite a reempacotamento. No primeiro caso, apenas tenha cuidado para que o processo makepkg não perca nenhum arquivo, você pode excluir arquivos desnecessários (por exemplo, desinstaladores) na fase post_install; no último caso, todo o processo de instalação deve ser feito na fase post_install. A fase build será apenas para copiar os arquivos de instalação.\n\n"
+    },
+    {
+      "title": "Instalador",
+      "level": 3,
+      "content": "É muito mais fácil trabalhar com arquivos compactados como .zip do que com instaladores do Windows. Se você não tiver escolha, pois o autor insiste em distribuir seu programa com um instalador, pesquise na Internet se é possível instalar silenciosamente o software. MSFN geralmente é um bom lugar para pesquisar. Se não conseguir encontrar uma maneira, tente abrir o instalador com diferentes utilitários de desempacotamento; pode funcionar.\n\n"
+    },
+    {
+      "title": "Portabilidade e limpeza",
+      "level": 3,
+      "content": "Um programa portátil não precisa de seu próprio sistema de arquivos em Wine, portanto, verifique em Portable Freeware se o programa que você está empacotando é portátil.\n\n"
+    },
+    {
+      "title": "A diretriz em resumo",
+      "level": 2,
+      "content": "A ideia por trás do empacotamento de um programa do Windows é usar os arquivos do programa como meros dados que o Wine interpretará, assim como o bytecode da JVM e do Java.\n\nEntão vamos instalar o programa em /usr/share/\"$pkgname\" e o programa irá escrever tudo o que precisa em \"$HOME\"/.\"$pkgname\". Tudo será preparado por um pequeno script salvo em /usr/bin/\"$pkgname\" que irá criar a pasta, prepará-la, se necessário, e finalmente iniciar o programa.\n\nNas próximas seções, nós vamos falar sobre cada etapa.\n\nDesta forma, cada usuário terá suas próprias configurações e suas decisões não incomodarão outros usuários.\n\n"
+    },
+    {
+      "title": "Instalando",
+      "level": 3,
+      "content": "Se o programa não tiver instalador, a instalação é uma mera descompactação de um arquivo; descompacte-o em \"$pkgdir\"/usr/share/$pkgname, certificando-se de que as permissões estejam corretas. Esses comandos servirão:\n\n```\n$ find \"$pkgdir\"/usr/share -type f -exec chmod 644 \"{}\" \\;\n$ find \"$pkgdir\"/usr/share -type d -exec chmod 755 \"{}\" \\;\n```\n\nSe o programa não puder ser instalado da maneira mais fácil, você precisará criar um ambiente Wine:\n\n```\n$ install -m755 -d \"$srcdir\"/tmp \"$srcdir\"/tmp/env \"$srcdir\"/tmp/local\n$ export WINEPREFIX=\"$srcdir\"/tmp/env\n$ export XDG_DATA_HOME=\"$srcdir\"/tmp/local\n$ wine \"$srcdir\"/installer.exe /silentoptions\n```\n\nNós ainda não discutimos a portabilidade, mas se o seu programa não precisa das chaves de registro que ele modificou, você pode simplesmente copiar o diretório do:\n\n```\n\"$srcdir\"/tmp/env/drive_c/Program\\ Files/nomeprograma\n```\n\nCaso contrário, você precisará copiar todos os arquivos de registro também e, eventualmente, os arquivos instalados pelo programa. O \"$srcdir\"/tmp/local conterá ícones de menu e arquivos da área de trabalho, você pode querer copiá-los no pacote. Se não existe uma maneira de instalar o programa silenciosamente ... Talvez você possa criar um arquivo .tar.gz e enviá-lo para algum lugar? Se nada for possível, force o usuário a seguir o instalador e espere que ele não estrague a instalação, faça algumas verificações antes de copiar cegamente uma pasta que pode não existir (por exemplo, o usuário pressionou 'Cancelar').\n\n"
+    },
+    {
+      "title": "O script /usr/bin",
+      "level": 3,
+      "content": "Este script prepara a pasta de configurações e inicia o programa. Se o seu programa for portátil, ficará assim:\n\n```\n#!/bin/bash\nunset WINEPREFIX\nif [ ! -d \"$HOME\"/.nomeprograma ] ; then\n   mkdir -p \"$HOME\"/.nomeprograma\n   #prepare o ambiente aqui\nfi\nWINEDEBUG=-all wine \"$HOME\"/.nomeprograma/nomeprograma \"$@\"\n```\n\nSe for limpo, ele vai se parecer com isso:\n\n```\n#!/bin/bash\nexport WINEPREFIX=\"$HOME\"/.nomeprograma/wine\nif [ ! -d \"$HOME\"/.nomeprograma ] ; then\n   mkdir -p \"$HOME\"/.nomeprograma/wine\n   wineboot -u\n   #copie o arquivo de registro se necessário\nfi\nWINEDEBUG=-all wine /usr/share/nomeprograma \"$@\"\n```\n\nComo você pode ver, no segundo caso não há preparação do ambiente. Na verdade, um aplicativo limpo será iniciado diretamente de /usr/share, pois não precisará gravar em sua pasta, portanto, suas configurações serão gravadas em algum lugar no sistema de arquivos emulado.\n\nSe o aplicativo não for nem limpo nem portátil, as duas ideias devem ser combinadas.\n\nSe o aplicativo não gravar configurações, ignore o if e inicie-o em /usr/share.\n\nA tarefa de preparar o ambiente pode diferir muito entre os aplicativos, mas siga estas regras práticas: Se o programa:\n\n- só precisa ler um arquivo, faça um link simbólico para ele.\n- precisa escrever em um arquivo, copie-o.\n- não usa um arquivo, ignore-o.\n\nÉ claro, o mínimo é só iniciar WINEDEBUG=-all wine /usr/share/nomeprograma \"$@\".\n\nGeralmente, o ambiente será feito por link simbólico entre o diretório \"$HOME\"/.nomeprograma e os arquivos /usr/share/nomeprograma. Mas já que alguns programas do Windows são muito inconstantes em relação aos seus caminhos, você pode precisar vincular diretamente no diretório \"$HOME\"/.nomeprograma/wine/drive_c/Program\\ Files/nomeprograma.\n\nClaro que essas são apenas ideias para integrar aplicativos Win32 no ambiente Linux, não esqueça sua inteligência e bom senso.\n\nComo exemplo, μTorrent é por padrão um aplicativo limpo, mas com uma etapa fácil pode ser usado como um arquivo portátil. Já que é um único arquivo e é bem pequeno criando seu ambiente do Wine (aproximadamente 5MB) é provavelmente um exagero. É melhor criar um link simbólico para o executável, criar o settings.dat vazio para poder usá-lo no diretório $HOME/.utorrent. Com a vantagem de apenas visitar a pasta .utorrent, um usuário pode ver uma cópia dos arquivos .torrent que baixou.\n\n"
+    },
+    {
+      "title": "UnionFsFuse",
+      "level": 3,
+      "content": "Você pode considerar o uso do programa UnionFsFuse disponível nos repositórios oficiais como unionfs-fuseAUR). UnionFsFuse permite manter o diretório base no /usr/share e colocar uma cópia dos arquivos do aplicativo necessários para escrever dentro de $HOME/.nomeprograma quase automaticamente.\n\nUsar UnionFsFuse significa uma dependência adicional e requer o módulo fuse, o que nem todos os usuários podem carregar. No entanto, pode valer a pena se o aplicativo precisar de muitos links simbólicos ou se não estiver claro exatamente o que precisa ser escrito. Apenas certifique-se de montar e desmontar os UnionFs corretamente.\n\n"
+    },
+    {
+      "title": "Um exemplo",
+      "level": 2,
+      "content": "Vamos fazer um pacote para o eMule. De acordo com Portable Freeware, eMule não é completamente portátil, pois ele escreve algumas chaves (inúteis) no registro.\n\nPor outro lado, ele também não é limpo já que ele escreve seus arquivos de configuração e coloca seus downloads em sua pasta de instalação.\n\nPor sorte, há uma versão sem instalador disponível.\n\nEntão, nós fazemos nosso PKGBUILD; a única dependência é o wine. O md5sums deve ser adicionado.\n\n```\n# Maintainer: Você <seuemail>\npkgname=emule\npkgver=0.49b\npkgrel=1\npkgdesc=\"One of the biggest and most reliable peer-to-peer file sharing\nclients around the world.\"\narch=(i686 x86_64)\nurl=\"http://www.emule-project.net\"\nlicense=('GPL')\ndepends=()\ndepends=(wine)\nmakedepends=(unzip)\nsource=(emule http://prdownloads.sourceforge.net/emule/eMule$pkgver.zip)\nnoextract=()\noptions=(!strip)\n\nbuild() {\n  rm -f src/eMule\"$pkgver\"/license* #It is GPL\n\n  install -d -m755 pkg/usr/share/emule\n  cp -ra src/eMule\"$pkgver\"/* pkg/usr/share/emule\n  find pkg/usr/share/emule -type d -exec chmod 755 \"{}\" \\;\n  find pkg/usr/share/emule -type f -exec chmod 644 \"{}\" \\;\n\n  install -d -m755 pkg/usr/bin\n  install -m755 emule pkg/usr/bin \n}\n```\n\nAgora, nós fazemos nosso arquivo emule, que, de com o build, será copiado e tornado executável em /usr/bin.\n\n```\n#!/bin/bash\nexport WINEARCH=win32 WINEPREFIX=\"$HOME/.emule/wine\"\n\nif [ ! -d \"$HOME\"/.emule ] ; then\n  mkdir -p \"$HOME\"/.emule/wine || exit 1\n  #Cada usuário terá suas config, nós copiamos o arquivo padrão\n  #já que o emule precisa escrevê-lo.\n  cp -r /usr/share/emule/config \"$HOME\"/.emule || exit 1\n  #Nós criamos links simbólicos para os arquivos que o emule precisa ler para funcionar\n  ln -s /usr/share/emule/emule.exe \"$HOME\"/.emule/emule || exit 1\n  ln -s -T /usr/share/emule/lang \"$HOME\"/.emule/lang || exit 1\n  ln -s -T /usr/share/emule/webserver \"$HOME\"/.emule/webserver || exit 1\nfi\n\nwine \"$HOME\"/.emule/emule \"$@\"\n```\n\nSe você quiser ser mais preciso, você pode adicionar uma mensagem no arquivo .install dizendo ao usuário que ele deve desabilitar o histórico de busca, já que o wine bagunça aquele menu. Você pode até fornecer um arquivo de configuração padrão com as melhores configurações. E é isso ... execute $ makepkg, verifique a pasta do pacote para ter certeza e instale-o.\n\n"
+    },
+    {
+      "title": "Gecko e Mono",
+      "level": 2,
+      "content": "A menos que você saiba com certeza que o software requer o navegador do tempo de execução do .NET (pacotes wine-gecko e wine-mono nos repositórios oficiais), os prompts padrão de instalação do wine para Gecko/Mono são indesejáveis.\n\nPara desabilitar renderização HTML, suporte a bytecode e diálogos, você precisa usar um dlloverride em seu script. Para Gecko:\n\n```\nexport WINEDLLOVERRIDES=\"mshtml=\"\n```\n\nPara Mono:\n\n```\nexport WINEDLLOVERRIDES=\"mscoree=\"\n```\n\nPara ambos:\n\n```\nexport WINEDLLOVERRIDES=\"mscoree,mshtml=\"\n```\n\nVocê também pode desabilitá-los via winecfg: basta definir mscoree/mshtml para desabilitar.\n\n"
+    }
+  ]
+}

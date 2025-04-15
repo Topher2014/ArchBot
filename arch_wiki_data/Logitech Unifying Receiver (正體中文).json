@@ -1,0 +1,91 @@
+{
+  "title": "Logitech Unifying Receiver (正體中文)",
+  "url": "https://wiki.archlinux.org/title/Logitech_Unifying_Receiver_(%E6%AD%A3%E9%AB%94%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "The Logitech Unifying Receiver is a wireless receiver using 2.4 GHz band radio communication that can connect up to six compatible wireless mice and keyboards to your computer. The same applies to the newer Logi Bolt wireless technology that comes with newer devices. The input device that comes with the receiver is already paired with it and should work out of the box through plug and play. Logitech officially supports pairing of additional devices just through their Windows and macOS software.\n\nPairing and unpairing on Linux is supported by a number of tools, listed thereafter:\n\nltunify is a command-line C program that can perform pairing, unpairing and listing of devices. As of January 2024, ltunify does not yet recognize Bolt receivers. Solaar is a graphical Python program that integrates in your system tray and allows you to configure additional features of your input device such as swapping the functionality of Fn keys. It handles Bolt devices as well as unifying devices. libratbag is a configurable mice daemon that allows you to configure your devices, it has a GTK based graphical frontend app, piper.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Several solutions are available:\n\n- libratbag/piper\n- pairing_toolAUR\n\nThe following packages use the plugdev user group, create it if it does not exist, and add users to this group to avoid the need of running these as root:\n\n- solaar or solaar-gitAUR\n- ltunifyAUR or ltunify-gitAUR\n\nDo not forget to relogin to apply user's group membership. After installation, run\n\n```\n# udevadm control --reload-rules\n```\n\nand then replug reciever, or reboot the system. After that you will not need root permissions.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "pairingtool can only be used for pairing and does not provide feedback, it also needs to know the device name for pairing. ltunify, Solaar and libratbag can detect the receiver automatically.\n\n"
+    },
+    {
+      "title": "ltunify",
+      "level": 3,
+      "content": "Examples on unpairing a device, pairing a new device and showing a list of all devices:\n\n```\n$ ltunify unpair mouse\nDevice 0x01 Mouse successfully unpaired\n$ ltunify pair\nPlease turn your wireless device off and on to start pairing.\nFound new device, id=0x01 Mouse\n$ ltunify list\nDevices count: 1\nConnected devices:\nidx=1   Mouse   M525\n```\n\n"
+    },
+    {
+      "title": "Solaar",
+      "level": 3,
+      "content": "Solaar has a GUI and CLI. Example CLI pairing session:\n\n```\n$ solaar unpair mouse\nUnpaired 1: Wireless Mouse M525 [M525:DAFA335E]\n$ solaar pair\nPairing: turn your new device on (timing out in 20 seconds).\nPaired device 1: Wireless Mouse M525 [M525:DAFA335E]\n$ solaar show\n-: Unifying Receiver [/dev/hidraw0:08D89AA6] with 1 devices\n1: Wireless Mouse M525 [M525:DAFA335E]\n```\n\nTo disable autostart of Solaar, remove /etc/xdg/autostart/solaar.desktop. See Gentoo:Logitech bolt for an udev example.\n\n"
+    },
+    {
+      "title": "libratbag",
+      "level": 3,
+      "content": "Currently, piper is not able to pair/manage devices for unifying receivers but libratbag does include a lur-command command line tool that is able to do this.\n\n"
+    },
+    {
+      "title": "pairingtool",
+      "level": 3,
+      "content": "To find the device that the receiver has, therefore take a look at the outputs of\n\n```\n$ ls -l /sys/class/hidraw/hidraw*/device/driver | awk -F/ '/receiver/{print $5}'\n```\n\nThis will show the names of your receiver, for example hidraw0.\n\nNow switch off the device that you want to pair (if it was on) and execute your compiled program with the appropriate device as argument:\n\n```\n# pairing_tool /dev/hidraw0\nThe receiver is ready to pair a new device.\nSwitch your device on to pair it (you have thirty seconds to do so).\n```\n\nNow switch on the device you want to pair. After a few seconds your new device should work properly.\n\n"
+    },
+    {
+      "title": "Wrong device (pairing tool only)",
+      "level": 3,
+      "content": "On some systems there is more than one device that has the same name. In that case you will receive the following error message when the wrong device is choosen:\n\n```\n# pairing_tool /dev/hidraw1\nError: 32\nwrite: Broken pipe\n```\n\n"
+    },
+    {
+      "title": "Keyboard layout via xorg.conf",
+      "level": 3,
+      "content": "With kernel 3.2 the Unifying Receiver got its own kernel module hid_logitech_dj which does not work flawlessly together with keyboard layout setting set via xorg.conf. A temporary workaround is to use xorg-setxkbmap and set the layout manually. For example for a German layout with no deadkeys one has to execute:\n\n```\n$ setxkbmap -layout de -variant nodeadkeys\n```\n\nTo automate this process one could add this line to xinitrc or the according autostart file of your windows manager respectively desktop environment.\n\n"
+    },
+    {
+      "title": "Logitech touchpad keyboard K400r with unifying receiver M325",
+      "level": 3,
+      "content": "The Logitech keyboard K400r with integrated touchpad comes with Logitech unifying receiver M325 so the above mentioned about the keyboard layout will apply here too.\n\nAlso the integrated touchpad is recognized as 'pointer' instead of 'touchpad' so you cannot use the Touchpad Synaptics drivers. Two finger horizontal scrolling and tapclick will work but in order to have a middle mouse button emulated you will have to add\n\n```\n/etc/X11/xorg.conf.d/10-evdev.conf\n```\n\n```\nSection \"InputClass\"\n        Identifier \"evdev pointer catchall\"\n        MatchIsPointer \"on\"\n        MatchDevicePath \"/dev/input/event*\"\n        Driver \"evdev\"\n        Option \"Emulate3Buttons\" \"true\"\nEndSection\n```\n\nto your evdev.conf. Now third button is emulated by pressing both buttons simultaneously.\n\n"
+    },
+    {
+      "title": "Solaar 'Permission denied'",
+      "level": 3,
+      "content": "Is it possible to have the error:\n\n```\n$ solaar show\nsolaar: error: [Errno 13] Permission denied: '/dev/hidraw2'\n```\n\nIn this case, you can physically remove the Unifying Receiver and re-insert it, and re-run the command (as described in the second point of installation part on the official site [1]).\n\n"
+    },
+    {
+      "title": "Wireless Keyboard does not work while booting (cannot enter luks passphrase)",
+      "level": 3,
+      "content": "While booting it is impossible to input anything with a Logitech wireless Keyboard (e. g. Logitech MK700). The cause of the problem is the own hid module for Logitech devices since Kernel 3.2.\n\nA workaround is adding hid-logitech-hidpp to MODULES in /etc/mkinitcpio.conf:\n\n```\nMODULES=\"hid-logitech-hidpp\"\n```\n\nand recreate the initrd for the kernel:\n\n```\n# mkinitcpio -p linux\n```\n\n"
+    },
+    {
+      "title": "MouseJack Vulnerability",
+      "level": 3,
+      "content": "Several security vulnerabilities of the system have been reported and you may be in particular affected by the MouseJack Vulnerability if your firmware has not been updated recently.\n\nIt is possible to display the current firmware's version by running:\n\n```\nltunify receiver-info\n```\n\nRQR12 firmware with version earlier than 012.008.00030 and RQR24 firmware versions earlier than 024.006.00030 are affected by this vulnerability and should be updated.\n\nThe firmware can be updated using fwupd like so:\n\n```\nfwupdmgr refresh && fwupdmgr get-updates\n```\n\nIf everything looks good, apply the update:\n\n```\nfwupdmgr update\n```\n\n"
+    },
+    {
+      "title": "Keyboard or mouse does not wake pc from sleep",
+      "level": 3,
+      "content": "Follow the Solaar USB installation instructions.\n\n"
+    },
+    {
+      "title": "PC wakes immediately from sleep",
+      "level": 3,
+      "content": "This can be a problem if using the logi bolt receiver, to resolve it you can install and run solaar. If you want you can start it hidden by adding it to your autostart programs with\n\n```\nsolaar -w hide\n```\n\n"
+    },
+    {
+      "title": "Lag of the wireless device",
+      "level": 3,
+      "content": "Because the receiver uses the 2.4 GHz frequency band also used by Bluetooth and Wi-Fi 802.11, it is possible in some circumstances of heavy Wi-Fi usage close to the receiver to experience lag or disturbances in communication with the devices. This is unlikely because the receiver confines its communication to channels unused by the majority of 802.11 solutions and it is able to quickly change channel within the band if it detects any interference from another device. However, some users have experienced interferences.\n\nSwitching on/off the device will force the search for a \"quiet\" channel and may solve the issue.\n\nThis problem can also manifest if there is electrical noise from USB3 sockets on the motherboard, and it is located close to or in one. Moving the receiver to a USB hub or the end of an extension cable may fix this.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 3,
+      "content": "Logiops - Logitech Options alternative for configuring supported mice and keyboards\n\n"
+    }
+  ]
+}

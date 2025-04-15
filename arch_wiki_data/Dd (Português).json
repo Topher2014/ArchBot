@@ -1,0 +1,66 @@
+{
+  "title": "Dd (Português)",
+  "url": "https://wiki.archlinux.org/title/Dd_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Clonagem de disco\n- Mídia de instalação em flash USB#Usando dd\n- Benchmarking#dd\n- Securely wipe disk#dd\n\ndd é um dos utilitários principais cujo propósito primário é converter e copiar um arquivo.\n\nSimilarmente ao cp, o dd faz, por padrão, uma cópia bit a bit do arquivo, mas com recursos de controle de fluxo de E/S de nível inferior.\n\nPara mais informações, consulte dd(1) ou a documentação completa.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "dd é parte do GNU coreutils. Para outros utilitários no pacote, por favor, confira Utilitários principais.\n\n"
+    },
+    {
+      "title": "Clonagem e restauração de disco",
+      "level": 2,
+      "content": "O comando dd é uma ferramenta simples, mas versátil e poderosa. Ele pode ser usado para copiar da origem para o destino, bloco por bloco, independentemente de seus tipos de sistema de arquivos ou sistemas operacionais. Um método conveniente é usar dd em um ambiente live, como em um Live CD.\n\n"
+    },
+    {
+      "title": "Clonando uma partição",
+      "level": 3,
+      "content": "Do disco físico /dev/sda, partição 1, para disco físico /dev/sdb, partição 1:\n\n```\n# dd if=/dev/sda1 of=/dev/sdb1 bs=64K conv=noerror,sync status=progress\n```\n\n"
+    },
+    {
+      "title": "Clonando todo um disco rígido",
+      "level": 3,
+      "content": "Do disco físico /dev/sda para um disco físico /dev/sdb:\n\n```\n# dd if=/dev/sda of=/dev/sdb bs=64K conv=noerror,sync status=progress\n```\n\nIsso irá clonar a unidade inteira, incluindo o MBR (e, portanto, o gerenciador de boot), todas as partições, UUIDs e dados.\n\n- bs= define o tamanho do bloco. O padrão é 512 bytes, que é o tamanho de bloco \"clássico\" para discos rígidos desde o início dos anos 80, mas não é o mais conveniente. Use um valor maior, 64K ou 128K. Além disso, leia o aviso abaixo, porque há mais do que apenas \"tamanhos de bloco\" - também influencia a maneira como os erros de leitura se propagam. Veja [1] e [2] para detalhes e para descobrir o melhor valor de bs para o seu caso de uso.\n- noerror instrui o dd a continuar a operação, ignorando todos os erros de leitura. O comportamento padrão para dd é parar em qualquer erro.\n- sync preenche os blocos de entrada com zeros se houver algum erro de leitura, para que os deslocamentos de dados permaneçam em sincronia.\n- status=progress mostra estatísticas de transferência periódicas que podem ser usadas para estimar quando a operação pode estar completa.\n\nO utilitário dd tecnicamente possui um \"tamanho de bloco de entrada\" (IBS) e um \"tamanho de bloco de saída\" (OBS). Quando você define bs, você efetivamente define IBS e OBS. Normalmente, se o tamanho do bloco for, digamos, 1 MiB, o dd lerá 1024×1024 bytes e gravará essa mesma quantidade de bytes. Mas se ocorrer um erro de leitura, as coisas vão dar errado. Muitas pessoas parecem pensar que o dd irá \"preencher erros de leitura com zeros\" se você usar as opções noerror, sync, mas isto não é o que acontece. O dd irá, segundo a documentação, preencher o OBS para o tamanho IBS depois de completar sua leitura, o que significa adicionar zeros no fim do bloco. Isso significa, para um disco, que efetivamente todo o 1 MiB seria confuso por causa de um único erro de leitura de 512 bytes no início da leitura: 12ERROR89 se tornaria 128900000 em vez de 120000089.\n\nSe você está certo de que o seu disco não contém erros, você pode continuar usando um tamanho de bloco maior, o que aumentará a velocidade da cópia várias vezes. Por exemplo, a alteração de bs de 512 para 64K alterou a velocidade de cópia de 35 MB/s para 120 MB/s em um sistema Celeron de 2,7 GHz. Mas lembre-se de que os erros de leitura no disco de origem terminarão como erros de bloco no disco de destino, ou seja, um único erro de leitura de 512 bytes estragará todo o bloco de saída de 64 KiB.\n\n- Para obter UUIDs únicos de um sistema de arquivos ext2/3/4, use tune2fs/dev/sdXY -U random em cada partição. Para partições de swap, use mkswap/dev/sdXY.\n- Mudanças na tabela de partição com o dd não são registradas pelo kernel. Para notificar as alterações sem reinicializar, use um utilitário como partprobe (parte do GNU Parted).\n\n"
+    },
+    {
+      "title": "Fazer backup da tabela de partição",
+      "level": 3,
+      "content": "Veja fdisk#Backup and restore partition table ou gdisk#Backup and restore partition table.\n\n"
+    },
+    {
+      "title": "Criar imagem de disco",
+      "level": 3,
+      "content": "Inicialize a partir de uma mídia ao vivo e certifique-se de que nenhuma partição seja montada a partir do disco rígido de origem.\n\nEm seguida, monte o disco rígido externo e faça o backup da unidade:\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64K | gzip -c  > /caminho/para/backup.img.gz\n```\n\nSe necessário (por exemplo, quando os arquivos resultantes serão armazenados em um sistema de arquivos FAT32), divida a imagem do disco em vários volumes (veja também split(1)):\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64K | gzip -c | split -a3 -b2G - /caminho/para/backup.img.gz\n```\n\nSe não houver espaço em disco suficiente localmente, você poderá enviar a imagem por meio de ssh:\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64K | gzip -c | ssh usuario@local dd of=backup.img.gz\n```\n\nFinalmente, salve informações extras sobre a geometria da unidade necessária para interpretar a tabela de partição armazenada na imagem. O mais importante dos quais é o tamanho do cilindro.\n\n```\n# fdisk -l /dev/sda > /caminho/para/lista_fdisk.info\n```\n\n"
+    },
+    {
+      "title": "Restaurar o sistema",
+      "level": 3,
+      "content": "Para restaurar seu sistema:\n\n```\n# gunzip -c /caminho/para/backup.img.gz | dd of=/dev/sda\n```\n\nQuando a imagem tiver sido dividida com split, use o seguinte:\n\n```\n# cat /caminho/para/backup.img.gz* | gunzip -c | dd of=/dev/sda\n```\n\n"
+    },
+    {
+      "title": "Aplicação de patch em arquivo binário",
+      "level": 2,
+      "content": "Caso queira substituir a posição 0x123AB de um arquivo com a sequência hexadecimal FF C0 14, isso pode ser feito com a linha de comando:\n\n```\n# printf '\\xff\\xc0\\x14' | dd seek=$((0x123AB)) conv=notrunc bs=1 of=/path/to/file\n```\n\n"
+    },
+    {
+      "title": "Fazer backup e restaurar MBR",
+      "level": 2,
+      "content": "Antes de fazer alterações em um disco, você pode querer fazer backup da tabela de partição e do esquema de partição da unidade. Você também pode usar um backup para copiar o mesmo layout de partição para várias unidades.\n\nO MBR é armazenado nos primeiros 512 bytes do disco. Consiste em 4 partes:\n\n1. Os primeiros 440 bytes contêm o código de bootstrap (gerenciador de boot).\n1. Os próximos 6 bytes contêm a assinatura do disco.\n1. Os próximos 64 bytes contêm a tabela de partição (4 entradas de 16 bytes cada, uma entrada para cada partição primária).\n1. Os últimos 2 bytes contêm uma assinatura de inicialização.\n\nPara salvar o MBR como arquivo_mbr.img:\n\n```\n# dd if=/dev/sdX of=/caminho/para/arquivo_mbr.img bs=512 count=1\n```\n\nVocê também pode extrair o MBR de uma imagem completa do disco dd:\n\n```\n# dd if=/caminho/para/disco.img of=/caminho/para/arquivo_mbr.img bs=512 count=1\n```\n\nPara restaurar (cuidado, isso destrói a tabela de partição existente e, com ela, o acesso a todos os dados no disco):\n\n```\n# dd if=/caminho/para/arquivo_mbr.img of=/dev/sdX bs=512 count=1\n```\n\nSe você deseja restaurar apenas o gerenciador de boot, mas não as entradas da tabela de partição primária, basta restaurar os primeiros 440 bytes do MBR:\n\n```\n# dd if=/caminho/para/arquivo_mbr.img of=/dev/sdX bs=440 count=1\n```\n\nPara restaurar apenas a tabela de partição, você deve usar:\n\n```\n# dd if=/caminho/para/arquivo_mbr.img of=/dev/sdX bs=1 skip=446 count=64\n```\n\n"
+    },
+    {
+      "title": "Remover o gerenciador de boot",
+      "level": 3,
+      "content": "Para apagar o código de bootstrap do MBR (pode ser útil se você tiver que fazer uma reinstalação completa de outro sistema operacional) apenas os primeiros 440 bytes precisam ser zerados:\n\n```\n# dd if=/dev/zero of=/dev/sdX bs=440 count=1\n```\n\n"
+    },
+    {
+      "title": "Leitura parcial",
+      "level": 3,
+      "content": "Arquivos criados com dd podem terminar com um tamanho menor do que o solicitado se o bloco completo de entrada não está disponível e a chamada de sistema read(2) retorna antes do esperado. Isto pode acontecer quando ler de um pipe(7) ou do /dev/random e não tem entropia o bastante[3], ou do /dev/urandom quando ler mais do que 32 MiB[4].\n\nÉ possível, mas não garantido, que dd vai avisá-lo sobre o problema:\n\n```\ndd: warning: partial read (X bytes); suggest iflag=fullblock\n```\n\nA solução é fazer como o aviso recomenda e adicionar iflag=fullblock para o comando, Por exemplo:\n\n```\n$ dd if=/dev/random of=grande_segredo.img bs=1K count=1 iflag=fullblock\n$ dd if=/dev/urandom of=grande_segredo.img bs=40M count=1 iflag=fullblock\n```\n\nUma alternativa para /dev/urandom é especificar o tamanho do bloco menor que 32 MiB, com um maior número de copías. Por exemplo:\n\n```\n$ dd if=/dev/urandom of=grande_segredo.img bs=1M count=40\n```\n\nQuando ler de uma pipe, uma alternativa para iflag=fullblock é limitar bs para o valor constante PIPE_BUF, definido em /usr/include/linux/limits.h [5]. Por exemplo:\n\n```\n$ cat entrada.img | dd of=saida.img bs=4k count=100\n```\n\n"
+    }
+  ]
+}

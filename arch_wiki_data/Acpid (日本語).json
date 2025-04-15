@@ -1,0 +1,66 @@
+{
+  "title": "Acpid (日本語)",
+  "url": "https://wiki.archlinux.org/title/Acpid_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- ACPI モジュール\n- DSDT\n\nacpid2 は ACPI イベントを伝える、柔軟性と拡張性があるデーモンです。イベントが発生すると、そのイベントを処理するプログラムを実行します。イベントは以下のようなアクションによって引き起こされます:\n\n- Power/Sleep/Suspend ボタンなど、特殊なキーを押す\n- ノートパソコンのフタを閉じる\n- ノートパソコンに AC 電源アダプタを接続 (切断) する\n- イヤフォンジャックを接続 (切断) する\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 別の設定\n- 3 ヒントとテクニック 3.1 サンプルイベント 3.2 ボリュームコントロールを有効にする 3.3 バックライトコントロールを有効にする 3.4 Wi-Fi トグルを有効にする 3.5 ノートパソコンのモニターの電源オフ 3.6 現在のディスプレイのユーザー名を取得\n- 4 参照\n\n- 2.1 別の設定\n\n- 3.1 サンプルイベント\n- 3.2 ボリュームコントロールを有効にする\n- 3.3 バックライトコントロールを有効にする\n- 3.4 Wi-Fi トグルを有効にする\n- 3.5 ノートパソコンのモニターの電源オフ\n- 3.6 現在のディスプレイのユーザー名を取得\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "公式リポジトリの acpid パッケージをインストールしてください。\n\nブート時に acpid を起動させるには、acpid.service を有効化します。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "acpid には発生したイベントについて定義済みのアクションが多数付属しています。例えばマシンの電源ボタンを押した時に起こることなどです。デフォルトでは、これらのアクションは /etc/acpi/handler.sh に定義されており、ACPI イベントが検出されると実行されます (/etc/acpi/events/anything によって判断されます)。\n\n以下はそうしたアクションの簡単なサンプルです。以下の場合、Sleep ボタンが押されたときに、acpid は echo -n mem >/sys/power/state コマンドを実行してコンピュータをスリープ (サスペンド) 状態にします:\n\n```\nbutton/sleep)\n    case \"$2\" in\n        SLPB) echo -n mem >/sys/power/state ;;\n\t *)    logger \"ACPI action undefined: $2\" ;;\n    esac\n    ;;\n```\n\n残念ながら、全てのコンピュータで同じ方法によって ACPI イベントが分類されているわけではありません。例えば、Sleep ボタンはマシンによって SLPB とか SBTN として認識されることがあります。\n\nボタンや Fn ショートカットがどうやって認識されているのか確認するには、root でターミナルから次のコマンドを実行します:\n\n```\n# journalctl -f\n```\n\nそしてマシンの Power ボタンや Sleep ボタン (例: Fn+Esc) を押してみて下さい。結果は以下のようになるはずです:\n\n```\nlogger: ACPI action undefined: PBTN\nlogger: ACPI action undefined: SBTN\n```\n\n上記が動作しない場合は、次を実行してください:\n\n```\n# acpi_listen\n```\n\nもしくは openbsd-netcat を使用:\n\n```\n$ netcat -U /var/run/acpid.socket\n```\n\nそして power ボタンを押して下さい。次のような表示がされます:\n\n```\nbutton/power PBTN 00000000 00000b31\n```\n\nacpi_listen の出力は $1, $2 , $3, $4 パラメータとして /etc/acpi/handler.sh に送られます。サンプル:\n\n```\n$1 button/power\n$2 PBTN\n$3 00000000\n$4 00000b31\n```\n\n気づいたかもしれませんが、上のサンプルの出力で Sleep ボタンは、デフォルトの /etc/acpi/handler.sh で指定されている SLPB ラベルではなく、実際は SBTN として認識されています。このマシンで Sleep 機能を正しく動作させるために、SLPB) を SBTN) で置き換える必要があるということです。\n\n以上の情報を元にして、/etc/acpi/handler.sh ファイルをカスタマイズすることで、発生するイベントに応じて色々なコマンドを簡単に実行することができます。他のよく使われるコマンドについては下の ヒントとテクニック‎ セクションを見て下さい。\n\n"
+    },
+    {
+      "title": "別の設定",
+      "level": 3,
+      "content": "デフォルトでは、全ての ACPI イベントは /etc/acpi/handler.sh スクリプトを通過します。これはルールセットが /etc/acpi/events/anything に記述されているためです:\n\n```\n# Pass all events to our one handler script\nevent=.*\naction=/etc/acpi/handler.sh %e\n```\n\nこのままでも問題なく動作しますが、ユーザーによっては自分で作成したスクリプトにルールやアクションを定義するほうが望ましいという人もいるでしょう。以下は個々のイベントファイルとそれに対応するアクションスクリプトを使用する方法の例です:\n\nroot で、以下のファイルを作成:\n\n```\n/etc/acpi/events/sleep-button\n```\n\n```\nevent=button sleep.*\naction=/etc/acpi/actions/sleep-button.sh %e\n```\n\nそして以下のファイルを作成:\n\n```\n/etc/acpi/actions/sleep-button.sh\n```\n\n```\n#!/bin/sh\ncase \"$3\" in\n    SLPB) echo -n mem >/sys/power/state ;;\n    *)    logger \"ACPI action undefined: $3\" ;;\nesac\n```\n\nスクリプトに実行可能属性を付与:\n\n```\n# chmod +x /etc/acpi/actions/sleep-button.sh\n```\n\n最後に、acpid に設定ファイルの変更を認識させるため acpid.service をリロードしてください。\n\nこの方法を使えば、個別のイベント/アクションスクリプトをいくらでも簡単に作成できます。\n\n"
+    },
+    {
+      "title": "サンプルイベント",
+      "level": 3,
+      "content": "以下は /etc/acpi/handler.sh スクリプトで使用できるイベントの例です。acpi_listen によってイベント変数の名前を変更するなど、あなたの環境に合うようにサンプルは修正を加える必要があります。\n\nノートパソコンのフタを閉じた際に xscreensaver で画面をロックするには:\n\n```\nbutton/lid)\n    case $3 in\n        close)\n            # The lock command need to be run as the user who owns the xscreensaver process and not as root.\n            # See: man xscreensaver-command. $xs will have the value of the user owning the process, if any.\n\n            xs=$(ps -C xscreensaver -o user=)\n            if test $xs; then su $xs -c \"xscreensaver-command -lock\"; fi\n            ;;\n```\n\nフタが閉じられたときに slimlock を使って画面をロックしてシステムをサスペンドするには:\n\n```\nbutton/lid)\n    case $3 in\n        close)\n            #echo \"LID switched!\">/dev/tty5\n\t     /usr/bin/pm-suspend &\n\t     DISPLAY=:0.0 su -c - username /usr/bin/slimlock\n            ;;\n```\n\nフタが閉じられたときに gnome-screensaver-command で画面をロックするには:\n\n```\nbutton/lid)\n       case \"$3\" in\n           close)\n               export DISPLAY=:0.0\n               for pid in $(pgrep -u username)\n               do\n                    declare DBUS_SESSION_BUS_ADDRESS=$(cat /proc/${pid}/environ \\\n                       | tr '\\0' '\\n' | grep \"DBUS_SESSION_BUS_ADDRESS=\")\n                    [ -z \"${DBUS_SESSION_BUS_ADDRESS}\" ] || break\n               done\n               export \"$DBUS_SESSION_BUS_ADDRESS\"\n               su -c - username 'gnome-screensaver-command -l'\n               ;;\n```\n\n電源が接続されたときや切断されたときにノートパソコンの画面の明るさを設定するには (おそらく数値は変更する必要があります、/sys/class/backlight/acpi_video0/max_brightness を見て下さい):\n\n```\nac_adapter)\n    case \"$2\" in\n        AC*|AD*)\n            case \"$4\" in\n                00000000)\n                    echo -n 50 > /sys/class/backlight/acpi_video0/brightness\n                    ;;\n                00000001)\n                    echo -n 100 > /sys/class/backlight/acpi_video0/brightness\n                    ;;\n            esac\n```\n\nヘッドホンジャックを抜いたらミュートしたい場合は、以下を /etc/acpi/handler.sh の jack/headphone セクションに追加してください。ヘッドホンジャックを差した場合にミュートが解除され、ヘッドホンジャックを抜いた場合にミュートされます。\n\n```\njack/headphone)\n       case \"$3\" in\n           plug)\n               logger 'HEADPHONE pluged'\n               /usr/bin/amixer sset Master unmute\n               ;;\n           unplug)\n               logger 'HEADPHONE unpluged'\n               /usr/bin/amixer sset Master mute\n               ;;\n       esac\n       ;;\n```\n\n"
+    },
+    {
+      "title": "ボリュームコントロールを有効にする",
+      "level": 3,
+      "content": "ボリュームボタンの acpi の id を確認して (上を参照)、以下のファイルで acpi イベントの代わりにします。ボリュームをコントロールするスクリプトを作成 (ALSA サウンドカードが前提):\n\n```\n/etc/acpi/handlers/vol\n```\n\n```\n#!/bin/sh\nstep=5\n\ncase $1 in\n  -) amixer set Master $step-;;\n  +) amixer set Master $step+;;\nesac\n```\n\nそして新しい acpi イベントに接続:\n\n```\n/etc/acpi/events/vol_d\n```\n\n```\nevent=button/volumedown\naction=/etc/acpi/handlers/vol -\n```\n\n```\n/etc/acpi/events/vol_u\n```\n\n```\nevent=button/volumeup\naction=/etc/acpi/handlers/vol +\n```\n\nさらに、ミュート設定を切り替えるイベントも:\n\n```\n/etc/acpi/events/mute\n```\n\n```\nevent=button/mute\naction=/usr/bin/amixer set Master toggle\n```\n\nFixing volume change in Linux (Internet Archive にあります) も参照。\n\n"
+    },
+    {
+      "title": "バックライトコントロールを有効にする",
+      "level": 3,
+      "content": "ボリュームコントロールと同じように、acpid を使えば画面の輝度をコントロールすることができます。輝度のコントロールには、以下のようなハンドラを書きます:\n\n```\n/etc/acpi/handlers/bl\n```\n\n```\n#!/bin/sh\nbl_dev=/sys/class/backlight/acpi_video0\nstep=1\n\ncase $1 in\n  -) echo $(($(< $bl_dev/brightness) - $step)) >$bl_dev/brightness;;\n  +) echo $(($(< $bl_dev/brightness) + $step)) >$bl_dev/brightness;;\nesac\n```\n\nそして、キーを ACPI イベントにつなげます:\n\n```\n/etc/acpi/events/bl_d\n```\n\n```\nevent=video/brightnessdown\naction=/etc/acpi/handlers/bl -\n```\n\n```\n/etc/acpi/events/bl_u\n```\n\n```\nevent=video/brightnessup\naction=/etc/acpi/handlers/bl +\n```\n\n"
+    },
+    {
+      "title": "Wi-Fi トグルを有効にする",
+      "level": 3,
+      "content": "WLAN ボタンを押すことによる、シンプルなワイヤレスの電源スイッチを作成することもできます。イベントの例:\n\n```\n/etc/acpi/events/wlan\n```\n\n```\nevent=button/wlan\naction=/etc/acpi/handlers/wlan\n```\n\nそしてそのハンドラ:\n\n```\n/etc/acpi/handlers/wlan\n```\n\n```\n#!/bin/sh\nrf=/sys/class/rfkill/rfkill0\n\ncase $(< $rf/state) in\n  0) echo 1 >$rf/state;;\n  1) echo 0 >$rf/state;;\nesac\n```\n\n"
+    },
+    {
+      "title": "ノートパソコンのモニターの電源オフ",
+      "level": 3,
+      "content": "以下を /etc/acpi/handler.sh の button/lid セクションに追加してください。フタが閉じられたときは LCD バックライトをオフにして、フタが開かれたときはバックライトをオンにします。\n\n```\ncase $(awk '{print $2}' /proc/acpi/button/lid/LID0/state) in\n    closed) XAUTHORITY=$(ps -C xinit -f --no-header | sed -n 's/.*-auth //; s/ -[^ ].*//; p') xset -display :0 dpms force off ;;\n    open)   XAUTHORITY=$(ps -C xinit -f --no-header | sed -n 's/.*-auth //; s/ -[^ ].*//; p') xset -display :0 dpms force on  ;;\nesac\n```\n\n明るさや X に関連することを増減させたい場合は、MIT マジッククッキーと X display を指定する必要があります (XAUTHORITY を使用)。前者は X サーバーやディスプレイ、入力デバイスなどへの読み書きアクセスを提供するセキュリティ証明です。\n\n以下は XAUTHORITY を使うかわりに sudo を使用するスクリプトです:\n\n```\ncase $(awk '{print $2}' /proc/acpi/button/lid/LID0/state) in\n    closed) sudo -u $(ps -o ruser= -C xinit) xset -display :0 dpms force off ;;\n    open)   sudo -u $(ps -o ruser= -C xinit) xset -display :0 dpms force on  ;;\nesac\n```\n\n特定の Xorg とハードウェアの組み合わせでは、xset dpms force off では画面が真っ黒になるだけでバックライトがオフにならないことがあります。公式リポジトリの vbetool を使うことでこれは修正できます。LCD セクションを以下のように変更してください:\n\n```\ncase $(awk '{print $2}' /proc/acpi/button/lid/LID0/state) in\n    closed) vbetool dpms off ;;\n    open)   vbetool dpms on  ;;\nesac\n```\n\n再度電源が入る前に一瞬だけモニターが落ちる場合、おそらく xscreensaver の電源管理が手動による dpms 設定と衝突しています。\n\n"
+    },
+    {
+      "title": "現在のディスプレイのユーザー名を取得",
+      "level": 3,
+      "content": "getuser 関数を使うことで現在のディスプレイのユーザーを知ることができます:\n\n```\ngetuser ()\n    {\n     export DISPLAY=$(echo $DISPLAY | cut -c -2)\n     user=$(who | grep \" $DISPLAY\" | awk '{print $1}' | tail -n1)\n     export XAUTHORITY=/home/$user/.Xauthority\n     eval $1=$user\n    }\n```\n\nこの関数を使って、power ボタンが押された時に KDE を適切にシャットダウンしたい場合:\n\n```\nbutton/power)\n    case \"$2\" in\n        PBTN)\n            getuser \"$user\"\n            echo $user > /dev/tty5\n            su $user -c \"dcop ksmserver ksmserver logout 0 2 0\"\n            ;;\n          *) logger \"ACPI action undefined $2\" ;;\n    esac\n    ;;\n```\n\nsystemd を使用する新しいシステムでは、X11 のログインは必ずしも who では表示されないため、上記の getuser 関数は動作しません。代わりに loginctl を使用して必要な情報を取得します。例えば xuserrun を使います。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- acpid ホームページ\n- Gentoo wiki\n\n"
+    }
+  ]
+}

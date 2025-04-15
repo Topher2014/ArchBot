@@ -1,0 +1,66 @@
+{
+  "title": "EFISTUB (日本語)",
+  "url": "https://wiki.archlinux.org/title/EFISTUB_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Arch ブートプロセス\n- ブートローダー\n- Unified Extensible Firmware Interface\n\nEFI boot stub (別名:EFI stub) は、EFI 実行ファイルであるカーネルのことを指します。つまり、UEFI から直接起動できるカーネルのことです。\n\n歴史的に、この記事や Debian Wiki では、この用語を一語で表現 (EFISTUB または EFIStub) としていました。\n\nArch Linux のカーネルはデフォルトで EFI ブートスタブです。もし カーネルをコンパイル する場合は、CONFIG_EFI_STUB=y を設定して有効化します。詳細については、The EFI Boot Stub を参照してください。\n\n続行する前に、EFI システムパーティション を用意し、どのようにマウントするか選択 する必要があります。\n\n- ESP(EFIシステムパーティション)を /boot にマウントすれば、pacman が UEFI が読み取るカーネルを直接更新します。\n- EFIブートスタブは ブートローダー を介して間接的に起動することも可能です: 複数のUEFIブートマネージャーが追加のオプションを提供したり、UEFIブートプロセスを簡略化したりすることができます。 これは、カーネルパラメータ を試したり、複数のカーネルや OS を使用したりする場合、またはマザーボードの UEFI ブートメニューが使いにくい場合に特に有用です。 カーネルと initramfs が存在するパーティションのファイルシステムドライバーを持つブートマネージャー(例: rEFInd)を使用すれば、これらを ESP の外に置くことが可能です。\n\n- 複数のUEFIブートマネージャーが追加のオプションを提供したり、UEFIブートプロセスを簡略化したりすることができます。\n- これは、カーネルパラメータ を試したり、複数のカーネルや OS を使用したりする場合、またはマザーボードの UEFI ブートメニューが使いにくい場合に特に有用です。\n- カーネルと initramfs が存在するパーティションのファイルシステムドライバーを持つブートマネージャー(例: rEFInd)を使用すれば、これらを ESP の外に置くことが可能です。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 EFISTUB の起動 1.1 UEFI を直接使う 1.1.1 efibootmgr 1.1.2 bcfg 1.1.3 kesboot 1.2 UEFI Shell を使う 1.2.1 startup.nsh スクリプトの使用\n- 2 ヒントとテクニック 2.1 フォールバック RAM ディスクを使用したブートエントリ\n- 3 トラブルシューティング 3.1 EFISTUB はいくつかの Dell システムで動作しません 3.2 ブートエントリーの変更が適用されない\n- 4 参照\n\n- 1.1 UEFI を直接使う 1.1.1 efibootmgr 1.1.2 bcfg 1.1.3 kesboot\n- 1.2 UEFI Shell を使う 1.2.1 startup.nsh スクリプトの使用\n\n- 1.1.1 efibootmgr\n- 1.1.2 bcfg\n- 1.1.3 kesboot\n\n- 1.2.1 startup.nsh スクリプトの使用\n\n- 2.1 フォールバック RAM ディスクを使用したブートエントリ\n\n- 3.1 EFISTUB はいくつかの Dell システムで動作しません\n- 3.2 ブートエントリーの変更が適用されない\n\n"
+    },
+    {
+      "title": "UEFI を直接使う",
+      "level": 3,
+      "content": "UEFI は GRUB のような中間ブートローダを必要としないように設計されています。あなたのマザーボードに優れた UEFI 実装があれば、UEFI ブートエントリーにカーネルパラメータを埋め込んで、マザーボードが直接 Arch を起動させることができます。 efibootmgr や UEFI Shell v2 を使ってマザーボードのブートエントリーを変更することができます。\n\n- 古い UEFI の実装は Linux カーネルとの互換性に問題がある場合があります。もしあなたの UEFI にバグフィックスが施された新しいバージョンがあるのなら、メーカー推奨のツールでフラッシュすることを検討してください。\n- NVRAM のブートエントリから EFI バイナリにコマンドラインパラメータを渡さないファームウェアもあります[1] この場合、カーネルとパラメータを Unified カーネルイメージ に統合して、できた .efi ファイルでブートエントリを作成することが可能です。\n\n"
+    },
+    {
+      "title": "efibootmgr",
+      "level": 4,
+      "content": "カーネルをロードする efibootmgr を使用してブートエントリを作成するには:\n\n```\n# efibootmgr --create --disk /dev/sdX --part Y --label \"Arch Linux\" --loader /vmlinuz-linux --unicode 'root=block_device_identifier rw initrd=\\initramfs-linux.img'\n```\n\nここで、/dev/sdX は ESP(EFI システムパーティション)が存在するドライブを、Y はそのパーティション番号を指します。また、root=のパラメーターにはLinuxのルートパーティションを指定します。\n\n省略された場合、/dev/sda の最初のパーティションが ESP として使用されます。\n\n引用符内の -u/--unicode 引数は、単なる カーネルパラメータ のリストであるため、必要に応じて追加のパラメーターを指定する必要があります(例: ハイバネート先指定を initramfs に渡す)\n\nLTS Linux カーネル、NVME ストレージ、特定のサブボリュームを備えた BTRFS ファイルシステム、およびスワップパーティションでの休止状態の例:\n\n```\n# efibootmgr --create \\\n --disk /dev/nvme0n1 --part 1 \\\n --label \"EFISTUB Arch\" \\\n --loader /vmlinuz-linux-lts \\\n --unicode 'root=UUID=01a40dd8-28f0-4636-be1e-aeed60c98095 resume=UUID=2d877d5d-4ca1-4d46-a3d6-b6ee94cbbd78 rw rootflags=subvol=@ loglevel=3 quiet initrd=\\initramfs-linux-lts.img'\n```\n\nブートエントリを使用してリストを取得したり、ブートの注文を設定したり、削除したりするには、efibootmgr を参照してください。\n\n- kesboot-gitAUR パッケージを使用すると、これを簡素化して自動化できます。このパッケージには、パッケージ操作中にEFI変数を追加および削除できる pacman フック も含まれています。\n- https://github.com/de-arl/auto-UEFI-entry は、コマンドを作成するための Bash ヘルパーです。\n- ブートエントリーを作成するコマンドをシェルスクリプトに保存しておくと、カーネルパラメーターを変更する場合などに簡単に修正できて便利です。この際、古いブートエントリーを削除する処理を自動化することを検討してください。現在のところ、efibootmgr は 既存のエントリーの編集をサポートしていません\n- フォーラム投稿 The linux kernel with build in bootloader? も参考になるかもしれません。\n\n"
+    },
+    {
+      "title": "bcfg",
+      "level": 4,
+      "content": "UEFI の実装によっては efibootmgr を使って NVRAM をうまく変更することが難しいものがあります。efibootmgr がうまくエントリを作成できない場合、UEFI シェル v2 で bcfg コマンドを使うことができます (例:Arch Linux live iso から)\n\nまず、あなたの ESP が存在するデバイス番号を調べます。\n\n```\nShell> map\n```\n\nこの例では、デバイス番号として 1 を使用しています。ESP の中身を一覧表示する。\n\n```\nsshell> ls FS1:\n```\n\n現在のブートエントリーを表示するには\n\n```\nShell> bcfg boot dump\n```\n\nカーネルのエントリを追加するには、以下を使用します。\n\n```\nShell> bcfg boot add N とします。FS1:\\vmlinuz-linux \"Arch Linux\"\n```\n\nここで N はブートメニューに追加されるエントリの場所です。0 は最初のメニュー項目です。既に存在するメニュー項目は、破棄されることなくメニュー内で移動されます。\n\nESP 上にファイルを作成し、必要なカーネルオプションを追加します。\n\n```\nShell> FS1:\\options.txt を編集します。\n```\n\nファイル内に、ブートラインを追加します。たとえば、以下のようになります。\n\n```\nroot=/dev/sda2 ro initrd=initramfs-linux.img\n```\n\n保存するには F2 を、終了するには F3 を押してください。\n\n前のエントリにこれらのオプションを追加します。\n\n```\nShell> bcfg boot -opt N FS1:\\options.txt\n```\n\n追加する項目がある場合は、この作業を繰り返してください。\n\n前に追加した項目を削除するには、次のようにします。\n\n```\nShell> bcfg boot rm N\n```\n\n"
+    },
+    {
+      "title": "kesboot",
+      "level": 4,
+      "content": "kesboot-gitAUR パッケージのスクリプトを使って EFISTUB での作業を単純化・自動化することもできます。パッケージの操作中に EFI 変数を追加・削除するための pacman フック も含まれています。\n\nまず、パッケージをインストールして、/etc/kesboot.conf ファイルを設定します。\n\n```\n/etc/kesboot.conf\n```\n\n```\nCMDLINES=('linux' 'acpi=on'\n          'linux-zen' 'iommu=off')\n```\n\n次に、以下を実行します。\n\n```\n# kesboot -u\n```\n\nまた、本パッケージには EFI ブートの初期設定用のプログラムも含まれています。ESPのマウント ディレクトリの後、以下を実行してください。\n\n```\n# /usr/lib/setup-efi-boot\n```\n\n"
+    },
+    {
+      "title": "UEFI Shell を使う",
+      "level": 3,
+      "content": "通常の UEFI アプリケーションと同じように UEFI Shell から EFISTUB カーネルを起動できます。その場合、通常のパラメータとして起動する EFISTUB カーネルファイルにカーネルパラメータを渡してください:\n\n```\n> fs0:\n> /vmlinuz-linux root=PARTUUID=3518bb68-d01e-45c9-b973-0b5d918aae96 rw initrd=/initramfs-linux.img\n```\n\n毎回カーネルパラメータを全て指定したくない場合、UEFI システムパーティションに archlinux.nsh などのシェルスクリプトの実行コマンドを保存することができます。以下のコマンドで起動できるようになります:\n\n```\n> fs0:\n> archlinux\n```\n\n"
+    },
+    {
+      "title": "startup.nsh スクリプトの使用",
+      "level": 4,
+      "content": "いくつかの UEFI 実装はコールドブート間で EFI 変数を保持せず (例:VirtualBox バージョン 6.1 以前)、UEFI ファームウェアインターフェースを通して設定したものは電源切断時に失われてしまいます。\n\nUEFI Shell Specification 2.0 は ESP パーティションのルートにある startup.nsh というスクリプトが常に解釈され、任意の命令を含むことができると定めています; その中でブートローディングラインを設定することが可能です。ESP パーティションを /boot にマウントし、カーネルブートローディングラインを含む startup.nsh スクリプトを作成することを確認します。例えば\n\n```\nvmlinuz-linux rw root=/dev/sdX [rootfs=myfs] [rootflags=myrootflags] \\\n [kernel.flag=foo] [mymodule.flag=bar] \\\n [initrd=\\intel-ucode.img] initrd=\\initramfs-linux.img\n```\n\nこの方法は、実際のハードウェアで遭遇する可能性のあるほぼすべての UEFI ファームウェアバージョンで機能します。最後の手段として使用できます。 スクリプトは1つの長い行である必要があります。 括弧内のセクションはオプションであり、ガイドとしてのみ提供されています。シェルスタイルの改行は、視覚的にわかりやすくするためのものです。 FAT ファイルシステムはバックスラッシュをパス区切り文字として使用します。この場合、バックスラッシュは initramfs が ESP パーティションのルートにあることを宣言します。 Intel マイクロコードのみが起動パラメータ行にロードされます。 AMD マイクロコードは、後で起動プロセス中にディスクから読み取られます。これはカーネルによって自動的に行われます。\n\n"
+    },
+    {
+      "title": "フォールバック RAM ディスクを使用したブートエントリ",
+      "level": 3,
+      "content": "ブートマネージャなしで EFISTUB を使用する場合、カーネルコマンドラインはブート時に変更できません。例えば initramfs-linux-fallback.img を使ったり、Intel マイクロコード無しで起動したりするような、少なくともある種のフォールバックの可能性を持つには、efibootmgr でさらなるブートエントリーを作成するだけです。\n\n"
+    },
+    {
+      "title": "EFISTUB はいくつかの Dell システムで動作しません",
+      "level": 3,
+      "content": "いくつかの世代の Dell ファームウェアは、ブートローダに渡す引数を間違えており、そのため EFISTUB は通常起動不可能なシステムを意味する null コマンドラインをパースします (linux-efi thread を参照してください)\n\nLinux 5.10 からは、この挙動を修正する回避策が見つかっています (この commit を参照してください) Linux < 5.10 では、arch-efiboot のような efi-packer を使うか、別のブートローダを使うことができます。\n\n"
+    },
+    {
+      "title": "ブートエントリーの変更が適用されない",
+      "level": 3,
+      "content": "Haswell 時代の Asus ボード(こちらのフォーラムを参照) などの一部のマザーボードは、システムが起動しない限りブートエントリの変更に気づきません。更新された EFISTUB エントリをブートする前に、別の既存のブート エントリを使用してください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- EFISTUB の Linux カーネルドキュメント\n- Linux カーネル EFISTUB Git コミット\n- Rod Smith の EFISTUB 記事\n\n"
+    }
+  ]
+}

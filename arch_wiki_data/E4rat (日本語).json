@@ -1,0 +1,106 @@
+{
+  "title": "E4rat (日本語)",
+  "url": "https://wiki.archlinux.org/title/E4rat_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- ブートパフォーマンスの向上\n- Preload\n- Ureadahead\n- Ext4\n\ne4rat は e4 'reduced access time' (ext4 ファイルシステムのみ) の略語で、Andreas Rid と Gundolf Kiefer によるプロジェクトです。e4rat range of tools は e4rat-collect, e4rat-realloc, e4rat-preload から成り立っています。\n\ne4rat-lite と呼ばれる別の実装がありますが、これは元の e4rat プロジェクトよりもアクティブで最適化されています。e4rat-lite section を参照してください。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 プロセス 1.1 利益を得る人、得ない人\n- 2 インストール\n- 3 使用方法 3.1 e4rat-collect 3.2 e4rat-realloc 3.3 e4rat-preload\n- 4 e4rat と init システム\n- 5 e4rat-lite 5.1 e4rat-lite を使用する\n- 6 Bootchart 6.1 bootchart 6.2 bootchart2\n- 7 トラブルシューティング 7.1 startup.log が作られない 7.2 e4rat が誤って ext2 ファイルシステムと認識する 7.3 /var/lib/e4rat/startup.log にアクセスできない 7.4 うるさいブートメッセージを削除する\n- 8 参照\n\n- 1.1 利益を得る人、得ない人\n\n- 3.1 e4rat-collect\n- 3.2 e4rat-realloc\n- 3.3 e4rat-preload\n\n- 5.1 e4rat-lite を使用する\n\n- 6.1 bootchart\n- 6.2 bootchart2\n\n- 7.1 startup.log が作られない\n- 7.2 e4rat が誤って ext2 ファイルシステムと認識する\n- 7.3 /var/lib/e4rat/startup.log にアクセスできない\n- 7.4 うるさいブートメッセージを削除する\n\n"
+    },
+    {
+      "title": "プロセス",
+      "level": 2,
+      "content": "古典的な bootchart を見ると、ブートプロセスの間にディスクも CPU も完全には使われていないことに気づくかもしれません。e4rat はブートプロセスでディスクと CPU をフルに使うようにして、起動時間を劇的に縮めます。3つの段階に分かれています:\n\n- e4rat-collect - 特定時間ファイルを収集します (デフォルトは120秒ですが変更することも可能です)\n- e4rat-realloc - ファイルを再配置します\n- e4rat-preload - ファイルをプリロードします\n\n"
+    },
+    {
+      "title": "利益を得る人、得ない人",
+      "level": 3,
+      "content": "X を起動して、多数のプログラムを開くような、典型的なシングルユーザーセットアップで e4rat は大変効果があることが証明されています。サーバーセットアップで CLI で起動するような場合、起動時間の短縮はあまり効果があらわれないでしょう。SSD ドライブを使っている場合も利益はあまりありません、可動部がないためディスクの遅延が（ほとんど）ないためです - Ureadahead はチェックする価値があるかもしれません。\n\n備えあれば憂いなし。パーティションに入っているデータを消失したくないのならばバックアップを取っておきましょう。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "AUR から e4ratAUR をインストールしてください。\n\n- ビルドするために、最初に staticlibs オプションを明示的に有効にして audit を ABS からリビルドする必要があります。デフォルトの audit パッケージをインストールするだけではビルドエラーが発生します。\n- audit を使うには audit をサポートしたカーネルが必要です。カーネルコンフィグで audit (CONFIG_AUDIT) と audit のシステムコールのサポート (CONFIG_AUDITSYSCALL) を有効にしてください。カーネル/コンパイル/Arch Build System も参照。また、カーネルパラメータに audit=1 を追加してください。\n\n- 2020-05-06 の時点で、 e4ratAUR は1年以上更新されておらず(最終更新日:2019-04-01)、コンパイルされていません。 代替の e4rat-lite-gitAUR には利用可能なパッチがありますが、元の e4ratAUR に移植または適用されていません。 詳細については、 AUR のコメントセクションと e4rat-lite セクションをご覧ください。\n- e4rat-lite は再構築された audit を必要とせず、公式リポジトリのバージョンで正常に機能します。\n\n"
+    },
+    {
+      "title": "使用方法",
+      "level": 2,
+      "content": "それでは本題に入ります:\n\n"
+    },
+    {
+      "title": "e4rat-collect",
+      "level": 3,
+      "content": "e4rat にファイルのリストを収集させるために init=/sbin/e4rat-collect をカーネルパラメータに追加します。例:\n\n```\nkernel /vmlinuz-linux root=/dev/disk/by-label/ARCH init=/sbin/e4rat-collect ro 5\n```\n\nこれは一度だけやれば十分なので、grub のコマンドラインなどにこのコマンドを追加すれば良いでしょう。\n\n起動時に e4rat-collect はデフォルトで120秒間システムを監視します。なので起動したら、2分の間に、X にログインして、お気に入りのブラウザやメールクライアントを開いたりしてください。それらの活動すべてが記録されます。デフォルトの120秒を変更したいときは /etc/e4rat.conf を編集してください。手動で e4rat-collect を停止するには次を入力:\n\n```\ne4rat-collect -k\n```\n\nもしくは:\n\n```\npkill e4rat-collect\n```\n\nちゃんと起動して規定の時間待機したら /var/lib/e4rat/startup.log ファイルを見て下さい。\n\nそして忘れずにブートローダーの設定ファイルから e4rat-collect コマンドを取り除いておきましょう (grub のコマンドラインに追加した場合は必要ありません)。\n\n"
+    },
+    {
+      "title": "e4rat-realloc",
+      "level": 3,
+      "content": "e4rat-collect を実行したら、root でログインして次を実行:\n\n```\ne4rat-realloc /var/lib/e4rat/startup.log\n```\n\nstartup.log ファイルに記述されたファイルの数によってしばらく時間がかかります。systemctl isolate rescue でレスキューモードに移行することで (Systemd#ターゲット表)、multiuser.target ではフリーにならない inode やブロックも再配置することができます。\n\n- フラグメンテーションカウントをさらに減らすために、終了またはリブートする前に、再割り当て手順を複数回繰り返すことが有効な場合があります。このコマンドを数回再実行して、セットアップでこれが可能かどうかを確認します。その場合、数回実行するとカウント数が減少します。これは完全に安全で、起動時に問題を起こすことはありません。\n- SysV スタイルの init システムを使っている場合、e4rat-realloc を実行する前に sudo init 1 を使ってランレベル 1 に切り替える必要があります。\n\n"
+    },
+    {
+      "title": "e4rat-preload",
+      "level": 3,
+      "content": "init=/sbin/e4rat-preload を永続的にカーネルパラメータに追加してください。\n\n"
+    },
+    {
+      "title": "e4rat と init システム",
+      "level": 2,
+      "content": "e4rat-collect はデフォルトで実行時に /sbin/init を置き換えます。systemd のデフォルト環境では、このファイルは /lib/systemd/systemd のシンボリックリンクになっています。他のプロセス (例: /usr/bin/busybox) を PID 1 に指定する必要がある場合、/etc/e4rat.conf を編集して init パラメータを設定することで変更することが可能です:\n\n```\ninit /usr/bin/busybox\n```\n\nこれによって同一のブートシーケンスで e4rat-preload と bootchart の両方を起動することができます。\n\n"
+    },
+    {
+      "title": "e4rat-lite",
+      "level": 2,
+      "content": "いくつかの改良が加えられた e4rat の代替。また、オリジナルの e4rat パッケージで経験するかもしれないいくつかの問題を回避することも期待できます。 e4rat-lite-gitAUR から取得できます。\n\n"
+    },
+    {
+      "title": "e4rat-lite を使用する",
+      "level": 3,
+      "content": "e4rat-lite のコマンドは、e4rat とほとんど同じように動作します。the README of the project を見てください。\n\ncollect:init=/usr/bin/e4rat-lite-collect-デフォルトの制限時間は120秒ですが、次のコマンドを使用して収集セッションを終了することもできます。\n\n```\n# e4rat-lite-collect -k\n```\n\nrealloc: /usr/bin/e4rat-lite-realloc - ランレベル1への切り替えが推奨されます。 systemd を使用する場合は、事前に以下を実行してください。\n\n```\n# systemctl isolate rescue.target\n```\n\npreload: init=/usr/bin/e4rat-lite-preload\n\nstartup.log: /var/lib/e4rat-lite/startup.log\n\n構成ファイル:/etc/e 4 rat-lite.conf - systemd を使用する場合は、init_file プロパティを次のように変更します。\n\n```\ninit_file=/usr/lib/systemd/systemd\n```\n\n"
+    },
+    {
+      "title": "Bootchart",
+      "level": 2,
+      "content": "Bootchart を使うことでシステムの起動グラフを生成できます。CPU やディスクの使用量を視覚的に確認することができます。必須ではありませんが、e4rat によるブートプロセスの変化を確認できます。\n\n"
+    },
+    {
+      "title": "bootchart",
+      "level": 3,
+      "content": "このバージョンの bootchart はディスプレイマネージャが立ち上がるとすぐにログの記録を停止します。以下のように上書きすることでログを停止しないようにすることができます:\n\nログを続行するには以下のように /etc/bootchartd.conf を変更:\n\n```\nAUTO_STOP_LOGGER=\"no\"\n```\n\n手動で停止するには次を実行:\n\n```\n# bootchartd stop\n```\n\ne4rat-preload と bootchart の両方を実行するには grub の kernel 行に以下を追加:\n\n```\ninit=/sbin/bootchartd bootchart_init=/sbin/e4rat-preload\n```\n\n"
+    },
+    {
+      "title": "bootchart2",
+      "level": 3,
+      "content": "e4rat と共に bootchart2AUR を動作させるには /sbin/bootchartd2 を編集して次の行を:\n\n```\ninit=\"/sbin/init\"\n```\n\n以下のように置き換えて下さい:\n\n```\ninit=\"/sbin/e4rat-preload\"\n```\n\n上記の設定で Bootchart2 による情報を使って起動時間を測定できます。\n\nbootchart2 を停止する時間は /etc/bootchartd2.conf ファイルを編集することで簡単に設定できます。特定のアプリケーションが起動したときに Bootchart2 のログを止めるには以下のように設定してください:\n\n```\nEXIT_PROC=\"kdm_greet xterm konsole gnome-terminal metacity mutter compiz ldm icewm-session enlightenment\"\n```\n\nもしくは、上記の行を空にすることで手動でログを停止することもできます。\n\nチャートを生成するには次のコマンドを実行: pybootchartgui -i。\n\n"
+    },
+    {
+      "title": "startup.log が作られない",
+      "level": 3,
+      "content": "- auditd サービスを無効にする\n- ヒントがないか次を確認\n\n```\n$ dmesg | grep e4rat\n```\n\n- e4rat.conf の verbose と loglevel を31にまで増やす\n- e4rat のかわりに e4rat-lite を使用する\n\n"
+    },
+    {
+      "title": "e4rat が誤って ext2 ファイルシステムと認識する",
+      "level": 3,
+      "content": "rootfstype=ext4 をブートローダーのカーネルパラメータに追加してください。\n\n"
+    },
+    {
+      "title": "/var/lib/e4rat/startup.log にアクセスできない",
+      "level": 3,
+      "content": "これは、起動時にまだマウントされていない別のパーティションに /var があることを示しています。startup.log をアクセス可能なパーティションに移動させて (/etc/e4rat/) 、/etc/e 4 rat.conf を調整してこの変更を反映する必要があります。\n\n```\nstartup_log_file /etc/e4rat/startup.log\n```\n\n"
+    },
+    {
+      "title": "うるさいブートメッセージを削除する",
+      "level": 3,
+      "content": "起動中の e4rat-preload のメッセージがうっとうしい場合は、/etc/e4rat.conf で verbose を 1 に減らします。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- フォーラムのメインスレッド\n- Improved e4rat-preload - フォーラムスレッド\n\n"
+    }
+  ]
+}

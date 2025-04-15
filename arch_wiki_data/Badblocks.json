@@ -1,0 +1,91 @@
+{
+  "title": "Badblocks",
+  "url": "https://wiki.archlinux.org/title/Badblocks",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Identify damaged files\n\nbadblocks is a program to test storage devices for bad blocks.\n\nIn modern HDDs and SSDs firmware automatically detects defective sectors and, where possible, takes action to correct the situation. However, firmware becomes aware of a corrupted sector only upon an attempt to use it. Badblocks may be used to test the entire device at once.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the e2fsprogs package.\n\nSee badblocks(8) for the usage.\n\n"
+    },
+    {
+      "title": "Storage device fidelity",
+      "level": 2,
+      "content": "Although there is no firm rule, it is common thinking that a new drive should have zero bad sectors. Over time, bad sectors will develop and although they are able to be defined to the file system so that they are avoided, continual use of the drive will usually result in additional bad sectors forming and it is usually the harbinger of its eventual death. Replacing the device is recommended.\n\n"
+    },
+    {
+      "title": "Comparisons with other programs",
+      "level": 2,
+      "content": "Typical recommended practice for testing a storage device for bad sectors is to use the manufacturer's testing program. Most manufacturers have programs that do this. The main reasoning for this is that manufacturers usually have their standards built into the test programs that will tell you if the drive needs to be replaced or not. The caveat here being is that some manufacturers testing programs do not print full test results and allow a certain number of bad sectors saying only if they pass or not. Manufacturer programs however are generally quicker than badblocks, sometimes a fair amount so.\n\n"
+    },
+    {
+      "title": "Testing for bad sectors",
+      "level": 2,
+      "content": "To test for bad sectors in Linux, the program badblocks is typically used. badblocks has several different modes to be able to detect bad sectors.\n\n"
+    },
+    {
+      "title": "Read-only test",
+      "level": 3,
+      "content": "This test checks, if all sectors on the device are readable. The operation is non-destructive and may be safely executed on live systems. However, the extended S.M.A.R.T. self-test provides the same information, while being done entirely in firmware. The primary difference lies in self-test stopping on the first error, while badblocks continuing and reporting all unreadable sectors.\n\n"
+    },
+    {
+      "title": "Write-mode test (warning: destructive)",
+      "level": 3,
+      "content": "This test is primarily for testing new drives and is a read-write test. As the pattern is written to every accessible block, contents of the device are lost. The default is an extensive test with four passes using four different patterns: 0xaa (10101010), 0x55 (01010101), 0xff (11111111) and 0x00 (00000000). For some devices this will take a couple of days to complete.\n\n```\n# badblocks -wsv /dev/device\n```\n\n```\nChecking for bad blocks in read-write mode\nFrom block 0 to 488386583\nTesting with pattern 0xaa: done\nReading and comparing: done\nTesting with pattern 0x55: done\nReading and comparing: done\nTesting with pattern 0xff: 22.93% done, 4:09:55 elapsed. (0/0/0 errors)\n[...]\nTesting with pattern 0x00: done\nReading and comparing: done\nPass completed, 0 bad blocks found. (0/0/0 errors)\n```\n\nOptions:\n\nAdditional options you might consider:\n\n"
+    },
+    {
+      "title": "Define specific test pattern",
+      "level": 4,
+      "content": "From the manpage: \"The test_pattern may either be a numeric value between 0 and ULONG_MAX-1 inclusive [...].\"\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nBadblocks can be made to repeatedly write a single \"random pattern\" with the -t random option.\n\n```\n# badblocks -wsv -t random /dev/device\n```\n\n```\nChecking for bad blocks in read-write mode\nFrom block 0 to 488386583\nTesting with random pattern: done                                                 \nReading and comparing: done                                                 \nPass completed, 0 bad blocks found. (0/0/0 errors)\n```\n\n"
+    },
+    {
+      "title": "Read-write test (non-destructive)",
+      "level": 3,
+      "content": "This test is designed for devices with data already on them. A non-destructive read-write test makes a backup of the original content of a sector before testing with a single random pattern and then restoring the content from the backup. This is a single pass test and is useful as a general maintenance test.\n\n```\n# badblocks -nsv /dev/device\n```\n\n```\nChecking for bad blocks in non-destructive read-write mode\nFrom block 0 to 488386583\nChecking for bad blocks (non-destructive read-write test)\nTesting with random pattern: done                                                 \nPass completed, 0 bad blocks found. (0/0/0 errors)\n```\n\nThe -n option signifies a non-destructive read-write test.\n\n"
+    },
+    {
+      "title": "Have filesystem incorporate bad sectors",
+      "level": 2,
+      "content": "To not use bad sectors, they have to be known by the filesystem.\n\n"
+    },
+    {
+      "title": "During filesystem check",
+      "level": 3,
+      "content": "Incorporating bad sectors can be done using the filesystem check utility (fsck). fsck can be told to use badblocks during a check. To do a read-write (non-destructive) test and have the bad sectors made known to the filesystem, run:\n\n```\n# fsck -vcck /dev/device-PARTITION\n```\n\nThe -cc option tells run fsck in non-destructive test mode, the -v tells fsck to show its output, and the -k option preserves old bad sectors that were detected.\n\nTo do a read-only test (not recommended):\n\n```\n# fsck -vck /dev/device-PARTITION\n```\n\n"
+    },
+    {
+      "title": "Before filesystem creation",
+      "level": 3,
+      "content": "Alternately, this can be done before filesystem creation.\n\nIf badblocks is run without the -o option, bad sectors will only be printed to stdout.\n\nExample output for read errors in the beginning of the disk:\n\n```\n# badblocks -wsv /dev/drive\n```\n\n```\n[...]\nTesting with pattern 0xff: done                                                 \nReading and comparing:\n[...]\n37584\n37585 0.84% done, 7:31:08 elapsed. (0/0/527405 errors)\n37586\n[...]\ndone\nTesting with pattern 0x00:\nReading and comparing:\n[...]\n37584\n37585\n[...]\ndone\nPass completed, 527405 bad blocks found. (0/0/527405 errors)\n```\n\nFor comfortably passing badblocks error output to the filesystem, it has to be written to a file.\n\n```\n# badblocks -wsv -o /root/badblocks.txt /dev/device\n```\n\n```\nChecking for bad blocks in read-write mode\nFrom block 0 to 488386583\nTesting with pattern 0xaa: done\nReading and comparing:   6.36% done, 0:51 elapsed. (0/0/14713 errors)\n[...]\nTesting with pattern 0x00: done\nReading and comparing: done\nPass completed, 527405 bad blocks found. (0/0/527405 errors)\n```\n\nThen (re-)create the file system with the information:\n\n```\n# mke2fs -t filesystem-type -l /root/badblocks.txt /dev/device\n```\n\n"
+    },
+    {
+      "title": "Ext4",
+      "level": 4,
+      "content": "From the mke2fs(8) manual page:\n\nSo the recommended method is to use:\n\n```\n# mkfs.ext4 -c /dev/device\n```\n\nUse -cc to do a read-write bad block test.\n\n"
+    },
+    {
+      "title": "Block size",
+      "level": 4,
+      "content": "Note: **This article or section is a candidate for merging with Securely wipe disk#Block size.** This article or section is a candidate for merging with Securely wipe disk#Block size.\n\nThis article or section is a candidate for merging with Securely wipe disk#Block size.\n\nFirst, find the file systems' block size. For example for ext# filesystems:\n\n```\n# dumpe2fs /dev/device-PARTITION | grep 'Block size'\n```\n\nFeed this to badblocks:\n\n```\n# badblocks -b block size\n```\n\n"
+    },
+    {
+      "title": "Finding bad sectors",
+      "level": 2,
+      "content": "You can use badblock to find bad sectors. Note that badblocks calls sectors \"blocks\". It supports a few scan modes. There is read-only mode (default) which is the least accurate. There is the destructive write-mode (-w option) which is the most accurate but takes longer and will (obviously) destroy all data on the drive, thus making it quite useless for matching sectors up to files. There is finally the non-destructive read-write mode which is probably as accurate as the destructive mode, with the only real downside that it is probably the slowest. However, if a drive is known to be failing, then read-only mode is probably still the safest.\n\nTo do a verbose (-v option), read-only scan, run one of these commands (with x being the drive letter and y being partition number you want to scan):\n\nWhole disk scan:\n\n```\n# badblocks -v /dev/sdx\n```\n\nSingle partition scan:\n\n```\n# badblocks -v /dev/sdxy\n```\n\nThe downside to scanning the drive as a whole is that each filesystem is going to start its block count relative to the partition it is on. This means that if you have a bad block that happens to be on, let us say, the second partition, and that partition starts on block 1000, then you will have to subtract 1000 from your block number in order to get the number you want. So if a scan from the beginning of the disk results in block number 1005 being bad, then block 5 of the second partition is what you will actually be using.\n\nOtherwise, if you have found bad blocks after doing a full scan, you can simply figure out which partitions they are on, and rescan those in order to get the block number, rather than do any block math.\n\nAnother thing to note is that badblocks defaults to 1024 byte blocks, so you will either have to change the default size with the -b option in order to match your filesystem or manually convert the block number(s) later.\n\nIf you need to figure out where your partitions start and end, run fdisk. Make sure to note the block size fdisk is using so that you can convert the block counts to match your scan.\n\n```\n# fdisk -l /dev/sdx\n```\n\n```\nDisk /dev/sdx: 149.05 GiB, 160041885696 bytes, 312581808 sectors\nUnits = sectors of 1 * 512 = 512 bytes\nSector size (logical/physical): 512 bytes / 512 bytes\nI/O size (minimum/optimal): 512 bytes / 512 bytes\n```\n\nAfter all this, you should have the block number(s) of your bad block(s), relative to the partition they exist on.\n\n"
+    },
+    {
+      "title": "Interaction with remapping",
+      "level": 2,
+      "content": "HDD controllers with SMART are generally able to remap a bad sector. They still waste time retrying reads at a bad sector, but on a write they either manage to fix it (when the error is \"soft\", i.e. ECC failure) or remap it to a spare sector, as long as the spare is not depleted.\n\n- In non-destructive RW mode, badblocks first attempt a read of a sector. As a result, both \"soft\" and \"hard\" bad sectors are considered bad and not further tested. You should see the pending count unchanged or go up in SMART.\n- In destructive RW mode, badblocks does the writing first. As a result, a remap should be triggered and the sector should be \"fixed\" in terms of being accessible. You should see the pending sector count go down in SMART, while the reallocated count stays unchanged (if \"soft\") or goes up (if \"hard\"). badblocks will go on to test whether the sector faithfully retains the data, as it is originally designed to.\n\nIt is possible to force a write using the badblocks list from non-destructive testing. One would need to calculate the LBA ranges, use hdparm --read-sector to narrow it down to single sectors, and finally use hdparm --write-sector [1] to trigger the write. You would be giving up on any possible future retries at this sector, but at least no more read hangs would occur.\n\n"
+    },
+    {
+      "title": "Alternatives",
+      "level": 2,
+      "content": "Since badblocks was originally written to verify floppy disks, its design isn’t construed for modern HDDs. With sizes such as 18 TB drives, even the regular tip to use -b 4096 won’t help anymore. This is an alternative:\n\n1. Span a crypto layer above the device: cryptsetup open /dev/device name --type plain --cipher aes-xts-plain64\n1. Fill the now opened decrypted layer with zeroes, which get written as encrypted data: shred -v -n 0 -z /dev/mapper/name\n1. Compare fresh zeroes with the decrypted layer: cmp -b /dev/zero /dev/mapper/name If it just stops with a message about end of file, the drive is fine. This method is also way faster than badblocks even with a single pass. As the command does a full write, any bad sectors (as known to the disk controller) should also be eliminated.\n\nOn btrfs and ZFS, the designers have decided that a floppy-era bad block list is not needed any more. They are usually right as long as you write over the defects (see above). Reading will still hang from retrying. If you want to \"isolate\" the bad blocks like in the old days, use a lower-level solution by partitioning or LVM.\n\nOn modern spinning drives, smartctl -t long /dev/device (see S.M.A.R.T.) performs a full read-only test. It will halt as soon as a failure is found and record it as a \"LBA_of_first_error\" data entry, which you can then overwrite with hdparm (see above). You can skip the failure with a follow up selective test.\n\n"
+    }
+  ]
+}

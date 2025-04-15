@@ -1,0 +1,71 @@
+{
+  "title": "MAC address spoofing (日本語)",
+  "url": "https://wiki.archlinux.org/title/MAC_address_spoofing_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "この記事では Media Access Control (MAC) アドレスを偽装 (変更) する方法を説明しています。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 手動 1.1 方法 1: iproute2 1.2 方法 2: macchanger\n- 2 自動 2.1 方法 1: systemd-networkd 2.2 方法 2: systemd-udevd 2.3 方法 3: systemd ユニット 2.3.1 ユニットの作成 2.3.1.1 iproute2 2.3.1.2 macchanger 2.3.2 サービスの有効化 2.4 方法 4: netctl インターフェイス 2.5 方法 5: NetworkManager\n- 3 トラブルシューティング 3.1 DHCPv4 ネットワークへの接続が失敗する\n- 4 参照\n\n- 1.1 方法 1: iproute2\n- 1.2 方法 2: macchanger\n\n- 2.1 方法 1: systemd-networkd\n- 2.2 方法 2: systemd-udevd\n- 2.3 方法 3: systemd ユニット 2.3.1 ユニットの作成 2.3.1.1 iproute2 2.3.1.2 macchanger 2.3.2 サービスの有効化\n- 2.4 方法 4: netctl インターフェイス\n- 2.5 方法 5: NetworkManager\n\n- 2.3.1 ユニットの作成 2.3.1.1 iproute2 2.3.1.2 macchanger\n- 2.3.2 サービスの有効化\n\n- 2.3.1.1 iproute2\n- 2.3.1.2 macchanger\n\n- 3.1 DHCPv4 ネットワークへの接続が失敗する\n\n"
+    },
+    {
+      "title": "手動",
+      "level": 2,
+      "content": "MAC アドレスを偽装するには iproute2 (デフォルトでインストールされます) または macchanger (公式リポジトリ からインストール可能) を使う2つの方法があります。どちらの方法も以下で示します。\n\n"
+    },
+    {
+      "title": "方法 1: iproute2",
+      "level": 3,
+      "content": "まず、次のコマンドで現在の MAC アドレスを確認できます:\n\n```\n# ip link show interface\n```\n\ninterface はネットワークインターフェイスの名前に置き換えて下さい。\n\n重要なのは \"link/ether\" の後に続く6桁の番号です。以下のように表示されているはずです:\n\n```\nlink/ether 00:1d:98:5a:d1:3a\n```\n\nMAC アドレスを偽装するために、まずはネットワークインターフェイスを下ろします。次のコマンドで行うことができます:\n\n```\n# ip link set dev interface down\n```\n\nそして、実際に MAC の偽装を行います。16進数の値を使いますが、ネットワークによってはベンダーが一致しないクライアントに IP アドレスを割り当てないように設定されていることがあります。したがって、接続するネットワークを管理していない場合は、ランダム化するよりも既知の MAC を使ってテストすると良いでしょう。\n\nMAC を変更するには、次のコマンドを実行します:\n\n```\n# ip link set dev interface address XX:XX:XX:XX:XX:XX\n```\n\n6桁の値は XX:XX:XX:XX:XX:XX という形式で入力する必要があります。\n\n最後にネットワークインターフェイスを立ち上げます。次のコマンドで行えます:\n\n```\n# ip link set dev interface up\n```\n\nMAC が偽装されたか確認したい場合は、ip link show interface をもう一度実行して 'link/ether' の値を確認してください。偽装されていれば、'link/ether' が変更したアドレスになっているはずです。\n\n"
+    },
+    {
+      "title": "方法 2: macchanger",
+      "level": 3,
+      "content": "macchanger (別名 GNU MAC Changer) を使用する方法です。特定のベンダーに一致するように変更したり、完全にランダムにするなど、様々な機能が備わっています。\n\n公式リポジトリ から macchanger パッケージを インストール してください。\n\n偽装はインターフェイスごとに行うので、以下に記載されているコマンドを使うときは interface で ネットワークインターフェイス を指定します。\n\nMAC アドレスを完全にランダムなアドレスに偽装するには:\n\n```\n# macchanger -r interface\n```\n\nベンダーコードを除いてアドレスをランダム化するには (MAC アドレスをチェックしていた場合に、同じベンダーのアドレスとして登録する)、次のコマンドを実行:\n\n```\n# macchanger -e interface\n```\n\nMAC アドレスを特定の値に変更するには、次を実行:\n\n```\n# macchanger --mac=XX:XX:XX:XX:XX:XX interface\n```\n\nXX:XX:XX:XX:XX:XX は変更後の MAC に置き換えて下さい。\n\n最後に、MAC アドレスをハードウェアの値に元に戻すには:\n\n```\n# macchanger -p interface\n```\n\n"
+    },
+    {
+      "title": "方法 1: systemd-networkd",
+      "level": 3,
+      "content": "systemd-networkd は link ファイル による MAC アドレスの偽装をサポートしています (詳しくは systemd.link(5) を参照):\n\n```\n/etc/systemd/network/00-default.link\n```\n\n```\n[Match]\nMACAddress=permanent MAC\n\n[Link]\nMACAddress=spoofed MAC\nNamePolicy=kernel database onboard slot path\n```\n\n起動毎に MAC アドレスをランダムに設定したい場合は、MACAddress=spoofed MAC を MACAddressPolicy=random に置き換えてください。\n\n"
+    },
+    {
+      "title": "方法 2: systemd-udevd",
+      "level": 3,
+      "content": "Udev は udev ルールを書く ことによる MAC アドレスの偽装をサポートしています。ATTR によって udev は適当なデバイスを見つけてその MAC アドレスを変更するので、address オプションは両方ともカスタマイズしてください:\n\n```\n/etc/udev/rules.d/75-mac-spoof.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"net\", ATTR{address}==\"02:03:09:xx:xx:xx\", RUN+=\"/usr/bin/ip link set dev $name address c8:0a:a9:xx:xx:xx\"\n```\n\n"
+    },
+    {
+      "title": "ユニットの作成",
+      "level": 4,
+      "content": "以下は systemd のユニットを使って MAC アドレスを起動時に変更する2つの例です。片方は ip を使って固定 MAC を設定し、もう片方は macchanger を使ってランダムな MAC アドレスを指定します。Netctl, NetworkManager, systemd-networkd, dhcpcd などのネットワークマネージャのサービスが起動する前に MAC が変更されるように systemd の network-pre.target を使っています。\n\nあらかじめ決めておいた MAC アドレスに設定する systemd ユニット:\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=MAC Address Change %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ip link set dev %i address 36:aa:88:c8:75:3a\nExecStart=/usr/bin/ip link set dev %i up\n\n[Install]\nWantedBy=multi-user.target\n```\n\n元の NIC ベンダーコードは維持しつつランダムなアドレスを設定する systemd ユニット。macchanger の インストール が必須です:\n\n```\n/etc/systemd/system/macspoof@.service\n```\n\n```\n[Unit]\nDescription=macchanger on %I\nWants=network-pre.target\nBefore=network-pre.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nExecStart=/usr/bin/macchanger -e %I\nType=oneshot\n\n[Install]\nWantedBy=multi-user.target\n```\n\n完全にランダムなアドレスは -r オプションを使うことで設定できます。#方法_2: macchanger を参照。\n\n"
+    },
+    {
+      "title": "サービスの有効化",
+      "level": 4,
+      "content": "サービスの名前に適当なネットワークインターフェイス (例: eth0) を追加してサービスを有効化してください:\n\n```\n# systemctl enable macspoof@eth0.service\n```\n\n適切な順番でサービスを再起動・停止・起動してください。ネットワークを管理している場合は、ルーターの固定アドレスまたは DHCP アドレステーブルを確認して、偽装された MAC がルーターによって認識されているか確認してください。\n\n"
+    },
+    {
+      "title": "方法 4: netctl インターフェイス",
+      "level": 3,
+      "content": "netctl フックを使うことで特定のネットワークインターフェイスで netctl プロファイルが起動するときにコマンドを実行することができます。interface は適宜置き換えてください:\n\n```\n/etc/netctl/interfaces/interface\n```\n\n```\n#!/usr/bin/env sh\n/usr/bin/macchanger -r interface\n```\n\nスクリプトに実行可能属性を付与:\n\n```\nchmod +x /etc/netctl/interfaces/interface\n```\n\nソース: akendo.eu\n\n"
+    },
+    {
+      "title": "方法 5: NetworkManager",
+      "level": 3,
+      "content": "NetworkManager#MAC アドレスのランダム化の設定 を見てください。\n\n"
+    },
+    {
+      "title": "DHCPv4 ネットワークへの接続が失敗する",
+      "level": 3,
+      "content": "NetworkManager のデフォルトである dhcpcd を使っていて DHCPv4 ネットワークに接続できない場合、dhcpcd の設定を変更 してリースを取得するようにしてみてください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Wikipedia:MAC spoofing\n- Macchanger GitHub ページ\n- Article on DebianAdmin with more macchanger options\n\n"
+    }
+  ]
+}

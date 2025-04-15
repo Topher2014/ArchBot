@@ -1,0 +1,61 @@
+{
+  "title": "Acpid (Español)",
+  "url": "https://wiki.archlinux.org/title/Acpid_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-11-03** \n\nArtículos relacionados\n\n- Módulos ACPI\n- DSDT\n\nacpid2 es un demonio flexible y extensible para entregar eventos ACPI. Cuando ocurre un evento, ejecuta programas para manejarlo. Estos eventos son desencadenados por ciertas acciones, tales como:\n\n- Presionando teclas especiales, incluido el botón de Encendido/Suspensión/Hibernación\n- Cerrando la tapa de un portátil\n- (Des)Enchufando un adaptador de corriente de un portátil\n- (Des)Enchufando el conector del teléfono (módem), etc.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete acpid. Entonces inicie/active acpid.service.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "acpid viene con una serie de acciones predefinidas para eventos activados, como lo que debería suceder cuando presionas el botón de encendido en tu máquina. De forma predeterminada, estas acciones se definen en /etc/acpi/handler.sh, que se ejecuta después de detectar cualquier evento ACPI (según lo determinado por /etc/acpi/events/anything )\n\nLo siguiente es un pequeño ejemplo de una acción de este tipo. En este caso, cuando se presiona el botón de Suspensión, acpid ejecuta la orden echo -n mem >/sys/power/state que debería colocar la computadora en un estado de suspensión (hibernación):\n\n```\nbutton/sleep)\n    case \"$2\" in\n        SLPB) echo -n mem >/sys/power/state ;;\n\t *)    logger \"ACPI action undefined: $2\" ;;\n    esac\n    ;;\n```\n\nDesafortunadamente, no todas las computadoras etiquetan los eventos ACPI de la misma manera. Por ejemplo, el botón de suspensión puede identificarse en una máquina como SLPB y en otra como SBTN.\n\nPara determinar cómo se reconocen sus botones o atajos Fn, ejecute la siguiente orden:\n\n```\n# journalctl -f\n```\n\nAhora presione el botón de encendido y/o el botón de suspensión (por ejemplo, Fn+Esc) en su máquina. El resultado debería ser algo así:\n\n```\nlogger: ACPI action undefined: PBTN\nlogger: ACPI action undefined: SBTN\n```\n\nSi eso no funciona, ejecute:\n\n```\n# acpi_listen\n```\n\no con openbsd-netcat:\n\n```\n$ netcat -U /var/run/acpid.socket\n```\n\nLuego presione el botón de encendido y verá algo como esto:\n\n```\nbutton/power PBTN 00000000 00000b31\n```\n\nEl resultado de acpi_listen se envía a /etc/acpi/handler.sh como parámetros $1, $2, $3 y $4. Ejemplo:\n\n```\n$1 button/power\n$2 PBTN\n$3 00000000\n$4 00000b31\n```\n\nComo habrá notado, el botón de suspensión en la salida del ejemplo se reconoce realmente como SBTN, en lugar de la etiqueta SLPB especificada en el archivo /etc/acpi/handler.sh predeterminado. Para que la función de suspensión funcione correctamente en esta máquina, debería reemplazar SLPB) por SBTN).\n\nAl utilizar esta información como base, puede personalizar fácilmente el archivo /etc/acpi/handler.sh para ejecutar una variedad de órdenes según el evento que se active. Véase la sección #Consejos y trucos a continuación para conocer otras órdenes usadas comúnmente.\n\n"
+    },
+    {
+      "title": "Configuración alternativa",
+      "level": 3,
+      "content": "De manera predeterminada, todos los eventos ACPI se pasan a través del script /etc/acpi/handler.sh. Esto se debe al conjunto de reglas descrito en /etc/acpi/events/anything:\n\n```\n# Pasar todos los eventos a nuestro script de un solo controlador\nevent=.*\naction=/etc/acpi/handler.sh %e\n```\n\nSi bien esto funciona bien, algunos usuarios pueden preferir definir reglas y acciones de eventos en sus propios script independientes. El siguiente es un ejemplo de como usar un archivo de evento individual y el script de acción correspondiente:\n\nComo superusuario, cree los siguientes archivos:\n\n```\n/etc/acpi/events/sleep-button\n```\n\n```\nevent=button sleep.*\naction=/etc/acpi/actions/sleep-button.sh %e\n```\n\n```\n/etc/acpi/actions/sleep-button.sh\n```\n\n```\n#!/bin/sh\ncase \"$3\" in\n    SLPB) echo -n mem >/sys/power/state ;;\n    *)    logger \"ACPI action undefined: $3\" ;;\nesac\n```\n\nHaga el script ejecutable y recargue acpid.service para que acpid reconozca los cambios en estos archivos.\n\nAl usar este método, es fácil crear cualquier cantidad de scripts de eventos/acciones individuales.\n\n"
+    },
+    {
+      "title": "Eventos de ejemplo",
+      "level": 3,
+      "content": "Los siguientes son ejemplos de eventos que se pueden usar en el script /etc/acpi/handler.sh. Estos ejemplos se deben modificar para que se ajusten a su entorno específico, por ejemplo cambiando los nombres de las variables de evento interpretados por acpi_listen.\n\nPara configurar el brillo de la pantalla del portátil cuando esté o no enchufado (es posible que sea necesario ajustar los números, véase /sys/class/backlight/acpi_video0/max_brightness):\n\n```\nac_adapter)\n    case \"$2\" in\n        AC*|AD*)\n            case \"$4\" in\n                00000000)\n                    echo -n 50 > /sys/class/backlight/acpi_video0/brightness\n                    ;;\n                00000001)\n                    echo -n 100 > /sys/class/backlight/acpi_video0/brightness\n                    ;;\n            esac\n```\n\n"
+    },
+    {
+      "title": "Activar el control del volumen",
+      "level": 3,
+      "content": "Averigüe la identidad acpi de los botones de volumen (véase arriba) y sustitúyalos por los eventos acpi en los archivos a continuación.\n\n```\n/etc/acpi/events/vol-d\n```\n\n```\nevent=button/volumedown\naction=amixer set Master 5-\n```\n\n```\n/etc/acpi/events/vol-m\n```\n\n```\nevent=button/mute\naction=amixer set Master toggle\n```\n\n```\n/etc/acpi/events/vol-u\n```\n\n```\nevent=button/volumeup\naction=amixer set Master 5+\n```\n\n```\n# sudo -u usuario XDG_RUNTIME_DIR=/run/user/1000 pactl\n```\n\nVéase también [2].\n\n"
+    },
+    {
+      "title": "Activar el control del brillo",
+      "level": 3,
+      "content": "De forma similar al control de volumen, acpid también le permite controlar el brillo de la pantalla. Para lograr esto, escriba algún controlador, como este:\n\n```\n/etc/acpi/handlers/bl\n```\n\n```\n#!/bin/sh\nbl_dev=/sys/class/backlight/acpi_video0\nstep=1\n\ncase $1 in\n  -) echo $(($(< $bl_dev/brightness) - $step)) >$bl_dev/brightness;;\n  +) echo $(($(< $bl_dev/brightness) + $step)) >$bl_dev/brightness;;\nesac\n```\n\ny nuevamente, conecte las teclas a los eventos ACPI:\n\n```\n/etc/acpi/events/bl_d\n```\n\n```\nevent=video/brightnessdown\naction=/etc/acpi/handlers/bl -\n```\n\n```\n/etc/acpi/events/bl_u\n```\n\n```\nevent=video/brightnessup\naction=/etc/acpi/handlers/bl +\n```\n\n"
+    },
+    {
+      "title": "Activar el control Wi-Fi",
+      "level": 3,
+      "content": "También puede crear un interruptor de alimentación de la red inalámbrica simple al presionar el botón WLAN. Un ejemplo de evento:\n\n```\n/etc/acpi/events/wlan\n```\n\n```\nevent=button/wlan\naction=/etc/acpi/handlers/wlan\n```\n\ny su controlador:\n\n```\n/etc/acpi/handlers/wlan\n```\n\n```\n#!/bin/sh\nrf=/sys/class/rfkill/rfkill0\n\ncase $(< $rf/state) in\n  0) echo 1 >$rf/state;;\n  1) echo 0 >$rf/state;;\nesac\n```\n\n"
+    },
+    {
+      "title": "Obtener el nombre de usuario de la pantalla actual",
+      "level": 3,
+      "content": "Para ejecutar órdenes que dependan de Xorg, es necesario definir la visualización X así como el archivo MIT Magic Cookie (a través de XAUTHORITY). Después es tener una credencial de seguridad que proporciona acceso de lectura y escritura al servidor X, a la pantalla y a cualquier dispositivo de entrada (Véase xauth(1)).\n\nVéase [3] para una función de ejemplo cuando se usa xinitrc.\n\n- Si la luz de fondo de la pantalla LCD no se apaga cuando la tapa está cerrada, puede hacerlo manualmente ejecutando getXuser xset dpms force off y getXuser xset dpms force on en los eventos de tapa cerrada y abierta respectivamente. Si la pantalla está en blanco pero la luz de fondo encendida, en su lugar utilice vbetool con betool dpms off y vbetool dpms on. Véase también Configuración de XScreenSaver.\n- Cuando utilice who o w, asegúrese de que se cree /run/utmp en el momento del arranque. Véase utmp(5) para más detalles.\n\n"
+    },
+    {
+      "title": "Conectar a un socket acpid",
+      "level": 4,
+      "content": "Además de los archivos de reglas, acpid acepta conexiones en un socket de dominio UNIX, de forma predeterminada /var/run/acpid.socket. Las aplicaciones de usuario pueden conectarse a este socket.\n\n```\n#!/bin/bash\ncoproc acpi_listen\ntrap 'kill $COPROC_PID' EXIT\n\nwhile read -u \"${COPROC[0]}\" -a event; do\n    handler.sh \"${event[@]}\"\ndone\n```\n\nDonde handler.sh puede ser una script similar a /etc/acpi/handler.sh.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Página principal de acpid\n- Gentoo:ACPI#Configuration\n\n"
+    }
+  ]
+}

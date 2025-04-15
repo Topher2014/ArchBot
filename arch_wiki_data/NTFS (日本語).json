@@ -1,0 +1,96 @@
+{
+  "title": "NTFS (日本語)",
+  "url": "https://wiki.archlinux.org/title/NTFS_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- ファイルシステム\n- マウント\n\nNTFS-3G は Microsoft の NTFS ファイルシステムの読み書きサポートを含むオープンソース実装です (Linux カーネルは NTFS の読み込みだけサポートしています)。開発を円滑に進めポータビリティを得るために NTFS-3G の開発者は FUSE ファイルシステムを使っています。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 手動マウント\n- 3 フォーマット\n- 4 設定 4.1 デフォルト設定 4.2 Linux 互換のパーミッション 4.3 グループ・ユーザーを許可する 4.4 基本的な NTFS-3G のオプション 4.5 ユーザーにマウントを許可する\n- 5 NTFS パーティションをリサイズする\n- 6 トラブルシューティング 6.1 Unsupported reparse point 6.2 破損した NTFS ファイルシステム 6.3 \"Metadata kept in Windows cache, refused to mount\" 6.4 Windows のハイバネートメタデータを削除する 6.5 マウントが失敗する\n- 7 参照\n\n- 4.1 デフォルト設定\n- 4.2 Linux 互換のパーミッション\n- 4.3 グループ・ユーザーを許可する\n- 4.4 基本的な NTFS-3G のオプション\n- 4.5 ユーザーにマウントを許可する\n\n- 6.1 Unsupported reparse point\n- 6.2 破損した NTFS ファイルシステム\n- 6.3 \"Metadata kept in Windows cache, refused to mount\"\n- 6.4 Windows のハイバネートメタデータを削除する\n- 6.5 マウントが失敗する\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "ntfs-3g パッケージをインストールしてください。\n\n"
+    },
+    {
+      "title": "手動マウント",
+      "level": 2,
+      "content": "NTFS パーティションを手動でマウントする方法は2つあります。伝統的な方法:\n\n```\n# mount -t ntfs-3g /dev/your_NTFS_partition /mount/point\n```\n\nArch ではマウントタイプ ntfs-3g を明示的に指定する必要はありません。ntfs-3g パッケージがインストールされていれば mount コマンドはデフォルトで /usr/bin/ntfs-3g にシンボリックリンクされている /usr/bin/mount.ntfs を使用します。\n\n2つ目の方法は ntfs-3g を直接呼び出すことです:\n\n```\n# ntfs-3g /dev/your_NTFS_partition /mount/point\n```\n\n利用可能なオプションは ntfs-3g(8) を見てください。\n\n"
+    },
+    {
+      "title": "フォーマット",
+      "level": 2,
+      "content": "```\n# mkfs.ntfs -Q -L diskLabel /dev/sdXY\n```\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "NTFS パーティションを自動でマウントするように設定したり、マウントしたいと思った時に特定の方法でマウントできるように事前に設定することができます。この設定は固定的なファイルシステムの設定 (fstab) か udev ルールを使って行います。\n\n"
+    },
+    {
+      "title": "デフォルト設定",
+      "level": 3,
+      "content": "デフォルト設定を使うと起動時に NTFS パーティションがマウントされます。この方法では、パーティションがマウントされている親のフォルダに適切なユーザーやグループのパーミッションがあれば、そのユーザーやグループはパーティションを読み書きすることができます。\n\n以下のように /etc/fstab に記述してください:\n\n```\n/etc/fstab\n```\n\n```\n# <file system>   <dir> <type>    <options>             <dump>  <pass>\n/dev/NTFS-part  /mnt/windows  ntfs-3g   defaults          0       0\n```\n\n"
+    },
+    {
+      "title": "Linux 互換のパーミッション",
+      "level": 3,
+      "content": "通常、Linux システムではフォルダは 755 に、ファイルは 644 にパーミッションが設定されます。定期的に NTFS パーティションを使う場合は NTFS パーティションにもこれらのパーミッションを同じように設定するのが推奨されています。以下の例では上記のパーミッションを通常ユーザーに指定しています:\n\n```\n# Mount internal Windows partition with linux compatible permissions, i.e. 755 for directories (dmask=022) and 644 for files (fmask=133)\n/dev/NTFS-partition  /mnt/windows  ntfs-3g uid=userid,gid=groupid,dmask=022,fmask=133 0 0\n```\n\n"
+    },
+    {
+      "title": "グループ・ユーザーを許可する",
+      "level": 3,
+      "content": "/etc/fstab (NTFS-3G ドライバー) にパーティションへのアクセス（読み取り）を許可するように他のオプションを指定することも可能です。例えば、groupid グループに入っているユーザーへアクセスを許可するには:\n\n```\n/dev/NTFS-partition  /mnt/windows  ntfs-3g   gid=groupid,umask=0022    0       0\n```\n\nデフォルトで、上記の行は書き込みサポートは root にだけ有効にします。ユーザーによる書き込みを有効にするには、書き込みパーミッションを与えるユーザーを指定する必要があります。uid パラメータとユーザーの名前を使ってユーザーの書き込みを有効にしてください:\n\n```\n/dev/NTFS-partition  /mnt/windows  ntfs-3g   uid=userid,gid=groupid,umask=0022    0       0\n```\n\n動かしているのがシングルユーザーマシンの場合、ファイルシステムの所有者を自分自身にして全てのパーティションを与えることができます:\n\n```\n/dev/NTFS-partition  /mnt/windows  ntfs-3g   uid=userid,gid=groupid    0       0\n```\n\n"
+    },
+    {
+      "title": "基本的な NTFS-3G のオプション",
+      "level": 3,
+      "content": "ほとんどの場合、上記の設定で十分なはずです。以下は、様々な Linux ファイルシステムのオプションと共通しているその他のオプションです。完全なリストは ntfs-3g(8) § OPTIONS を見て下さい。\n\n"
+    },
+    {
+      "title": "ユーザーにマウントを許可する",
+      "level": 3,
+      "content": "デフォルトでは、/etc/fstab に \"user\" オプションを設定していたとしても、ntfs-3g はファイルシステムをマウントするのに root 権限を必要とします。詳しくは ntfs-3g-faq を読んでください。fstab の user オプションは必須です。ユーザーとしてマウントするには、多少の設定が必要になります:\n\nまず、使用したいマウントデバイスへのアクセスができるか確認してください。一番簡単な方法は次のコマンドで disk グループに追加することです:\n\n```\n# gpasswd -a username disk\n```\n\nまた、使用したいマウントポイントへのアクセス権も必要になります。このマウントポイントでユーザーとして何かマウントすることになるので、所有者を変更したほうが良いでしょう:\n\n```\n# chown user /mnt/mountpoint\n```\n\n次に、完全な FUSE サポートを付けてコンパイルされた NTFS-3G ドライバーをインストールしてください。公式リポジトリの ntfs-3g パッケージには完全なサポートがありませんが、AUR に ntfs-3g-fuseAUR があります。\n\nこれで root 権限なしで NTFS パーティションをマウントすることができるようになっているはずです。\n\n"
+    },
+    {
+      "title": "NTFS パーティションをリサイズする",
+      "level": 2,
+      "content": "購入したパソコンには Windows がプリインストールされている場合がほとんどなので、Arch Linux をインストールする際に完全に Windows を消去してしまいたくない人もいるでしょう。その場合、既存の Windows パーティションをリサイズして Linux のパーティションを一つか二つ作るための領域を用意すると便利です。これには基本的に Live CD やブータブル USB サムドライブを使用します。\n\nLive CD を使う場合は ISO ファイルをダウンロードして、CD に焼き込み、その CD から起動するのが常套手段です。要件を満たす Windows 用のフリーの (GPL3 の) CD/DVD 書き込みアプリケーションとして InfraRecorder があります。ブータブル USB メディアを使う場合は、USB インストールメディアに書かれているブータブル USB スティックを作る方法を見て下さい。\n\nブータブル CD/USB イメージは多数存在します。このリストは完全ではありませんが、起点としては役に立つはずです:\n\n- GParted — x86 ベースのコンピュータ向けの小さなブータブル GNU/Linux ディストリビューション。GParted アプリケーションの最新版の全ての機能が使用できます。追加パッケージの System Rescue CD は含まれておらず、ディスク暗号化はサポートしていません。\n\n- Parted Magic — 完全なハードディスク管理ソリューション。Partition Editor を使ってパーティションをリサイズ・コピー・移動することができます。C: ドライブを拡大・縮小することが可能です。新しいオペレーティングシステムのために領域を作成できます。消失したパーティションからデータを救出する機能もあります。\n\n- SystemRescueCD — 大抵の場合でシームレスに動作させることができるツールです。起動すると、GParted が実行されすぐに操作することができます。\n\nNTFS パーティションをリサイズするのに必要なプログラムには util-linux パッケージに入っている fdisk や (G)parted などのユーティリティや ntfs-3g が含まれます。\"上級\"ユーザーでないのならば、ユーザーによる間違いによってデータが消失する可能性をできるだけ少なくするために、リサイズ操作には GParted などのツールを使うことが推奨されます。\n\n既に Arch Linux をインストール済みで、既存の NTFS パーティションをリサイズしたいだけの場合、parted と ntfs-3g パッケージを使ってリサイズできます。任意で、GParted パッケージをインストールして GParted GUI を使うことも可能です。\n\n"
+    },
+    {
+      "title": "Unsupported reparse point",
+      "level": 3,
+      "content": "Windows 10のNTFSファイルシステムをマウントし、ファイルまたはディレクトリを読み取る際、以下のようになることがあります\n\n1. 'unsupported reparse point' を指す壊れたシンボリックリンクが見える、もしくは\n1. cannot access some_file: Input/output error というエラーメッセージが表示される (この場合、journalにCould not load plugin /usr/lib64/ntfs-3g/ntfs-plugin-80000017.so: Success と表示されます)。\n\nこの原因はNTFS reparse pointsによるもので、NTFS-3Gはデフォルトで一部のタイプの再解析ポイントをサポートしていないためです。次の再解析ポイントで定義されている機能の一部との互換性を提供するためにNTFS-3Gプラグインが使えるかもしれません。\n\n- システム圧縮\n- 重複ファイル\n- OneDriveファイル\n\nさらなる詳細は このページ を参照してください。\n\n\"Compact OS\" として知られるシステム圧縮は、特定のファイルを圧縮しています。システム圧縮の回避策は2つ考えられます。\n\nNTFS-3Gプラグイン ntfs-3g-system-compressionAUR をインストールする。現在、このプラグインでは読み取りのみサポートされていますが、書き込みはサポートされていません。つまり、ファイルの作成または更新はサポートされていません。\n\nもしくは、Windows10のシステム圧縮機能を無効にすることです\n\n```\nC:\\WINDOWS\\system32> compact.exe /CompactOS:never\n```\n\n"
+    },
+    {
+      "title": "破損した NTFS ファイルシステム",
+      "level": 3,
+      "content": "NTFS ファイルシステムにエラーが存在する場合、NTFS-3G はファイルシステムを読み取り専用でマウントします。NTFS ファイルシステムを修復するには、Windows をロードしてディスクチェックプログラムの chkdsk を実行してください。 ntfsfix で修正できるエラーは限られているので注意してください。ntfsfix が失敗する場合でも、chkdsk が成功することがあります。\n\nNTFS ファイルシステムを修復するには、デバイスをアンマウントしておく必要があります。例えば、/dev/sda2 にある NTFS パーティションを修復するには:\n\n```\n# umount /dev/sda2\n# ntfsfix /dev/sda2\nMounting volume... OK\nProcessing of $MFT and $MFTMirr completed successfully.\nNTFS volume version is 3.1.\nNTFS partition /dev/sda2 was processed successfully.\n# mount /dev/sda2\n```\n\n全てが上手く行けば、ボリュームは書き込み可能になるはずです。\n\n"
+    },
+    {
+      "title": "\"Metadata kept in Windows cache, refused to mount\"",
+      "level": 3,
+      "content": "Windows 8 や 10 とデュアルブートをしている場合、Windows に見えているパーティションをマウントしようとすると以下のエラーが表示されることがあります:\n\n```\nThe disk contains an unclean file system (0, 0).\n Metadata kept in Windows cache, refused to mount.\n Failed to mount '/dev/sdc1': Operation not permitted\n The NTFS partition is in an unsafe state. Please resume and shutdown\n Windows fully (no hibernation or fast restarting), or mount the volume\n read-only with the 'ro' mount option.\n```\n\nこの問題は Windows 8 の新しい\"高速スタートアップ\"と呼ばれる機能が原因です。高速スタートアップが有効になっていると、マウントされる全てのパーティションのメタデータの一部が以前に終了したときの状態に復帰します。結果として、Linux によって加えられた変更が消失しています。Windows 8 を終了するときに\"シャットダウン\"や\"ハイバネート\"を選べば内蔵ディスクのどのパーティションにもデータの消失が起こる可能性があります。ただし、\"再起動\"で Windows 8 を終了するのは安全のようです。\n\n他のオペレーティングシステムのパーティションへの書き込みを有効にするときは、Windows 8 の高速スタートアップを無効にしてください。管理者権限で次のコマンドを実行することで無効にできます:\n\n```\npowercfg /h off\n```\n\n現在の設定は コントロールパネル > ハードウェアとサウンド > 電源オプション > システム設定 > 電源ボタンの動作を選択する で確認が可能です。\"高速スタートアップを有効にする\" のチェックが外れているか表示がなくなっているはずです。\n\n"
+    },
+    {
+      "title": "Windows のハイバネートメタデータを削除する",
+      "level": 3,
+      "content": "上記のようにシャットダウンする方法以外に、ハイバネートの後に保存される NTFS のメタデータを完全に消去するという方法もあります。Windows を起動することがなく完全にシャットダウンした場合のみ適しています。ntfs-3g を使って NTFS ファイルシステムをマウントするときに remove_hiberfile オプションを指定してください:\n\n```\n# mount -t ntfs-3g -o remove_hiberfile /dev/your_NTFS_partition /mount/point\n```\n\n"
+    },
+    {
+      "title": "マウントが失敗する",
+      "level": 3,
+      "content": "このガイドに従っても NTFS パーティションをマウントできない場合、/etc/fstab の全ての NTFS パーティションでデバイス名の代わりに UUID を使うようにしてみてください。これが fstab のサンプルです。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- ntfs-3g(8)\n\n"
+    }
+  ]
+}

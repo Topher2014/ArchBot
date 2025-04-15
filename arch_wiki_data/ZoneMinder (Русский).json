@@ -1,0 +1,76 @@
+{
+  "title": "ZoneMinder (Русский)",
+  "url": "https://wiki.archlinux.org/title/ZoneMinder_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "ZoneMinder — это интегрированный набор приложений, которые обеспечивают полное решение для видео наблюдения, позволяющее осуществлять захват, анализ, запись и мониторинг любых камер видеонаблюдения или камер безопасности, подключенных к компьютерам на базе Linux. Приложение предназначено для работы с дистрибутивами, поддерживающими интерфейс Video For Linux (V4L), и было протестировано с видеокамерами, подключенными к картам BTTV, различными USB-камерами, а также поддерживает большинство IP-камер.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет zoneminderAUR.\n\nДля создания миниатюр (используется редко) установите пакет netpbm.\n\nПосле завершения настройки и запуска системной службы, веб-интерфейс будет доступен по следующему адресу: http://localhost/zoneminder/.\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "Включите PHP, как описано в Apache HTTP Server#PHP.\n\nРаскомментируйте следующую строку в /etc/httpd/conf/httpd.conf:\n\n```\nLoadModule cgi_module modules/mod_cgi.so\n```\n\nВключите конфигурационный файл httpd-zoneminder, добавив эту строку в конец httpd.conf:\n\n```\nInclude conf/extra/httpd-zoneminder.conf\n```\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "Отредактируйте /etc/php/php.ini. Убедитесь, что следующие расширения включены, раскомментируя эти строки:\n\n```\nextension=apcu\nextension=ftp\nextension=gd\nextension=gettext\nextension=pdo_mysql\nextension=sockets\nextension=zip\n```\n\nТакже задайте часовой пояс, например:\n\n```\ndate.timezone = \"Europe/Kiev\"\n```\n\nСмотрите https://php.net/manual/en/timezones.php для просмотра списка часовых поясов.\n\nИногда может присутствовать следующий файл /etc/php/conf.d/zoneminder.ini:\n\n```\nextension=apcu\nextension=ftp\nextension=gd\nextension=gettext\nextension=pdo_mysql\nextension=sockets\nextension=zip\n```\n\n```\ndate.timezone = PLACEHOLDER\n```\n\nесли часовой пояс не заполнен, выполните:\n\n```\nsed -i 's|PLACEHOLDER|'`timedatectl | grep \"Time zone\" | tr -s ' ' | cut -f4 -d ' '`'|g' /etc/php/conf.d/zoneminder.ini\n```\n\n"
+    },
+    {
+      "title": "MySQL",
+      "level": 3,
+      "content": "Создание базы данных zm и пользователя с соответствующими разрешениями и паролем:\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE DATABASE zm;\nCREATE USER 'zmuser'@'localhost' IDENTIFIED BY 'zmpass';\nGRANT ALL ON zm.* TO 'zmuser'@'localhost';\nexit\n```\n\nИмпортируйте предварительно сконфигурированные таблицы в недавно созданную базу данных zm:\n\n```\n$ mysql -u root -p zm < /usr/share/zoneminder/db/zm_create.sql\n```\n\nОбновите конфигурацию ZoneMinder с новыми параметрами:\n\n```\n/etc/zm.conf\n```\n\n```\nZM_DB_HOST=localhost\nZM_DB_NAME=zm\nZM_DB_USER=zmuser\nZM_DB_PASS=zmpass\n```\n\n"
+    },
+    {
+      "title": "Безопасность",
+      "level": 4,
+      "content": "Для повышения безопасности нужно установить пароль для пользователя root:\n\n```\n/usr/bin/mysqladmin' -u root password 'new-password'\n/usr/bin/mysqladmin' -u root -h lilya-x64 password 'new-password'\n```\n\nКроме того, вы можете запускать:\n\n```\n/usr/bin/mysql_secure_installation\n```\n\n"
+    },
+    {
+      "title": "Запуск",
+      "level": 3,
+      "content": "Запустите/включите службы httpd.service, zoneminder.service, fcgiwrap-multiwatch и php-fpm.service.\n\n```\nsystemctl start php-fpm\nsystemctl enable php-fpm\n```\n\n```\nsystemctl start httpd\nsystemctl enable httpd\n```\n\n```\nsystemctl start zoneminder\nsystemctl enable zoneminder\n```\n\n```\nsystemctl start fcgiwrap-multiwatch\nsystemctl enable fcgiwrap-multiwatch\n```\n\n"
+    },
+    {
+      "title": "Решение проблем",
+      "level": 2,
+      "content": "По умолчанию, логи хранятся в /var/log/zoneminder. Вы также можете просматривать логи в веб-интерфейсе.\n\nТакже смотрите официальную wiki-страницу проекта: Troubleshooting.\n\n"
+    },
+    {
+      "title": "Очистка данных приложения",
+      "level": 3,
+      "content": "Данная функция будет полезна разработчикам или пользователям, которым нужно очистить все данные ZoneMinder и начать настройку с нуля.\n\n"
+    },
+    {
+      "title": "Восстановление базы данных",
+      "level": 4,
+      "content": "Удалите базу данных ZoneMinder и пользователя MySQL:\n\n```\n$ mysql -u root -p\n```\n\n```\nDROP DATABASE zm;\nDROP USER 'zmuser'@'localhost';\n```\n\nПересоздайте базу данных и пользователя:\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE DATABASE zm;\nCREATE USER 'zmuser'@'localhost' IDENTIFIED BY 'zmpass';\nGRANT CREATE, INSERT, SELECT, DELETE, UPDATE ON zm.* TO 'zmuser'@'localhost';\nexit\n```\n\nИмпортируйте предварительно сконфигурированные таблицы в недавно созданную базу данных zm:\n\n```\n$ mysql -u root -p zm < /usr/share/zoneminder/db/zm_create.sql\n```\n\n"
+    },
+    {
+      "title": "Очистка папки кеша",
+      "level": 4,
+      "content": "```\n$ rm -Rf /var/cache/zoneminder/events/* /var/cache/zoneminder/images/* /var/cache/zoneminder/temp/*\n```\n\n"
+    },
+    {
+      "title": "Локальные видеоустройства",
+      "level": 3,
+      "content": "Важно, чтобы пользователь, выполняющий httpd (обычно http), мог получить доступ к вашим камерам, например:\n\n```\n$ groups http\n```\n\n```\nvideo http\n```\n\n```\n$ ls -l /dev/video0\n```\n\n```\ncrw-rw----+ 1 root video 81, 0 Oct 28 21:54 /dev/video0\n```\n\nТо есть, добавьте пользователя http в группу video.\n\n```\nsudo usermod -aG video http\n```\n\n"
+    },
+    {
+      "title": "Несколько локальных USB-камер",
+      "level": 3,
+      "content": "Если вы заметили ошибку, например, libv4l2: error turning on stream: No space left on device при использовании нескольких USB-видеоустройств (к примеру, нескольких веб-камер), вам может потребоваться увеличить пропускную способность шины.\n\nСначала проверьте это, остановив zoneminder.service и выполнив данные команды:\n\n```\n$ rmmod uvcvideo\n$ modprobe uvcvideo quirks=128\n```\n\nЗапустите zoneminder.service и если проблема решена, сохраните изменение, добавив параметр модуля в /etc/modprobe.d/uvcvideo.conf. Например:\n\n```\noptions uvcvideo nodrop=1 quirks=128\n```\n\n(источник)\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- https://wiki.zoneminder.com/index.php/Arch_Linux — Страница проекта.\n\n"
+    }
+  ]
+}

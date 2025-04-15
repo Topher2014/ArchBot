@@ -1,0 +1,56 @@
+{
+  "title": "Matrix (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Matrix_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Matrix is an ambitious new ecosystem for open federated instant messaging and VoIP. It consists of servers, clients and bridge software to connect to existing messaging solutions like IRC.\n\nA Matrix channel for Arch Linux exists at #archlinux:archlinux.org. Some international communities have their own matrix rooms; see International communities for details.\n\nFor clients, see List of applications/Internet#Matrix clients.\n\nYou can either use an existing server like https://matrix.org or host your own Synapse server, which is described below.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The reference server implementation Synapse is available as matrix-synapse, which creates a synapse user.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "After installation, a configuration file needs to be generated. It should be readable by the synapse user:\n\n```\n# generate_config --server-name my.domain.name \\\n                  --config-dir /etc/synapse \\\n                  --data-dir /var/lib/synapse \\\n                  --report-stats yes \\\n                  --generate-secrets \\\n                  --output-file /etc/synapse/homeserver.yaml\n\n# generate_log_config -o /etc/synapse/my.domain.name.log.config \\\n                      -f /var/log/synapse/homeserver.log\n                      \n# generate_signing_key --output_file /etc/synapse/my.domain.name.signing.key\n\n# chown -R synapse:synapse /etc/synapse \\\n                           /var/log/synapse\n```\n\nNote that this will generate corresponding SSL keys and self-signed certificates for the specified server name. You have to regenerate those if you change the server name.\n\nIf your Synapse server is meant to be accessed over the internet, it is highly recommended to configure a reverse proxy.\n\n"
+    },
+    {
+      "title": "Databases",
+      "level": 2,
+      "content": "Synapse uses SQLite only to test the server, Postgres is used for operation.\n\nTo use Postgres you will need to install the python-psycopg2 package.\n\nYou can read more about installation and configuration on the official website: Using Postgres\n\n"
+    },
+    {
+      "title": "Service",
+      "level": 2,
+      "content": "The synapse.service systemd service is included in the matrix-synapse package. It will start the synapse server as user synapse and use the configuration file /etc/synapse/homeserver.yaml.\n\n"
+    },
+    {
+      "title": "User management",
+      "level": 2,
+      "content": "You need at least one user on your fresh synapse server. You may create one as your normal non-root user with the command\n\n```\n[synapse]$ register_new_matrix_user -c /etc/synapse/homeserver.yaml http://127.0.0.1:8008\n```\n\nor using one of the matrix clients, for example element-desktop, or the purple-matrix-gitAUR plug-in for libpurple.\n\n"
+    },
+    {
+      "title": "Spider Webcrawler",
+      "level": 2,
+      "content": "To enable the webcrawler, for server generated link previews, the additional packages python-lxml and python-netaddr have to be installed. After that, the option url_preview_enabled: True can be set in your homeserver.yaml. To prevent the synapse server from issuing arbitrary GET requests to internal hosts, the url_preview_ip_range_blacklist: has to be set.\n\nThere are some examples that can be uncommented. Add your local IP ranges to that list to prevent the synapse server from trying to crawl them. After changing the homeserver.yaml, the service has to be restarted.\n\n"
+    },
+    {
+      "title": "Interesting channels",
+      "level": 2,
+      "content": "KDE community has a wide variety of matrix rooms for specific applications, languages, events and etc. See https://community.kde.org/Matrix for details.\n\nThe GNOME Community also has a Matrix instance for its instant communications with a wide variety of matrix rooms. See https://wiki.gnome.org/GettingInTouch/Matrix for details.\n\n"
+    },
+    {
+      "title": "Read-only file system",
+      "level": 3,
+      "content": "By default, synapse can only write to the working-directory (/var/lib/synapse) set in its service file. A write-error may occur if synapse writes to a different path (e.g. your media-store is in /var/lib/matrix-synapse/media).\n\nYou can allow access to other directories by creating a replacement unit file for synapse.service and by adding ReadWritePaths=your_paths to the [Service] section.\n\n"
+    },
+    {
+      "title": "High memory consumption",
+      "level": 3,
+      "content": "The memory consumption of Synapse can be significantly reduced[1] by installing jemalloc. To enable it, the environment variable LD_PRELOAD must be set accordingly. This can be done by creating /etc/default/synapse, which will be applied by the systemd unit file.[2]\n\n```\n/etc/default/synapse\n```\n\n```\nLD_PRELOAD=/usr/lib/libjemalloc.so\n```\n\nAfter enabling jemalloc, the memory footprint can be reduced further by tuning cache settings: [3]\n\n```\n/etc/synapse/homeserver.yaml\n```\n\n```\ncaches:\n  cache_autotuning:\n    max_cache_memory_usage: 1024M\n    target_cache_memory_usage: 758M\n    min_cache_ttl: 5m\n```\n\nThe configuration options under cache_autotuning will not work unless jemalloc is enabled.\n\n"
+    }
+  ]
+}

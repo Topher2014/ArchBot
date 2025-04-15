@@ -1,0 +1,56 @@
+{
+  "title": "USB MIDI keyboards (日本語)",
+  "url": "https://wiki.archlinux.org/title/USB_MIDI_keyboards_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "このページでは ALSA を使用して音楽が聞けるようにサウンドカードが設定されていることが前提となります。Evolution MK-631 USB midi キーボードと SB Live! Value カードが使えることが確認されています。特記がないかぎりコマンドは非特権ユーザーで実行して下さい。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 予備テスト 1.1 ALSA\n- 2 キーボードの接続\n- 3 イベントの確認\n- 4 録音\n- 5 演奏 5.1 ハードウェアシンセサイザー 5.2 ソフトウェアシンセサイザー 5.2.1 Qsynth 5.2.2 Qsynth で JACK を使う\n\n- 1.1 ALSA\n\n- 5.1 ハードウェアシンセサイザー\n- 5.2 ソフトウェアシンセサイザー 5.2.1 Qsynth 5.2.2 Qsynth で JACK を使う\n\n- 5.2.1 Qsynth\n- 5.2.2 Qsynth で JACK を使う\n\n"
+    },
+    {
+      "title": "ALSA",
+      "level": 3,
+      "content": "公式リポジトリから alsa-utils パッケージをインストールして下さい。\n\naseqdump を実行してください。以下のような出力がされるはずです:\n\n```\nWaiting for data at port 128:0. Press Ctrl+C to end.\nSource_ Event_________________ Ch _Data__\n```\n\n表示はこれだけです。Ctrl+C を押してプログラムを終了してください。\n\n"
+    },
+    {
+      "title": "キーボードの接続",
+      "level": 2,
+      "content": "キーボードを接続して電源を入れて下さい。lsusb に以下のような出力がされるはずです:\n\n```\nBus 002 Device 002: ID 0a4d:00a0 Evolution Electronics, Ltd\n```\n\nlsmod | grep usb の出力には以下のモジュールが含まれているはずです:\n\n```\nusb_midi               25348  0\nsnd_usb_audio          70592  0\nsnd_usb_lib            16640  1 snd_usb_audio\n```\n\naconnect -i と入力して全ての MIDI 入力ポートを表示してください。以下のように出力されます:\n\n```\nclient 72: 'MK-361 USB MIDI keyboard' [type=kernel]\n    0 'MK-361 USB MIDI keyboard MIDI 1'\n```\n\nclient の数字はおそらく異なっていると思われます。メモして下さい。\n\n"
+    },
+    {
+      "title": "イベントの確認",
+      "level": 2,
+      "content": "aseqdump -p ## と入力してください。## はキーボードの client 番号に置き換えてください。以下のように表示されます:\n\n```\n72:0   Active Sensing\n```\n\n鍵盤を押すと以下のように表示されます:\n\n```\n72:0   Note on                 0  65  94\n 72:0   Note on                 0  65   0\n```\n\nリストには他にも様々なイベント (ノブを回したり、チャンネルを変えるなど) が登録されています。キーボードがちゃんと動作しているか確認するのに便利です。\n\nMIDI イベントをキーボードや他の MIDI 出力デバイスに送信するには、aplaymidi -p ## midifile.mid を実行して MIDI ファイルを指定してください。\n\n"
+    },
+    {
+      "title": "録音",
+      "level": 2,
+      "content": "まず、arecordmidi -l を実行します。使用可能な入力デバイスが一覧表示されるので、使用するデバイスを決めます。 それから、以下のコマンドを実行して記録を開始します。\n\n```\narecordmidi -p <port_number> <output_file>\n```\n\n記録を停止するには、プロセスを kill します。(Ctrl+c)\n\nこのツールで使用できる追加オプションの詳細は man arecordmidi を参照してください。\n\n"
+    },
+    {
+      "title": "演奏",
+      "level": 2,
+      "content": "キーボードのボタンを押した時に音が鳴るようにするには、MIDI 信号を音声に変換するシンセサイザーが必要です。\n\nサウンドカードによってはハードウェアシンセサイザーが内蔵されていることがありますが、最近のサウンドカード、特にオンボードのサウンドカードの場合、普通は搭載されていません。自分で楽器の音源をロードすることができるプログラムである、ソフトウェアシンセサイザーを使うのが簡単でしょう。\n\n"
+    },
+    {
+      "title": "ハードウェアシンセサイザー",
+      "level": 3,
+      "content": "aconnect -o と入力して全ての MIDI 出力ポートを表示してください。サウンドカードによって出力は変わります。SB Live! Value では、以下のように出力されます:\n\n```\nclient 64: 'EMU10K1 MPU-401 (UART)' [type=kernel]\n    0 'EMU10K1 MPU-401 (UART)'\nclient 65: 'Emu10k1 WaveTable' [type=kernel]\n    0 'Emu10k1 Port 0  '\n    1 'Emu10k1 Port 1  '\n    2 'Emu10k1 Port 2  '\n    3 'Emu10k1 Port 3  '\n```\n\nclient 65 が MIDI シンセサイザーです。サウンドカードが正しく設定されていれば、キーボードの出力を MIDI シンセサイザーにつなげることができるはずです。aconnect in out と入力してください。out は出力の client 番号 (このページの例では 65)、in は入力の client 番号に置き換えてください (このページの例では 72)。それでサウンドカードの MIDI 出力を使ってキーボードを演奏できるようになります。\n\n"
+    },
+    {
+      "title": "Qsynth",
+      "level": 4,
+      "content": "1. qsynth をインストールして下さい。\n1. QSynth を起動して Setup を開いて下さい。SF2 形式のサウンドフォントをロードする必要があります。http://soundfonts.narod.ru/ (ロシア語) からフリーの SoundFont を入手できます。SoundFont をロードした後に QSynth がエンジンを再起動するように言ってきたら、それに従って下さい。\n1. aconnect -o と入力して全ての MIDI 出力ポートを表示します。FLUID Synth を含むポートを探して client 番号をメモして下さい。\n1. aconnect in out と入力して下さい。out は出力の client 番号、in は入力の client 番号に置き換えてください (このページの例では 72)。これでキーボードを演奏すると QSynth が音を鳴らすはずです。\n\n"
+    },
+    {
+      "title": "Qsynth で JACK を使う",
+      "level": 4,
+      "content": "1. qsynth, jack, qjackctl をインストールして下さい\n1. qjackctl を起動して設定を確認:\n\n```\nServer Path: jackd\n Driver: alsa\n Realtime=enable; Priority:0\n Frames/Period:512\n Soft Mode=enable; Periods/Buffer:2\n Rest of parameters=disable(by default)\n Dither: None\n Audio: Duplex\n```\n\n1. qjackctl を使って jackd を起動 (Play ボタン)\n1. USB キーボードを接続\n1. QSynth を起動して Setup を開いて下さい。SF2 形式のサウンドフォントをロードする必要があります。http://soundfonts.narod.ru/ (ロシア語) からフリーの SoundFont を入手できます。SoundFont をロードした後に QSynth がエンジンを再起動するように言ってきたら、それに従って下さい。\n1. qjackctl から、Connect をクリックして ALSA タブを選択して下さい。MIDI キーボードと QSynth を選択して、Connect をクリックして下さい。\n\n"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "title": "EFISTUB (Español)",
+  "url": "https://wiki.archlinux.org/title/EFISTUB_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-11-27** \n\nArtículos relacionados\n\n- Arch boot process (Español)\n- Unified Extensible Firmware Interface (Español)\n\nEl kernel de Linux admite arrancar con EFISTUB (EFI BOOT STUB). Esta característica permite que el firmware EFI cargue el kernel como un ejecutable EFI. La opción está activada de forma predeterminada en los kernels de Arch Linux o se puede activar mediante el establecimiento de la variable CONFIG_EFI_STUB=y en la configuración del kernel. Vea The EFI Boot Stub para más información.\n\nCon EFISTUB un kernel se puede arrancar directamente por una placa base UEFI o indirectamente usando un gestor de arranque. Este último es recomendado si se tienen múltiples pares de kernel/initramfs y el menú de inicio UEFI de su placa base no es fácil de usar.\n\n"
+    },
+    {
+      "title": "Prepararse para EFISTUB",
+      "level": 2,
+      "content": "Primero, debe crear una EFI system partition (Español) y elegir cómo se monta. Vea EFI system partition (Español)#Montar la partición para todas las opciones de montaje disponibles.\n\n- pacman (Español) actualizará directamente el kernel que leerá el firmware EFI si monta la partición ESP en /boot.\n- Puede mantener el kernel e initramfs fuera de la partición ESP si utiliza un gestor de arranque que tenga un controlador de sistema de archivos para la partición donde residan, por ejemplo rEFInd.\n\n"
+    },
+    {
+      "title": "Utilizar un gestor de arranque",
+      "level": 3,
+      "content": "Existen varios gestores de arranque UEFI que pueden proporcionar opciones adicionales o simplificar el proceso de arranque UEFI —especialmente si tiene múltiples kernels/sistemas operativos—. Vea Arch boot process (Español)#Gestor de arranque para más información.\n\nEs posible lanzar un kernel EFISTUB desde el intérprete de órdenes de UEFI como si fuera una aplicación normal UEFI. En este caso, los parámetros del kernel se pasan como parámetros normales al archivo del kernel EFISTUB lanzado.\n\n```\n> fs0:\n> \\vmlinuz-linux root=PARTUUID=3518bb68-d01e-45c9-b973-0b5d918aae96 rw initrd=\\initramfs-linux.img\n```\n\nPara evitar tener que recordar todos los parámetros del kernel una y otra vez, puede guardar la orden ejecutable como un script de intérprete de órdenes (por ejemplo, como archlinux.nsh) en la partición del sistema UEFI, luego ejecútelo con:\n\n```\n> fs0:\n> archlinux\n```\n\n"
+    },
+    {
+      "title": "Utilizar directamente UEFI",
+      "level": 3,
+      "content": "UEFI está diseñado para eliminar la necesidad de tener un gestor de arranque intermediario como, por ejemplo, GRUB (Español). Si su placa base tiene una buena implementación UEFI, es posible incluir los parámetros del kernel dentro de una entrada de arranque UEFI para que la placa base arranque Arch directamente. Puede utilizar efibootmgr o UEFI Shell v2 para modificar las entradas de arranque de su placa base (para que incluya a Arch).\n\n"
+    },
+    {
+      "title": "efibootmgr",
+      "level": 4,
+      "content": "La orden sería como sigue:\n\n```\n# efibootmgr --disk /dev/sdX --part Y --create --label \"Arch Linux\" --loader /vmlinuz-linux --unicode 'root=PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rw initrd=\\initramfs-linux.img' --verbose\n```\n\nDonde /dev/sdX and Y se deben cambiar para reflejar el disco y la partición donde se encuentra la ESP. Cambie el parámetro root= para reflejar la raiz de Linux. Tenga en cuenta que el argumento -u/--unicode entre comillas es solo un ejemplo de la lista de los parámetros del kernel, por lo que es posible que deba agregar parámetros adicionales (por ejemplo, para suspender en disco o Microcode (Español)).\n\nDespués de agregar la entrada de inicio, puede verificar que dicha entrada se añadió correctamente con:\n\n```\n# efibootmgr --verbose\n```\n\n```\n# rm /sys/firmware/efi/efivars/dump-*\n```\n\nPara establecer el orden de arranque, ejecute:\n\n```\n# efibootmgr --bootorder XXXX,XXXX --verbose\n```\n\ndonde XXXX es el número que aparece en la salida de la orden efibootmgr de cada entrada.\n\nMás información sobre efibootmgr en Unified Extensible Firmware Interface (Español)#efibootmgr. Publicación del foro: https://bbs.archlinux.org/viewtopic.php?pid=1090040#p1090040 .\n\n"
+    },
+    {
+      "title": "efibootmgr con el archivo .efi",
+      "level": 4,
+      "content": "Si usa cryptbootAUR y sbupdate-gitAUR para generar sus propias claves para Secure Boot y firma con ellas initramfs y el kernel, cree, luego, una imagen .efi de arranque, efibootmgr puede usarse directamente para arrancar el archivo .efi file:\n\n```\n# efibootmgr --create --disk /dev/sdX --part partition_number --label \"label\" --loader \"EFI\\folder\\file.efi\" --verbose\n```\n\nVéase efibootmgr(8) para obtener una explicación de las opciones.\n\n"
+    },
+    {
+      "title": "Intérprete de órdenes de UEFI",
+      "level": 4,
+      "content": "Algunas implementaciones de UEFI hacen que sea difícil modificar la NVRAM con éxito usando efibootmgr. Si efibootmgr no puede crear una entrada con éxito, puede usar la orden bcfg en UEFI Shell v2 (es decir, desde la imagen iso live de Arch Linux).\n\nPrimero, averigüe el número de dispositivo donde reside la EFI system partition (Español), usando:\n\n```\nShell> map\n```\n\nEn este ejemplo, 1 se utiliza como número de dispositivo. Para listar los contenidos de EFI system partition (Español) escriba:\n\n```\nShell> ls fs1:\n```\n\nPara ver las entradas de arranque actuales escriba:\n\n```\nShell> bcfg boot dump\n```\n\nPara agregar una entrada para el kernel, utilice:\n\n```\nShell> bcfg boot add N fs1:\\vmlinuz-linux \"Arch Linux\"\n```\n\ndonde N es la ubicación donde se agregará la entrada en el menú de inicio. 0 es el primer elemento del menú. Los elementos de menú ya existentes se desplazarán en el menú sin que se descarten.\n\nPara agregar las opciones de kernel necesarias, primero cree un archivo en la ESP:\n\n```\nShell> edit fs1:\\options.txt\n```\n\nEn el archivo agregue la línea de arranque. Por ejemplo:\n\n```\nroot=/dev/sda2 ro initrd=\\initramfs-linux.img\n```\n\nPresione F2 para guardar y luego F3 para salir.\n\nPara agregar estas opciones a su entrada anterior, haga lo siguiente:\n\n```\nShell> bcfg boot -opt N fs1:\\options.txt\n```\n\nRepita este proceso para cualquier entrada adicional.\n\nPara eliminar un elemento previamente agregado, escriba:\n\n```\nShell> bcfg boot rm N\n```\n\n"
+    },
+    {
+      "title": "Utilizar un script startup.nsh",
+      "level": 4,
+      "content": "Algunas implementaciones de UEFI no retienen las variables de EFI entre los arranques en frío (por ejemplo, VirtualBox (Español)) y cualquier cosa que se haya configurado a través de la interfaz del firmware de UEFI se perderá durante el apagado.\n\nLa UEFI Shell Specification 2.0 establece que un script llamado startup.nsh en la raíz de la partición de ESP siempre debe interpretarse y puede contener instrucciones arbitrarias; entre las que se puede establecer una línea de carga de arranque. Asegúrese de montar la partición ESP en /boot y cree un script startup.nsh que contenga una línea de carga de arranque del kernel. Por ejemplo:\n\n```\nvmlinuz-linux rw root=/dev/sdX [rootfs=myfs] [rootflags=myrootflags] \\\n [kernel.flag=foo] [mymodule.flag=bar] \\\n [initrd=\\intel-ucode.img] initrd=\\initramfs-linux.img\n```\n\nEste método funcionará con casi todas las versiones de firmware UEFI que pueda encontrar en hardware real, por lo que puede usarlo como último recurso. El script debe ser una única línea larga. Las secciones entre paréntesis son opcionales y se ofrecen solo como una guía. Los saltos de línea de estilo shell son solo para clarificación visual. Los sistemas de archivos FAT utilizan la barra invertida como separador de ruta y, en este caso, la barra diagonal inversa declara que el initramfs se encuentra en la raíz de la partición ESP. Solo se carga el microcódigo de Intel en la línea de parámetros de arranque; El microcódigo de AMD se lee del disco más tarde durante el proceso de arranque; Esto se hace automáticamente por el kernel.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Linux Kernel Documentation on EFISTUB\n- Linux Kernel EFISTUB Git Commit\n- Rod Smith's page on EFISTUB\n\n"
+    }
+  ]
+}

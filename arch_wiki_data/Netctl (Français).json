@@ -1,0 +1,161 @@
+{
+  "title": "Netctl (Français)",
+  "url": "https://wiki.archlinux.org/title/Netctl_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Bridge with netctl\n- Network configuration (Français)\n- Configuration réseau sans-fil\n\nnetctl est un gestionnaire de réseau en ligne de commande basé sur des profils et un projet Arch.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Installez le paquet netctl.\n\nLes #Unités spéciales de systemd de netctl utilisées dans l'automatisation des connexions requièrent quelques dépendances supplémentaires ; consultez cette section pour plus d'informations.\n\nD'autres dépendances optionnelles sont présentées dans le tableau ci-dessous.\n\nTable content:\nFonctionnalité | Dépendance\nWPA | wpa_supplicant\nDHCP | dhcpcd ou dhclient\nwifi-menu | dialog\nPPPoE | ppp\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "netctl utilise des profils pour gérer les connexions réseau et différents modes de fonctionnement pour lancer les profils automatiquement ou manuellement à la demande.\n\nLes fichiers de profil netctl sont stockés dans /etc/netctl/ et des fichiers de configuration d'exemple sont disponibles dans /etc/netctl/examples/.\n\nPour utiliser un profil d'exemple, il suffit de le copier de /etc/netctl/examples/ vers /etc/netctl/ et de le configurer en fonction de vos besoins ; voir les #Exemples de profils de base ci-dessous. Le premier paramètre dont vous avez besoin pour créer un profil est l'Interface réseau, consultez Network configuration#Network interfaces pour plus de détails.\n\n- Pour les paramètres sans fil, vous pouvez utiliser wifi-menu en tant que root pour générer le fichier de profil dans /etc/netctl/. Le paquet dialog est nécessaire pour utiliser wifi-menu.\n- Utilisez SkipNoCarrier=yes dans votre profil pour activer un profil IP statique sur une interface filaire, que le câble soit connecté ou non.\n\nVoir netctl.profile(5) pour une liste complète des options de profil.\n\n"
+    },
+    {
+      "title": "Utilisation",
+      "level": 2,
+      "content": "Voir netctl(1) pour une liste complète des commandes netctl.\n\n"
+    },
+    {
+      "title": "Démarrer un profil",
+      "level": 3,
+      "content": "Une fois que vous avez créé votre profil, essayez d'établir une connexion, où profil est seulement le nom du profil, pas le chemin complet :\n\n```\n# netctl start profil\n```\n\nSi la commande ci-dessus échoue, exécutez journalctl -xn en tant que root et netctl status profile pour obtenir une explication plus approfondie de l'échec.\n\n"
+    },
+    {
+      "title": "Activation d'un profil",
+      "level": 3,
+      "content": "Un profil peut être activé pour démarrer au démarrage en utilisant :\n\n```\n# netctl enable profil\n```\n\nCela créera et activera un service systemd qui démarrera au démarrage de l'ordinateur. Les modifications apportées au fichier de profil ne se propageront pas automatiquement au fichier de service. Après de telles modifications, il est nécessaire de réactiver le profil :\n\n```\n# netctl reenable profil\n```\n\nAprès avoir activé un profil, celui-ci sera lancé au prochain démarrage. Évidemment, cela ne peut réussir que si le câble réseau pour une connexion filaire est branché, ou si le point d'accès sans fil utilisé dans un profil est à portée respectivement.\n\nSi vous devez changer fréquemment de profil (par exemple, si vous voyagez avec un ordinateur portable), utilisez #Unités spéciales de systemd au lieu d'activer un profil.\n\n"
+    },
+    {
+      "title": "Unités spéciales de systemd",
+      "level": 3,
+      "content": "netctl fournit des services spéciaux systemd pour la commutation automatique des profils pour les connexions filaires et sans fil. Voir netctl.special(7) pour une liste complète des unités spéciales de systemd.\n\n"
+    },
+    {
+      "title": "Filaire",
+      "level": 4,
+      "content": "Installez le paquet ifplugd et démarrez/activez l'unité systemd netctl-ifplugd@interface.service. Les profils DHCP seront démarrés/arrêtés lorsque le câble réseau est branché/débranché.\n\n- L'unité netctl-ifplugd@interface.service préférera les profils qui utilisent DHCP.\n- Pour démarrer automatiquement un profil d'IP statique, l'option ExcludeAuto=no doit être définie dans celui-ci.\n- Pour donner la priorité à un profil d'IP statique par rapport aux profils DHCP, vous pouvez définir l'option Priority=2, qui est supérieure à la priorité par défaut accordée aux profils DHCP, à savoir Priority=1.\n\n"
+    },
+    {
+      "title": "Sans fil",
+      "level": 4,
+      "content": "Démarrez/activez l'unité systemd netctl-auto@interface.service. Les profils netctl seront démarrés/arrêtés automatiquement lorsque vous passez de la portée d'un réseau à la portée d'un autre réseau (itinérance).\n\n- Les profils doivent utiliser Security=wpa-configsection ou Security=wpa pour fonctionner avec netctl-auto plutôt que Security=wpa-config.\n- Si vous voulez qu'un profil sans fil ne soit pas lancé automatiquement par netctl-auto@interface.service, vous devez explicitement ajouter ExcludeAuto=yes à ce profil.\n- Vous pouvez utiliser priority= dans la section WPAConfigSection (voir /etc/netctl/examples/wireless-wpa-configsection) pour définir la priorité d'un profil lorsque plusieurs points d'accès sans fil sont disponibles. Les chiffres les plus grands indiquent une priorité plus élevée.\n\nNotez que interface n'est pas littéral, mais doit être substitué par le nom de l'interface de votre périphérique, par exemple netctl-auto@wlp4s0.service. Voir netctl.profile(5) pour plus de détails.\n\n- Si l'un des profils contient des erreurs, comme une variable Key= vide ou mal citée, le chargement de l'unité échouera avec le message \"Failed to read or parse configuration '/run/network/wpa_supplicant_wlan0.conf', même si ce profil n'est pas utilisé.\n- Si vous avez précédemment activation d'un profil via netctl, exécutez netctl disable profil pour empêcher le profil de démarrer deux fois au démarrage.\n\nIl est possible de contrôler manuellement une interface autrement gérée par netctl-auto sans avoir à arrêter netctl-auto.service. Ceci est fait en utilisant la commande netctl-auto. Pour une liste complète des actions disponibles, voir netctl-auto(1).\n\n"
+    },
+    {
+      "title": "Filaire",
+      "level": 4,
+      "content": "Pour une connexion DHCP, seule l'interface Interface doit être configurée après avoir copié le profil exemple /etc/netctl/examples/ethernet-dhcp dans /etc/netctl.\n\nPar exemple :\n\n```\n/etc/netctl/mon_profil_dhcp\n```\n\n```\nInterface=enp1s0\nConnection=ethernet\nIP=dhcp\n```\n\nPour une configuration IP statique, copiez le profil d'exemple /etc/netctl/examples/ethernet-static dans /etc/netctl et modifiez Interface, Address, Gateway et DNS) selon les besoins.\n\nPar exemple :\n\n```\n/etc/netctl/mon_profil_statique\n```\n\n```\nInterface=enp1s0\nConnection=ethernet\nIP=static\nAddress=('10.1.10.2/24')\nGateway='10.1.10.1'\nDNS=('10.1.10.1')\n```\n\nPrenez soin d'inclure la notation de sous-réseau de /24. Elle équivaut à un masque de réseau de 255.255.255.0) et sans elle, le profil ne pourra pas démarrer. Voir également CIDR notation. Pour aliaser plus d'une adresse IP par un ensemble de NIC Address=('10.1.10.2/24' '192.168.1.2/24'). Pour aliaser plus d'un ensemble d'adresses de serveurs DNS, définissez par exemple DNS=('1.1.1.1' '1.0.0.1').\n\n"
+    },
+    {
+      "title": "Sans fil (WPA-PSK)",
+      "level": 4,
+      "content": "Ce qui suit s'applique aux connexions sans fil standard utilisant une clé pré-partagée (WPA-PSK).\n\n```\n/etc/netctl/wireless-wpa\n```\n\n```\nDescription='A simple WPA encrypted wireless connection using 256-bit PSK'\nInterface=wlp2s2\nConnection=wireless\nSecurity=wpa\nIP=dhcp\nESSID=your_essid\nKey=\\\"64cf3ced850ecef39197bb7b7b301fc39437a6aa6c6a599d0534b16af578e04a\n```\n\nNote: **règles de citation spéciales** \n\n- Assurez-vous d'utiliser les règles de citation spéciales pour la variable Key comme expliqué dans netctl.profile(5) § SPECIAL QUOTING RULES.\n- Si la phrase de passe échoue, essayez de supprimer le \\\" de la variable Key.\n- Bien que \"chiffrée\", la clé que vous mettez dans la configuration du profil est suffisante pour se connecter à un réseau WPA-PSK. Par conséquent, ce processus n'est utile que pour cacher la version lisible par l'homme de la phrase de passe. Cela n'empêchera pas quiconque ayant un accès en lecture à ce fichier de se connecter au réseau.\n\n"
+    },
+    {
+      "title": "Obfusquer la phrase de passe sans fil",
+      "level": 3,
+      "content": "Vous pouvez également suivre l'étape suivante pour obscurcir la phrase de passe sans fil (wifi-menu le fait automatiquement lorsque vous utilisez le paramètre -o) :\n\nLes utilisateurs qui ne souhaitent pas que la phrase de passe de leur réseau sans fil soit stockée en texte clair ont la possibilité de stocker la clé pré-partagée 256 bits correspondante, qui est calculée à partir de la phrase de passe et du SSID à l'aide d'algorithmes standard.\n\nCalculez votre clé pré-partagée de 256 bits en utilisant wpa_passphrase :\n\n```\n$ wpa_passphrase votre_essid\n```\n\n```\nnetwork={\n  ssid=\"your_essid\"\n  #psk=\"passphrase\"\n  psk=64cf3ced850ecef39197bb7b7b301fc39437a6aa6c6a599d0534b16af578e04a\n}\n```\n\nLa clé pré-partagée (psk) doit maintenant remplacer la phrase de passe en texte clair de la variable Key dans le profil.\n\n"
+    },
+    {
+      "title": "Utilisation d'une interface graphique expérimentale",
+      "level": 3,
+      "content": "Si vous voulez une interface utilisateur graphique pour gérer netctl et vos connexions et que vous n'avez pas peur des paquets non officiels très expérimentaux, il existe quelques options disponibles. netctl-guiAUR fournit une interface graphique basée sur Qt, un daemon DBus et un widget KDE. netmenuAUR utilise dmenu comme interface graphique.\n\nIl existe également une application qui affiche des notifications de bureau sur les changements de profil et qui présente une icône dans la barre d'état système : netctl-trayAUR.\n\n"
+    },
+    {
+      "title": "Bonding",
+      "level": 3,
+      "content": "Consultez Netctl#Bonding : cette section nécessite une mise à jour car elle reposait sur un outil qui n'est plus fourni par le noyau.\n\n"
+    },
+    {
+      "title": "Utilisation de n'importe quelle interface",
+      "level": 3,
+      "content": "Dans certains cas, il peut être souhaitable d'autoriser un profil à utiliser n'importe quelle interface du système. Un exemple courant d'utilisation est l'utilisation d'une image disque commune sur plusieurs machines avec un matériel différent (ceci est particulièrement utile si elles sont sans affichage). Si vous utilisez le schéma de nommage du noyau, et que votre machine ne possède qu'une seule interface Ethernet, vous pouvez probablement deviner que eth0 est la bonne interface. En revanche, si vous utilisez le système d'attribution de noms d'udev Predictable Network Interface Names, les noms seront attribués en fonction du matériel spécifique lui-même (par exemple enp1s0), plutôt que dans le simple ordre de détection du matériel (par exemple eth0, eth1). Cela signifie qu'un profil netctl peut fonctionner sur une machine et pas sur une autre, car elles ont toutes des noms d'interface différents.\n\nUne solution simple et rapide consiste à utiliser le répertoire /etc/netctl/interfaces/. Choisissez un nom pour votre alias d'interface (en-any dans cet exemple), et écrivez ce qui suit dans un fichier portant ce nom (en vous assurant qu'il est exécutable).\n\n```\n/etc/netctl/interfaces/en-any\n```\n\n```\n#!/bin/sh\nfor interface in /sys/class/net/en*; do\n        break;\ndone\nInterface=$(basename \"$interface\")\necho \"en-any: using interface $Interface\";\n```\n\nCréez ensuite un profil qui utilise l'interface. Faites particulièrement attention à la directive Interface. Le reste n'est fourni qu'à titre d'exemple.\n\n```\n/etc/netctl/wired\n```\n\n```\nDescription='Wired'\nInterface=en-any\nConnection=ethernet\nIP=static\nAddress=('192.168.1.15/24')\nGateway='192.168.1.1'\nDNS=('192.168.1.1')\n```\n\nLorsque le profil wired est lancé, toute machine utilisant les deux fichiers ci-dessus fera automatiquement apparaître et configurer la première interface Ethernet trouvée sur le système, quel que soit le nom qu'udev lui a attribué. Notez que ce n'est pas la manière la plus robuste de configurer des interfaces. Si vous utilisez plusieurs interfaces, netctl peut essayer de leur attribuer la même interface, ce qui provoquera probablement une interruption de la connectivité. Si vous n'êtes pas gêné par une solution plus compliquée, netctl-auto est probablement plus fiable.\n\n"
+    },
+    {
+      "title": "Utilisation des hooks",
+      "level": 3,
+      "content": "netctl prend en charge les hooks dans /etc/netctl/hooks/ et les hooks par interface dans /etc/netctl/interfaces/. Vous pouvez définir toute option dans un hook/interface que vous pouvez dans un profil. Cela inclut surtout ExecUpPost et ExecDownPre.\n\nLorsqu'un profil est lu, netctl extrait tous les scripts exécutables du répertoire hooks, puis il lit le fichier de profil de la connexion et enfin il extrait un script exécutable portant le nom de l'interface utilisée dans le profil du répertoire interfaces. Par conséquent, les déclarations dans un script d'interface remplacent les déclarations dans le profil, qui remplacent les déclarations dans les hooks.\n\nLes variables $INTERFACE et $ACTION sont disponibles dans hooks/interfaces uniquement lorsque vous utilisez netctl-auto.\n\n"
+    },
+    {
+      "title": "Exemples",
+      "level": 4,
+      "content": "```\n/etc/netctl/hooks/myservices\n```\n\n```\n#!/bin/sh\nExecUpPost=\"systemctl start crashplan.service ; systemctl start dropbox@<username>.service\"\nExecDownPre=\"systemctl stop crashplan.service ; systemctl stop dropbox@<username>.service\"\n```\n\nPour définir ou modifier le client DHCP utilisé pour tous les profils :\n\n```\n/etc/netctl/hooks/dhcp\n```\n\n```\n#!/bin/sh\nDHCPClient='dhclient'\n```\n\nN'oubliez pas de rendre le fichier exécutable.\n\nOn peut également le spécifier pour une interface réseau spécifique en créant un fichier exécutable /etc/netctl/interfaces/<interface> avec la ligne suivante :\n\n```\nDHCPClient='dhclient'\n```\n\n"
+    },
+    {
+      "title": "Section WPAConfig minimale",
+      "level": 3,
+      "content": "Comme indiqué dans netctl.profile(5) § OPTIONS FOR 'WIRELESS' CONNECTIONS, la variable WPAConfigSection est un tableau de lignes de configuration passées à wpa_supplicant. Ainsi, une WPAConfigSection minimale contiendrait :\n\n```\nDescription='A wireless connection using a custom network block configuration'\nInterface=wlan0\nConnection=wireless\nSecurity=wpa-configsection\nIP=dhcp\nWPAConfigSection=(\n    'ssid=\"University\"'\n    'psk=\"very secret passphrase\"'\n)\n```\n\n"
+    },
+    {
+      "title": "/etc/resolv.conf",
+      "level": 3,
+      "content": "Si vous utilisez des options DNS* dans votre profil, netctl appelle resolvconf pour écraser resolv.conf.\n\n"
+    },
+    {
+      "title": "Job for netctl@wlan(...).service failed",
+      "level": 3,
+      "content": "Certaines personnes rencontrent un problème lorsqu'elles se connectent à un réseau avec netctl, par exemple :\n\n```\n# netctl start wlan0-ssid\n```\n\n```\nJob for netctl@wlan0\\x2ssid.service failed. See 'systemctl status netctl@wlan0\\x2ssid.service' and 'journalctl -xn' for details.\n```\n\nLorsque vous regardez le journal en exécutant journalctl -xn en tant que root, l'un ou l'autre des éléments suivants s'affiche :\n\n1. Si votre périphérique (wlan0 dans ce cas) est en marche :\n\n```\nnetwork[2322] : L'interface du profil réseau 'wlan0-ssid' est déjà en service.\n```\n\nLa mise hors service de l'interface devrait résoudre le problème :\n\n```\n# ip link set wlan0 down\n```\n\nPuis réessayez :\n\n```\n# netctl start wlan0-ssid\n```\n\n2. Si l'erreur persiste, réessayez après avoir ajouté l'option ForceConnect :\n\n```\n/etc/netctl/wlan0-ssid\n```\n\n```\n...\nForceConnect=yes\n```\n\nEnregistrez-la et essayez de vous connecter avec le profil :\n\n```\n# netctl start wlan0-ssid\n```\n\n"
+    },
+    {
+      "title": "dhcpcd: ipv4_addroute: File exists",
+      "level": 3,
+      "content": "Sur certains systèmes, la combinaison de dhcpcd et de netctl provoque des problèmes de délai d'attente lors de la reprise, en particulier si vous avez changé de réseau entre-temps. netctl signalera que vous êtes connecté avec succès mais que vous recevez toujours des problèmes de délai d'attente. Dans ce cas, l'ancienne route par défaut existe toujours et n'est pas renouvelée. Une solution pour éviter ce comportement erroné est de passer à dhclient comme client DHCP par défaut. Vous trouverez plus d'informations sur ce problème ici.\n\n"
+    },
+    {
+      "title": "Problèmes de délai d'attente DHCP",
+      "level": 3,
+      "content": "Si vous rencontrez des problèmes de délai d'attente lors de la demande de baux via DHCP, vous pouvez définir une valeur de délai d'attente supérieure aux 30 secondes par défaut de netctl. Créez un fichier dans /etc/netctl/hooks/ ou /etc/netctl/interfaces/, ajoutez-y TimeoutDHCP=40 pour un timeout de 40 secondes et rendez le fichier exécutable.\n\n"
+    },
+    {
+      "title": "Débogage de dhcpcd",
+      "level": 3,
+      "content": "Si dhcpcd ne parvient pas à obtenir une adresse, ajoutez l'option -d à /usr/lib/netctl/dhcp puis exécutez journalctl -xe en tant que root pour afficher les messages de débogage qui peuvent indiquer, par exemple, que l'adresse IP offerte par le serveur est rejetée par le client après avoir détecté que l'adresse IP est déjà utilisée.\n\n"
+    },
+    {
+      "title": "Problèmes de délais de connexion",
+      "level": 3,
+      "content": "Si vous rencontrez des problèmes de délai d'attente qui ne sont pas liés au DHCP (sur une connexion ethernet statique par exemple), et que vous rencontrez des erreurs similaires à celles qui suivent au démarrage de votre profil :\n\n```\n# journalctl _SYSTEMD_UNIT=netctl@profil'.service\n```\n\n```\nDémarrage du profil réseau 'profil'...\nAucune connexion trouvée sur l'interface 'eth0' (timeout)\nÉchec de la mise en service du réseau pour le profil 'profil'.\n```\n\nEnsuite, vous devez augmenter les délais d'attente pour la porteuse et l'activation en ajoutant TimeoutUp= et TimeoutCarrier= à votre fichier de profil :\n\n```\n/etc/netctl/profile\n```\n\n```\n...\nTimeoutUp=300\nTimeoutCarrier=300\n```\n\nN'oubliez pas de réactiver votre profil :\n\n```\n# netctl reenable profil\n```\n\n"
+    },
+    {
+      "title": "Problèmes avec netctl-auto sur la reprise",
+      "level": 3,
+      "content": "Parfois, netctl-auto ne parvient pas à se reconnecter lorsque le système reprend après une suspension, une hibernation ou un sommeil hybride. Une solution facile est de redémarrer le service pour netctl-auto. Ceci peut être automatisé avec un service supplémentaire comme le suivant :\n\n```\n/etc/systemd/system/netctl-auto-resume@.service\n```\n\n```\n[Unit]\nDescription=restart netctl-auto on resume.\nRequisite=netctl-auto@%i.service\nAfter=sleep.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/systemctl restart netctl-auto@%i.service\n\n[Install]\nWantedBy=sleep.target\n```\n\nPour activer ce service pour votre carte sans fil, par exemple, activez netctl-auto-resume@wlan0.service en tant que root. Remplacez wlan0 par l'interface réseau requise.\n\nSi le périphérique n'est pas encore en cours d'exécution sur la reprise lorsque l'unité est démarrée, cela échouera. Cela peut être corrigé en ajoutant la dépendance suivante dans la ligne After :\n\n```\n/etc/systemd/system/netctl-auto-resume@.service\n```\n\n```\n...\nAfter=sleep.target sys-subsystem-net-devices-%i.device\n...\n```\n\n"
+    },
+    {
+      "title": "netctl-auto ne débloque pas automatiquement une carte sans fil pour utiliser une interface",
+      "level": 3,
+      "content": "De nombreux ordinateurs portables ont un bouton matériel (ou un interrupteur) pour désactiver la carte sans fil, cependant, la carte peut également être bloquée par le noyau. Ceci peut être géré par rfkill.\n\nSi vous souhaitez que netctl-auto débloque automatiquement votre carte sans fil pour vous connecter à un réseau particulier, définissez l'option RFKill=++auto++ pour la connexion sans fil de votre choix, comme spécifié dans netctl.profile(5).\n\n"
+    },
+    {
+      "title": "RTNETLINK répond : Le fichier existe (avec plusieurs NICs)",
+      "level": 3,
+      "content": "Cette réponse est très trompeuse, elle signifie en réalité que vous avez assigné une passerelle par défaut dans un fichier de contrôle netctl antérieur. Quand netctl démarre la n-ième NIC et va définir sa route locale, il échoue parce qu'il y a déjà une route par défaut de n-1.\n\nSupprimez-la et tout fonctionne, sauf que vous n'avez plus de route par défaut et que vous ne pouvez pas accéder à des éléments tels qu'Internet. ExecUpPost ne fonctionne pas car il est exécuté pour chaque carte réseau.\n\nUne solution possible est de créer un nouveau service. Remplacez \"FIRST_INTERFACE\" et \"SECOND_INTERFACE\" par vos noms d'interface, et remplacez \"192.168.xxx.yyy\" par votre passerelle par défaut.\n\n```\n/etc/systemd/system/defaultrouter.service\n```\n\n```\n[Unit]\nDescription=\"Configure default gateway\"\nRequires=netctl@FIRST_INTERFACE.service netctl@SECOND_INTERFACE.service\nAfter=netctl@FIRST_INTERFACE.service netctl@SECOND_INTERFACE.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ip route add default via 192.168.xxx.yyy\n\n[Install]\nWantedBy=network-online.target\n```\n\n"
+    },
+    {
+      "title": "Problèmes avec Eduroam et autres connexions MSCHAPv2",
+      "level": 3,
+      "content": "Consultez wpa_supplicant#Problems with Eduroam.\n\n"
+    },
+    {
+      "title": "Avertissements du journal pour les profils utilisant les directives .include",
+      "level": 3,
+      "content": "Les profils utilisant toujours les anciennes directives .include de systemd produiront des avertissements de journal, par exemple :\n\n```\nsystemd[1]: /etc/systemd/system/netctl@<profile>.service:1: .include directives are deprecated, and support for them will be removed in a future version of systemd. Please use drop-in files instead.\n```\n\nVoir FS#59494 pour plus de détails.\n\nL'exécution de\n\n```\nnetctl reenable profile\n```\n\nmettra à jour le profil au nouveau format des fichiers de substitution.\n\n"
+    },
+    {
+      "title": "Les hooks ne fonctionnent pas",
+      "level": 3,
+      "content": "Si vous avez plusieurs hooks dans /etc/netctl/hooks/, des variables comme ExecUpPost et ExecDownPre ne seront exécutées que depuis un seul fichier. Pour résoudre ce problème, définissez les variables comme suit :\n\n```\n/etc/netctl/hooks/test\n```\n\n```\nExecUpPost=\"une commande ; \"$ExecUpPost\nExecDownPre=\"une commande ; \"$ExecDownPre\n```\n\nCeci ajoutera vos commandes à exécuter à celles déjà définies.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Annonce initiale sur la liste de diffusion\n- Sujet d'annonce officiel\n- Annonce officielle dans les actualités\n\n"
+    }
+  ]
+}

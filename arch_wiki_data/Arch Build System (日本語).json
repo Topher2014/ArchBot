@@ -1,0 +1,61 @@
+{
+  "title": "Arch Build System (日本語)",
+  "url": "https://wiki.archlinux.org/title/Arch_Build_System_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Arch パッケージングスタンダード\n- Arch User Repository\n- パッケージの作成\n- カーネル/Arch build system\n- makepkg\n- 公式リポジトリ\n- pacman\n- PKGBUILD\n- パッケージにパッチを適用\n\nArch build system (ABS) とは、ports ライクなシステムで、ソースコートからソフトウェアをビルドしたりパッケージングしたりするためのものです。pacman はバイナリパッケージの管理用に特殊化された Arch ツールであるに対し、Arch build system は、インストール可能な .pkg.tar.zst パッケージにソースをコンパイルするためのツールのコレクションです。\n\nPorts は BSD 系によって採用されている、ソースコードからのソフトウェアのビルドを自動化するシステムです。port を使ってソフトウェアのダウンロード、展開、パッチの適用、コンパイル、インストールを行います。port はユーザのコンピュータ上にあるただの小さなディレクトリで、それぞれの port に対応する個々のソフト名が付けられており、中にはソフトウェアのビルド・インストールのための情報が書かれたファイルが入っています。これにより、port のディレクトリ内で make か make install clean を実行すればよく、ソフトウェアのインストールがシンプルになります。\n\nArch build system も似たようなコンセプトに基づいています。Arch build system は、Arch Linux で利用可能なそれぞれパッケージの git リポジトリのコレクションで構成されています。各リポジトリには PKGBUILD ファイル (場合によっては他のファイルも) が含まれており、ソフトウェアのソースやバイナリは含まれていません。makepkg をディレクトリ内で実行すると、ソフトウェアのソースがダウンロードされ、ソフトウェアがコンパイルされ、ビルドディレクトリ内でパッケージングされます。その後、そのパッケージを pacman でインストールできます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 ツールチェイン 1.1 リポジトリ構造\n- 2 ユースケース\n- 3 使用法 3.1 PKGBUILD ソースを取得する 3.1.1 pkgctl ツールを使う 3.1.2 直接 git を使う 3.2 パッケージをビルドする\n- 4 ヒントとテクニック 4.1 修正を加えたパッケージを保護する\n- 5 他のツール\n\n- 1.1 リポジトリ構造\n\n- 3.1 PKGBUILD ソースを取得する 3.1.1 pkgctl ツールを使う 3.1.2 直接 git を使う\n- 3.2 パッケージをビルドする\n\n- 3.1.1 pkgctl ツールを使う\n- 3.1.2 直接 git を使う\n\n- 4.1 修正を加えたパッケージを保護する\n\n"
+    },
+    {
+      "title": "ツールチェイン",
+      "level": 2,
+      "content": "Arch build system には、ソースからパッケージをビルドするプロセスで使用されるいくつかのコンポーネントとツールが含まれており、それらのコンポーネントに依存しています:\n\n"
+    },
+    {
+      "title": "リポジトリ構造",
+      "level": 3,
+      "content": "公式リポジトリ core、extra、core-testing、そして extra-testing は、Arch Linux Gitlab インスタンス上でホストされています。\n\n各パッケージには、archlinux/packaging/packages という名前空間内にそれぞれの独自のリポジトリが存在します。各リポジトリには、公式なビルドで使用される PKGBUILD とファイルが含まれています。また、ビルドプロセスで開発者によって使用されるファイルも存在していることがあります。\n\n例えば、acl のツリーは以下のような見た目をしています:\n\n```\nacl\n├── keys\n│   └── pgp\n│       ├── 259B3792B3D6D319212CC4DCD5BF9FEB0313653A.asc\n│       ├── 600CD204FBCEA418BD2CA74F154343260542DF34.asc\n│       └── B902B5271325F892AC251AD441633B9FE837F581.asc\n└── PKGBUILD\n```\n\nパッケージのソースコードはディレクトリ内には存在しません。その代わり、パッケージのビルド時にソースコードをダウンロードする URL が PKGBUILD に含まれています。\n\n"
+    },
+    {
+      "title": "ユースケース",
+      "level": 2,
+      "content": "Arch build system は、ソースからのコンパイルに関連する特定のタスクを自動化します。ABS のユースケースとしては以下があります:\n\n- パッケージを(再)コンパイルする必要があるケース。\n- パッケージがまだ利用できないソフトウェアのソースから新しいパッケージを make しインストールする (パッケージの作成 を見てください)。\n- 既存のパッケージをニーズに合わせてカスタマイズする (例: オプションを有効化/無効化する、パッチを当てる)。\n- (FreeBSD 風に) コンパイラフラグを指定してシステム全体をリビルドする。\n- 自分のカスタムカーネルをクリーンにビルド・インストールする (カーネル#コンパイル を見てください)。\n- カーネルモジュールをカスタムカーネルで動くようにする。\n- PKGBUILD 内のバージョン番号を編集して、新しい、古い、ベータ、開発バージョンの Arch パッケージを簡単にコンパイル・インストールする。\n\n"
+    },
+    {
+      "title": "PKGBUILD ソースを取得する",
+      "level": 3,
+      "content": "特定のパッケージをソースからビルドするために必要な PKGBUILD ファイルを取得するには、pkgctl ツールを使うか、直接 Git を使うことができます。\n\n"
+    },
+    {
+      "title": "pkgctl ツールを使う",
+      "level": 4,
+      "content": "前提条件として、devtools パッケージをインストールしてください。pkgctl は、Git を使用して Arch Linux パッケージのビルドソースファイルを操作するためのツールです。\n\npkgctl を使用して最新のビルドファイルを含む git リポジトリを clone するには、以下のコマンドが使用されます:\n\n```\n$ pkgctl repo clone pkgname\n```\n\n注意点として、ここではビルドソースファイルというのは PKGBUILD のことを指します (場合によっては、キーファイルなどの他の必要なファイルも含みます)。つまり、Arch Linux ビルドシステムで必要な必須のファイル群です。パッケージを作成したチームによって書かれたパッケージのソースファイル (C や Python のファイル) を指すのではありません。\n\nこのコマンドにより、現在のソースビルドファイルのみならず、以前のバージョンもダウンロードします。さらに、古いバージョンに checkout したりカスタムの変更を追跡したりするための他の git コマンドもすべて利用できます。\n\nパッケージの特定のバージョンを入手したい場合、以下のようなことを行うことができます:\n\n```\n$ pkgctl repo clone --switch=\"2:1.19.5-1\" go\n```\n\n詳細や他の利用可能なコマンドは pkgctl-repo-clone(1) を読んでください。\n\n"
+    },
+    {
+      "title": "直接 git を使う",
+      "level": 4,
+      "content": "以下の git コマンドでパッケージを clone できます:\n\n```\n$ git clone https://gitlab.archlinux.org/archlinux/packaging/packages/pkgname.git\n```\n\n例えば、Apache のビルドファイルをコピーするには:\n\n```\n$ git clone https://gitlab.archlinux.org/archlinux/packaging/packages/apache.git\n```\n\n"
+    },
+    {
+      "title": "パッケージをビルドする",
+      "level": 3,
+      "content": "チェックアウトした PKGBUILD からパッケージをビルドするときに makepkg を設定する方法は makepkg#設定を見てください。\n\nPKGBUILD が含まれたディレクトリをどこか好きなところにコピーしてください。それから必要な修正を加えてください。makepkg#使用方法に書かれているように makepkg を使ってパッケージを作成・インストールします。\n\n"
+    },
+    {
+      "title": "修正を加えたパッケージを保護する",
+      "level": 3,
+      "content": "pacman でシステムを更新すると、修正を加えたパッケージが公式リポジトリにある同じ名前のパッケージで置き換えられてしまいます。これを回避するには以下の方法を見て下さい。\n\ngroup 配列を PKGBUILD に挿入し、対象のパッケージを modified と言う名前の group に追加してください。\n\n```\nPKGBUILD\n```\n\n```\ngroups=('modified')\n```\n\nそしてこのグループを /etc/pacman.conf の IgnoreGroup セクションに追加してください。\n\n```\n/etc/pacman.conf\n```\n\n```\nIgnoreGroup = modified\n```\n\nシステムアップデートで公式リポジトリにパッケージの新しいバージョンがあっても、pacman は IgnoreGroup セクションにパッケージがあるため更新をスキップすると表示します。部分的なアップグレードにならないようにここでパッケージをビルドしなおす必要があります。\n\n"
+    },
+    {
+      "title": "他のツール",
+      "level": 2,
+      "content": "- pbget - Web インターフェイスから直接個々のパッケージの PKGBUILD を取得します。AUR サポートもあり。\n\n"
+    }
+  ]
+}

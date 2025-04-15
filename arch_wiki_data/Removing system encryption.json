@@ -1,0 +1,76 @@
+{
+  "title": "Removing system encryption",
+  "url": "https://wiki.archlinux.org/title/Removing_system_encryption",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nRemoving system encryption with dm-crypt and LUKS.\n\n"
+    },
+    {
+      "title": "Overview",
+      "level": 3,
+      "content": "Although not as safe as backing up your data and restoring it on to a reformatted device, cryptsetup does allow the user to permanently remove the LUKS encryption from a device in-place. For example, if you have an ext4 filesystem living inside a LUKS-encrypted partition, performing in-place decryption will remove the LUKS signature, and place the ext4 filesystem directly on the partition, so that you can mount it directly. Unless something goes wrong, the files in the filesystem will remain intact. The terms used by cryptsetup's documentation for this is \"decryption.\"\n\nSee the cryptsetup-reencrypt(8) manual for the --decrypt option.\n\nSupport for non-destructive offline decryption of LUKS1 devices has been available starting with cryptsetup version 1.5.0, which was released in 2012. LUKS1 decryption is only supported for offline mode decryption.\n\nFor LUKS2 devices, both offline and online (i.e. unmount not required) decryption are supported.\n\n"
+    },
+    {
+      "title": "Decrypting LUKS1 devices in-place",
+      "level": 3,
+      "content": "The decryption of a LUKS1 device is done in offline mode, i.e. it must not opened and mounted. If you want to decrypt the system drive, reboot into a USB live environment. Otherwise, use unmount followed by cryptsetup close dm-name.\n\nTo start, identify the device_path using blkid or lsblk.\n\nNext, the following command performs the decryption:\n\n```\n# cryptsetup reencrypt --decrypt device_path\nEnter any existing passphrase: \nFinished, time 02m05s,   19 GiB written, speed 162,6 MiB/s\n```\n\nIt will automatically identify the LUKS1 header version and not proceed for an opened device. The process might take a while, but give a progress meter. If no problems occur, the filesystem on the device can immediately be mounted directly.\n\n"
+    },
+    {
+      "title": "Decrypting LUKS2 devices in-place",
+      "level": 3,
+      "content": "Decryption can be done in either offline or online mode, using the cryptsetup command. Since cryptsetup version 2.5.0 (2022) LUKS2 supports decryption by migrating LUKS2 header in a separate file.\n\nThe new_file to which the LUKS2 header will be migrated must not exist in the initialization phase of the decryption.\n\n```\n# cryptsetup reencrypt --decrypt --header new_file device_path\n```\n\nTo resume interrupted LUKS2 in-place decryption just issue following command:\n\n```\n# cryptsetup reencrypt --decrypt --resume-only --header migrated_header_file device_path\n```\n\nIf the decryption was successfully finished on active device (online decryption), the mapped device will be lazy deactivated so that linear mapping is automatically removed when no longer used. Later the original device_path can be used without device mapper mapping.\n\n"
+    },
+    {
+      "title": "Cleaning up system files",
+      "level": 3,
+      "content": "Device names and UUIDs may change due to decryption, and you will likely need to update relevant configuration files. The files most likely to need updating are /etc/crypttab, /etc/fstab and, if your recently decrypted device appeared on the kernel command line, your bootloader's configuration (e.g, /etc/default/grub). If you edit the latter, remember to regenerate the grub configuration as described in GRUB.\n\n"
+    },
+    {
+      "title": "Prerequisites",
+      "level": 3,
+      "content": "- An encrypted root filesystem you wish to decrypt.\n- Enough drive space to store a backup.\n- An Arch Linux (or other) live CD/USB.\n- A few hours.\n\n"
+    },
+    {
+      "title": "Boot into a live environment",
+      "level": 3,
+      "content": "Download and burn the latest Arch ISO to a CD or USB, reboot the system, and boot to cd.\n\n"
+    },
+    {
+      "title": "Activate partitions",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n"
+    },
+    {
+      "title": "Note about different setups",
+      "level": 4,
+      "content": "An example setup is shown here:\n\nTable content:\nNTFS | myvg(lvm) | NTFS\nOther OS | cryptswap(lv) | cryptroot(lv) | Shared\nluks | luks\nswap | root(xfs)\n\nThe grey partition is a frame of reference and can be ignored. The yellow partition will be used as storage space and may be changed at will. The green partitions will be modified. Bold text must match your system's setup.\n\nIn the example system: myvg contains lvs called cryptroot and cryptswap. They are located at /dev/myvg/cryptroot and /dev/myvg/cryptswap. Upon boot, LUKS is used along with a few crypttab entries to create /dev/mapper/root and /dev/mapper/swap.\n\nSwap will not be unencrypted as part of this guide, as undoing the swap encryption does not require any complex backup or restoration.\n\nThe example system is not indicative of all systems. Different filesystems require different tools to effectively backup and restore their data. LVM can be ignored if not used.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Once partitions are located",
+      "level": 4,
+      "content": "Load necessary modules. For device mapper/LVM:\n\n```\n# modprobe dm-mod\n```\n\nFor LUKS:\n\n```\n# modprobe dm-crypt\n```\n\nScan for physical, volume and logical volumes:\n\n```\n# pvscan; vgscan; lvscan\n```\n\nActivate the LVM volume group:\n\n```\n# lvchange -ay myvg/cryptroot\n```\n\nOpen the encrypted filesystem with LUKS so that it can be read:\n\n```\n# cryptsetup luksOpen /dev/myvg/cryptroot root\n```\n\nEnter password.\n\nOnly if using NTFS to store the backup, install ntfs-3g.\n\nThe next step is important for backup storage.\n\n```\n# mount -t ntfs-3g -o rw /dev/sdXY /mount/point/\n```\n\nor use netcat to store the backup on a remote system.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Backup data",
+      "level": 3,
+      "content": "Using xfs_copy:\n\n```\n# xfs_copy -db /dev/mapper/root /mount/point/backup_root.img\n```\n\nUsing dd:\n\n```\n# dd if=/dev/mapper/root of=/mount/point/backup_root.img\n```\n\n"
+    },
+    {
+      "title": "Undo encryption",
+      "level": 3,
+      "content": "This is the point of no return. Make sure that you are ready for this step. If you plan to undo this later, you will have to start almost from scratch.\n\n```\n# cryptsetup luksClose root\n# lvm lvremove myvg/cryptroot\n```\n\n"
+    },
+    {
+      "title": "Restore data",
+      "level": 3,
+      "content": "We have to create a new logical volume to house our root filesystem, then we restore our filesystem.\n\n```\n# lvm lvcreate -l 100%FREE -n root myvg\n# xfs_copy -db /mount/point/backup_root.img /dev/myvg/root\n```\n\nThe second drive name is changed now.\n\n"
+    },
+    {
+      "title": "Adjust configurations",
+      "level": 3,
+      "content": "You need to boot into your system and edit /etc/crypttab, /etc/mkinitcpio.conf, /etc/fstab, and possibly /boot/grub/menu.lst.\n\n"
+    }
+  ]
+}

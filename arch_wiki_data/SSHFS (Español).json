@@ -1,0 +1,81 @@
+{
+  "title": "SSHFS (Español)",
+  "url": "https://wiki.archlinux.org/title/SSHFS_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-06** \n\nArtículos relacionados\n\n- SCP and SFTP\n- SFTP chroot\n- Pure-FTPd\n- sftpman\n\nSSHFS es un cliente de sistema de archivos basado en FUSE para montar directorios remotos a través de una conexión Secure Shell.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete sshfs.\n\n- Si a menudo necesita montar sistemas de archivos sshfs, puede estar interesado en utilizar un ayudante sshfs, como qsshfsAUR[enlace roto: package not found], sftpman, sshmntAUR o fmount.py.\n- Es posible que desee utilizar Google Authenticator para proporcionar seguridad adicional como es la autenticación de dos pasos.\n- SSH keys puede ser utilizado sobre la autenticación tradicional de contraseña.\n\n"
+    },
+    {
+      "title": "Montaje",
+      "level": 3,
+      "content": "Para poder montar un directorio, el usuario de SSH necesita poder acceder a él. Invoque sshfs para montar un directorio remoto:\n\n```\n$ sshfs [usuario@]host:[dir] puntodemontaje [opciones]\n```\n\nPor ejemplo:\n\n```\n$ sshfs miusuario@micomputadora:/ruta/remota /ruta/local -C -p 9876\n```\n\nAquí -p 9876 especifica el número de puerto y -C activa la compresión. Para más opciones véase la sección #Opciones.\n\nCuando no se especifica, la ruta remota se establece de manera predeterminada en el directorio de inicio del usuario remoto. Los nombres de usuario y las opciones predeterminadas se pueden predefinir para cada computadora en ~/.ssh/config para simplificar el uso de sshfs. Para obtener más información, véase OpenSSH#Client usage.\n\nSSH le pedirá la contraseña, si es necesario. Si no desea escribir la contraseña varias veces al día, véase SSH keys.\n\n"
+    },
+    {
+      "title": "Desmontaje",
+      "level": 3,
+      "content": "Para desmontar el sistema remoto:\n\n```\n$ fusermount3 -u puntodemontaje\n```\n\nPor ejemplo:\n\n```\n$ fusermount3 -u /ruta/local\n```\n\n"
+    },
+    {
+      "title": "Opciones",
+      "level": 2,
+      "content": "sshfs' puede convertir automáticamente entre ID de usuarios locales y remotos. Utilice la opción idmap=user para traducir el UID del usuario que se conecta al usuario remoto miusuario (GID permanece sin cambios):\n\n```\n$ sshfs miusuario@micomputadora:/ruta/remota /ruta/local -o idmap=user\n```\n\nSi necesita más control sobre la traducción de UID y GID, mire las opciones idmap=file, uidfile y gidfile.\n\nSe puede encontrar una lista completa de opciones en sshfs(1).\n\n"
+    },
+    {
+      "title": "Haciendo Chroot",
+      "level": 2,
+      "content": "Es posible que desee restringir un usuario específico a un directorio específico en el sistema remoto. Esto se puede hacer editando /etc/ssh/sshd_config:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n.....\nMatch User algúnusuario \n       ChrootDirectory /chroot/%u\n       ForceCommand internal-sftp\n       AllowTcpForwarding no\n       X11Forwarding no\n.....\n```\n\nNote: **debe** \n\nVéase también SFTP chroot. Para más información revise la página del manual sshd_config(5) para Match, ChrootDirectory y ForceCommand.\n\n"
+    },
+    {
+      "title": "Montaje automático",
+      "level": 2,
+      "content": "El montaje automático puede ocurrir en el arranque o bajo demanda (al acceder al directorio). Para ambos, la configuración ocurre en fstab.\n\nNote: **Y más importante** Para permitir que el superusuario utilice una clave SSH de un usuario normal, especifique su ruta completa en la opción IdentityFile.\n\nPara permitir que el superusuario utilice una clave SSH de un usuario normal, especifique su ruta completa en la opción IdentityFile.\n\nY más importante, utilice manualmente cada montaje sshfs al menos una vez cuando sea superusuario para que la firma del anfitrión se añada al archivo /root/.ssh/known_hosts.\n\n"
+    },
+    {
+      "title": "Bajo demanda",
+      "level": 3,
+      "content": "Con systemd es posible el montaje bajo demanda utilizando entradas /etc/fstab.\n\nPor ejemplo:\n\n```\nusuario@host:/carpeta/remota /punto/montaje  fuse.sshfs noauto,x-systemd.automount,_netdev,users,idmap=user,IdentityFile=/home/usuario/.ssh/id_rsa,allow_other,reconnect 0 0\n```\n\nLas opciones de montaje importantes aquí son noauto,x-systemd.automount,_netdev.\n\n- noauto le dice que no se monte en el arranque\n- x-systemd.automount hace la magia bajo demanda\n- _netdev le dice que es un dispositivo de red, no un dispositivo de bloque (sin él pueden ocurrir errores del tipo \"No existe dicho dispositivo\")\n\n"
+    },
+    {
+      "title": "En el arranque",
+      "level": 3,
+      "content": "Un ejemplo de cómo utilizar sshfs para montar un sistema de archivos remoto a través de /etc/fstab\n\n```\nUSUARIO@NOMBREHOST_O_IP:/DIRECTORIO/REMOTO  /PUNTOMONTAJE/LOCAL  fuse.sshfs  defaults,_netdev  0  0\n```\n\nTomemos, por ejemplo, la línea fstab\n\n```\nllib@192.168.1.200:/home/llib/FAH  /media/FAH2  fuse.sshfs  defaults,_netdev  0  0\n```\n\nLo anterior funcionará automáticamente si está utilizando una clave SSH para el usuario. Véase Uso de claves SSH.\n\nSi quiere utilizar sshfs con múltiples usuarios:\n\n```\nusuario@dominio.org:/home/usuario  /media/usuario   fuse.sshfs    defaults,allow_other,_netdev    0  0\n```\n\nUna vez más, es importante configurar la opción de montaje _netdev para asegurarse de que la red esté disponible antes de intentar montar.\n\n"
+    },
+    {
+      "title": "Acceso de usuario seguro",
+      "level": 3,
+      "content": "Al realizar el montaje automático a través de fstab, el sistema de archivos generalmente será montado por el superusuario. De forma predeterminada, esto produce resultados indeseables si desea acceder como un usuario normal y limitar el acceso a otros usuarios.\n\nUn ejemplo de configuración del punto de montaje:\n\n```\nUSUARIO@NOMBREHOST_O_IP:/DIRECTORIO/REMOTO  /PUNTOMONTAJE/LOCAL  fuse.sshfs noauto,x-systemd.automount,_netdev,user,idmap=user,follow_symlinks,identityfile=/home/USUARIO/.ssh/id_rsa,allow_other,default_permissions,uid=N_ID_USUARIO,gid=N_GID_USUARIO 0 0\n```\n\nResumen de las opciones relevantes:\n\n- allow_other - Permite que otros usuarios que no sean el montador (es decir, el superusuario) accedan al recurso compartido.\n- default_permissions - Permite que el kernel verifique los permisos, es decir, utilice los permisos reales en el sistema de archivos remoto. Esto permite prohibir el acceso a todas las personas que de otra forma concede allow_other.\n- uid, gid - establece la propiedad de archivos reportada a unos valores determinados; uid es el ID numérico de su usuario, gid es el ID numérico del grupo de su usuario.\n\n"
+    },
+    {
+      "title": "Lista de comprobación",
+      "level": 3,
+      "content": "Lea primero OpenSSH (Español)#Lista de comprobación. Otros temas para verificar son:\n\n1. ¿Su inicio de sesión SSH está enviando información adicional desde, por ejemplo, el archivo /etc/issue del servidor? Esto podría confundir SSHFS. Debería desactivar temporalmente el archivo /etc/issue del servidor:\n\n```\n$ mv /etc/issue /etc/issue.orig\n```\n\n2. Tenga en cuenta que la mayoría de los artículos de solución de problemas relacionados con SSH que encontrará en la web no están relacionados con Systemd. A menudo las definiciones en /etc/fstab comienzan erroneamente con sshfs#user@host:/mnt/servidores/carpeta ... fuse ... en lugar de utilizar la sintaxis user@host:/mnt/servidores/carpeta ... fuse.sshfs ... x-systemd, ....\n\n3. Compruebe que el propietario de la carpeta de origen y el contenido del servidor es propiedad del usuario del servidor.\n\n```\n$ chown -R USER_S: /mnt/servidores/carpeta\n```\n\n4. El ID de usuario del servidor puede ser diferente del cliente. Obviamente ambos nombres de usuario tienen que ser los mismos. Solo tiene que cuidar los ID de usuario del cliente. SSHFS traducirá el UID con las siguientes opciones de montaje:\n\n```\nuid=ID_USUARIO_C,gid=ID_GRUPO_C\n```\n\n5. Compruebe que el punto de montaje de destino del cliente (carpeta) es propiedad del usuario cliente. Esta carpeta debe tener el mismo ID de usuario definido en las opciones de montaje de SSHFS.\n\n```\n$ chown -R USUARIO_C: /mnt/cliente/carpeta\n```\n\n6. Compruebe que el punto de montaje (carpeta) del cliente esté vacío. De forma predeterminada no puede montar carpetas SSHFS en carpetas no vacías.\n\n"
+    },
+    {
+      "title": "Connection reset by peer",
+      "level": 3,
+      "content": "- Si está intentando acceder al sistema remoto con un nombre de host, intente utilizar su dirección IP, ya que puede ser un problema de resolución de nombres de dominio. Asegúrese de editar /etc/hosts con los detalles del servidor.\n- Si está utilizando nombres de clave no predeterminados y los está pasando como -i .ssh/my_key, no funcionará. Tiene que utilizar -o IdentityFile=/home/user/.ssh/my_key, con la ruta completa a la clave.\n- Si su /root/.ssh/config es un enlace simbólico, recibirá este error también. Véase este tema en serverfault\n- Añadiendo la opción 'sshfs_debug' (como en 'sshfs -o sshfs_debug user@server ...') puede ayudar a resolver el problema.\n- Si eso no revela nada útil, también puede intentar añadir la opción 'debug'\n- Si está intentando hacer sshfs a través de un enrutador que utiliza DD-WRT o similar, hay una solución aquí. (tenga en cuenta que la opción -osftp_server=/opt/libexec/sftp-server se puede utilizar para la orden sshfs en lugar de parchear dropbear)\n- Si ve esto solo durante el arranque, puede ser que systemd esté intentando montar antes de que haya una conexión de red disponible. Habilite el servicio de 'espera-en-línea' apropiado para su conexión de red (por ejemplo, systemd-networkd-wait-online.service) para solucionar esto.\n- Hilo antiguo del foro: sshfs: Connection reset by peer\n- Asegúrese de que su usuario pueda iniciar sesión en el servidor (especialmente al utilizar AllowUsers)\n- Asegúrese de que Subsystem sftp /usr/lib/ssh/sftp-server está activado en /etc/ssh/sshd_config.\n\n"
+    },
+    {
+      "title": "El host remoto se ha desconectado",
+      "level": 3,
+      "content": "Si recibe este mensaje directamente después de intentar utilizar sshfs:\n\n- Primero asegúrese de que la máquina remota tiene instalado sftp. No funcionará si no lo tiene.\n- Después, comprueba que la ruta de Subsystem sftp en /etc/ssh/sshd_config en la máquina remota es válida.\n\n"
+    },
+    {
+      "title": "Problemas de montaje fstab",
+      "level": 3,
+      "content": "Para obtener una salida de depuración detallada, añada lo siguiente a las opciones de montaje:\n\n```\nssh_command=ssh\\040-vv,sshfs_debug,debug\n```\n\nPara poder ejecutar mount -av y ver la salida de depuración, elimine lo siguiente:\n\n```\nnoauto,x-systemd.automount\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Cómo montar el sistema de archivos SSH en chroot, Con especial cuidado con las preguntas de propietarios y permisos.\n\n"
+    }
+  ]
+}

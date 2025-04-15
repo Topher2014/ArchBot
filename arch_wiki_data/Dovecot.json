@@ -1,0 +1,86 @@
+{
+  "title": "Dovecot",
+  "url": "https://wiki.archlinux.org/title/Dovecot",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Mail server\n- SOGo\n- Virtual user mail system\n\nDovecot is an open source IMAP and POP3 server for Linux/UNIX-like systems, written primarily with security in mind. Dovecot primarily aims to be a lightweight, fast and easy to set up open source mailserver. For more detailed information, please see the official Dovecot Wiki.\n\nThis article describes how to set up Dovecot for personal or small office use.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the dovecot package.\n\n"
+    },
+    {
+      "title": "Assumptions",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n- Each mail account served by Dovecot, has a local user account defined on the server.\n- The server uses PAM to authenticate the user against the local user database (/etc/passwd).\n- TLS is used to encrypt the authentication password.\n- The common Maildir format is used to store the mail in the user's home directory.\n- A MDA has already been set up to deliver mail to the local users.\n\n"
+    },
+    {
+      "title": "Create the TLS certificate",
+      "level": 3,
+      "content": "To obtain a certificate, see OpenSSL#Usage.\n\nAlternatively you can generate the certificate using a script that comes with the dovecot package:\n\n1. Copy the example configuration: cp /usr/share/doc/dovecot/dovecot-openssl.cnf /etc/ssl/dovecot-openssl.cnf as the root user.\n1. Edit /etc/ssl/dovecot-openssl.cnf to configure the certificate.\n1. Execute /usr/lib/dovecot/mkcert.sh as the root user to generate the certificate.\n\nThe certificate/key pair is created as /etc/ssl/certs/dovecot.pem and /etc/ssl/private/dovecot.pem.\n\nRun cp /etc/ssl/certs/dovecot.pem /etc/ca-certificates/trust-source/anchors/dovecot.crt and then trust extract-compat as the root user whenever you have changed your certificate.\n\n"
+    },
+    {
+      "title": "Dovecot configuration",
+      "level": 3,
+      "content": "- Create the dovecot configuration folder /etc/dovecot.\n- Copy the dovecot.conf and conf.d/* configuration files from /usr/share/doc/dovecot/example-config to /etc/dovecot:\n\n```\n# mkdir /etc/dovecot\n# cp /usr/share/doc/dovecot/example-config/dovecot.conf /etc/dovecot/dovecot.conf\n# cp -r /usr/share/doc/dovecot/example-config/conf.d /etc/dovecot\n```\n\nThe default configuration is ok for most systems, but make sure to read through the configuration files to see what options are available. See the quick configuration guide and dovecot configuration for more instructions.\n\nBy default dovecot will try to detect what mail storage system is in use on the system. To use the Maildir format edit /etc/dovecot/conf.d/10-mail.conf to set mail_location = maildir:~/Maildir.\n\n"
+    },
+    {
+      "title": "Generate DH parameters",
+      "level": 3,
+      "content": "To generate a new DH parameters file (this will take a long time):\n\n```\n# openssl dhparam -out /etc/dovecot/dh.pem 4096\n```\n\nthen add the file to /etc/dovecot/conf.d/10-ssl.conf\n\n```\nssl_dh = </etc/dovecot/dh.pem\n```\n\n"
+    },
+    {
+      "title": "PAM Authentication",
+      "level": 3,
+      "content": "To enable PAM authentication with Dovecot follow this section and then either #PAM Authentication with LDAP or #PAM Authentication with SSSD.\n\nEdit /etc/dovecot/conf.d/auth-system.conf.ext by removing the comment in front of the PAM authentication section , like this:\n\n```\n# PAM authentication. Preferred nowadays by most systems.\n# PAM is typically used with either userdb passwd or userdb static.\n# REMEMBER: You'll need /etc/pam.d/dovecot file created for PAM\n# authentication to actually work. <doc/wiki/PasswordDatabase.PAM.txt>\npassdb {\n  driver = pam\n  # [session=yes] [setcred=yes] [failure_show_msg=yes] [max_requests=<n>]\n  # [cache_key=<key>] [<service name>]\n  args = session=yes dovecot\n}\n```\n\nIf you also want to log login failures add failure_show_msg=yes to args.\n\nBy using the pam_mkhomedir.so module and by adding the session part in the passdb directive, if an LDAP user logs in for the first time the corresponding home directory will be automatically created.\n\n"
+    },
+    {
+      "title": "PAM Authentication with LDAP",
+      "level": 4,
+      "content": "If you are using an OpenLDAP or 389-ds-base server for authentication instead, be sure to be able to login with your LDAP users first, as described in LDAP authentication. You can then write the following in /etc/pam.d/dovecot remembering that the entries order is very important:\n\n```\n/etc/pam.d/dovecot\n```\n\n```\nauth    sufficient      pam_ldap.so\nauth    required        pam_unix.so     nullok\naccount sufficient      pam_ldap.so\naccount required        pam_unix.so\nsession required        pam_mkhomedir.so skel=/etc/skel umask=0022\nsession sufficient      pam_ldap.so\n```\n\nIn this way both LDAP and system users have their mailbox.\n\n"
+    },
+    {
+      "title": "PAM Authentication with SSSD",
+      "level": 4,
+      "content": "If you are using SSSD for authentication You can then write the following in /etc/pam.d/dovecot remembering that the entries order is very important:\n\n```\n/etc/pam.d/dovecot\n```\n\n```\nauth    sufficient      pam_sss.so\nauth    required        pam_unix.so     nullok\naccount sufficient      pam_sss.so\naccount required        pam_unix.so\nsession required        pam_mkhomedir.so skel=/etc/skel umask=0022\nsession sufficient      pam_sss.so\n```\n\nIn this way both LDAP and system users have their mailbox.\n\n"
+    },
+    {
+      "title": "Sieve",
+      "level": 3,
+      "content": "Sieve is a programming language that can be used to create filters for email on mail server.\n\n"
+    },
+    {
+      "title": "Sieve Interpreter Plugin",
+      "level": 4,
+      "content": "This facilitates the actual Sieve filtering upon delivery.\n\n- Install pigeonhole.\n- Depending on your usage, add sieve to mail_plugins in /etc/dovecot/conf.d/15-lda.confprotocol lda { mail_plugins = $mail_plugins sieve } and/or /etc/dovecot/conf.d/20-lmtp.confprotocol lmtp { mail_plugins = $mail_plugins sieve }\n\n- /etc/dovecot/conf.d/15-lda.confprotocol lda { mail_plugins = $mail_plugins sieve }\n- and/or /etc/dovecot/conf.d/20-lmtp.confprotocol lmtp { mail_plugins = $mail_plugins sieve }\n\n```\nprotocol lda {\n  mail_plugins = $mail_plugins sieve\n}\n```\n\n```\nprotocol lmtp {\n  mail_plugins = $mail_plugins sieve\n}\n```\n\n- Optionally, add configuration in plugin section. See Sieve Interpreter Documentation for configuration options and default values. Example: run cp /usr/share/doc/dovecot/example-config/conf.d/90-sieve.conf /etc/dovecot/conf.d/90-sieve.conf and verify in /etc/dovecot/conf.d/90-sieve.conf: plugin { sieve = file:~/sieve;active=~/.dovecot.sieve }\n\n```\nplugin {\n  sieve = file:~/sieve;active=~/.dovecot.sieve \n}\n```\n\n- Add spamtest configuration\n\n```\n/etc/dovecot/conf.d/90-sieve.conf\n```\n\n```\nplugin {\n  sieve_extensions = +spamtest +spamtestplus\n\n  sieve_spamtest_status_type = score\n  sieve_spamtest_status_header = \\ \n    X-Spam_score: (-?[[:digit:]]+\\.[[:digit:]]).* \n  sieve_spamtest_max_value = 5.0 \n\n  sieve_before = /var/lib/dovecot/sieve/global_sieves/move_to_spam_folder.sieve\n}\n```\n\nNote: This tests for \"X-Spam_score\" (which is the spam header format in default Exim configuration). Your header might look different, ie \"X-Spam-Score\".\n\n- Create sieve script: mkdir -p /var/lib/dovecot/sieve/global_sieves\n\n```\n/var/lib/dovecot/sieve/global_sieves/move_to_spam_folder.sieve\n```\n\n```\nrequire \"spamtestplus\";\nrequire \"fileinto\";\nrequire \"relational\";\nrequire \"comparator-i;ascii-numeric\";\n\nif spamtest :value \"ge\" :comparator \"i;ascii-numeric\" \"5\" {\n  fileinto \"Junk\";\n}\n```\n\n- To compile sieve, execute in shell sievec /var/lib/dovecot/sieve/global_sieves and make sure the move_to_spam_folder.sieve and the resulting move_to_spam_folder.svbin files are world readable.\n\n```\nsievec /var/lib/dovecot/sieve/global_sieves\n```\n\n"
+    },
+    {
+      "title": "ManageSieve Server",
+      "level": 4,
+      "content": "This implements the ManageSieve protocol through which users can remotely manage Sieve scripts on the server.\n\n- Follow the steps in #Sieve Interpreter Plugin above.\n- Add sieve to protocols in dovecot.conf protocols = imap pop3 sieve\n- Add minimal /etc/dovecot/conf.d/20-managesieve.conf service managesieve-login { } service managesieve { } protocol sieve { }\n- Restart dovecot. The managesieve daemon will listen on port 4190 by default.\n\n```\nprotocols = imap pop3 sieve\n```\n\n```\nservice managesieve-login {\n}\n\nservice managesieve {\n}\n\nprotocol sieve {\n}\n```\n\n"
+    },
+    {
+      "title": "Full Text Search",
+      "level": 2,
+      "content": "By default Dovecot does not index the full message content, which will result in slow response times for IMAP SEARCH queries for bigger mailboxes. There is a number of FTS backends Dovecot can be hooked up to.\n\nDovecot needs a plugin for the chosen search backend. The solr plugin is included in dovecot but solr itself is not the easiest to set up. There are packages for Xapian (dovecot-fts-xapian) and Elasticsearch (dovecot-fts-elastic).\n\n"
+    },
+    {
+      "title": "Starting the server",
+      "level": 2,
+      "content": "Start/enable dovecot.service.\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "Generate hashes with non-default hash functions:\n\n```\n$ doveadm pw -s SHA512-CRYPT -p \"password\"\n```\n\nEnsure that the column in the database is large enough. A warning will be emitted if it is too small.\n\nRemember to set the password password scheme:\n\n```\ndovecot-sql.conf\n```\n\n```\ndefault_pass_scheme = SHA512-CRYPT\n```\n\n"
+    },
+    {
+      "title": "warning: pipe flag `D' requires dovecot_destination_recipient_limit = 1",
+      "level": 3,
+      "content": "If you cannot receive emails with multiple recipients and there is something like this is your logs:\n\n```\nmail postfix/pipe[663]: 72A62733: to=<user2@example.com>, relay=dovecot, delay=495, delays=495/0.01/0/0.08, dsn=4.3.5, status=deferred (mail system configuration error)\nmail postfix/pipe[663]: 72A62733: to=<user1@example.com>, relay=dovecot, delay=495, delays=495/0.01/0/0.06, dsn=4.3.5, status=deferred (mail system configuration error)\nmail postfix/pipe[1614231]: warning: pipe flag `D' requires dovecot_destination_recipient_limit = 1\n```\n\nAdd dovecot_destination_recipient_limit = 1 to /etc/postfix/main.cf and reload postfix.\n\n"
+    }
+  ]
+}

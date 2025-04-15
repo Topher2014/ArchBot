@@ -1,0 +1,116 @@
+{
+  "title": "Dhcpcd (日本語)",
+  "url": "https://wiki.archlinux.org/title/Dhcpcd_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- ネットワーク設定\n- ワイヤレスネットワーク設定\n- dhcpd\n\ndhcpcd は DHCP と DHCPv6 のクライアントです。現在は最も機能豊富なオープンソースの DHCP クライアントであり、ホームページに全ての機能のリストが載っています。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 実行\n- 3 設定 3.1 DHCP スタティックルート 3.2 DHCP クライアント ID 3.3 静的プロファイル 3.3.1 フォールバックプロファイル\n- 4 フック 4.1 10-wpa_supplicant\n- 5 ヒントとテクニック 5.1 ARP プローブを無効にして DHCP を高速化 5.2 古い DHCP リースを削除 5.3 マルチブートするときに IP を変える 5.4 /etc/resolv.conf\n- 6 トラブルシューティング 6.1 クライアント ID 6.2 まず IP を開放して DHCP の問題を確認する 6.3 強情なルーターの問題 6.4 dhcpcd と systemd ネットワークインターフェイス 6.5 タイムアウトと遅延\n- 7 既知の問題 7.1 dhcpcd@.service によって起動が遅くなる\n- 8 参照\n\n- 3.1 DHCP スタティックルート\n- 3.2 DHCP クライアント ID\n- 3.3 静的プロファイル 3.3.1 フォールバックプロファイル\n\n- 3.3.1 フォールバックプロファイル\n\n- 4.1 10-wpa_supplicant\n\n- 5.1 ARP プローブを無効にして DHCP を高速化\n- 5.2 古い DHCP リースを削除\n- 5.3 マルチブートするときに IP を変える\n- 5.4 /etc/resolv.conf\n\n- 6.1 クライアント ID\n- 6.2 まず IP を開放して DHCP の問題を確認する\n- 6.3 強情なルーターの問題\n- 6.4 dhcpcd と systemd ネットワークインターフェイス\n- 6.5 タイムアウトと遅延\n\n- 7.1 dhcpcd@.service によって起動が遅くなる\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "dhcpcd パッケージをインストールします。\n\ndhcpcd-uiAUR は dhcpcd デーモンの GTK フロントエンドで、オプションで wpa_supplicant にも対応しています。設定ダイアログと、無線ネットワークのパスフレーズを入力する機能があります。\n\n"
+    },
+    {
+      "title": "実行",
+      "level": 2,
+      "content": "すべてのネットワークインターフェースでデーモンを起動するには、dhcpcd.service を起動/有効化します。\n\n特定のインターフェースのみでデーモンを起動するには、テンプレートユニット dhcpcd@interface.service を起動/有効化します。ここで interface は ネットワークインターフェースの一覧表示で確認できます。\n\nテンプレートユニットを使用することを推奨します。詳細は dhcpcd と systemd ネットワークインターフェース を参照してください。どちらの場合でも、動的な IP アドレスが割り当てられます。静的な IP アドレスを割り当てるには、静的プロファイルを参照してください。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "メインの設定は /etc/dhcpcd.conf で行います、詳細は dhcpcd.conf(5) を参照してください。よく使われるオプションについては以下で説明します。\n\n"
+    },
+    {
+      "title": "DHCP スタティックルート",
+      "level": 3,
+      "content": "スタティックルートをクライアント側に追加する必要がある場合、/etc/dhcpcd.exit-hook に新しい dhcpcd フックスクリプトを作成してください。以下の例は 192.168.192.5 のゲートウェイマシンを通じて VPN サブネットにスタティックルートを追加するフックスクリプトです:\n\n```\n/etc/dhcpcd.exit-hook\n```\n\n```\nip route add 10.11.12.0/24 via 192.168.192.5\n```\n\n上記のファイルには複数のルートを追加できます。\n\n"
+    },
+    {
+      "title": "DHCP クライアント ID",
+      "level": 3,
+      "content": "複数の方法を使って DHCP クライアントをサーバーから一意に識別させることが可能です:\n\n- ホストネーム (またはクライアントから送信されたホストネームの値)\n- 接続を作成するのに使われたネットワークインターフェイスコントローラの MAC アドレス\n- Identity Association ID (IAID)、ホストのユースケースやインターフェイスを区別するための抽象レイヤー\n- DHCP Unique Identifier (DUID)\n\n詳しい解説は RFC 3315 を見てください。\n\nDHCP サーバーの設定によって、オプションは設定する必要がなかったり、もしくは DHCP IP リースをリクエストするのに必須であったりします。\n\ndhcpcd のデフォルト設定で IP が取得できない場合、dhcpcd.conf で以下のオプションを使うことができます:\n\n- hostname は /etc/hostname で設定されたホストネームを送信します。\n- clientid は MAC アドレスを識別子として送信します。\n- iaid <interface> は DHCP ディスカバリに使われる IAID を取得します。interface ブロックで使用します (interface <interface> で始まるブロック、詳しくは [1] を参照)。ただし、次のオプションの方がよく使われます:\n- duid は DUID と IAID の組み合わせを識別子として使用します。\n\nDUID の値は /var/lib/dhcpcd/duid で設定します。効率的な DHCP リース操作のために DUID はシステム固有の値にして全てのネットワークインターフェイスに適用することが重要です。逆に IAID は各々のインターフェイスを表す識別子です (RFC 4361 を参照)。\n\nDynamic DNS を使っているネットワークでは3つの ID がそれぞれ異なっていることに注意を払ってください。重複する DUID の値が DNS サーバーに渡された場合 (仮想マシンを複製したときにホストネームと MAC は変更したのに DUID を変更しなかった場合など)、重複した DUID を持ったクライアントがリースをリクエストすることになり、サーバーはクライアントを DNS レコードから削除してしまいます。\n\n"
+    },
+    {
+      "title": "静的プロファイル",
+      "level": 3,
+      "content": "必要な設定はネットワーク設定で説明されています。これらの設定には通常、ネットワークインターフェース名、IPアドレス、ルーターアドレス、およびネームサーバーが含まれます。\n\n例えば、/etc/dhcpcd.conf で dhcpcd の静的プロファイルを以下のように設定します:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\ninterface eth0\nstatic ip_address=192.168.0.10/24\t\nstatic routers=192.168.0.1\nstatic domain_name_servers=192.168.0.1 8.8.8.8\n```\n\narping オプションを使うなど、もっと複雑な設定をすることもできます。詳しくは dhcpcd.conf(5) を見て下さい。\n\n"
+    },
+    {
+      "title": "フォールバックプロファイル",
+      "level": 4,
+      "content": "dhcpcd 内で静的プロファイルを設定し、DHCP リースが失敗した場合にそのプロファイルにフォールバックすることができます。これは特にヘッドレスマシンで役立ちます。静的プロファイルは \"リカバリー\" プロファイルとして使用でき、常にマシンに接続できることを保証するためです。\n\n次の例では、IP アドレス 192.168.1.23、ゲートウェイとネームサーバー 192.168.1.1 を持つ static_eth0 プロファイルを設定し、このプロファイルをインターフェース eth0 のフォールバックとしています。\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# define static profile\nprofile static_eth0\nstatic ip_address=192.168.1.23/24\nstatic routers=192.168.1.1\nstatic domain_name_servers=192.168.1.1\n\n# fallback to static profile on eth0\ninterface eth0\nfallback static_eth0\n```\n\n"
+    },
+    {
+      "title": "フック",
+      "level": 2,
+      "content": "dhcpcd は /usr/lib/dhcpcd/dhcpcd-hooks/ にあるスクリプトを辞書順で全て実行します。詳しくは dhcpcd(5) や dhcpcd-run-hooks(8) を見て下さい。\n\n- dhcpcd.conf で nohook オプションを使うことで個別のスクリプトを無効化できます。\n- env オプションを使うことですべてのフックに環境変数を設定することが可能です。例えば、env force_hostname=YES を使えば hostname フックに常時ホストネームを設定するように指定できます。\n\n"
+    },
+    {
+      "title": "10-wpa_supplicant",
+      "level": 3,
+      "content": "10-wpa_supplicant フックは無線インターフェイスで WPA supplicant を自動的に起動します。起動するのは以下の条件を満たした場合に限られます:\n\n- インターフェイスを使っている wpa_supplicant プロセスがまだない場合。\n- wpa_supplicant 設定ファイルが存在する場合。dhcpcd はデフォルトで以下のファイルを (この順番で) チェックします:\n\n```\n/etc/wpa_supplicant/wpa_supplicant-\"$interface\".conf\n/etc/wpa_supplicant/wpa_supplicant.conf\n/etc/wpa_supplicant-\"$interface\".conf\n/etc/wpa_supplicant.conf\n```\n\nただし、/etc/dhcpcd.conf に env wpa_supplicant_conf=configuration_file_path と追加することでカスタムパスを追加することもできます。\n\nwpa_supplicant で無線接続を管理している場合、フックによって望ましくない接続イベントが作成されてしまう可能性があります。例えば、wpa_supplicant を停止したときにフックによってインターフェイスが再度立ち上げられてしまうかもしれません。また、netctl-auto を使用している場合、/run/network/wpa_supplicant_\"$interface\".conf によって wpa_supplicant は自動的に起動するため、フックから起動する必要はなくなり、結果としてデフォルトのパッケージに含まれているダミーの値しか記述されていない /etc/wpa_supplicant/wpa_supplicant.conf ファイルのパースエラーが起動時に発生します。\n\nフックを無効にするには、dhcpcd.conf に nohook wpa_supplicant を追加してください。\n\n"
+    },
+    {
+      "title": "ARP プローブを無効にして DHCP を高速化",
+      "level": 3,
+      "content": "dhcpcd には DHCP 標準 (RFC2131 section 2.2) で勧告されている実装が含まれており、割り当てられた IP アドレスが実際に取得できているかどうか ARP でチェックを行います。ホームネットワークではこの機能はあまり意味がないので、/etc/dhcpcd.conf に以下の行を追加することで、5秒ほど接続のときにかかる時間を減らすことができます:\n\n```\nnoarp\n```\n\n上記の設定は dhcpcd に --noarp を指定するのと同一の効果を持ち、ARP プローブを無効化します。これにより DHCP によるネットワークの接続が高速化されます。\n\n"
+    },
+    {
+      "title": "古い DHCP リースを削除",
+      "level": 3,
+      "content": "/var/lib/dhcpcd/interface.lease (interface はリースを得るインターフェイスの名前) ファイルには DHCP サーバーから送信された実際の DHCP リースの応答が含まれています。無線インターフェイスの場合、ファイル名は /var/lib/dhcpcd/interface-ssid.lease になります (ssid は無線ネットワークの名前に置き換えてください)。このファイルを使ってサーバーからの最後のリースを判別することができ、また、ファイルの mtime 属性を使ってリースの発行日時が確認されます。最後のリース情報を使用することで、前回ネットワーク上で確保されたのと同じ IP アドレスをリクエストします。リース情報を使用して欲しくない場合、ファイルを削除してください。\n\nファイルを削除しても DHCP サーバーから同じ IP アドレスが割り当てられる場合、割り当てを安定化するためにリクエストしてくる DHCP クライアントの ID や DUID を識別するように設定されている可能性があります (#DHCP クライアント ID を参照)。dhcpcd を停止して /var/lib/dhcpcd/duid を削除あるいは名前を変更することでテストができます。dhcpcd は次回の起動時に新しいファイルを生成します。\n\nDUID は再起動しても変わらない永続的なマシンの識別子であることに注意してください。システムを新しいコンピュータに移動する場合、ファイルをそのまま持っていくと古いコンピュータとして認識されます。\n\n"
+    },
+    {
+      "title": "マルチブートするときに IP を変える",
+      "level": 3,
+      "content": "Arch と OS X あるいは Windows をデュアルブートしていて、それぞれ別の IP アドレスを割り当てたい場合、オペレーティングシステムごとに別々の DUID を指定することでリースされる IP を制御することができます。\n\n(XP 以降の) Windows では以下のレジストリキーに DUID が保存されています:\n\n```\n\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters\\Dhcpv6DUID\n```\n\nOS X では Network\\adapter\\dhcp preferences panel から直接アクセスできます。\n\ndnsmasq DHCP サーバーを使っている場合、dnsmasq の設定で適切な dhcp-host= ルールを使うことで別々の DUID を使えます。\n\n"
+    },
+    {
+      "title": "/etc/resolv.conf",
+      "level": 3,
+      "content": "resolvconf が利用可能な場合、DNS情報はそちらに送信されます。そうでない場合、dhcpcd 自身が /etc/resolv.conf に書き込みます。\n\n/etc/resolv.conf の上書きは、フック /usr/lib/dhcpcd/dhcpcd-hooks/20-resolv.conf を無効にすることで停止できます。/etc/dhcpcd.conf の最後のセクションに以下を追加してください。\n\n```\nnohook resolv.conf\n```\n\nこのフックを無効にすると、dhcpcd による resolvconf の使用も全体的に無効になることに注意してください。\n\nあるいは、DNSサーバーを含む /etc/resolv.conf.head というファイルを作成することもできます。dhcpcd はこのファイルを /etc/resolv.conf の先頭に追加します。\n\nまたは、dhcpcd が常に同じ DNS サーバーを使用するように設定できます。これを行うには、/etc/dhcpcd.conf の最後に次の行を追加します。dns-server-ip-addressses は、スペースで区切られた DNS IP アドレスのリストです。\n\n```\nstatic domain_name_servers=dns-server-ip-addresses\n```\n\n例えば、Google の DNS サーバーに設定するには、次のようにします。\n\n```\nstatic domain_name_servers=8.8.8.8 8.8.4.4\n```\n\n"
+    },
+    {
+      "title": "クライアント ID",
+      "level": 3,
+      "content": "また、MAC アドレスに基づくクライアント ID をフィルタリングしている DHCPv4 ネットワークを使う場合は、次の行を:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# Use the same DUID + IAID as set in DHCPv6 for DHCPv4 Client ID as per RFC4361. \nduid\n```\n\n以下のように変更してください:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# Use the hardware address of the interface for the Client ID (DHCPv4).\nclientid\n```\n\nこうしないと、DHCP サーバーがあなたの DHCPv6 クライアント ID を正しく読み込めない可能性があります。詳しくは RFC 4361 を見て下さい。\n\n"
+    },
+    {
+      "title": "まず IP を開放して DHCP の問題を確認する",
+      "level": 3,
+      "content": "DHCP が間違った IP の割り当てを取得している時、問題が起こることがあります。例えば2つのルーターが VPN で結び付けられている場合が考えられます。修正するには、コンソールで、root 権限を使って IP アドレスを開放してください:\n\n```\n# dhcpcd -k\n```\n\nそれから新しい IP アドレスをリクエストしてください:\n\n```\n# dhcpcd\n```\n\nおそらくこの2つのコマンドを何度も実行する必要があります。\n\n"
+    },
+    {
+      "title": "強情なルーターの問題",
+      "level": 3,
+      "content": "(厄介な) ルーターによっては、/etc/dhcpcd.conf にある以下の行をコメントアウトしないと接続が上手くいかないことがあります:\n\n```\nrequire dhcp_server_identifier\n```\n\nネットワーク上に複数の DHCP サーバーがあるという状況でないかぎり (こういうことは稀です)、コメントアウトすることで問題が発生することはありません。詳しくは このページ を参照。\n\n"
+    },
+    {
+      "title": "dhcpcd と systemd ネットワークインターフェイス",
+      "level": 3,
+      "content": "インターフェイスを指定しないで dhcpcd.service を有効にすることもできますが、predictable network interface name を適用する systemd-udevd と起動時に競合状態になる可能性があります:\n\n```\nerror changing net interface name wlan0 to wlp4s0: Device or resource busy\"\n```\n\nこれを避けるために、dhcpcd を有効にするときは#実行で説明されているようにインターフェイスを指定して下さい。ただしテンプレートユニットでは有線接続のホットプラグをサポートしていないため、ネットワークケーブルが接続されていないと起動に失敗します。問題を回避したい場合、#タイムアウトを見てください。\n\ndhcpcd.conf(5) で denyinterfaces または allowinterfaces を使って dhcpcd がカーネル名にバインドしないようにすることもできます。例:\n\n```\ndenyinterfaces wlan* eth*\n```\n\n"
+    },
+    {
+      "title": "タイムアウトと遅延",
+      "level": 3,
+      "content": "dhcpcd が単一のインタフェースで動作して30秒後にリースを取得できない場合(たとえば、サーバーが準備ができていない場合、またはケーブルが接続されていない場合)、エラーで終了します。\n\ndhcpcd を1回限り無期限に待機させる場合、ユニットを 編集 設定し timeout オプションを 0 に設定します。\n\n```\n/etc/systemd/system/dhcpcd@.service.d/timeout.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/dhcpcd -w -q -t 0 %I\n```\n\n無期限に待機させるには、ユニットの終了後に再起動させます。\n\n```\n/etc/systemd/system/dhcpcd@.service.d/dhcpcdrestart.conf\n```\n\n```\n[Service]\nRestart=always\n```\n\n"
+    },
+    {
+      "title": "dhcpcd@.service によって起動が遅くなる",
+      "level": 3,
+      "content": "デフォルトでは dhcpcd@.service は IP アドレスが取得されるまで待機して、それから -w フラグを使って dhcpcd をバックグラウンドにフォークします。ユニットを有効化すると、IP アドレスが取得されるまで起動が進まなくなってしまう可能性があります。解決するには、以下の内容でユニットのドロップインファイルを作成してください:\n\n```\n/etc/systemd/system/dhcpcd@.service.d/no-wait.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/dhcpcd -b -q %I\n```\n\n詳しくは FS#49685 を参照。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- dhcpcd(8)\n- dhcpcd.conf(5)\n\n"
+    }
+  ]
+}

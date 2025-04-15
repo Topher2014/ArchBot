@@ -1,0 +1,61 @@
+{
+  "title": "Calibrating Touchscreen",
+  "url": "https://wiki.archlinux.org/title/Calibrating_Touchscreen",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section is a candidate for merging with Touchscreen.** This article or section is a candidate for merging with Touchscreen.\n\nThis article or section is a candidate for merging with Touchscreen.\n\nTo use multiple displays (some of which are touchscreens), you need to tell Xorg the mapping between the touch surface and the screen. This can be done using xinput to set the touchscreen's coordinate transformation matrix.\n\nThis is a guide to do that, the old-fashioned way, in cases when xrandr does not know about your separate screens because they have been merged into one (e.g., when using TwinView). Everyone else, please go to Touchscreen to do it the easy way.\n\nYou will need to run the xinput command every time you attach the monitor or log in. Or course, you can add the command to your session-autostart. You can also use Udev to automate this.\n\n"
+    },
+    {
+      "title": "Your screen",
+      "level": 4,
+      "content": "Using TwinView, X will see all your Screens as one big screen. You can get your total height and width by executing\n\n```\n$ xrandr | grep \\* # xrandr uses \"*\" to identify the screen being used\n```\n\nYou should see a line like this:\n\n```\n3600x1230      50.0*\n```\n\nwhat means, your total width is 3600 and your total height is 1230.\n\n"
+    },
+    {
+      "title": "Your touch device",
+      "level": 4,
+      "content": "Your next job is to get your device's name. Execute\n\n```\n$ xinput list\n```\n\nand find it by its name. Find the item containing [slave pointer (2)], which is usually your own device name. E.g. if the line can look like this\n\n```\n⎜   ↳ Acer T230H                              \tid=24\t[slave  pointer  (2)]\n```\n\nyour device name is\n\n```\nAcer T230H\n```\n\nExecute\n\n```\n$ xinput list-props \"Device Name\"\n```\n\nand make sure there is a property called\n\n```\nCoordinate Transformation Matrix\n```\n\nIf not, you probably selected the wrong device, use another one.\n\n"
+    },
+    {
+      "title": "Touch area",
+      "level": 4,
+      "content": "You need to shrink your touch area into a rectangle which is smaller than the total screen. This means, you have to know four values:\n\n- Height of touch area\n- Width of touch area\n- horizontal offset (x offset) (amount of pixels between the left edge of your total screen and the left edge of your touch area)\n- vertical offset (y offset) (amount of pixels between the top edge of your total screen and the top edge of your touch area)\n\n"
+    },
+    {
+      "title": "Calculate the Coordinate Transformation Matrix",
+      "level": 3,
+      "content": "Now, calculate these as accurate as possible:\n\n- c0 = touch_area_width / total_width\n- c2 = touch_area_height / total_height\n- c1 = touch_area_x_offset / total_width\n- c3 = touch_area_y_offset / total_height\n\nThe matrix is\n\n```\n[ c0 0  c1 ]\n[ 0  c2 c3 ]\n[ 0  0  1  ]\n```\n\nwhich is represented as a row-by-row array:\n\n```\nc0 0 c1 0 c2 c3 0 0 1\n```\n\n"
+    },
+    {
+      "title": "Apply the Matrix",
+      "level": 3,
+      "content": "Execute\n\n```\n$ xinput set-prop \"Device Name\" --type=float \"Coordinate Transformation Matrix\" c0 0 c1 0 c2 c3 0 0 1\n```\n\ne.g.\n\n```\n$ xinput set-prop \"Acer T230H\" --type=float \"Coordinate Transformation Matrix\" 0.533333333 0 0 0 0.87804878 0.12195122 0 0 1\n```\n\nto calibrate your touchscreen device. Now, it should work properly.\n\n"
+    },
+    {
+      "title": "Do it automatically via a udev rule",
+      "level": 3,
+      "content": "Create a file something like /etc/udev/rules.d/99-acer-touch.rules with contents like this:\n\n```\n/etc/udev/rules.d/99-acer-touch.rules\n```\n\n```\nENV{ID_VENDOR_ID}==\"2149\",ENV{ID_MODEL_ID}==\"2703\",ENV{WL_OUTPUT}=\"DVI1\",ENV{LIBINPUT_CALIBRATION_MATRIX}=\"1 0 0  0 1 0\"\n```\n\nSubstitute your own touchscreen's vendor ID, model ID, the xrandr output name, and the calibration matrix that you calculated above. This is based on the assumption that you are using the libinput driver for your touchscreen.\n\n"
+    },
+    {
+      "title": "Wayland",
+      "level": 2,
+      "content": "Using libinput you can calibrate your touchscreen on Wayland compositors. See the libinput documentation.\n\nIf you have weston installed, you can use the weston-calibrator utility to get the transformation matrix. You can then apply it using a udev rule.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If, after following these instructions, multiple clicks occur in different places when you touch the screen, you will need to build the xorg-server package using the ABS, applying this patch before you build the package. (This patch fails on the current xorg source, but the bug is present on at least 1 system.)\n\n"
+    },
+    {
+      "title": "Using libinput",
+      "level": 3,
+      "content": "The libinput package provides a few utilities to debug input events:\n\n- The libinput debug-events command provides a list of events emitted by all devices, including the touchscreen driver. You can use the --verbose option to get more information.\n- libinput debug-gui provides a graphical debug environment. This can be useful to verify visually that the transformation matrix has the correct values.\n- libinput list-devices lists all input devices. This can be useful to identify the name and eventual attributes of an input device. Using this command you can also verify that the transformation matrix was applied correctly.\n\nFor more information see the troubleshooting section of the libinput page.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://wiki.postmarketos.org/wiki/Screen_Calibration#Touch_screen\n- https://wayland.freedesktop.org/libinput/doc/latest/device-configuration-via-udev.html#static-device-configuration-via-udev\n\n"
+    }
+  ]
+}

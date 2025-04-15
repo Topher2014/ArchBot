@@ -1,0 +1,71 @@
+{
+  "title": "Kernels/Compilation/Arch Build System (日本語)",
+  "url": "https://wiki.archlinux.org/title/Kernels/Compilation/Arch_Build_System_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Arch Build System を使うことで、公式の linux パッケージをベースにカスタムカーネルをビルドすることができます。このコンパイル方法は全体のプロセスを自動化でき、よくテストされたパッケージに基づいています。PKGBUILD を編集することでカスタムカーネルの設定やパッチの追加が可能です。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 材料の入手\n- 2 PKGBUILD の修正 2.1 ドキュメントの作成を避ける 2.2 prepare() の変更 2.3 新しいチェックサムを生成\n- 3 コンパイル\n- 4 インストール\n- 5 ブートローダー\n- 6 アップデート 6.1 クリーンアップ\n- 7 参照\n\n- 2.1 ドキュメントの作成を避ける\n- 2.2 prepare() の変更\n- 2.3 新しいチェックサムを生成\n\n- 6.1 クリーンアップ\n\n"
+    },
+    {
+      "title": "材料の入手",
+      "level": 2,
+      "content": "makepkg を使用するので、以下のベストプラクティスに従ってください。例えば、makepkg を root ユーザとして実行することはできません。したがって、まずはホームディレクトリに build ディレクトリを作成してください:\n\n```\n$ mkdir ~/build/\n$ cd ~/build/\n```\n\nパッケージ devtools と base-devel をインストールしてください。\n\nカスタマイズを開始するには、クリーンなカーネルが必要です。以下を実行して、git を使って PKGBUILD ソースを取得し、他のいくつかのファイルも取得してください:\n\n```\n$ pkgctl repo clone --protocol=https linux\n```\n\nこの時点で、ディレクトリツリーは以下のようになります（他にもいくつかファイルがあるかもしれません）\n\n```\n~/build/linux/-+\n               +--config\n               \\__PKGBUILD\n```\n\nその後、必要なファイル (例:カスタム設定ファイル、パッチなど) をそれぞれのソースから取得してください。\n\n"
+    },
+    {
+      "title": "PKGBUILD の修正",
+      "level": 2,
+      "content": "PKGBUILD を編集して、pkgbase パラメータをあなたのカスタムパッケージの名前に変えて下さい、例えば:\n\n```\nPKGBUILD\n```\n\n```\npkgbase=linux-custom\n```\n\n"
+    },
+    {
+      "title": "ドキュメントの作成を避ける",
+      "level": 3,
+      "content": "長いコンパイル作業の大部分は、ドキュメントの作成に費やされています。2022年8月25日の時点で、PKGBUILD への次のパッチにより作成を回避します:\n\n```\n63c63\n<   make htmldocs all\n---\n>   make all\n195c195\n< pkgname=(\"$pkgbase\" \"$pkgbase-headers\" \"$pkgbase-docs\")\n---\n> pkgname=(\"$pkgbase\" \"$pkgbase-headers\")\n```\n\nこのパッチは行#63 と行#195 を変更します。 PKGBUILD ファイルが正しく適用されない場合は、手動で編集する必要がある場合があります。\n\n"
+    },
+    {
+      "title": "prepare() の変更",
+      "level": 3,
+      "content": "prepare() 関数では、パッチの適用 やカーネルビルドの設定を変更することができます。 2018-08-01以降、PKGBUILDは自動的にソース内の*.patchファイルを適用します。\n\nもし、いくつかの設定を変更する必要があるなら、ソースの config を編集することができます。\n\nまた、GUI ツールを使ってオプションを調整することもできます。PKGBUILD の prepare() 関数に make olddefconfig とコメントし、好きなツールを追加してください (利用可能な設定ターゲットをすべてリストアップするには make help を実行してください):\n\n```\nPKGBUILD\n```\n\n```\n...\n  msg2 \"Setting config...\"\n  cp ../config .config\n  #make olddefconfig\n\n  make nconfig     # new CLI menu for configuration\n  #make menuconfig # CLI menu for configuration\n  #make xconfig    # X-based configuration\n  #make oldconfig  # using old config from previous kernel version\n  # ... or manually edit .config\n  make prepare\n...\n```\n\n"
+    },
+    {
+      "title": "新しいチェックサムを生成",
+      "level": 3,
+      "content": "#prepare() の変更 では、$_srcname/.config への変更の可能性を示唆しています。 このパスはパッケージファイルのダウンロードが終了した場所ではないため、そのチェックサムは makepkg によってチェックされませんでした (実際は $_srcname/../../config をチェックしました)。\n\nmakepkg を実行する前に、ダウンロードした config を別の設定ファイルに置き換えた場合は、pacman-contrib パッケージをインストールし、以下を実行して新しいチェックサムを生成してください:\n\n```\n$ updpkgsums\n```\n\n"
+    },
+    {
+      "title": "コンパイル",
+      "level": 2,
+      "content": "これで、いつものコマンド makepkg を使って、あなたのカーネルをコンパイルできるようになりました。\n\nカーネルパラメータの設定に (menuconfig などの) インタラクティブなプログラムを選んだ場合は、コンパイル中に設定を行ってください。\n\n```\n$ makepkg -s\n```\n\n-s パラメータによって xml やドキュメントなど最近のカーネルが必要とする依存パッケージがダウンロードされます。\n\n- カーネルソースは PGP 署名 が付いており、makepkg は署名を検証します。詳しくは Makepkg#署名チェックを見てください。\n- ハードウェアのパフォーマンスによっては、コンパイルに数時間かかる可能性があります。マルチコアのシステムでは複数のコンパイルジョブを同時に実行することでコンパイル時間を大幅に削減することが可能です。\n- 上記の makepkg を time コマンドを使って実行すれば、コンパイルにどれだけの時間が掛かったのかを知ることができます。\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "コンパイルのステップを終えると、~/build/linux フォルダ内に 2 つのパッケージが作成されています。1 つはカーネルで、もう一つはカーネルのヘッダファイル群です。これらは以下のような名前かもしれません:\n\n```\nlinux-custom-5.8.12-x86_64.pkg.tar.zst\nlinux-custom-headers-5.8.12-x86_64.pkg.tar.zst\n```\n\nベストプラクティスは、両方のパッケージを一緒にインストールすることです。両方とも必要になるかもしれませんから (例えば DKMS):\n\n```\n# pacman -U linux-custom-headers-5.8.12-x86_64.pkg.tar.zst linux-custom-5.8.12-x86_64.pkg.tar.zst\n```\n\n(先のフォルダ内にあるファイルの実際の名前に置き換えてください)\n\n"
+    },
+    {
+      "title": "ブートローダー",
+      "level": 2,
+      "content": "新しいカーネルをデフォルトのカーネルと共存させるために pkgbase を変更した場合、ブートローダーの設定ファイルを更新し、関連する initramfs イメージとカスタムカーネルの新しいエントリ ('default' と 'fallback') を追加する必要があります。\n\n"
+    },
+    {
+      "title": "アップデート",
+      "level": 2,
+      "content": "更新したい arch kernel source を持っていると仮定すると、そのための一つの方法は https://github.com/archlinux/linux を使うことです。以下では、カーネルソースの最上位ディレクトリを ~/build/linux/ とします。\n\n一般に、arch は2つのローカル git リポジトリを持つ arch kernel source を設定します。archlinux-linux/ にあるのは、https://github.com/archlinux/linux.git を指しているローカルの裸の git リポジトリです。もう一つは src/archlinux-linux/ にあり、最初のリポジトリから取り出します。可能なローカルパッチとビルドは、src/archlinux-linux/ にあると期待されます。\n\nこの例では、archlinux-linux/ にローカルにインストールされた bare git リポジトリソースの HEAD が最初に指されています:\n\n```\n$ cd ~/build/linux/archlinux-linux/\n$ git log --oneline --max-count 1 HEAD\n```\n\n```\n4010b622f1d2 Merge branch 'dax-fix-5.3-rc3' of git://git.kernel.org/pub/scm/linux/kernel/git/nvdimm/nvdimm\n```\n\nv5.2.5-arch1とv5.2.6-arch1の間のどこかにあります。\n\n```\n$ git fetch --verbose\n```\n\n取得した新しいタグを出力するため、最新の archlinux タグである v5.2.7-arch1 をフェッチしたことがわかります。 新しいタグが取得されなかった場合、利用可能な新しい archlinux ソースはありません。\n\nこれで、実際のビルドが行われる場所でソースを更新できます。\n\n```\n$ cd ~/build/linux/src/archlinux-linux/\n$ git checkout master\n$ git pull\n$ git fetch --tags --verbose\n$ git branch --verbose 5.2.7-arch1 v5.2.7-arch1\n$ git checkout 5.2.7-arch1\n```\n\n次のような方法で状況が進んでいることを確認できます\n\n```\n$ git log --oneline 5.2.7-arch1 --max-count=7\n```\n\n```\n13193bfc03d4 Arch Linux kernel v5.2.7-arch1\n9475c6772d05 netfilter: nf_tabf676926c7f60les: fix module autoload for redir\n498d650048f6 iwlwifi: Add support for SAR South Korea limitation\nbb7293abdbc7 iwlwifi: mvm: disable TX-AMSDU on older NICs\nf676926c7f60 ZEN: Add CONFIG for unprivileged_userns_clone\n5e4e503f4f28 add sysctl to disallow unprivileged CLONE_NEWUSER by default\n5697a9d3d55f Linux 5.2.7\n```\n\nこれは、Arch Linux kernel v5.2.7-arch1 と Linux 5.2.7 の間のいくつかの特定の archlinux パッチを示しています。\n\n最新の PKGBUILD および archlinux カーネルのコンフィグレーションファイルは、git を使ってパッケージディレクトリへ取得できます:\n\n```\n$ cd ~/build/linux/\n$ git pull\n```\n\n~/build/linux/linux/* 内のファイルを ~/build/linux/ へマージする必要があります。マージは手動で行うことができますし、特定のユーティリティを使うこともできます。#prepare() の変更 を見て、PKGBUILD::prepare() のシェルコマンドを (全てではないにしろ) ほぼ全て手動で実行してください。\n\nこの時点で、 makepkg--verifysource は成功するはずです。#コンパイル の時には、makepkg --noextract オプションも追加してください。これによりソースが makepkg --nobuild によって抽出されたかのようにパッケージをビルドできるはずです。そして #インストール に戻ります。\n\n"
+    },
+    {
+      "title": "クリーンアップ",
+      "level": 3,
+      "content": "マージした後、~/build/linux/linux/ を削除したい場合があるでしょう。~/build/linux/src/archlinux は、より新しい更新がこの方法で行われた場合、5.2.7-arch1 の形でブランチを蓄積します。 これらは以下で削除することができます:\n\n```\n$ cd ~/build/linux/src/archlinux\n$ git branch --delete --force --verbose 5.2.7-arch1\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- https://docs.kernel.org/kbuild/kconfig.html とその親ディレクトリ\n\n"
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "title": "Install Arch Linux on ZFS (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Install_Arch_Linux_on_ZFS_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- ZFS\n- Experimenting with ZFS\n\nQuesto articolo spiega i passaggi richiesti per installare Arch Linux su una root filesystem ZFS.\n\n- FreeBSD ZFS Handbook\n- ZFSOnLinux wiki\n- OpenZFS wiki\n- Aaron Toponce Install ZFS on Debian GNU/Linux\n- OpenZFS documentation for Arch Linux\n\n"
+    },
+    {
+      "title": "Installazione",
+      "level": 2,
+      "content": "Per installare Arch Linux su ZFS, sarà necessario avviare il sistema con il modulo ZFS.\n\n"
+    },
+    {
+      "title": "Precauzioni",
+      "level": 3,
+      "content": "Il fatto che i moduli Kernel ZFS siano out-of-tree combinato alla natura rolling release come la distribuzione Arch, ci saranno spesso dei momenti (anche se brevi) in cui i pacchetti del kernel nel repository esterno non saranno allineati con quelli Arch, e occasionalmente i moduli ZFS (in versione dkms) non verranno compilati affato con i kernel piu recenti. Se hai bisogno o vuoi utilizzare sempre i pacchetti Kernel piu recenti, installare Arch su ZFS potrebbe non essere una buona idea. Tuttavia, nella maggior parte dei casi è sensato inserire linux e i relativi linux-* (e linux-*-headers se si utilizza dkms) nel file IgnorePkg e aggiornarli solo manualmente e ripristinarli nel caso in cui ci siano problemi evidenti. In alternativa, si potrebbe usare il pacchetto LTS Kernel, che dovrebbe essere sempre utilizabile con dkms.\n\n"
+    },
+    {
+      "title": "Installare il modulo ZFS sul sistema archiso",
+      "level": 3,
+      "content": "Esistono due modi per installare il modulo ZFS in archiso.\n\nUno di questi è tramite un semplice script che installa e carica il modulo ZFS sul sistema archiso avviato. Questo dovrebbe funzionare su tutte le versioni di archiso.\n\nVedi eoli3n/archiso-zfs.\n\n"
+    },
+    {
+      "title": "Incorporamento del modulo ZFS in un archiso personalizzato.",
+      "level": 3,
+      "content": "per creare un archiso personalizzato, leggere questo articolo ZFS.\n\n"
+    },
+    {
+      "title": "Partizionamento dell'unità di destinazione",
+      "level": 2,
+      "content": "Rivedersi Partitioning per informazioni su come determinare il tipo di tabella partizioni da utilizzare per ZFS. ZFS supporta le tabelle partizioni GPT e MBR.\n\nZFS gestise le proprie partizioni, quindì è richiesto solo uno schema di tabella partizioni di base. La partizione che conterrà il filesystem ZFS dovrà essere di tipo bf00, o \"Solaris Root\".\n\nI dischi più grandi di 2TB richiedono la tabella partizioni GPT. La configurazione GRUB per BIOS/GPT richiede una partizione di tipo \"BIOS GRUB\" grande (1-2MiB) per contenere l'immagine del codice di avvio..\n\nIn base al firmware della macchina e alla modalità di avvio scelta, l'avvio potrà richiedere o meno una EFI system partition. Su una macchina BIOS (o una macchina UEFI avvio in modalità legacy), una partizione di sistema EFI non è richiesta. Consulta la pagina Arch boot process#Boot loader per maggiori informazioni.\n\n"
+    },
+    {
+      "title": "Schema partizioni",
+      "level": 3,
+      "content": "Ecco un esempio di uno schema di partizioni base che potrebbe essere utilizzato per l'installazione root ZFS su una macchina con BIOS/MBR e GRUB:\n\n```\nPart     Size   Type\n----     ----   -------------------------\n   1     XXXG   Solaris Root (bf00)\n```\n\nUtilizzando GRUB con tipo di avvio della macchina BIOS (o una macchina UEFI in modalità avvio legacy) ma usando lo schema partizioni GPT:\n\n```\nPart     Size   Type\n----     ----   -------------------------\n   1       2M   BIOS boot partition (ef02)\n   2     XXXG   Solaris Root (bf00)\n```\n\nUtilizzando Syslinux con zfsbootmenuAUR su una macchina con modalità avvio BIOS e una tabella partizioni GPT o MBR:\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n```\nPart     Size   Type\n----     ----   -------------------------\n   1     512M   BIOS boot partition (ef02)\n   2     XXXG   Solaris Root (bf00)\n```\n\nUn altro esempio, questa volta usando un bootloader specifico UEFI (come rEFInd) con tabella partizioni GPT:\n\n```\nPart     Size   Type\n----     ----   -------------------------\n   1       1G   EFI system partition (ef00)\n   2     XXXG   Solaris Root (bf00)\n```\n\nZFS non suporta lo swap file. Se si necessita della partizione di swap, visitare ZFS#Swap volume per creare lo swap ZVOL.\n\n"
+    },
+    {
+      "title": "Esempi di comandi per parted",
+      "level": 3,
+      "content": "Ecco alcuni comandi di esempio per partizionare un'unità per il secondo scenario di cui sopra, ovvero utilizzando la modalità di avvio BIOS/legacy con una tabella delle partizioni GPT e una partizione di avvio del BIOS da 1 MB (poco più) per GRUB:\n\n```\n# parted /dev/sdx\n```\n\n```\n(parted)mklabel gpt\n(parted)mkpart non-fs 0% 2\n(parted)mkpart primary 2 100%\n(parted)set 1 bios_grub on\n(parted)set 2 boot on\n(parted)quit\n```\n\nè possibile ottenere quanto sopra, in un singolo comando:\n\n```\n# parted --script /dev/sdx mklabel gpt mkpart non-fs 0% 2 mkpart primary 2 100% set 1 bios_grub on set 2 boot on\n```\n\nSe si sta creando un partizione di sistema EFI dovrà essere impostata sotto boot invece che root.\n\n"
+    },
+    {
+      "title": "Formattazione del disco di destinazione",
+      "level": 2,
+      "content": "Se si ha optato per una partizione di avvio e per qualsiasi altra partizione di sistema non ZFS, formattala. Non fare nulla alla partizione Solaris né alla partizione alla partizione di avvio BIOS GRUB. ZFS gestirà la prima, mentre il bootloader la seconda.\n\n"
+    },
+    {
+      "title": "Configurazione ZFS filesystem",
+      "level": 2,
+      "content": "Prima, assicurati che il modulo ZFS sia caricato:\n\n```\n# modprobe zfs\n```\n\n"
+    },
+    {
+      "title": "Creazione del pool di root",
+      "level": 3,
+      "content": "Creare il tuo pool e imposta tutte le opzioni del dataset predefinite. Tutti i dataset creati da zpool, erediteranno ciascuno l'opzione -O alla creazione. Le impostazioni di default sono spiegate in Debian Buster Root on ZFS. Step 2: Disk Formatting.\n\nNote: **comporterà** \n\n```\n# zpool create -f -o ashift=12         \\\n             -O acltype=posixacl       \\\n             -O relatime=on            \\\n             -O xattr=sa               \\\n             -O dnodesize=legacy       \\\n             -O normalization=formD    \\\n             -O mountpoint=none        \\\n             -O canmount=off           \\\n             -O devices=off            \\\n             -R /mnt                   \\\n             zroot /dev/disk/by-id/id-to-partition-partx\n```\n\n"
+    },
+    {
+      "title": "Compressione e crittografia nativa",
+      "level": 4,
+      "content": "Questo abiliterà la compressione e la crittografia nativa per impostazione predefinita su tutti i dataset:\n\n```\n# zpool create -f -o ashift=12         \\\n             -O acltype=posixacl       \\\n             -O relatime=on            \\\n             -O xattr=sa               \\\n             -O dnodesize=legacy       \\\n             -O normalization=formD    \\\n             -O mountpoint=none        \\\n             -O canmount=off           \\\n             -O devices=off            \\\n             -R /mnt                   \\\n             -O compression=lz4        \\\n             -O encryption=aes-256-gcm \\\n             -O keyformat=passphrase   \\\n             -O keylocation=prompt     \\\n             zroot /dev/disk/by-id/id-to-partition-partx\n```\n\nNote: **alcuni dei quali potrebbero non essere supportati da GRUB** \n\n- Utilizza sempre i nomi ID quando lavori con ZFS, altrimenti si verificheranno errori di importazione.\n- Invece di by-id, considera l'utilizzo di by-partuuid o by-uuid, poiché rimarranno coerenti anche se un'unità interna viene spostata in un contenitore USB o viceversa (questo è possibile solo se ZFS viene utilizzato con una partizione, non con un intero disco)\n- Gli utenti GRUB dovrebbero tenere a mente che il comando zpool-create normalmente abilita tutte le caratteristiche, alcuni dei quali potrebbero non essere supportati da GRUB. Vedi: ZFS#GRUB-compatible pool creation.\n\n"
+    },
+    {
+      "title": "Creazione dei dataset",
+      "level": 3,
+      "content": "Invece di utilizzare le partizioni del disco convenzionali, ZFS utilizza il concetto di dataset per gestire il tuo spazio di archiviazione. A differenza delle partizioni del disco, i dataset non hanno dimensioni fisse e consentono di applicare attributi diversi, come la compressione, a ciascun dataset. I normali dataset ZFS vengono montati automaticamente da ZFS mentre i dataset legacy devono essere montati utilizzando fstab o con il tradizionale comando mount.\n\nUna delle funzionalità più utili di ZFS sono gli ambienti di avvio. Gli ambienti di boot ti consentono di creare un'istantanea avviabile del tuo sistema a cui puoi ripristinare immediatamente in qualsiasi momento semplicemente riavviando e avviando da quell'ambiente di boot. Ciò può rendere gli aggiornamenti di sistema molto più sicuri ed è anche incredibilmente utile per lo sviluppo e il test del software. Per poter utilizzare un gestore dell'ambiente di boot come beadm, zectlAUR (systemd-boot), o zedenvAUR (GRUB) per gestire gli ambienti di boot, i dataset devono essere configurati correttamente. La chiave è che dividi le tue cartelle di dati (come /home) in dataset distinti dai dataset del tuo sistema e che non inserisci i dati nella radice del pool poiché questo non può essere spostato in seguito.\n\nDovresti sempre creare un dataset almeno per il tuo filesystem root e in quasi tutti i casi vorrai che anche /home sia in un dataset separato. Potresti decidere di desiderare che i tuoi registri persistano negli ambienti di avvio. Se stai utilizzando un software che memorizza dati al di fuori di /home (come nel caso dei server di database) dovresti strutturare i tuoi dataset in modo che le cartelle dei dati del software che desideri eseguire siano separate dal dataset root.\n\nCon questi comandi di esempio, creeremo una configurazione compatibile con l'ambiente di boot di base comprendente solo i dataset root e /home. Eredita le opzioni predefinite da zpool creation.\n\n```\n# zfs create -o mountpoint=none zroot/data\n# zfs create -o mountpoint=none zroot/ROOT\n# zfs create -o mountpoint=/ -o canmount=noauto zroot/ROOT/default\n# zfs create -o mountpoint=/home zroot/data/home\n```\n\nPuoi anche creare il tuo dataset ROOT senza dover specificare il punto di montaggio su / poiché GRUB lo monterà comunque su /. Ciò ti dà la possibilità di avviare alcune vecchie versioni di root semplicemente clonandole e inserendole come voce di menu di GRUB. In tal modo, puoi creare ROOT con il seguente comando:\n\n```\n# zfs create -o mountpoint=/roots/default zroot/ROOT/default\n```\n\nPuoi memorizzare /root nella tua zroot/data/home dataset.\n\n```\n# zfs create -o mountpoint=/root zroot/data/home/root\n```\n\nDovrai abilitare alcune opzioni per i dataset che contengono directory specifiche:\n\nTable content:\nDirectory | Dataset option | Details\n/ | canmount=noauto | \n/var/log/journal | acltype=posixacl | systemd (Italiano)#systemd-tmpfiles-setup.service non si avvia al boot\n\n"
+    },
+    {
+      "title": "Dataset di sistema",
+      "level": 4,
+      "content": "Per creare dataset per il sistema di cartelle, usa canmount=off.\n\nPer alcuni esempi, puoi leggere Debian-Buster-Root-on-ZFS#step-3-system-installation.\n\n```\n# zfs create -o mountpoint=/var -o canmount=off     zroot/var\n# zfs create                                        zroot/var/log\n# zfs create -o mountpoint=/var/lib -o canmount=off zroot/var/lib\n# zfs create                                        zroot/var/lib/libvirt\n# zfs create                                        zroot/var/lib/docker\n```\n\n"
+    },
+    {
+      "title": "Export/Import dei pool",
+      "level": 3,
+      "content": "Per validare la propria configurazine, esportare e reimportare i propri pool.\n\n```\n# zpool export zroot\n# zpool import -d /dev/disk/by-id -R /mnt zroot -N\n```\n\nNote: Se questo comando fallisce e viene chiesto di importare i pool tramite il suo ID numerico, esegui zpool import per scoprire lo ID del tuo pool, quindi utilizza un comando come:\n\nSe questo comando fallisce e viene chiesto di importare i pool tramite il suo ID numerico, esegui zpool import per scoprire lo ID del tuo pool, quindi utilizza un comando come:\n\n```\n# zpool import 9876543212345678910 -R /mnt zroot\n```\n\nSe si sta usando la cifratura nativa, caricare la chiave zfs.\n\n```\n# zfs load-key zroot\n```\n\nMontare manualmente il proprio rootfs dataset perché questo ha l'opzione canmount=noauto, poi montare i rimanenti datasets creati.\n\n```\n# zfs mount zroot/ROOT/default\n# zfs mount -a\n```\n\nAdesso lo ZFS filesystem è pronto ad essere utilizzato.\n\n"
+    },
+    {
+      "title": "Configurazione del root filesystem",
+      "level": 3,
+      "content": "Se hai utilizzato i dataset legacy, saranno elencati in /etc/fstab.\n\nImposta la proprietà di bootfs sul filesystem di root, in modo che il boot loader sia in grado di trovare il sistema ooperativo.\n\n```\n# zpool set bootfs=zroot/ROOT/default zroot\n```\n\nSe non si ha /etc/zfs/zpool.cache, crearlo:\n\n```\n# zpool set cachefile=/etc/zfs/zpool.cache zroot\n```\n\nAssicurati di portare il file zpool.cache nel ptoprio sistema. Questo sarà necessario successivamente per l'avvio del demone ZFS.\n\n```\n# mkdir -p /mnt/etc/zfs\n# cp /etc/zfs/zpool.cache /mnt/etc/zfs/zpool.cache\n```\n\n"
+    },
+    {
+      "title": "Installazione e configurazione Arch Linux",
+      "level": 2,
+      "content": "Segui i passaggi seguenti usando la Installation guide (Italiano). Verrà specificato dove sarà necessario prestare più attenzione per ZFSonLinux.\n\n- Per prima cosa montare tutte le partizioni di avvio o di sistema legacy o non-ZFS, usando il comando mount.\n\n- Installa il sistema di base.\n\n- La procedura descritta in Installation guide (Italiano)#Fstab di solito è eccessivo per ZFS. Solitamente ZFS monta automaticamente le proprie partizioni, quindi non abbiamo bisogno delle partizioni ZFS nel file fstab, a meno che l'utente non abbia creato i dataset legacy delle cartelle di sistema. Per generare fstab per i filesystem, usare:\n\n```\n# genfstab -U -p /mnt >> /mnt/etc/fstab\n```\n\n- Cambiare root nel nuovo sistema, per Installation guide (Italiano)#Chroot:\n\n```\n# arch-chroot /mnt\n```\n\n- Modificare il file /etc/fstab:\n\n- Se hai scelto di creare dataset legacy per le cartelle di sistema, mantienili nel file fstab!\n- Commentare tutti i non-legacy dataset al di fuori di swap file e la partizione di sistema EFI. Questa è una convenzione per sostituire lo UUID dello swap con /dev/zvol/zroot/swap.\n\n- Sarà necessario aggiungere Arch ZFS repository in /etc/pacman.conf, firmarne la chiave e installare zfs-linuxAUR (o zfs-linux-ltsAUR se si sta usando il kernel LTS) all'interno di arch-chroot prima di poter aggiornare il ramdisk con il supporto ZFS.\n\n- Quando si crea lo initial ramdisk, prima modificare /etc/mkinitcpio.conf. Aggiungere zfs a MODULES:\n\n```\nMODULES=(zfs)\n```\n\nPoi in HOOKS, aggiungere zfs prima di filesystems. Poi, spostare keyboard hook prima di zfs quindi puoi digitare in console se qualcosa va storto. Sarà necessario anche rimuovere fsck (se non si sta usando Ext3 or Ext4). La tua linea di HOOKS dovrà essere simile alla seguente:\n\n```\nHOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block zfs filesystems)\n```\n\n- Quando si utilizza systemd nello initrd, è necessario installare mkinitcpio-sd-zfsAUR[broken link: package not found] e aggiungere lo hook sd-zfs dopo lo hook systemd invece dello hook zfs. Tieni presente che questo hook utilizza parametri del kernel diversi rispetto allo hook predefinito zfs, maggiori informazioni possono essere trovate su project page.\n\n- sd-zfs non supporta ancora la crittografia nativa dasJ/sd-zfs/issues/4.\n- Se si sta utilizzando un dataset separato per /usr e si ha seguito le istruzioni riportate di seguito, bisognerà assicurarsi di avere lo hook usr abilitato dopo zfs, o il sistema non si avvierà.\n- Quando si genera lo initramfs, il file zpool.cache viene copiato nello initrd. Se non lo hai generato prima o hai bisogno di rigenerarlo, ricordati di rigenerare nuovamente lo initramfs.\n- Puoi anche utilizzare il muontpoint legacy per consentire a fstab di montarlo.\n\n- Regenerate the initramfs.\n\n"
+    },
+    {
+      "title": "Installazione e configurazione del bootloader",
+      "level": 2,
+      "content": "In linea di principio, la configurazione del bootloader non differisce molto se il kernel e initrd risiedono in una partizione non-ZFS. Una volta che il kernel ha il modulo zfs e initrd che sono stati compilati con lo hook, e la riga cmd del kernel ha il parametro kernel zfs, il sistema può avviarsi. Ad esempio, zfs=zroot/ROOT/default rw o anche solo zfs=zroot rw (nel caso in cui il parametro bootfs sia stato impostato correttamente come fatto precedentemente) dovrebbe funzionano per la maggior parte dei casi. Non è necessario un parametro root poiché zfs monterà la root. Consulta la documentazione del bootloader su come impostare i parametri del kernel.\n\nTuttavia, se è necessario caricare l'immagine del kernel e/o initrd da zfs, è necessario utilizzare un bootloader in grado di leggere zfs e configurare correttamente il bootloader.\n\nConsiderando quanto sopra, configurare il tuo bootloader dovrebbe essere abbastanza semplice. Ecco alcuni esempi, ma l’elenco non è affatto completo.\n\n"
+    },
+    {
+      "title": "Utilizzando EFISTUB",
+      "level": 3,
+      "content": "Per EFISTUB, sarà possibile aggiungere una voce al menu di avvio UEFI:\n\n```\n# efibootmgr --create --disk il_tuo_disco_esp --part il_tuo_numero_di_partizione_esp --label \"Arch Linux (ZFS)\" --loader /vmlinuz-linux --unicode 'zfs=zroot/ROOT/default rw initrd=\\initramfs-linux.img'\n```\n\n"
+    },
+    {
+      "title": "Utilizzando Unified kernel image",
+      "level": 3,
+      "content": "Utilizzando una Unified kernel image (UKI) è abbastanza semplice. Assicurati solo di avere il parametro zfs da qualche parte in /etc/cmdline.d. Configura manualmente mkinitcpio (moduli e hooks) come fatto in precedenza in questa pagina, o altrimnenti come faresti per una normale UKI. Per esempio:\n\n```\n/etc/cmdline.d/root.conf\n```\n\n```\nzfs=zroot/ROOT/default rw\n```\n\nForse zfs=zroot è sufficiente (non testato), poiché zfs dovrebbe montare automaticamente root. Ricorda solo di rieseguire mkinitcpio ogni volta che si apportato modifiche.\n\n"
+    },
+    {
+      "title": "Utilizzando GRUB",
+      "level": 3,
+      "content": "Se si usa GRUB, sarà possibile inserire il proprio /boot in uno zpool. Leggere Debian-Buster-Root-on-ZFS#step-3-system-installation.\n\nInstalla GRUB sul disco come indicato qui: GRUB#BIOS systems o GRUB#UEFI systems. GRUB manual fornisce informazioni dettagliate sulla configurazione manuale del software che è possibile integrare con GRUB e GRUB/Tips and tricks.\n\n"
+    },
+    {
+      "title": "bug: rilevamento del pool root danneggiato",
+      "level": 4,
+      "content": "A causa di un bug, grub-mkconfig non riuscirà a rilevare il pool root e ometterà /boot/grub/grub.cfg. Fino a quando il problema non viene risolto, ci sono due possibili soluzioni alternative:\n\n- Soluzione A: Modifica il codice per il rilevamento rpool in /etc/grub.d/10_linux. Sostituisci\n\n```\nrpool=`${grub_probe} --device ${GRUB_DEVICE} --target=fs_label 2>/dev/null || true`\n```\n\n```\nrpool=`zdb -l ${GRUB_DEVICE} | grep \" name:\" | cut -d\\' -f2`\n```\n\n- Soluzione B: Se la soluzione di cui sopra non riesce a rilevare il percorso corretto, puoi codificarlo in /etc/grub.d/10_linux. Sostituendo\n\n```\nlinux   ${rel_dirname}/${basename} root=${linux_root_device_thisversion} rw ${args}\n```\n\n```\nlinux   ${rel_dirname}/${basename} root=ZFS=zroot/ROOT/default rw ${args}\n```\n\n"
+    },
+    {
+      "title": "errore: impossibile ottenere il percorso canonico di",
+      "level": 4,
+      "content": "grub-mkconfig non riesce a generare correttamente le voci per i sistemi su ZFS.\n\n```\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\n```\n/usr/bin/grub-probe: error: failed to get canonical path of `/dev/bus-Your_Disk_ID-part#'\ngrub-install: error: failed to get canonical path of `/dev/bus-Your_Disk_ID-part#'\n```\n\nPer risolvere questo problema è necessario impostare questa variabile di ambiente: ZPOOL_VDEV_NAME_PATH=1. Per esempio:\n\n```\n# ZPOOL_VDEV_NAME_PATH=1 grub-mkconfig -o /boot/grub/grub.cfg\n```\n\n"
+    },
+    {
+      "title": "errore: filesystem sconosciuto",
+      "level": 4,
+      "content": "Gli strumenti GRUB come grub-probe o grub-install potrebbero fallire con l'errore unknown filesystem quando il rilevamento del filesystem fallisce. Ciò può accadere perché il filesystem non è supportato da GRUB o, nel caso di ZFS, potrebbero essere presenti funzionalità non supportate (fare riferimento ZFS#GRUB-compatible pool creation per le funzionalità appropriate da includere in uno zpool di avvio.)\n\nPer risolvere l'errore, capire quale filesystem non riesce a identificare (ad esempio, eseguire grub-probe sui sospetti, come grub-probe / o grub-probe /boot). Segue un esempio di interazione:\n\n```\n# grub-probe /boot\nzfs\n\n# grub-probe /\ngrub-probe: error: unknown filesystem.\n```\n\nDopo aver identificato il filesystem problematico, esegui grub-probe -vvvv / e scansiona lo output per il filesystem che avrebbe dovuto identificare. In questo caso era previsto ZFS, ma è stato generato il seguente output:\n\n```\ngrub-probe -vvvv /\n```\n\n```\n(...)\ngrub-core/kern/fs.c:56: Detecting zfs...\ngrub-core/osdep/hostdisk.c:420: opening the device `/dev/sda4' in open_device()\ngrub-core/fs/zfs/zfs.c:1199: label ok 0\ngrub-core/osdep/hostdisk.c:399: reusing open device `/dev/sda4'\ngrub-core/fs/zfs/zfs.c:1014: check 2 passed\ngrub-core/fs/zfs/zfs.c:1025: check 3 passed\ngrub-core/fs/zfs/zfs.c:1032: check 4 passed\ngrub-core/fs/zfs/zfs.c:1042: check 6 passed\ngrub-core/fs/zfs/zfs.c:1050: check 7 passed\ngrub-core/fs/zfs/zfs.c:1061: check 8 passed\ngrub-core/fs/zfs/zfs.c:1071: check 9 passed\ngrub-core/fs/zfs/zfs.c:1093: check 11 passed\ngrub-core/fs/zfs/zfs.c:1119: check 10 passed\ngrub-core/fs/zfs/zfs.c:1135: str=com.delphix:hole_birth\ngrub-core/fs/zfs/zfs.c:1135: str=com.delphix:embedded_data\ngrub-core/fs/zfs/zfs.c:1144: check 12 passed (feature flags)\ngrub-core/fs/zfs/zfs.c:1884: zio_read: E 0: size 4096/4096\n(...)\ngrub-core/osdep/hostdisk.c:399: reusing open device `/dev/sda4'\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.delphix:extensible_dataset, value = 18, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.datto:bookmark_v2, value = 0, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.datto:encryption, value = c, cd = 0 # <------------------\ngrub-core/kern/fs.c:78: zfs detection failed.  # <----------------------------------------------------\ngrub-core/kern/fs.c:56: Detecting xfs...\ngrub-core/fs/xfs.c:931: Reading sb\ngrub-core/fs/xfs.c:270: Validating superblock\ngrub-core/kern/fs.c:78: xfs detection failed.\ngrub-core/kern/fs.c:56: Detecting ufs2...\n(...)\ngrub-core/kern/fs.c:56: Detecting affs...\ngrub-core/kern/fs.c:78: affs detection failed.\ngrub-probe: error: unknown filesystem.\n```\n\nCiò dimostra che il rilevamento ZFS è andato bene finché non è stata rilevata la funzionalità com.datto:encryption. Poiché la crittografia nativa ZFS non è supportata da GRUB (a partire da agosto 2021), il rilevamento di ZFS non è riuscirà. Un secondo zpool compatibile con GRUB potrebbe essere appropriato per l'avvio in un sistema crittografato: a partire da agosto 2021, questo è l'approccio consigliato (fare riferimento a relevant OpenZFS project page).\n\nUn'esecuzione riuscita grub-probe su uno zpool compatibile con GRUB assomiglia a questo:\n\n```\ngrub-probe -vvvv /boot\n```\n\n```\n(...)\ngrub-core/osdep/hostdisk.c:399: reusing open device `/dev/sda3'\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.delphix:extensible_dataset, value = 0, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.delphix:embedded_data, value = 1, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = com.delphix:hole_birth, value = 1, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = org.open-zfs:large_blocks, value = 0, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = org.illumos:lz4_compress, value = 1, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = , value = 0, cd = 0\ngrub-core/fs/zfs/zfs.c:2117: zap: name = , value = 0, cd = 0\ngrub-core/fs/zfs/zfs.c:3285: alive\n(...)\ngrub-core/fs/zfs/zfs.c:1906: endian = 1\ngrub-core/fs/zfs/zfs.c:597: dva=8, 20008\ngrub-core/fs/zfs/zfs.c:2697: alive\nzfs\n```\n\n"
+    },
+    {
+      "title": "Avvio del kernel e initrd da ZFS",
+      "level": 4,
+      "content": "Puoi saltare questa sezione se hai il kernel e initrd su una partizione /boot separata utilizzando qualcosa come ext4 o vfat.\n\nAltrimenti grub deve caricare il kernel e initrd provenienti da un dataset ZFS, i percorsi del kernel e initrd devono essere nel seguente formato:\n\n```\n/dataset/@/actual/path\n```\n\nEsempio con Arch installato sul dataset root:\n\n```\n/boot/grub/grub.cfg\n```\n\n```\nset timeout=5\nset default=0\n\nmenuentry \"Arch Linux\" {\n    search -u UUID\n    linux /@/boot/vmlinuz-linux zfs=zroot rw\n    initrd /@/boot/initramfs-linux.img\n}\n```\n\nEsempio con Arch installato su un dataset nidificato:\n\n```\n/boot/grub/grub.cfg\n```\n\n```\nset timeout=5\nset default=0\n\nmenuentry \"Arch Linux\" {\n    search -u UUID\n    linux /ROOT/default/@/boot/vmlinuz-linux zfs=zroot/ROOT/default rw\n    initrd /ROOT/default/@/boot/initramfs-linux.img\n}\n```\n\n"
+    },
+    {
+      "title": "Avvio del kernel e initrd da una partizione di avvio separata",
+      "level": 4,
+      "content": "Esempio con una partizione /boot separata non ZFS e Arch installato su un set di dati nidificato:\n\n```\n/boot/grub/grub.cfg\n```\n\n```\nset timeout=5\nset default=0\n\nmenuentry \"Arch Linux\" {\n    search -u UUID\n    linux /vmlinuz-linux zfs=zroot/ROOT/default rw\n    initrd /initramfs-linux.img\n}\n```\n\n"
+    },
+    {
+      "title": "Utilizzo di systemd-boot (solo per EFI)",
+      "level": 3,
+      "content": "systemd-boot non riesce ad aprire /boot se risiede all'interno di uno zpool, quindi sarà necessario far risiedere /boot in una partizione VFAT o ext4 separata.\n\nInstallare systemd-boot sulla propria partizione di sistema EFI seguendo systemd-boot#Installing the UEFI boot manager.\n\nCreare una boot entry:\n\n```\nesp/loader/entries/arch.conf\n```\n\n```\ntitle   Arch Linux\nlinux   /vmlinuz-linux\ninitrd  /initramfs-linux.img\noptions zfs=zroot/ROOT/default rw\n```\n\n"
+    },
+    {
+      "title": "Utilizzando rEFInd per UEFI",
+      "level": 3,
+      "content": "Usare EFISTUB e rEFInd per il UEFI boot loader. I parametri kernel in refind_linux.conf per ZFS dovrebbero essere zfs=bootfs o zfs=zroot in modo che il sistema possa avviarsi da ZFS. I parametri root e rootfstype non sono richiesti.\n\n"
+    },
+    {
+      "title": "Using ZFSBootMenu for UEFI",
+      "level": 3,
+      "content": "Quando si utilizza ZFSBootMenu si deve avere la directory /boot posizionata sul tuo filesystem root (ZFS). Vedi Boot Environments and You: A Primer per ulteriori informazioni.\n\nSarà possibile scegliere tra usare #Generazione immagine ZFSBootMenu o usare #Binari EFI ZFSBootMenu precostruito.\n\n"
+    },
+    {
+      "title": "Generazione immagine ZFSBootMenu",
+      "level": 4,
+      "content": "- Montare la propria partizione ESP\n- Installare zfsbootmenuAUR e efibootmgr\n\n- Configurazione ZFSBootMenu:\n\n```\n/etc/zfsbootmenu/config.yaml\n```\n\n```\nGlobal:\n  ManageImages: true\n  BootMountPoint: percorso_del_tuo_ESP\n  DracutConfDir: /etc/zfsbootmenu/dracut.conf.d\n  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d\n  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d\n  InitCPIO: true\n  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf\nComponents:\n  ImageDir: percorso_del_tuo_ESP/EFI/zbm\n  Versions: 3\n  Enabled: false\n  syslinux:\n    Config: /boot/syslinux/syslinux.cfg\n    Enabled: false\nEFI:\n  ImageDir: percorso_del_tuo_ESP/EFI/zbm\n  Versions: false\n  Enabled: true\nKernel:\n  CommandLine: ro quiet loglevel=0\n```\n\n- Generazione immagini ZFSBootMenu:\n\n```\n# generate-zbm\n```\n\n- Configurazione degli argomenti della riga di comando di avvio zfs:\n\n```\n# zfs set org.zfsbootmenu:commandline=\"rw\" zroot/ROOT\n```\n\n- Prima di aggiungere ZFSBootMenu dovrai montare lo UEFI variable filesystem:\n\n```\n# mount -t efivarfs efivarfs /sys/firmware/efi/efivars\n```\n\n- Aggiunta della ZFSBootMenu entry allo EFI boot manager:\n\n```\n# efibootmgr -c -d disco_esp -p numero_partizione_esp -L \"ZFSBootMenu\" -l '\\EFI\\zbm\\vmlinuz-linux.EFI'\n```\n\n"
+    },
+    {
+      "title": "Binari EFI ZFSBootMenu",
+      "level": 4,
+      "content": "- Montare la propria partizione ESP\n- Installare zfsbootmenu-efi-binAUR e efibootmgr\n\n- Configurazione degli argomenti della riga di comando di avvio zfs:\n\n```\n# zfs set org.zfsbootmenu:commandline=\"rw\" zroot/ROOT\n```\n\n- Prima di aggiungere ZFSBootMenu dovrai montare lo UEFI variable filesystem:\n\n```\n# mount -t efivarfs efivarfs /sys/firmware/efi/efivars\n```\n\n- Aggiunta della ZFSBootMenu entry allo EFI boot manager:\n\n```\n# efibootmgr -c -d disco_esp -p numero_partizione_esp -L \"ZFSBootMenu\" -l '\\EFI\\zbm\\zfsbootmenu-release-vmlinuz-x86_64.EFI'\n```\n\n"
+    },
+    {
+      "title": "Utilizzando ZFSBootMenu per Legacy/CSM",
+      "level": 3,
+      "content": "Come per UEFI, se si utilizza ZFSBootMenu la directory /boot dovrà esser parte del pool zroot. Ma a differnza della directory efi si avrà bisogno della directory syslinux.\n\nBooting explaination ZFSBootMenu\n\nInstalling ZFSBootMenu on MBR\n\nComplete guide for Syslinux\n\nMontare la propria partizione syslinux.\n\nInstallare il pacchetto syslinux e gptfdisk per supporto a dischi con tabelle partizioni GPT.\n\nCopiare tutti i file .c32 dentro la directory syslinux:\n\n```\n# cp /usr/lib/syslinux/bios/*.c32 /la_tua_posizione/syslinux\n```\n\nAdesso installare il bootloader:\n\n```\n# extlinux --install /la_tua_posizione/syslinux\n```\n\nUna volta fatto, procedere con l'installazione di Syslinux bootstrap code appropriato per la propria tabella partizioni:\n\n- mbr.bin verrà installatio per una #MBR partition table or,\n- gptmbr.bin verrà installatio per una #GUID partition table\n\nAdesso sarà possibile installare zfsbootmenuAUR\n\nConfigurazione degli argomenti della riga di comando di avvio zfs:\n\n```\n# zfs set org.zfsbootmenu:commandline=\"rw\" zroot/ROOT\n```\n\nImpostazione della creazione di immagini di ZFSBootMenu mediante modifica di:\n\n```\n/etc/zfsbootmenu/config.yaml\n```\n\n```\nGlobal:\n  ManageImages: true\n  BootMountPoint: path_to_your_syslinux_folder\n  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d\n  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d\n  InitCPIO: true\n  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf\nComponents:\n  ImageDir: percorso_della_tua_cartella_syslinux/zfsbootmenu\n  Versions: false\n  Enabled: true\nKernel:\n  CommandLine: ro quiet loglevel=0\n```\n\nAdesso generare l'immagine ZFSBootMenu:\n\n```\n# generate-zbm\n```\n\nModificare il file sostiuendo il contenuto con:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nUI menu.c32\nPROMPT 0\n\nMENU TITLE ZFSBootMenu\nTIMEOUT 50\n\nDEFAULT zfsbootmenu\n\nLABEL zfsbootmenu\n  MENU LABEL ZFSBootMenu\n  KERNEL /zfsbootmenu/vmlinuz-linux-bootmenu\n  INITRD /zfsbootmenu/initramfs-bootmenu.img\n  APPEND zfsbootmenu quiet\n\n# The following for the backup entry\nLABEL zfsbootmenu-backup\n  MENU LABEL ZFSBootMenu (Backup)\n  KERNEL /zfsbootmenu/vmlinuz-linux-bootmenu-backup\n  INITRD /zfsbootmenu/initramfs-bootmenu-backup.img\n  APPEND zfsbootmenu quiet\n```\n\nPer concludere rigenerare mkinitcpio:\n\n```\n# mkinitcpio -P\n```\n\n"
+    },
+    {
+      "title": "Configurazione di systemd ZFS mounts",
+      "level": 2,
+      "content": "Affinché il tuo sistema possa riavviarsi senza problemi, devi abilitare zfs.target per montare automaticamente i pool e impostare lo hostid.\n\nPer ogni pool che si desidera montare automaticamente eseguire:\n\n```\n# zpool set cachefile=/etc/zfs/zpool.cache pool\n```\n\nAvviare zfs.target\n\nPer montare automaticamente i pool zfs all'avvio è necessario Avviarezfs-import-cache.service, zfs-mount.service e zfs-import.target.\n\nQuando si esegue ZFS su root, lo hostid della macchina non sarà disponibile al momento del montaggio del filesystem di root. Ci sono due soluzioni. Puoi inserire il tuo spl hostid nei kernel parameters del tuo boot loader. Per esempio, aggiungendo spl.spl_hostid=0x00bab10c, per ottenere il tuo numero di hostid digitare il comando hostid.\n\nL'altra soluzione suggerita è assicurarsi che ci sia un hostid in /etc/hostid, quindi rigenerare l'immagine initramfs che copierà lo hostid nell'immagine initramfs. Per scrivere il file hostid in modo sicuro è necessario utilizzare il coamndo zgenhostid.\n\nPer utilizzare lo hostid generato da libc (raccomandata):\n\n```\n# zgenhostid $(hostid)\n```\n\nPer utilizzare un hostid personalizzato (deve essere esadecimale e lungo 8 caratteri):\n\n```\n# zgenhostid deadbeef\n```\n\nPer consentire allo strumento di generare un hostid:\n\n```\n# zgenhostid\n```\n\nNon dimenticare di regenerate the initramfs.\n\n"
+    },
+    {
+      "title": "Smontare e riavvio",
+      "level": 2,
+      "content": "Abbiamo quasi finito! Se disponi di una partizione di avvio legacy prima eseguire:\n\n```\n# umount /mnt/boot\n```\n\npoi:\n\n```\n# zfs umount -a\n# zpool export zroot\n```\n\nAdesso riavviare.\n\n"
+    },
+    {
+      "title": "Caricamento password da USB-Stick",
+      "level": 3,
+      "content": "È possibile memorizzare la password su una chiavetta USB e caricarla all'avvio:\n\nSalva la password nei primi bytes della USB-Stick:\n\n```\n# dd if=il_tuo_password_file bs=32 count=1 of=/dev/disk/by-id/usb_stick\n```\n\nPer creare la partizione zfs è possibile utilizzare il metodo descritto in precedenza con la richiesta della password o eseguire il pipe con dd:\n\n```\n# dd if=/dev/disk/by-id/usb_stick bs=32 count=1 | zfs create -o encryption=on -o keyformat=passphrase zroot/ROOT\n```\n\nIl prossimo passo è modificare lo hook zfs. Per impostazione predefinita zfs richiede la password. Devi cambiarlo per averlo collegato con dd dalla tua pendrive. Per fare ciò modifica /usr/lib/initcpio/hooks/zfs e cambia la seguente riga:\n\n```\n# ! eval zfs load-key \"${encryptionroot}\"; do\n```\n\ncosì:\n\n```\n# ! eval dd if=/dev/disk/by-id/usb_stick bs=32 count=1 | zfs load-key \"${encryptionroot}\"; do\n```\n\nStai modificando il tuo hook zfs quindi non dimenticare di regenerate the initramfs. Ora zfs dovrebbe caricare la password dalla chiavetta USB all'avvio.\n\n"
+    },
+    {
+      "title": "Il sistema non si avvia a causa di: impossibile importare zroot: nessun pool di questo tipo disponibile",
+      "level": 3,
+      "content": "Puoi provare i seguenti passaggi e vedere se possono essere d'aiuto.\n\n- Utilizza il modulo kernel da archzfs repo invece della versione dkms. Si potrà tornare alla versione dkms ad avvio completato.\n- Rimuovere il file /etc/zfs/zpool.cache e eseguire:\n\n```\n# zpool set cachefile=none zroot\n```\n\n- Rimuovere il file /etc/hostid.\n- Regenerate the initramfs.\n\n"
+    },
+    {
+      "title": "Guarda anche",
+      "level": 2,
+      "content": "- HOWTO install Ubuntu to a Native ZFS Root\n- ZFS cheatsheet\n- Funtoo:ZFS Install Guide\n- A reference guide to ZFS on Arch Linux\n- Arch Linux On Zfs\n- Youtube: Open-ZFS Bootcamp\n\n"
+    }
+  ]
+}

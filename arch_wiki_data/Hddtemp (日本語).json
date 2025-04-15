@@ -1,0 +1,46 @@
+{
+  "title": "Hddtemp (日本語)",
+  "url": "https://wiki.archlinux.org/title/Hddtemp_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- lm sensors\n\nhddtemp は S.M.A.R.T. によって (この機能をサポートしているドライブで) ハードドライブの温度を得ることができる小さなユーティリティです (デーモン付き)\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 使用方法\n- 3 デーモン 3.1 デフォルトのディスクを上書きする\n- 4 モニター\n- 5 ソリッドステートドライブ\n\n- 3.1 デフォルトのディスクを上書きする\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "hddtemp パッケージをインストールして下さい。\n\n"
+    },
+    {
+      "title": "使用方法",
+      "level": 2,
+      "content": "Hddtemp には Root user 権限が必要です。hddtemp コマンドの後には、少なくとも 1 つのドライブの場所を指定する必要があります。複数のドライブをスペースで区切ってリストできます。\n\n```\n# hddtemp /dev/disk/by-id/wwn-0x60015ee0000b237f /dev/sdX2 ... /dev/sdXn\n```\n\n使用方法の詳細については、hddtemp(8) を参照してください。\n\n"
+    },
+    {
+      "title": "デーモン",
+      "level": 2,
+      "content": "デーモンを実行すると、通常のユーザーとして TCP/IP 経由で温度情報にアクセスできるようになります。これは、スクリプトやシステムモニタリングに役立ちます。\n\nデーモンは、hddtemp.service で 制御 します。\n\n温度を取得するには、ポート 7634 をリッスンするデーモンに接続します。\n\ninetutils を使用する場合:\n\n```\n$ telnet localhost 7634\n```\n\ngnu-netcat の場合:\n\n```\n$ nc localhost 7634\n```\n\nどちらの出力も次のようになります。\n\n```\n|/dev/sda|ST3500413AS|32|C||/dev/sdb|ST2000DM001-1CH164|36|C|\n```\n\n統計をより見やすくするには:\n\n```\n$ nc localhost 7634 |sed 's/|//m' | sed 's/||/ \\n/g' | awk -F'|' '{print $1 \" \" $3 \" \" $4}'\n```\n\n```\n/dev/sda 32 C \n/dev/sdb 36 C\n```\n\n"
+    },
+    {
+      "title": "デフォルトのディスクを上書きする",
+      "level": 3,
+      "content": "デフォルトの Hddtemp デーモンは、/dev/sda のみを監視します。複数のディスクがある場合は、それらを監視するためにデフォルトの設定を 上書き する必要があります。\n\nどのハードドライブが監視をサポートしているかを知る必要がある場合は、smartmontools で確認できます。hddtemp.service を 編集 します:\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/hddtemp --daemon --foreground /dev/disk/by-id/wwn-0x60015ee0000b237f /dev/sdb --listen=127.0.0.1\n```\n\nデバイス名を監視したいデバイス名に変更します。\n\n編集後、ファイルを保存してエディタを終了します。Systemd は変更を適用し、hddtemp サービスを自動的にリロードします。\n\nauto-generate スクリプトを使用することもできます。これにより、smartmontools を使用してサポートされているハードドライブを検出し、stdout に出力することもできます。\n\n"
+    },
+    {
+      "title": "モニター",
+      "level": 2,
+      "content": "Hddtemp は システムモニター と統合できます。Conky には、デーモンモードでの Hddtemp のサポートが組み込まれています。hddtemp.service を 有効化 して、Conky 設定ファイルに $hddtemp °C を追加するだけです。\n\n"
+    },
+    {
+      "title": "ソリッドステートドライブ",
+      "level": 2,
+      "content": "通常 Hddtemp はドライブのスマートデータからフィールド 194 を読み取ります。SSD では基本的に温度情報はフィールド 190 に保存されています。この情報を取得するには、次のコマンドを実行します。:\n\n```\n# smartctl --all /dev/sdx\n```\n\nまたは:\n\n```\n# hddtemp --debug /dev/sdx\n```\n\nX はドライブ文字に置き換えてください (例: a,b,c...)。ドライブ文字は lsblk で確認できます。\n\nまた、/usr/share/hddtemp/hddtemp.db に新しいエントリを追加することも可能です。例:\n\n```\n# echo '\"Samsung SSD 840 EVO 250GB\" 190 C \"Samsung SSD 840 EVO 250GB\"' >> /etc/hddtemp.db\n```\n\n"
+    }
+  ]
+}

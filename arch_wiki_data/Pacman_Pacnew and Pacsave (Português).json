@@ -1,0 +1,51 @@
+{
+  "title": "Pacman/Pacnew and Pacsave (Português)",
+  "url": "https://wiki.archlinux.org/title/Pacman/Pacnew_and_Pacsave_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Quando o pacman remove um pacote que tem um arquivo de configuração, ele normalmente cria uma cópia backup daquele arquivo de configuração e anexa .pacsave ao nome do arquivo. Da mesma forma, quando o pacman atualiza um pacote que inclui um novo arquivo de configuração pelo mantenedor, comparando-o com a configuração atualmente instalada, ele salva um arquivo .pacnew com a nova configuração. O pacman fornece um aviso quando esses arquivos são escritos.\n\n"
+    },
+    {
+      "title": "Por que esses arquivos são criados",
+      "level": 2,
+      "content": "Um arquivo .pacnew pode ser criado durante uma atualização de pacote (pacman -Syu, pacman -Su ou pacman -U) para evitar sobrescrever um arquivo que já existe e foi previamente modificado pelo usuário. Quando isso acontecer, uma mensagem como a seguir aparecerá na saída do pacman:\n\n```\natenção: /etc/pam.d/usermod instalado como /etc/pam.d/usermod.pacnew\n```\n\nUm arquivo .pacsave pode ser criado durante a remoção de um pacote (pacman -R) ou na atualização de um pacote (o pacote deve ser removido primeiro). Quando a base de dados do pacman tiver um registro de que deve-se fazer backup de um certo arquivo de um pacote, ele vai criar um arquivo .pacsave. Quando isso acontece, o pacman emite uma mensagem como a seguir:\n\n```\natenção: /etc/pam.d/usermod salvo como /etc/pam.d/usermod.pacsave\n```\n\nEsses arquivos exigem intervenção manual do usuário e é uma boa prática tratar deles imediatamente a cada atualização ou remoção de pacote. Se não for tratado, configurações inadequadas podem resultar em função inadequada do software ou o software sendo incapaz de funcionar por completo.\n\n"
+    },
+    {
+      "title": "Arquivos backup do pacote",
+      "level": 2,
+      "content": "Um arquivo PKGBUILD do pacote especifica quais arquivos devem ser preservados ou cujo backup deve ser armazenado quando o pacote é atualizado ou removido. Por exemplo, o PKGBUILD do pulseaudio contém a seguinte linha:\n\n```\nbackup=(etc/pulse/{daemon.conf,default.pa,system.pa})\n```\n\nPara evitar que um pacote sobrescreva um certo arquivo, veja Pacman (Português)#Pular pacotes para não serem atualizados.\n\n"
+    },
+    {
+      "title": ".pacnew",
+      "level": 3,
+      "content": "Para cada um dos #Arquivos backup do pacote sendo atualizado, o pacman compara três md5sums gerados do conteúdo do arquivo: uma soma para a versão originalmente instalada pelo pacote, um para a versão atualmente no sistema de arquivo e uma para a versão no novo pacote. Se a versão do arquivo atualmente no sistema de arquivos foi modificada da versão originalmente instalada pelo pacote, o pacman não consegue saber como mesclar essas alterações com a nova versão do arquivo. Portanto, em vez de escrever no arquivo modificado ao atualizar, o pacman salva a nova versão com uma extensão .pacnew e deixa a versão modificada sem alterá-la.\n\nEntrando nos detalhes, os resultados da comparação de soma do MD5 em três vias é um dos seguintes:\n\nRaramente, quando um pacote atualizado inclui um arquivo backup que a versão anterior não incluía, a situação é corretamente lidada como X/Y/Y ou X/Y/Z, com X sendo um valor não existente.\n\n"
+    },
+    {
+      "title": ".pacsave",
+      "level": 3,
+      "content": "Se o usuário modificou um dos arquivos especificados em backup, então aquele arquivo será renomeado com a extensão .pacsave e vai permanecer no sistema de arquivos após o resto do pacote ser removido.\n\n"
+    },
+    {
+      "title": "Localizando arquivos .pac*",
+      "level": 2,
+      "content": "O pacman não lida com arquivos .pacnew automaticamente: você deve mantê-los você mesmo. Algumas poucas ferramentas são apresentadas na próxima seção. Para fazer isso manualmente, você primeiro terá que localizá-los. Ao atualizar ou remover um grande número de pacotes, arquivos .pac* atualizados serão perdidos. Para descobrir se algum arquivo .pac* foi instalado, use um entre os seguintes:\n\n- Para procurar no /etc, onde a maioria das configurações globais estão armazenadas: $ find /etc -regextype posix-extended -regex \".+\\.pac(new|save)\" 2> /dev/null ou pesquisar em todo o disco substituindo /etc por / no comando anterior.\n- Se instalado, locate também pode ser usado. Primeiro reindexe a base de dados: # updatedb. Então, execute: $ locate --existing --regex \"\\.pac(new|save)$\"\n- Use o log do pacman para localizá-los: $ grep --extended-regexp \"\\.pac(new|save)\" /var/log/pacman.log Note que o log não mantém rastro dos arquivos atualmente no sistema de arquivos nem daqueles que já foram removidos; o comando acima vai listar todos os arquivos .pac* que já existiram em seu sistema. Para apenas obter os 10 mais recentes arquivos .pac*, faça um pipe do resultado para tail.\n\n```\n$ find /etc -regextype posix-extended -regex \".+\\.pac(new|save)\" 2> /dev/null\n```\n\n```\n# updatedb\n```\n\n```\n$ locate --existing --regex \"\\.pac(new|save)$\"\n```\n\n```\n$ grep --extended-regexp \"\\.pac(new|save)\" /var/log/pacman.log\n```\n\n"
+    },
+    {
+      "title": "pacdiff",
+      "level": 3,
+      "content": "pacman-contrib fornece pacdiff, uma ferramenta simples para gerenciar arquivos pac*. Com isso, pode-se vai pesquisar por todos os arquivos .pacnew e .pacsave e pedir por quaisquer ações neles. Ele usa vimdiff por padrão, mas você pode especificar uma ferramenta diferente com DIFFPROG=seu_editor pacdiff. Veja List of applications/Utilities#Comparison, diff, merge para outras ferramentas de comparação comum.\n\n"
+    },
+    {
+      "title": "Utilitários de terceiros",
+      "level": 3,
+      "content": "Alguns poucos utilitários de terceiros fornecendo vários níveis de automação para essas ferramentas estão disponíveis no AUR.\n\nVocê pode usar uma das seguintes ferramentas:\n\n- dotpac — Script interativo básico com interface de texto baseada no ncurses e um passo a passo útil. Nenhum recurso de mesclagem ou automesclagem.\n\n- etc-update — Utilitário do Gentoo compatível com outras distribuições, incluindo o Arch. Ele fornece uma CLI simples para ver, mesclar e editar interativamente alterações. Alterações triviais, como comentários, podem ser mescladas automaticamente.\n\n- p3wm — Mesclagem em três vias de arquivos .pacnew. Ele consegue mesclar automaticamente alterações triviais. Se ocorrer conflitos, ele vai iniciar o vimdiff, meeld ou kdiff3 para resolvê-los.\n\n- pacnews-git — Um script simples visando localizar todos os arquivos .pacnew, para então editá-los com vimdiff.\n\n- pacfiles-mode — Um pacote para Emacs para gerenciar e mesclar arquivos .pacnew.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Fórum do Arch Linux: Dealing with .pacnew files (\"Lidando com arquivos .pacnew\")\n\n"
+    }
+  ]
+}

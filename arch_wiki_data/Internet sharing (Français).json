@@ -1,0 +1,61 @@
+{
+  "title": "Internet sharing (Français)",
+  "url": "https://wiki.archlinux.org/title/Internet_sharing_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Android tethering\n- Software access point\n- Bridge with netctl\n- Ad-hoc networking\n- Sharing PPP Connection\n- Simple stateful firewall\n- Router\n- USB 3G Modem\n\nCet article explique la marche à suivre pour partager une connexion Internet d'une machine à une autre.\n\n"
+    },
+    {
+      "title": "Pré-requis",
+      "level": 2,
+      "content": "La machine fonctionnant comme le serveur devra posséder une interface réseau supplémentaire pour établir le lien (data link layer) avec la machine qui recevra la connexion Internet:\n\n- Pour partager Internet avec plusieurs machines un switch peut fournir la connexion physique.\n- Un périphérique sans fil peut également partager une conexion vers plusieurs machines, voir Software access point (en) en premier lieu.\n- Si vous partagez l'accès à une seule machine un câble croisé (crossover cable) peut suffir. Dans le cas de deux ordinateurs ayant des carte ethernet activant la fonctionnalité MDI-X, un câble normal suffit. Executez ethtool interface | grep MDI en tant que root pour en connaitre la disponibilité.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Cette section suppose que le périphérique réseau connecté à l'ordinateur client est nommé net0 et que le périphérique réseau connecté à Internet est internet0.\n\nToute la configuration s'effectue sur l'ordinateur serveur, sauf l'étape finale #Attribution d'adresses IP au(x) PC client(s).\n\n"
+    },
+    {
+      "title": "Adresse IP statique",
+      "level": 3,
+      "content": "Sur l'ordinateur serveur assignez une adresse statique IPv4 à l'interface connectée aux autres machines. Les 3 premiers bytes de cette adresse ne pourront pas être les mêmes que ceux d'une autre interface, à moins que chaque interface ait un netmasks strictement suppérieur à /24.\n\n```\n# ip link set up dev net0\n# ip addr add 192.168.123.100/24 dev net0 # arbitrary address\n```\n\nPour assigner une adresse statique lors du démarrage, vous pouvez utiliser un gestionnaire de connexion réseau.\n\n"
+    },
+    {
+      "title": "Activer la retransmission des paquets",
+      "level": 3,
+      "content": "Pour consulter l'état actuel:\n\n```\n# sysctl -a | grep forward\n```\n\nRemarquez que des options existent pour activer la la retransmission de paquet par défaut, par interface, ainsi que des options pour IPv4/IPv6 par interface.\n\nPur activer la retransmission des paquets après démarrage utilisez:\n\n```\n# sysctl net.ipv4.ip_forward=1\n```\n\nÉditez /etc/sysctl.d/30-ipforward.conf pour établir les définitivement le changement après redémarrage pour toutes les interfaces:\n\n```\n/etc/sysctl.d/30-ipforward.conf\n```\n\n```\nnet.ipv4.ip_forward=1\nnet.ipv6.conf.default.forwarding=1\nnet.ipv6.conf.all.forwarding=1\n```\n\nAprès ceci, il est conseillé de bien vérifier que le «packet forwarding» est bien actif après reboot.\n\n"
+    },
+    {
+      "title": "Avec iptables",
+      "level": 4,
+      "content": "Installez le paquet iptables. Et utilisez iptables pour activer le NAT:\n\n```\n# iptables -t nat -A POSTROUTING -o internet0 -j MASQUERADE\n# iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n# iptables -A FORWARD -i net0 -o internet0 -j ACCEPT\n```\n\nSi vous êtes connecté via PPPoE, bloquez mss sur pmtu afin d'éviter la fragmentation :\n\n```\n# iptables -t mangle -A FORWARD -o ppp0 -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu\n```\n\nLisez l'article iptables pour plus d'informations (notamment pour enregistrer la règle et l'appliquer automatiquement au démarrage). Il existe également un excellent guide sur iptables Simple stateful firewall.\n\n"
+    },
+    {
+      "title": "Avec nftables",
+      "level": 4,
+      "content": "Installez le paquet nftables. Pour activer le NAT avec nftables, vous devrez créer la chaîne postrouting dans une table nouvelle/existante :\n\n```\n# nft add table inet nat\n# nft add chain inet nat postrouting '{type nat hook postrouting priority 100 ; }'.\n```\n\nEnsuite, vous devez masquer les adresses net0 pour internet0 :\n\n```\n# nft add rule inet nat postrouting oifname internet0 masquerade\n```\n\nVous pouvez ajouter d'autres restrictions de pare-feu sur le transfert (en supposant que la table de filtres existe déjà, comme configuré dans nftables#Server) :\n\n```\n# nft add chain inet filter forward '{ type filter hook forward priority 0 ; policy drop ; }.\n# nft add rule inet filter forward ct state related,established accept\n# nft add rule inet filter forward iifname net0 oifname internet0 accept\n```\n\nVous pouvez trouver plus d'informations sur le NAT dans nftables dans le Wiki nftables (en). Si vous voulez rendre ces changements permanents, suivez les instructions sur l'article nftables en anglais.\n\n"
+    },
+    {
+      "title": "Attribution d'adresses IP au(x) PC client(s)",
+      "level": 3,
+      "content": "Si vous prévoyez d'avoir régulièrement plusieurs machines utilisant l'internet partagé par cette machine, c'est une bonne idée d'installer un serveur DHCP, tel que dhcpd ou dnsmasq. Configurez ensuite un client DHCP (par exemple dhcpcd) sur chaque PC client.\n\nNote: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nLes connexions entrantes vers le port UDP 67 doivent être autorisées pour le serveur DHCP. Il est également nécessaire d'autoriser les connexions entrantes sur le port UDP/TCP 53 pour les requêtes DNS.\n\n```\n# iptables -I INPUT -p udp --dport 67 -i net0 -j ACCEPT\n# iptables -I INPUT -p udp --dport 53 -s 192.168.123.0/24 -j ACCEPT\n# iptables -I INPUT -p tcp --dport 53 -s 192.168.123.0/24 -j ACCEPT\n```\n\nSi vous ne prévoyez pas d'utiliser cette configuration régulièrement, vous pouvez ajouter manuellement une IP à chaque client.\n\n"
+    },
+    {
+      "title": "Ajout manuel d'une IP",
+      "level": 4,
+      "content": "Au lieu d'utiliser DHCP, une adresse IP statique et une route par défaut via 192.168.123.100 peuvent également être configurées manuellement. Il existe de nombreux outils permettant de configurer le réseau en conséquence. Un exemple important d'un tel outil est ip(8), consultez Network configuration#Network management. On peut également utiliser un fichier .network, consultez l'article concernant Systemd-networkd pour configurer une IP statique.\n\nConfigurez un serveur DNS pour chaque client, consultez l'article concernant la résolution de noms de domaine pour plus de détails.\n\nLe tour est joué. Le PC client devrait maintenant avoir Internet.\n\n"
+    },
+    {
+      "title": "Dépannage",
+      "level": 2,
+      "content": "Si vous pouvez connecter les deux PC mais que vous ne pouvez pas envoyer de données (par exemple, si le PC client fait une demande DHCP au PC serveur, que ce dernier reçoit la demande et offre une IP au client, mais que ce dernier ne l'accepte pas et s'arrête), vérifiez que vous n'avez pas d'autres règles iptables interférant.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- le guide Xyne (avec scripts) pour lancer un sous-réseau avec DHCP et DNS\n- NetworkManager peut être utilisé pour configurer un partage de connexion.\n\n"
+    }
+  ]
+}

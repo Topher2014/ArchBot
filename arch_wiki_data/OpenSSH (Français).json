@@ -1,0 +1,306 @@
+{
+  "title": "OpenSSH (Français)",
+  "url": "https://wiki.archlinux.org/title/OpenSSH_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- SSH keys\n- Pam abl\n- fail2ban\n- sshguard\n- SSHFS (Français)\n- Syslog-ng\n- SFTP chroot\n- SCP and SFTP\n- VPN over SSH\n\nOpenSSH (OpenBSD Secure Shell) est un ensemble de programmes informatiques fournissant des sessions de communication chiffrées sur un réseau informatique en utilisant le protocole Secure Shell (SSH). Il a été créé comme alternative open source à la suite logicielle propriétaire Secure Shell offerte par SSH Communications Security. OpenSSH est développé dans le cadre du projet OpenBSD, qui est dirigé par Theo de Raadt.\n\nOpenSSH est parfois confondu avec OpenSSL, qui porte un nom proche ; cependant, les projets ont des objectifs différents et sont développés par des équipes différentes, la similitude du nom est uniquement due à des objectifs similaires.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Installez le paquet openssh.\n\n"
+    },
+    {
+      "title": "Utilisation du client",
+      "level": 2,
+      "content": "Pour se connecter à un serveur, exécutez :\n\n```\n$ ssh -p port utilisateur @ adresse du serveur.\n```\n\nSi le serveur n'autorise que l'authentification par clé publique, suivez SSH keys.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "Le client peut être configuré pour stocker les options et les hôtes courants. Toutes les options peuvent être déclarées globalement ou restreintes à des hôtes spécifiques. Par exemple :\n\n```\n~/.ssh/config\n```\n\n```\n# global options\nUser user\n\n# host-specific options\nHost myserver\n    Hostname server-address\n    Port     port\n```\n\nAvec une telle configuration, les commandes suivantes sont équivalentes\n\n```\n$ ssh -p port user@server-address' (utilisateur)\n$ ssh myserver\n```\n\nConsultez ssh_config(5) pour plus d'informations.\n\nCertaines options n'ont pas d'équivalent en ligne de commande, mais vous pouvez spécifier des options de configuration sur la ligne de commande avec -o. Par exemple -oKexAlgorithmes=+diffie-hellman-group1-sha1.\n\n"
+    },
+    {
+      "title": "Utilisation du serveur",
+      "level": 2,
+      "content": "sshd est le daemon du serveur OpenSSH, configuré avec /etc/ssh/sshd_config et géré par sshd.service. Chaque fois que vous modifiez la configuration, utilisez sshd en mode test avant de redémarrer le service pour vous assurer qu'il pourra démarrer proprement. Les configurations valides ne produisent aucune sortie.\n\n```\n# sshd -t\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "Pour autoriser l'accès uniquement à certains utilisateurs, ajoutez cette ligne :\n\n```\nAllowUsers user1 user2\n```\n\nPour autoriser l'accès uniquement à certains groupes :\n\n```\nAllowGroups group1 group2\n```\n\nPour ajouter un beau message de bienvenue (par exemple à partir du fichier /etc/issue), configurez l'option Banner :\n\n```\nBanner /etc/issue\n```\n\nLes clés d'hôte publiques et privées sont automatiquement générées dans /etc/ssh par le service sshdgenkeys et régénérées si elles sont manquantes, même si l'option HostKeyAlgorithms de sshd_config n'en autorise que quelques-unes. Quatre paires de clés sont fournies, basées sur les algorithmes dsa, rsa, ecdsa et ed25519. Pour que sshd utilise une clé particulière, spécifiez l'option suivante :\n\n```\nHostKey /etc/ssh/ssh_host_rsa_key\n```\n\nSi le serveur doit être exposé au WAN, il est recommandé de changer le port par défaut de 22 à un port supérieur aléatoire comme ceci :\n\n```\nPort 39901\n```\n\n- Pour vous aider à sélectionner un autre port qui n'est pas déjà attribué à un service commun, consultez la liste des numéros de port TCP et UDP. Vous pouvez également trouver des informations sur les ports en local dans /etc/services. Un changement de port par rapport au port 22 par défaut réduira le nombre d'entrées de journal causées par les tentatives d'authentification automatique mais ne les éliminera pas. Consultez Port knocking pour des informations connexes.\n- Il est recommandé de désactiver entièrement les connexions par mot de passe. Cela augmentera considérablement la sécurité, consultez #Forcer l'authentification par clé publique pour plus d'informations. Consultez #Protection pour plus de méthodes de sécurité recommandées.\n- OpenSSH peut écouter plusieurs ports simplement en ayant plusieurs Port numéro_port lignes dans le fichier de configuration.\n- Les paires de clés d'hôte nouvelles (ou manquantes) peuvent être générées en supprimant la ou les paires que vous voulez remplacer de /etc/ssh et en exécutant ssh-keygen -A en tant que root.\n\n"
+    },
+    {
+      "title": "Gestion des daemons",
+      "level": 3,
+      "content": "Démarrez et activez sshd.service. Il maintiendra le daemon SSH actif en permanence et forkera pour chaque connexion entrante. [1]\n\n- L'unité sshd.socket peut échouer (par exemple, en raison d'une situation de mémoire insuffisante) et Restart=always ne peut pas être spécifié sur les unités de socket. Consultez problème de systemd n°11553.\n- L'utilisation de l'activation de socket peut entraîner un déni de service, car un trop grand nombre de connexions peut entraîner le refus d'activer davantage le service. Consultez le FS#62248.\n\n"
+    },
+    {
+      "title": "Protection",
+      "level": 3,
+      "content": "Autoriser la connexion à distance via SSH est une bonne chose à des fins administratives, mais peut constituer une menace pour la sécurité de votre serveur. Souvent la cible d'attaques par force brute, l'accès SSH doit être limité correctement pour empêcher des tiers d'accéder à votre serveur.\n\nssh-audit offre une analyse automatisée de la configuration du serveur et du client. Plusieurs autres bons guides et outils sont disponibles sur le sujet, par exemple :\n\n- Article de l'équipe Mozilla Infosec.\n- Mozilla ssh_scan\n- SSH Hardening Guides\n\n"
+    },
+    {
+      "title": "Forcer l'authentification par clé publique",
+      "level": 4,
+      "content": "Si un client ne peut pas s'authentifier au moyen d'une clé publique, le serveur SSH revient par défaut à l'authentification par mot de passe, ce qui permet à un utilisateur malveillant de tenter d'obtenir un accès en force brute par mot de passe. L'un des moyens les plus efficaces de se protéger contre cette attaque est de désactiver complètement les connexions par mot de passe et de forcer l'utilisation de clés SSH. Ceci peut être réalisé en définissant les options suivantes dans le fichier de configuration du daemon :\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nPasswordAuthentication no\nAuthenticationMethods publickey\n```\n\n"
+    },
+    {
+      "title": "Authentification à deux facteurs et clés publiques",
+      "level": 4,
+      "content": "SSH peut être configuré pour nécessiter plusieurs méthodes d'authentification. Vous pouvez indiquer les méthodes d'authentification requises à l'aide de l'option AuthenticationMethods. Cela vous permet d'utiliser des clés publiques ainsi qu'une autorisation à deux facteurs.\n\nConsultez Google Authenticator pour configurer Google Authenticator.\n\nPour Duo, installez duo_unixAUR qui fournira le module pam_duo.so. Lisez la documentation Duo Unix pour savoir comment configurer les informations d'identification Duo nécessaires (clé d'intégration, clé secrète, nom d'hôte API).\n\nPour utiliser PAM avec OpenSSH, éditez les fichiers suivants :\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nKbdInteractiveAuthentication yes\nAuthenticationMethods publickey keyboard-interactive:pam\n```\n\nVous pouvez alors vous connecter avec une clé publique ou l'authentification de l'utilisateur comme requis par votre configuration PAM.\n\nSi, par contre, vous voulez authentifier l'utilisateur à la fois avec une clé publique et l'authentification utilisateur requise par votre configuration PAM, utilisez une virgule au lieu d'un espace pour séparer les AuthenticationMethods :\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nKbdInteractiveAuthentication yes\nAuthenticationMethods publickey,keyboard-interactive:pam\n```\n\nSi l'authentification par pubkey et pam est requise, vous pouvez désactiver le mot de passe :\n\n```\n/etc/pam.d/sshd\n```\n\n```\nauth      required  pam_securetty.so     #disable remote root\n#Require google authenticator\nauth      required  pam_google_authenticator.so\n#But not password\n#auth      include   system-remote-login\naccount   include   system-remote-login\npassword  include   system-remote-login\nsession   include   system-remote-login\n```\n\n"
+    },
+    {
+      "title": "Protection contre les attaques par force brute",
+      "level": 4,
+      "content": "Le forçage brutal est un concept simple : on essaie continuellement de se connecter à une page Web ou à une invite de connexion à un serveur comme SSH avec un grand nombre de combinaisons aléatoires de nom d'utilisateur et de mot de passe.\n\nConsultez ufw#Rate limiting with ufw ou Simple stateful firewall#Bruteforce attacks pour iptables.\n\nVous pouvez également vous protéger contre les attaques par force brute en utilisant un script automatisé qui bloque toute personne essayant d'entrer par force brute, par exemple fail2ban ou sshguard.\n\n- N'autorisez les connexions SSH entrantes qu'à partir d'emplacements de confiance.\n- Utilisez fail2ban ou sshguard pour bloquer automatiquement les adresses IP qui échouent trop souvent à l'authentification par mot de passe.\n- Utilisez pam_shield pour bloquer les adresses IP qui effectuent trop de tentatives de connexion pendant une certaine période. Contrairement à fail2ban ou sshguard, ce programme ne prend pas en compte le succès ou l'échec de la connexion.\n\n"
+    },
+    {
+      "title": "Limiter la connexion root",
+      "level": 4,
+      "content": "Il est généralement considéré comme une mauvaise pratique de permettre à l'utilisateur root de se connecter sans contrainte via SSH. Il existe deux méthodes permettant de restreindre l'accès root SSH pour une sécurité accrue.\n\nSudo fournit de manière sélective les droits root pour les actions qui le nécessitent sans avoir à s'authentifier auprès du compte root. Cela permet de verrouiller le compte root contre l'accès via SSH et fonctionne potentiellement comme une mesure de sécurité contre les attaques par force brute, puisque maintenant un attaquant doit deviner le nom du compte en plus du mot de passe.\n\nSSH peut être configuré pour refuser les connexions à distance avec l'utilisateur root en modifiant la section \"Authentification\" du fichier de configuration du daemon. Définissez simplement PermitRootLogin à no :\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nPermitRootLogin no\n```\n\nEnsuite, redémarrez le daemon SSH.\n\nVous ne pourrez plus vous connecter par SSH sous root, mais vous pourrez toujours vous connecter avec votre utilisateur normal et utiliser su ou sudo pour administrer le système.\n\nCertaines tâches automatisées, telles que la sauvegarde complète du système à distance, nécessitent un accès complet à root. Pour les autoriser de manière sécurisée, au lieu de désactiver la connexion root via SSH, il est possible de n'autoriser la connexion root que pour certaines commandes. Ceci peut être réalisé en éditant ~root/.ssh/authorized_keys, en préfixant la clé désirée, par exemple comme suit :\n\n```\ncommand=\"/usr/lib/rsync/rrsync -ro /\" ssh-rsa ...\n```\n\nCela permettra à toute connexion avec cette clé spécifique d'exécuter la commande spécifiée entre les guillemets.\n\nL'augmentation de la surface d'attaque créée par l'exposition du nom d'utilisateur root à la connexion peut être compensée en ajoutant ce qui suit à sshd_config :\n\n```\nPermitRootLogin forced-commands-only\n```\n\nCe paramètre ne limitera pas seulement les commandes que root peut exécuter via SSH, mais il désactivera également l'utilisation de mots de passe, forçant l'utilisation de l'authentification par clé publique pour le compte root.\n\nUne alternative un peu moins restrictive autorise n'importe quelle commande pour root, mais rend les attaques par force brute infaisables en imposant l'authentification par clé publique. Pour cette option, définissez :\n\n```\nPermitRootLogin prohibit-password\n```\n\n"
+    },
+    {
+      "title": "Verrouillage du fichier authorized_keys",
+      "level": 4,
+      "content": "Si, pour une raison quelconque, vous pensez que l'utilisateur en question ne devrait pas pouvoir ajouter ou modifier des clés existantes, vous pouvez l'empêcher de manipuler le fichier.\n\nSur le serveur, mettez le fichier authorized_keys en lecture seule pour l'utilisateur et refusez toutes les autres autorisations :\n\n```\n$ chmod 400 ~/.ssh/authorized_keys\n```\n\nPour empêcher l'utilisateur de simplement rétablir les autorisations, définissez le bit immuable sur le fichier authorized_keys. Pour empêcher l'utilisateur de renommer le répertoire ~/.ssh et de créer un nouveau répertoire ~/.ssh et un nouveau fichier authorized_keys, définissez également le bit immuable sur le répertoire ~/.ssh. Pour ajouter ou supprimer des clés, vous devrez supprimer le bit immuable de authorized_keys et le rendre temporairement accessible en écriture.\n\n"
+    },
+    {
+      "title": "Tunnel SOCKS chiffré",
+      "level": 3,
+      "content": "Ceci est très utile pour les utilisateurs d'ordinateurs portables connectés à diverses connexions sans fil non sécurisées. La seule chose dont vous avez besoin est un serveur SSH fonctionnant dans un endroit quelque peu sécurisé, comme votre domicile ou votre lieu de travail. Il peut être utile d'utiliser un service DNS dynamique comme DynDNS pour ne pas avoir à se souvenir de votre adresse IP.\n\n"
+    },
+    {
+      "title": "Étape 1 : démarrer la connexion",
+      "level": 4,
+      "content": "Vous n'avez qu'à exécuter cette seule commande pour démarrer la connexion :\n\n```\n$ ssh -TND 4711 user@host\n```\n\noù user est votre nom d'utilisateur sur le serveur SSH fonctionnant sur host. Il vous demandera votre mot de passe, et vous serez alors connecté. L'option N désactive l'invite interactive, et l'option D spécifie le port local sur lequel écouter (vous pouvez choisir n'importe quel numéro de port si vous le souhaitez). L'option T désactive l'allocation de pseudo-tty.\n\nIl est intéressant d'ajouter l'option verbose (-v), car vous pouvez alors vérifier que le système est réellement connecté à partir de cette sortie.\n\n"
+    },
+    {
+      "title": "Étape 2 (Variante A) : configurez votre navigateur (ou d'autres programmes)",
+      "level": 4,
+      "content": "L'étape ci-dessus n'est utile qu'en combinaison avec un navigateur web ou un autre programme qui utilise ce tunnel SOCKS nouvellement créé. Comme SSH prend actuellement en charge SOCKS v4 et SOCKS v5, vous pouvez utiliser l'un ou l'autre.\n\n- Pour Firefox : Dans Préférences > Général, naviguez jusqu'au bas de la page et cliquez sur Paramètres..., qui se trouve à droite du titre Paramètres réseau. Ensuite, dans la nouvelle semi-fenêtre, cochez l'option Configuration manuelle du proxy et entrez localhost dans le champ de texte Hôte SOCKS, et le numéro de port dans le champ de texte Port (4711 dans l'exemple ci-dessus) à côté.\n\n- Pour Chromium : Vous pouvez définir les paramètres SOCKS comme variables d'environnement ou comme options de ligne de commande. Je recommande d'ajouter l'une des fonctions suivantes à votre .bashrc :\n\n```\nfunction secure_chromium {\n    port=4711\n    export SOCKS_SERVER=localhost:$port\n    export SOCKS_VERSION=5\n    chromium &\n    exit\n}\n```\n\nOU\n\n```\nfunction secure_chromium {\n    port=4711\n    chromium --proxy-server=\"socks://localhost:$port\" &\n    exit\n}\n```\n\nMaintenant, ouvrez un terminal et faites simplement :\n\n```\n$ secure_chromium\n```\n\nProfitez de votre tunnel sécurisé !\n\n"
+    },
+    {
+      "title": "Étape 2 (Variante B) : configurer une interface TUN locale",
+      "level": 4,
+      "content": "Cette variante est un peu plus complexe au départ, mais elle vous évite de devoir configurer manuellement chaque application une par une pour utiliser le proxy SOCKS. Elle consiste à configurer une interface TUN locale et à acheminer le trafic à travers celle-ci.\n\nConsultez VPN over SSH#Set up badvpn and tunnel interface.\n\n"
+    },
+    {
+      "title": "Déport d'affichage X11",
+      "level": 3,
+      "content": "Le déport d'affichage avec X11 est un mécanisme qui permet aux interfaces graphiques des programmes X11 s'exécutant sur un système distant d'être affichées sur une machine cliente locale. Pour la redirection X11, l'hôte distant n'a pas besoin d'avoir un système X11 complet installé, mais il doit au moins avoir xauth installé. xauth est un utilitaire qui maintient les configurations Xauthority utilisées par le serveur et le client pour l'authentification de la session X11 (source).\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 4,
+      "content": "- installez les paquets xorg-xauth\n- dans /etc/ssh/sshd_config : définissez X11Forwarding à yes. vérifiez que les options AllowTcpForwarding et X11UseLocalhost ont pour valeur yes, et que X11DisplayOffset a pour valeur 10 (ce sont les valeurs par défaut si rien n'a été changé, consultez sshd_config(5))\n- puis redémarrez le daemon sshd.\n\n- définissez X11Forwarding à yes.\n- vérifiez que les options AllowTcpForwarding et X11UseLocalhost ont pour valeur yes, et que X11DisplayOffset a pour valeur 10 (ce sont les valeurs par défaut si rien n'a été changé, consultez sshd_config(5))\n\n- installez le paquet xorg-xauth\n- Activez l'option ForwardX11 en spécifiant le paramètre -X sur la ligne de commande pour les connexions opportunistes, ou en définissant ForwardX11 à yes dans la configuration du client.\n\n"
+    },
+    {
+      "title": "Utilisation",
+      "level": 4,
+      "content": "Connectez-vous à la machine distante normalement, en spécifiant le paramètre -X si ForwardX11 n'a pas été activé dans le fichier de configuration du client :\n\n```\n$ ssh -X user@host\n```\n\nSi vous recevez des erreurs en essayant d'exécuter des applications graphiques, essayez plutôt ForwardX11Trusted :\n\n```\n$ ssh -Y user@host\n```\n\nSi vous obtenez X11 forwarding request failed, recommencez la configuration pour votre machine distante. Une fois que la demande de transfert X11 a réussi, vous pouvez lancer n'importe quel programme X sur le serveur distant et il sera transféré à votre session locale :\n\n$ xclock\n\nUne erreur contenant Can't open display indique que DISPLAY n'est pas correctement configuré.\n\nSoyez prudent avec certaines applications car elles vérifient qu'une instance est en cours d'exécution sur la machine locale. Firefox est un exemple : fermez l'instance de Firefox en cours d'exécution ou utilisez le paramètre de démarrage suivant pour lancer une instance distante sur la machine locale :\n\n```\n$ firefox --no-remote\n```\n\nSi vous obtenez \"X11 forwarding request failed on channel 0\" lorsque vous vous connectez (et que le serveur /var/log/errors.log affiche \"Failed to allocate internet-domain X11 display socket\"), vérifiez que le paquet xorg-xauth est installé. Si son installation ne fonctionne pas, essayez soit de :\n\n- activer l'option AddressFamily any dans sshd_config sur le serveur, soit\n- Définir l'option AddressFamily de sshd_config sur le serveur à inet.\n\nLe réglage sur inet peut résoudre les problèmes avec les clients Ubuntu sur IPv4.\n\nPour exécuter des applications X en tant qu'autre utilisateur sur le serveur SSH, vous devez xauth add la ligne d'authentification prise dans xauth list de l'utilisateur connecté à SSH.\n\n"
+    },
+    {
+      "title": "Transfert d'autres ports",
+      "level": 3,
+      "content": "En plus du support intégré de SSH pour X11, il peut également être utilisé pour tunnelliser de manière sécurisée toute connexion TCP, en utilisant la redirection locale ou la redirection à distance.\n\nLe transfert local ouvre un port sur la machine locale, dont les connexions seront transférées vers l'hôte distant et de là, vers une destination donnée. Très souvent, la destination de la redirection sera la même que l'hôte distant, fournissant ainsi un shell sécurisé et, par exemple, une connexion VNC sécurisée, à la même machine. Le transfert local est accompli au moyen du paramètre -L et il accompagne la spécification du transfert sous la forme <port du tunnel>:<adresse de destination>:<port de destination>.\n\nAinsi :\n\n```\n$ ssh -L 1000:mail.google.com:25 192.168.0.100\n```\n\nutilisera SSH pour se connecter et ouvrir un shell sur 192.168.0.100, et créera également un tunnel depuis le port TCP 1000 de la machine locale vers mail.google.com sur le port 25. Une fois établi, les connexions à localhost:1000 se connecteront au port SMTP de Gmail. Pour Google, il apparaîtra que cette connexion (mais pas nécessairement les données transmises par cette connexion) provient de 192.168.0.100, et ces données seront sécurisées entre la machine locale et 192.168.0.100, mais pas entre 192.168.0.100 et Google, sauf si d'autres mesures sont prises.\n\nDe même :\n\n```\n$ ssh -L 2000:192.168.0.100:6001 192.168.0.100\n```\n\npermettra les connexions à localhost:2000 qui seront envoyées de manière transparente à l'hôte distant sur le port 6001. L'exemple précédent est utile pour les connexions VNC utilisant l'utilitaire vncserver - qui fait partie du paquet tightvnc - qui, bien que très utile, est explicite quant à son manque de sécurité.\n\nLe transfert à distance permet à l'hôte distant de se connecter à un hôte arbitraire via le tunnel SSH et la machine locale, ce qui constitue une inversion fonctionnelle du transfert local, et est utile dans les situations où, par exemple, l'hôte distant a une connectivité limitée en raison d'un pare-feu. Il est activé avec le paramètre -R et une spécification de transfert sous la forme <port du tunnel>:<adresse de destination>:<port de destination>.\n\nAinsi :\n\n```\n$ ssh -R 3000:irc.libera.chat:6667 192.168.0.200\n```\n\nfera apparaître un shell sur 192.168.0.200, et les connexions de 192.168.0.200 à lui-même sur le port 3000 (le localhost:3000 de l'hôte distant) seront envoyées via le tunnel à la machine locale, puis à irc.libera.chat sur le port 6667, ce qui, dans cet exemple, permet d'utiliser les programmes IRC sur l'hôte distant, même si le port 6667 lui serait normalement bloqué.\n\nLa redirection locale et distante peut être utilisée pour fournir une \"passerelle\" sécurisée, permettant à d'autres ordinateurs de profiter d'un tunnel SSH, sans réellement exécuter SSH ou le daemon SSH en fournissant une adresse de liaison pour le début du tunnel dans le cadre de la spécification de la redirection, par exemple <adresse du tunnel>:<port du tunnel>:<adresse de destination>:<port de destination>. L'adresse <tunnel address> peut être n'importe quelle adresse sur la machine au début du tunnel. L'adresse localhost autorise les connexions via l'interface localhost ou loopback, et une adresse vide ou * autorise les connexions via n'importe quelle interface. Par défaut, le transfert est limité aux connexions provenant de la machine située au \"début\" du tunnel, c'est-à-dire que l'adresse <adresse du tunnel> est définie sur localhost. La redirection locale ne nécessite aucune configuration supplémentaire, mais la redirection à distance est limitée par la configuration du daemon SSH du serveur distant. Consultez l'option GatewayPorts dans sshd_config(5) et l'option -L address dans ssh(1) pour plus d'informations sur le transfert à distance et le transfert local, respectivement.\n\n"
+    },
+    {
+      "title": "Hôtes de saut",
+      "level": 3,
+      "content": "Dans certains scénarios, il se peut qu'il n'y ait pas de connexion directe à votre daemon SSH cible, et l'utilisation d'un serveur de saut (ou serveur bastion) est nécessaire. Ainsi, nous essayons de connecter ensemble deux ou plusieurs tunnels SSH, et supposons que vos clés locales sont autorisées pour chaque serveur de la chaîne. Ceci est possible en utilisant le transfert d'agent SSH (-A) et l'allocation de pseudo-terminaux (-t) qui transmet votre clé locale avec la syntaxe suivante :\n\n```\n$ ssh -A -t -l user1 bastion1 \\\n  ssh -A -t -l utilisateur2 intermédiaire2 \\\n  ssh -A -t -l utilisateur3 cible\n```\n\nUne façon plus simple de le faire est d'utiliser l'option -J :\n\n```\n$ ssh -J user1@bastion1,user2@intermediate2 user3@target\n```\n\nPlusieurs hôtes dans la directive -J peuvent être séparés par une virgule, ils seront connectés dans l'ordre de la liste. La partie user...@ n'est pas obligatoire, mais peut être utilisée. Les spécifications de l'hôte pour -J utilisent le fichier de configuration ssh, donc des options spécifiques par hôte peuvent être définies ici, si nécessaire.\n\nUn équivalent de l'indicateur -J dans le fichier de configuration est l'option ProxyJump, consultez ssh_config(5) pour plus de détails.\n\n"
+    },
+    {
+      "title": "Inverser SSH à travers un relais",
+      "level": 3,
+      "content": "L'idée est que le client se connecte au serveur via un autre relais, tandis que le serveur est connecté au même relais en utilisant un tunnel SSH inverse. Ceci est par exemple utile lorsque le serveur est derrière un NAT et que le relais est un serveur SSH accessible au public utilisé comme proxy auquel l'utilisateur a accès. La condition préalable est donc que les clés du client soient autorisées à la fois par le relais et le serveur et que les clés du serveur soient également autorisées par le relais pour la connexion SSH inverse.\n\nL'exemple de configuration suivant suppose que l'utilisateur1 est le compte utilisateur utilisé sur le client, l'utilisateur2 sur le relais et l'utilisateur3 sur le serveur. Tout d'abord, le serveur doit établir le tunnel inverse avec :\n\n```\nssh -R 2222:localhost:22 -N user2@relay\n```\n\nCe qui peut également être automatisé avec un script de démarrage, un service systemd ou autossh.\n\nDu côté client, la connexion est établie avec :\n\n```\nssh -t user2@relay ssh user3@localhost -p 2222\n```\n\nLa commande à distance pour établir la connexion au tunnel inverse peut également être définie dans le ~/.ssh/authorized_keys du relais en incluant le champ command comme suit :\n\n```\ncommand=\"ssh user3@localhost -p 2222\" ssh-rsa KEY2 user1@client\n```\n\nDans ce cas, la connexion est établie avec :\n\n```\nssh user2@relay\n```\n\nNotez que la fonction d'autocomplétion de SCP dans le terminal du client ne fonctionne pas et que les transferts SCP eux-mêmes ne fonctionnent pas dans certaines configurations.\n\n"
+    },
+    {
+      "title": "Multiplexage",
+      "level": 3,
+      "content": "Le daemon SSH écoute généralement sur le port 22. Cependant, il est courant pour de nombreux points d'accès publics à Internet de bloquer tout le trafic qui n'est pas sur les ports HTTP/S habituels (80 et 443, respectivement), bloquant ainsi efficacement les connexions SSH. La solution immédiate à ce problème consiste à faire en sorte que sshd écoute en plus sur l'un des ports de la liste blanche :\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nPort 22\nPort 443\n```\n\nCependant, il est probable que le port 443 soit déjà utilisé par un serveur web servant du contenu HTTPS, auquel cas il est possible d'utiliser un multiplexeur, tel que sslh, qui écoute sur le port multiplexé et peut transférer intelligemment les paquets vers de nombreux services.\n\n"
+    },
+    {
+      "title": "Accélérer SSH",
+      "level": 3,
+      "content": "Il existe plusieurs options configuration du client qui peuvent accélérer les connexions de manière globale ou pour des hôtes spécifiques. Consultez ssh_config(5) pour une description complète de ces options.\n\n- Use a faster cipher : sur les CPUs modernes avec les instructions AESNI, aes128-gcm@openssh.com et aes256-gcm@openssh.com devraient offrir de meilleures performances que le chiffrement préféré par défaut d'openssh, habituellement chacha20-poly1305@openssh.com. Le chiffrement peut être sélectionné par l'option -c. Pour un effet permanent, mettez l'option Ciphers dans votre ~/.ssh/config avec les ciphers dans le nouvel ordre préféré, par exemple :Ciphers aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr\n- Activer ou désactiver la compression : la compression peut augmenter la vitesse sur les connexions lentes, elle est activée avec l'option Compression yes ou le paramètre -C. Cependant, l'algorithme de compression utilisé est le relativement lent gzip(1) qui devient le goulot d'étranglement sur les réseaux rapides. Afin d'accélérer la connexion, il faut utiliser l'option Compression no sur les réseaux locaux ou rapides.\n- Partage de connexion : vous pouvez faire en sorte que toutes les sessions sur le même hôte partagent une seule connexion en utilisant ces options :ControlMaster auto ControlPersist yes ControlPath ~/.ssh/sockets/socket-%r@%h:%p\n\n```\nCiphers aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr\n```\n\n```\nControlMaster auto\nControlPersist yes\nControlPath ~/.ssh/sockets/socket-%r@%h:%p\n```\n\n- ControlPersist spécifie combien de temps le maître doit attendre en arrière-plan de nouveaux clients après la fermeture de la connexion client initiale. Les valeurs possibles sont soit : no pour fermer la connexion immédiatement après la déconnexion du dernier client, un temps en secondes, yes pour attendre éternellement, la connexion ne sera jamais fermée automatiquement.\n- Le temps de connexion peut être raccourci en contournant la recherche IPv6 à l'aide de l'option AddressFamily inet ou de l'option -4.\n- Enfin, si vous avez l'intention d'utiliser SSH pour SFTP ou SCP, High Performance SSH/SCP peut augmenter considérablement le débit en augmentant dynamiquement la taille des tampons SSH. Installez le paquet openssh-hpn-gitAUR[broken link: package not found] pour utiliser une version corrigée d'OpenSSH avec cette amélioration.\n\n- no pour fermer la connexion immédiatement après la déconnexion du dernier client,\n- un temps en secondes,\n- yes pour attendre éternellement, la connexion ne sera jamais fermée automatiquement.\n\n"
+    },
+    {
+      "title": "Montage d'un système de fichiers distant avec SSHFS",
+      "level": 3,
+      "content": "Veuillez vous référer à l'article SSHFS pour monter un système distant accessible par SSH dans un répertoire local, ce qui vous permettra d'effectuer n'importe quelle opération sur les fichiers montés avec n'importe quel outil (copier, renommer, éditer avec vim, etc.). sshfs est généralement préféré à shfs, ce dernier n'ayant pas été mis à jour depuis 2004.\n\n"
+    },
+    {
+      "title": "Maintenir en vie",
+      "level": 3,
+      "content": "Par défaut, la session SSH se déconnecte automatiquement si elle est restée inactive pendant un certain temps. Pour maintenir la session en vie, le client peut envoyer un signal de maintien en vie au serveur si aucune donnée n'a été reçue depuis un certain temps, ou symétriquement, le serveur peut envoyer des messages à intervalles réguliers s'il n'a pas reçu de nouvelles du client.\n\n- Du côté du serveur, ClientAliveInterval définit le délai en secondes après lequel, si aucune donnée n'a été reçue du client, sshd enverra une demande de réponse. La valeur par défaut est 0, aucun message n'est envoyé. Par exemple, pour demander une réponse toutes les 60 secondes au client, définissez l'option ClientAliveInterval 60 dans votre configuration du serveur. Consultez également les options ClientAliveCountMax et TCPKeepAlive.\n- Du côté client, ServerAliveInterval contrôle l'intervalle entre les demandes de réponse envoyées par le client au serveur. Par exemple, pour demander une réponse toutes les 120 secondes au serveur, ajoutez l'option ServerAliveInterval 120 à votre client. Consultez également les options ServerAliveCountMax et TCPKeepAlive.\n\n"
+    },
+    {
+      "title": "Redémarrer automatiquement les tunnels SSH avec systemd",
+      "level": 3,
+      "content": "systemd peut démarrer automatiquement les connexions SSH au démarrage/à la connexion et les redémarrer lorsqu'elles échouent. Cela en fait un outil utile pour la maintenance des tunnels SSH.\n\nLe service suivant peut démarrer un tunnel SSH à la connexion en utilisant les paramètres de connexion dans votre ssh configuration. Si la connexion se ferme pour une raison quelconque, il attend 10 secondes avant de la redémarrer :\n\n```\n~/.config/systemd/user/tunnel.service\n```\n\n```\n[Unit]\nDescription=SSH tunnel to myserver\n\n[Service]\nType=simple\nRestart=always\nRestartSec=10\nExecStart=/usr/bin/ssh -F %h/.ssh/config -N myserver\n```\n\nPuis activez et démarrez le service comme utilisateur. Consultez #Maintenir en vie pour savoir comment empêcher le tunnel de s'interrompre. Si vous souhaitez démarrer le tunnel au démarrage, vous pourriez vouloir réécrire l'unité en tant que service système.\n\n"
+    },
+    {
+      "title": "Autossh - redémarrer automatiquement les sessions et tunnels SSH",
+      "level": 3,
+      "content": "Lorsqu'une session ou un tunnel ne peut être maintenu en vie, par exemple en raison de mauvaises conditions de réseau provoquant des déconnexions du client, vous pouvez utiliser autossh pour les redémarrer automatiquement.\n\nExemples d'utilisation :\n\n```\n$ autossh -M 0 -o \"ServerAliveInterval 45\" -o \"ServerAliveCountMax 2\" username@example.com\n```\n\nCombiné avec SSHFS :\n\n```\n$ sshfs -o reconnect,compression=yes,transform_symlinks,ServerAliveInterval=45,ServerAliveCountMax=2,ssh_command='autossh -M 0' username@example.com : /mnt/exemple\n```\n\nConnexion via un proxy SOCKS défini par Paramètres du proxy :\n\n```\n$ autossh -M 0 -o \"ServerAliveInterval 45\" -o \"ServerAliveCountMax 2\" -NCD 8080 username@example.com\n```\n\nAvec l'option -f, autossh peut être exécuté en tant que processus de fond. Cependant, cela signifie que la phrase de passe ne peut pas être saisie de manière interactive.\n\nLa session se termine lorsque vous tapez exit dans la session, ou lorsque le processus autossh reçoit un signal SIGTERM, SIGINT ou SIGKILL.\n\n"
+    },
+    {
+      "title": "Lancer automatiquement autossh au démarrage via systemd",
+      "level": 4,
+      "content": "Si vous souhaitez lancer automatiquement autossh, vous pouvez créer un fichier d'unité systemd :\n\n```\n/etc/systemd/system/autossh.service\n```\n\n```\n[Unit]\nDescription=AutoSSH service for port 2222\nAfter=network.target\n\n[Service]\nEnvironment=\"AUTOSSH_GATETIME=0\"\nExecStart=/usr/bin/autossh -M 0 -NL 2222:localhost:2222 -o TCPKeepAlive=yes foo@bar.com\n\n[Install]\nWantedBy=multi-user.target\n```\n\nIci AUTOSSH_GATETIME=0 est une variable d'environnement qui spécifie combien de temps ssh doit être actif avant qu'autossh ne le considère comme une connexion réussie. En lui donnant la valeur 0, autossh ignore également l'échec de la première exécution de ssh. Cela peut être utile lorsque autossh est lancé au démarrage. D'autres variables d'environnement sont disponibles à autossh(1). Bien sûr, vous pouvez rendre cette unité plus complexe si nécessaire (consultez la documentation de systemd pour plus de détails), et vous pouvez évidemment utiliser vos propres options pour autossh, mais notez que le -f impliquant AUTOSSH_GATETIME=0 ne fonctionne pas avec systemd.\n\nN'oubliez pas : démarrez et/ou activez le service par la suite.\n\nVous pouvez également avoir besoin de désactiver ControlMaster, par ex.\n\n```\nExecStart=/usr/bin/autossh -M 0 -o ControlMaster=no -NL 2222:localhost:2222 -o TCPKeepAlive=yes foo@bar.com\n```\n\n"
+    },
+    {
+      "title": "Service alternatif en cas d'échec du daemon SSH",
+      "level": 3,
+      "content": "Pour les serveurs distants ou sans affichage qui reposent exclusivement sur SSH, un échec du démarrage du daemon SSH (par exemple, après une mise à jour du système) peut empêcher l'accès à l'administration. systemd offre une solution simple via l'option OnFailure.\n\nSupposons que le serveur exécute sshd et que telnet soit l'alternative de choix en cas d'échec. Créez un fichier comme suit. N'activez pas telnet.socket !\n\n```\n/etc/systemd/system/sshd.service.d/override.conf\n```\n\n```\n[Unit]\nOnFailure=telnet.socket\n```\n\nC'est tout. Telnet n'est pas disponible lorsque sshd est en cours d'exécution. Si le démarrage de sshd échoue, une session telnet peut être ouverte pour la récupération.\n\n"
+    },
+    {
+      "title": "Couleur de fond du terminal basée sur l'hôte",
+      "level": 3,
+      "content": "Pour mieux distinguer si vous êtes sur différents hôtes, vous pouvez définir une couleur de fond différente en fonction du type d'hôte.\n\nCette solution fonctionne, mais n'est pas universelle (ZSH uniquement).\n\n"
+    },
+    {
+      "title": "Configuration spécifique au réseau",
+      "level": 3,
+      "content": "Vous pouvez utiliser une configuration d'hôte spécifique au réseau auquel vous êtes connecté en utilisant un Match exec.\n\nPar exemple, lorsque vous utilisez nmcli, et que la connexion est configurée (manuellement ou par DHCP) pour utiliser un domaine de recherche :\n\n```\nMatch exec \"nmcli | grep domains: | grep example.com\"\n  CanonicalDomains example.com\n  # Should you use a different username on this network\n  #User username\n  # Use a different known_hosts file (for private network or synchronisation)\n  #UserKnownHostsFile <network>_known_hosts\n```\n\n"
+    },
+    {
+      "title": "Vérification des clés d'hôtes des réseaux privés",
+      "level": 3,
+      "content": "Parce que différents serveurs sur différents réseaux sont susceptibles de partager une adresse IP privée commune, vous pourriez vouloir les traiter différemment.\n\nLa meilleure solution consiste à utiliser la #Configuration spécifique au réseau pour utiliser un UserKnownHostsFile différent selon le réseau sur lequel vous vous trouvez. La seconde solution, qu'il est préférable d'utiliser par défaut lorsque vous travaillez sur des réseaux nouveaux/prototypes, serait d'ignorer tout simplement les clés d'hôte pour les réseaux privés :\n\n```\nHost 10.* 192.168.*.* 172.31.* 172.30.* 172.2?.* 172.1?.*\n    # Disable HostKey verification\n    # Trust HostKey automatically\n    StrictHostKeyChecking no\n    # Do not save the HostKey\n    UserKnownHostsFile=/dev/null\n    # Do not display: \"Warning: Permanently Added ...\"\n    LogLevel Error\n```\n\n"
+    },
+    {
+      "title": "Exécuter une commande à la connexion",
+      "level": 3,
+      "content": "Si vous utilisez une session interactive, il existe plusieurs façons d'exécuter une commande à la connexion :\n\n- utiliser le fichier authorized_keys sur l'hôte distant (consultez AUTHORIZED_KEYS FILE FORMAT dans sshd(8))\n- utiliser ~/.ssh/rc sur l'hôte distant si le serveur a activé l'option PermitUserRC.\n- Utilisez votre fichier de configuration du shell sur l'hôte distant, par exemple .bashrc.\n\n"
+    },
+    {
+      "title": "Transfert d'agent",
+      "level": 3,
+      "content": "Le transfert d'agent SSH vous permet d'utiliser vos clés locales lorsque vous êtes connecté à un serveur. Il est recommandé d'activer le transfert d'agent uniquement pour certains hôtes.\n\n```\n~/.ssh/config\n```\n\n```\nHost myserver.com\n    ForwardAgent yes\n```\n\nEnsuite, configurez un agent SSH et ajoutez votre clé locale avec ssh-add.\n\nSi vous vous connectez maintenant à un serveur distant, vous pourrez vous connecter à d'autres services en utilisant vos clés locales.\n\n"
+    },
+    {
+      "title": "Génération de nouvelles clés",
+      "level": 3,
+      "content": "De nouvelles clés privées de serveur peuvent être générées :\n\n1. Supprimez toutes les clés, par ex : # rm /etc/ssh/ssh_host_*_key*\n1. Redémarrez sshdgenkeys.service ou exécuter ssh-keygen -A en tant que root.\n\n```\n# rm /etc/ssh/ssh_host_*_key*\n```\n\n"
+    },
+    {
+      "title": "Checklist",
+      "level": 3,
+      "content": "Vérifiez ces problèmes simples avant de chercher plus loin.\n\n1. Le répertoire de configuration ~/.ssh, son contenu ne doit être accessible que par l'utilisateur (vérifiez-le sur le client et le serveur), et le répertoire personnel de l'utilisateur ne doit être accessible en écriture que par l'utilisateur : $ chmod go-w ~ $ chmod 700 ~/.ssh $ chmod 600 ~/.ssh/* $ chown -R $USER ~/.ssh\n1. Vérifiez que la clé publique du client (par exemple, id_rsa.pub) se trouve dans ~/.ssh/authorized_keys sur le serveur.\n1. Vérifiez que vous n'avez pas limité l'accès SSH avec AllowUsers ou AllowGroups dans la configuration du serveur.\n1. Vérifiez si l'utilisateur a défini un mot de passe. Parfois, les nouveaux utilisateurs qui ne se sont pas encore connectés au serveur n'ont pas de mot de passe.\n1. Ajoutez LogLevel DEBUG à /etc/ssh/sshd_config.\n1. Exécutez journalctl -xe en tant que root pour les éventuels messages (d'erreur).\n1. Redémarrez sshd et déconnexion/login sur le client et le serveur.\n\n```\n$ chmod go-w ~\n$ chmod 700 ~/.ssh\n$ chmod 600 ~/.ssh/*\n$ chown -R $USER ~/.ssh\n```\n\n"
+    },
+    {
+      "title": "Redirection de port",
+      "level": 4,
+      "content": "Si vous êtes derrière un mode/routeur NAT (ce qui est probable, sauf si vous êtes sur un VPS ou un hôte à adresse publique), assurez-vous que votre routeur transfère les connexions ssh entrantes vers votre machine. Trouvez l'adresse IP interne du serveur avec $ ip addr et configurez votre routeur pour qu'il transfère le TCP sur votre port SSH vers cette IP. portforward.com peut vous aider à le faire.\n\n"
+    },
+    {
+      "title": "Est-ce que SSH fonctionne et écoute ?",
+      "level": 4,
+      "content": "L'utilitaire ss affiche tous les processus qui écoutent un port TCP avec la ligne de commande suivante :\n\n```\n$ ss --tcp --listening\n```\n\nSi la commande ci-dessus ne montre pas que le système écoute le port ssh, alors SSH ne fonctionne pas : vérifiez le journal pour les erreurs, etc.\n\n"
+    },
+    {
+      "title": "Des règles de pare-feu bloquent-elles la connexion ?",
+      "level": 4,
+      "content": "iptables peut bloquer les connexions sur le port 22. Vérifiez-le avec :\n\n```\n# iptables -nvL\n```\n\net recherchez les règles qui pourraient bloquer des paquets sur la chaîne INPUT. Ensuite, si nécessaire, débloquez le port avec une commande telle que :\n\n```\n# iptables -I INPUT 1 -p tcp --dport 22 -j ACCEPT\n```\n\nPour plus d'aide sur la configuration des pare-feu, consultez pare-feu.\n\n"
+    },
+    {
+      "title": "Le trafic arrive-t-il jusqu'à votre ordinateur ?",
+      "level": 4,
+      "content": "Lancez une vidange du trafic sur l'ordinateur avec lequel vous avez des problèmes :\n\n```\n# tcpdump -lnn -i any port ssh et tcp-syn\n```\n\nCette opération devrait afficher des informations de base, puis attendre qu'un trafic correspondant se produise avant de l'afficher. Essayez votre connexion maintenant. Si vous ne consultez aucun résultat lorsque vous tentez de vous connecter, c'est que quelque chose d'extérieur à votre ordinateur bloque le trafic (par exemple, un pare-feu matériel, un routeur NAT, etc.).\n\n"
+    },
+    {
+      "title": "Votre FAI ou un tiers bloque le port par défaut ?",
+      "level": 4,
+      "content": "Dans certains cas, votre FAI peut bloquer le port par défaut (port SSH 22), de sorte que tout ce que vous tentez (ouverture de ports, durcissement de la pile, défense contre les attaques par inondation, etc.) est inutile. Pour confirmer cela, créez un serveur sur toutes les interfaces (0.0.0.0) et connectez-vous à distance.\n\nSi vous obtenez un message d'erreur comparable à celui-ci :\n\n```\nssh : connect to host www.inet.hr port 22 : Connection refused\n```\n\nCela signifie que le port n'est pas bloqué par le FAI, mais que le serveur n'exécute pas SSH sur ce port (consultez wikipedia:fr:Sécurité par l'obscurité).\n\nToutefois, si vous obtenez un message d'erreur comparable à celui-ci :\n\n```\nssh : connect to host 111.222.333.444 port 22 : Operation timed out\n```\n\nCela signifie que quelque chose rejette votre trafic TCP sur le port 22. En fait, ce port est furtif, soit à cause de votre pare-feu, soit à cause de l'intervention d'un tiers (comme un FAI qui bloque et/ou rejette le trafic entrant sur le port 22). Si vous savez que vous n'exécutez pas de pare-feu sur votre ordinateur et que vous savez que les Gremlins ne pullulent pas dans vos routeurs et switchs, alors votre FAI bloque le trafic.\n\nPour vérifier, vous pouvez exécuter Wireshark sur votre serveur et écouter le trafic sur le port 22. Étant donné que Wireshark est un utilitaire de reniflage de paquets de couche 2, et que TCP/UDP sont des couches 3 et plus (consultez IP Network stack), si vous ne recevez rien lorsque vous vous connectez à distance, il est fort probable qu'un tiers bloque le trafic sur ce port vers votre serveur.\n\nInstallez soit tcpdump soit Wireshark avec le paquet wireshark-cli.\n\nPour tcpdump :\n\n```\n# tcpdump -ni interface \"port 22\"\n```\n\nPour Wireshark :\n\n```\n$ tshark -f \"tcp port 22\" -i interface\n```\n\noù interface est l'interface réseau pour une connexion WAN (consultez ip a pour vérifier). Si vous ne recevez aucun paquet lorsque vous essayez de vous connecter à distance, vous pouvez être certain que votre FAI bloque le trafic entrant sur le port 22.\n\nLa solution consiste simplement à utiliser un autre port que le FAI ne bloque pas. Ouvrez le /etc/ssh/sshd_config et configurez le fichier pour utiliser différents ports. Par exemple, ajoutez :\n\n```\nPort 22\nPort 1234\n```\n\nAssurez-vous également que les autres lignes de configuration du \"Port\" dans le fichier sont commentées. Le fait de commenter \"Port 22\" et de mettre \"Port 1234\" ne résoudra pas le problème car sshd n'écoutera que sur le port 1234. Utilisez les deux lignes pour exécuter le serveur SSH sur les deux ports.\n\nRedémarrez le serveur sshd.service et vous avez presque terminé. Vous devez encore configurer votre ou vos clients pour qu'ils utilisent l'autre port au lieu du port par défaut. Il existe de nombreuses solutions à ce problème, mais nous allons en aborder deux ici.\n\n"
+    },
+    {
+      "title": "Échec de la lecture de la socket : la connexion a été réinitialisée par le pair",
+      "level": 4,
+      "content": "Les versions récentes d'openssh échouent parfois avec le message d'erreur ci-dessus lors de la connexion à des serveurs ssh plus anciens. Ce problème peut être contourné en définissant diverses options du client pour cet hôte. Consultez ssh_config(5) pour plus d'informations sur les options suivantes.\n\nLe problème peut provenir des algorithmes de clé hôte elliptique ecdsa-sha2-nistp*-cert-v01@openssh. Ceux-ci peuvent être désactivés en définissant HostKeyAlgorithms comme une liste excluant ces algorithmes.\n\nSi cela ne fonctionne pas, il se peut que la liste des algorithmes de chiffrement soit trop longue. Définissez l'option Ciphers sur une liste plus courte (moins de 80 caractères devraient suffire). De même, vous pouvez essayer de raccourcir la liste des MAC.\n\nConsultez également la discussion sur le forum des bogues d'openssh.\n\n"
+    },
+    {
+      "title": "\"[votre shell] : No such file or directory\" / problème de ssh_exchange_identification",
+      "level": 3,
+      "content": "Une cause possible de ce problème est le besoin de certains clients SSH de trouver un chemin absolu (celui renvoyé par whereis -b [votre shell], par exemple) dans $SHELL, même si le binaire du shell est situé dans l'une des entrées $PATH.\n\n"
+    },
+    {
+      "title": "Message d'erreur \"Terminal inconnu\" ou \"Erreur d'ouverture de terminal\"",
+      "level": 3,
+      "content": "Si vous recevez les erreurs ci-dessus lors de la connexion, cela signifie que le serveur ne reconnaît pas votre terminal. Les applications Ncurses comme nano peuvent échouer avec le message \"Error opening terminal\".\n\nLa bonne solution est d'installer le fichier terminfo du terminal du client sur le serveur. Ce fichier indique aux programmes de console sur le serveur comment interagir correctement avec votre terminal. Vous pouvez obtenir des informations sur le fichier terminfo actuel à l'aide de $ infocmp, puis trouver à quel paquet il appartient.\n\nSi vous ne pouvez pas l'installer normalement, vous pouvez copier votre terminfo dans votre répertoire personnel sur le serveur :\n\n```\n$ ssh myserver mkdir -p ~/.terminfo/${TERM:0:1}\n$ scp /usr/share/terminfo/${TERM:0:1}/$TERM myserver:~/.terminfo/${TERM:0:1}/\n```\n\nAprès avoir ouvert et fermé une session sur le serveur, le problème devrait être résolu.\n\n"
+    },
+    {
+      "title": "TERM hack",
+      "level": 4,
+      "content": "Vous pouvez aussi simplement définir TERM=xterm dans votre environnement sur le serveur (par exemple dans .bash_profile). Cela fera taire l'erreur et permettra aux applications ncurses de s'exécuter à nouveau, mais vous pouvez avoir un comportement étrange et des problèmes graphiques à moins que les séquences de contrôle de votre terminal ne correspondent exactement à celles de xterm.\n\n"
+    },
+    {
+      "title": "Connexion fermée par x.x.x.x [preauth]",
+      "level": 3,
+      "content": "Si vous consultez cette erreur dans les journaux sshd, vérifiez que vous avez défini une clé d'hôte valide.\n\n```\nHostKey /etc/ssh/ssh_host_rsa_key\n```\n\n"
+    },
+    {
+      "title": "subsystem request failed",
+      "level": 3,
+      "content": "Depuis OpenSSH 8.8, scp utilise SFTP comme protocole par défaut pour les transferts de données en demandant le sous-système nommé sftp. Si vous exécutez scp en mode verbeux, scp -v, vous pouvez déterminer quel sous-système votre client utilise (par exemple, Sending subsystem: nom_du_sous-système). Les erreurs telles que subsystem request failed on channel 0 peuvent être corrigées en configurant les paramètres du sous-système du serveur : sshd_config(5) § Subsystem. La configuration du serveur doit ressembler à l'exemple ci-dessous.\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n...\nSubsystem subsystem-name /path/to/subsystem-executable\n...\n```\n\n"
+    },
+    {
+      "title": "id_dsa refusé par OpenSSH 7.0",
+      "level": 3,
+      "content": "OpenSSH 7.0 a déprécié les clés publiques DSA pour des raisons de sécurité. Si vous devez absolument les activer, définissez l'option de configuration PubkeyAcceptedKeyTypes +ssh-dss. (https://www.openssh.com/legacy.html ne le mentionne pas).\n\n"
+    },
+    {
+      "title": "Aucune méthode d'échange de clés correspondante trouvée par OpenSSH 7.0",
+      "level": 3,
+      "content": "OpenSSH 7.0 a déprécié l'algorithme de clé diffie-hellman-group1-sha1 car il est faible et se trouve dans la portée théorique de l'attaque dite Logjam (consultez https://www.openssh.com/legacy.html). Si l'algorithme de clé est nécessaire pour un hôte particulier, ssh produira un message d'erreur comme celui-ci :\n\n```\nUnable to negotiate with 127.0.0.1: no matching key exchange method found.\nTheir offer: diffie-hellman-group1-sha1\n```\n\nLa meilleure solution pour ces échecs est de mettre à jour/configurer le serveur pour ne pas utiliser les algorithmes dépréciés. Si cela n'est pas possible, vous pouvez forcer le client à réactiver l'algorithme avec l'option client. KexAlgorithmes +diffie-hellman-group1-sha1.\n\n"
+    },
+    {
+      "title": "Session tmux/screen tuée lors de la déconnexion de SSH",
+      "level": 3,
+      "content": "Si vos processus sont tués à la fin de la session, il est possible que vous utilisiez l'activation de la socket et qu'elle soit tuée par systemd lorsqu'elle remarque que le processus de la session SSH a quitté. Dans ce cas, il existe deux solutions. La première consiste à éviter d'utiliser l'activation de socket en utilisant ssh.service au lieu de ssh.socket. L'autre consiste à définir KillMode=process dans la section Service de ssh@.service.\n\nLe paramètre KillMode=process peut également être utile avec le classique ssh.service, car il évite de tuer le processus de session SSH ou les processus screen ou tmux lorsque le serveur est arrêté ou redémarré.\n\n"
+    },
+    {
+      "title": "La session SSH cesse de répondre",
+      "level": 3,
+      "content": "SSH répond aux commandes de contrôle de flux XON et XOFF. Il se fige/se fige/cesse de répondre lorsque vous appuyez sur Ctrl+s. Utilisez Ctrl+q pour reprendre votre session.\n\n"
+    },
+    {
+      "title": "Broken pipe",
+      "level": 3,
+      "content": "Si vous tentez de créer une connexion qui donne lieu à une réponse Broken pipe pour packet_write_wait, vous devez réessayer la connexion en mode débogage et consulter si la sortie se termine par une erreur :\n\n```\ndebug3 : send packet : type 1\npacket_write_wait : Connexion au port 22 de A.B.C.D : pipe cassé\n```\n\nLa ligne send packet ci-dessus indique que le paquet de réponse n'a jamais été reçu. Il s'ensuit donc qu'il s'agit d'un problème de QoS. Pour diminuer la probabilité qu'un paquet soit abandonné, définissez IPQoS :\n\n```\n/etc/ssh/ssh_config\n```\n\n```\nHost *\n    IPQoS reliability\n```\n\nLe paramètre reliability (0x04) devrait résoudre le problème, ainsi que les types de service 0x00 et throughput. (0x08).\n\n"
+    },
+    {
+      "title": "Démarrage lent des daemons après un redémarrage",
+      "level": 3,
+      "content": "Si vous rencontrez des temps de démarrage de daemon excessivement longs après les redémarrages (par exemple, plusieurs minutes avant que le daemon ne commence à accepter des connexions), en particulier sur des serveurs sans affichage («headless») ou virtualisés, cela peut être dû à un manque d'entropie [2]. Cela peut être résolu en installant Rng-tools ou Haveged, selon ce qui convient à votre système. Cependant, prenez note des implications de sécurité associées discutées dans la page wiki respective de chaque paquet.\n\n"
+    },
+    {
+      "title": "Terminer une connexion SSH qui ne répond pas",
+      "level": 3,
+      "content": "Si une session client ne répond plus et ne peut être interrompue en donnant des instructions au programme en cours d'exécution (par exemple, le shell), vous pouvez toujours mettre fin à la session en appuyant successivement sur Enter, ~ et . dans cet ordre.\n\nLe ~ est un caractère d'échappement pseudo-terminal (consultez ssh(1) § ESCAPE CHARACTERS), qui peut être ajouté plusieurs fois en fonction de la session client à interrompre. Par exemple, si vous vous êtes connecté de A à B puis de B à C et que la session de B à C se fige, vous pouvez y mettre fin en appuyant sur Enter et en tapant ~~., ce qui vous laissera dans une session de travail sur B.\n\n"
+    },
+    {
+      "title": "Attention : l'identification de l'hôte distant a changé !",
+      "level": 3,
+      "content": "Si le client vous avertit que la clé d'un serveur ssh a changé, vous devez vérifier que la nouvelle clé proposée appartient bien à l'opérateur du serveur. Ensuite, supprimez l'ancienne clé du fichier known_hosts avec ssh-keygen -R $SSH_HOST et acceptez la nouvelle clé comme s'il s'agissait d'un nouveau serveur.\n\n"
+    },
+    {
+      "title": "Connexion à un serveur distant sans l'entrée terminfo appropriée",
+      "level": 3,
+      "content": "Lorsque vous vous connectez à des hôtes qui n'ont pas d'entrée terminfo pour votre terminal, par exemple, lorsque vous utilisez un émulateur de terminal dont l'entrée terminfo n'est pas fournie avec ncurses. (par exemple, kitty et rxvt-unicode), ou lorsque vous vous connectez à des hôtes dont la base de données terminfo est limitée (par exemple, les systèmes exécutant OpenWrt), divers problèmes peuvent survenir avec les logiciels qui reposent sur terminfo(5).\n\nUne bonne solution consiste à placer l'entrée terminfo appropriée sur l'hôte. Si cela n'est pas possible, une alternative est de définir TERM à une valeur qui est à la fois prise en charge par l'hôte distant et compatible avec le terminal.\n\nDepuis OpenSSH 8.7, une variable d'environnement TERM personnalisée peut être passée aux hôtes distants avec un simple extrait de configuration :\n\n```\n~/.ssh/config\n```\n\n```\nHost example.com\n  SetEnv TERM=xterm-256color\n```\n\n"
+    },
+    {
+      "title": "La connexion à travers l'hôte de saut échoue avec \"bash : No such file or directory\"",
+      "level": 3,
+      "content": "Si la variable d'environnement SHELL n'est pas définie sur un chemin complet et valide (sur le serveur de saut), la connexion échouera avec un message d'erreur similaire à celui-ci :\n\n```\nbash: No such file or directory\nkex_exchange_identification: Connection closed by remote host\nConnection closed by UNKNOWN port 65535\n```\n\nVous pouvez simplement résoudre ce problème en définissant votre SHELL à un nom de chemin complet d'un shell qui sera également valide sur le serveur de saut ou en définissant une variable SHELL spécifique pour chaque serveur dans votre fichier ~/.ssh/config.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Se défendre contre les attaques ssh par force brute\n- Gestion des clés OpenSSH : Partie 1 sur IBM developerWorks, Partie 2, Partie 3 sur funtoo.org\n- Sécuriser Secure Shell\n\n"
+    }
+  ]
+}

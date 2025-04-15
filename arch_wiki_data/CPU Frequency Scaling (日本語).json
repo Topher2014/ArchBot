@@ -1,0 +1,186 @@
+{
+  "title": "CPU Frequency Scaling (日本語)",
+  "url": "https://wiki.archlinux.org/title/CPU_Frequency_Scaling_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- 省電力設定\n- Laptop Mode Tools\n- CPU の低電圧化\n\nCPU パフォーマンススケーリングにより、オペレーティングシステムは消費電力の削減やパフォーマンスの向上のために CPU の周波数を上げ下げすることができるようになります。スケーリングは、システムの負荷に応じて自動的に行ったり、ACPI イベントに応じて調整したり、ユーザスペースのプログラムで手動で変更したりできます。\n\nLinux カーネルは CPUFreq サブシステムを通して CPU パフォーマンススケーリングを提供します。このサブシステムには2つの抽象化レイヤが定義されています:\n\n- スケーリングガバナーは、望ましい CPU 周波数を計算するアルゴリズムを実装します。システムのニーズに基づいている可能性があります。\n- スケーリングドライバは、直接 CPU と対話し、現在のガバナーの要求する望ましい周波数に変更します。\n\nデフォルトのスケーリングドライバとスケーリングガバナーは自動的に選択されますが、cpupower や acpid、Laptop Mode Tools、デスクトップ環境によって提供されている GUI ツールなどのユーザスペースのツールでも高度な設定をすることができます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 ユーザースペースツール 1.1 i7z 1.2 turbostat 1.3 cpupower 1.4 thermald 1.5 power-profiles-daemon 1.6 tuned 1.7 cpupower-gui 1.8 gnome-shell-extension-cpupower 1.9 auto-cpufreq\n- 2 スケーリングドライバ 2.1 最大・最小周波数を設定する 2.2 周波数ブーストを設定する 2.2.1 sysfs から設定する (intel_pstate) 2.2.2 sysfs から設定する (古いスケーリングドライバ) 2.2.3 x86_energy_perf_policy から設定する 2.3 amd_pstate\n- 3 スケーリングガバナー 3.1 ondemand ガバナーを調整する 3.1.1 閾値を切り替える 3.1.2 サンプリングレート 3.1.3 変更を永続化させる\n- 4 自律的な周波数スケーリング 4.1 Intel active、非 HWP 4.2 EPP を設定する\n- 5 Collaborative processor performance control\n- 6 Intel performance and energy bias hint 6.1 sysfs から設定する 6.2 x86_energy_perf_policy から設定する 6.3 cpupower から設定する\n- 7 他の x86 エネルギーフラグ\n- 8 CPU idle ドライバ\n- 9 ACPI イベントとの対話\n- 10 トラブルシューティング 10.1 BIOS の周波数制限\n- 11 参照\n\n- 1.1 i7z\n- 1.2 turbostat\n- 1.3 cpupower\n- 1.4 thermald\n- 1.5 power-profiles-daemon\n- 1.6 tuned\n- 1.7 cpupower-gui\n- 1.8 gnome-shell-extension-cpupower\n- 1.9 auto-cpufreq\n\n- 2.1 最大・最小周波数を設定する\n- 2.2 周波数ブーストを設定する 2.2.1 sysfs から設定する (intel_pstate) 2.2.2 sysfs から設定する (古いスケーリングドライバ) 2.2.3 x86_energy_perf_policy から設定する\n- 2.3 amd_pstate\n\n- 2.2.1 sysfs から設定する (intel_pstate)\n- 2.2.2 sysfs から設定する (古いスケーリングドライバ)\n- 2.2.3 x86_energy_perf_policy から設定する\n\n- 3.1 ondemand ガバナーを調整する 3.1.1 閾値を切り替える 3.1.2 サンプリングレート 3.1.3 変更を永続化させる\n\n- 3.1.1 閾値を切り替える\n- 3.1.2 サンプリングレート\n- 3.1.3 変更を永続化させる\n\n- 4.1 Intel active、非 HWP\n- 4.2 EPP を設定する\n\n- 6.1 sysfs から設定する\n- 6.2 x86_energy_perf_policy から設定する\n- 6.3 cpupower から設定する\n\n- 10.1 BIOS の周波数制限\n\n"
+    },
+    {
+      "title": "i7z",
+      "level": 3,
+      "content": "i7z は Linux 向けの i7 (現在は、i3、i5、i7、i9) CPU レポートツールです。i7z コマンドでターミナルから実行することができ、GUI は i7z-gui で起動できます。\n\n"
+    },
+    {
+      "title": "turbostat",
+      "level": 3,
+      "content": "turbostat は最近の Intel と AMD の CPU の周波数、消費電力、アイドル状態、その他の統計情報を表示することができます。\n\n"
+    },
+    {
+      "title": "cpupower",
+      "level": 3,
+      "content": "cpupower は CPU 周波数スケーリングを補助するように作られたユーザースペースのユーティリティの集まりです。このパッケージがなくてもスケーリングを使うことはできますが、便利なコマンドラインユーティリティや起動時にガバナーを変えるための systemd のサービスが入っているためインストールすることが推奨されています。\n\ncpupower の設定ファイルは /etc/default/cpupower です。この設定ファイルは /usr/lib/systemd/scripts/cpupower 内の bash スクリプトによって読み込まれます。bash スクリプトは cpupower.service と systemd によって有効にされます。ブート時に起動するには cpupower.service を有効化してください。\n\n"
+    },
+    {
+      "title": "thermald",
+      "level": 3,
+      "content": "thermald は、Intel CPU のオーバーヒートを防止するために使用される Linux デーモンです。このデーモンは P-state、T-state、および Intel power clamp ドライバを使用してサーマルパラメータを積極的に制御します。最新のドライバが利用できない場合、デーモンはシステムの冷却を制御するために x86 モデル固有のレジスタと Linux の \"cpufreq サブシステム\" に戻り、システムの冷却を制御します。\n\nデフォルトでは、このデーモンは利用可能な CPU デジタル温度センサーを使って CPU 温度を監視し、ハードウェアが積極的な補正動作を行う前に CPU 温度を制御下に維持します。thermal sysfs に皮膚温度センサーがある場合、皮膚温度を 45C 以下に保とうと試みます (訳注: ここでの皮膚温度 (skin temperature) とは、ユーザがデバイスを持ったときに感じる温度のことです)。\n\nTiger Lake ラップトップ (例: Dell Latitude 3420) では、このデーモンは、他の方法で利用できるものよりも 多くのパフォーマンスを解放する と報告されています。\n\n関連する systemd ユニットは thermald.service です。このサービスは起動され、かつ有効化されている必要があります。詳細については、thermald(8) を参照してください。\n\n"
+    },
+    {
+      "title": "power-profiles-daemon",
+      "level": 3,
+      "content": "power-profiles-daemon の powerprofilesctl コマンドラインツールは power-profiles-daemon サービスを通して電源プロファイル (省電力、バランス、パフォーマンスなど) を扱います。GNOME と KDE もプロファイル切り替えのための グラフィカルインターフェイス を提供しています。以下を参照してください:\n\n- GNOME#電源モード\n- KDE#電源管理\n\n使い方や使用例、類似プロジェクトとの比較などについては、プロジェクトの README を参照してください。\n\npower-profiles-daemon サービスを 起動/有効化 してください。powerprofilesctl が起動されると、サービスも起動しようとすることに注意してください (dbus.service の ユニットステータス を見てください。)\n\n- power-profiles-daemon は、TLP や tuned、system76-powerAUR といった他の電源管理サービスと衝突します。(潜在的に依存関係にあるため) power-profiles-daemon を アンインストール せずに前述のサービスのどれかを代わりに使用するには、power-profiles-daemon サービスを マスク して無効化してください ([1]、[2] も参照。)\n- tuned は、バージョン 2.23.0 以降、power-profiles-daemon 用のtuned-ppd サービス互換性レイヤーを提供するようになりました。\n\n"
+    },
+    {
+      "title": "tuned",
+      "level": 3,
+      "content": "tuned は、システムデバイスの監視と適応チューニングのためのデーモンです。GPU 電力モード、PCIe 電力管理、sysctl 設定の設定、カーネル スケジューリングの調整などを行うことができます。システム内の電源管理の設定も行います。\n\nrelease 2.23.0 の時点で、プロジェクトには互換性レイヤーである tuned-ppd が同梱されています。次のような、power-profiles-daemon 用に作成されたプログラム:\n\n- GNOME#電源モード\n- KDE#電源管理\n\npower-profiles-daemon の代わりにtuned を使用する必要がある理由については、Fedora の 提案 を参照して、tuned に置き換えてください。反対の議論については、[3]を参照してください。\n\ntuned デーモン サービスを起動/有効化します。 power-profiles-daemon の互換性のために、tuned-ppd サービスも起動/有効化します。コマンドラインから tuned を制御するには、tuned-adm を使用してプロファイルを表示、設定します。\n\n"
+    },
+    {
+      "title": "cpupower-gui",
+      "level": 3,
+      "content": "cpupower-guiAUR は CPU 周波数のスケーリングを支援するために設計されたグラフィカルなユーティリティです。GUI は GTK をベースにしており、cpupower と同じオプションを提供することを意図しています。 cpupower-gui は各コアの最大/最小の CPU 周波数とガバナーを変更することができます。このアプリケーションは polkit を通して特権付与を行い、wheel ユーザグループのログイン済みユーザであれば誰でも周波数とガバナーを変更することができます。\n\n"
+    },
+    {
+      "title": "gnome-shell-extension-cpupower",
+      "level": 3,
+      "content": "gnome-shell-extension-cpupower-gitAUR は、CPU 周波数の最大値と最小値を変更し、周波数ブーストを有効化/無効化することのできる GNOME シェル拡張です。\n\n"
+    },
+    {
+      "title": "auto-cpufreq",
+      "level": 3,
+      "content": "auto-cpufreqAUR は、Linux 用の CPU 速度と電源の自動オプティマイザです。ノート PC のバッテリー状態、CPU 使用率、CPU 温度、そしてシステムの負荷をアクティブに監視します。\n\n"
+    },
+    {
+      "title": "スケーリングドライバ",
+      "level": 2,
+      "content": "スケーリングドライバは、ガバナーによって指定された周波数を設定する CPU 固有の詳細を実装します。厳密に言えば、ACPI 標準は、P0 で始まって徐々に低パフォーマンスになる power-performance states (P-states) を要求しています。この機能は、Intel では SpeedStep と、AMD では PowerNow! と呼ばれています。\n\nとはいえ実際には、プロセッサは固定の P-state に制限するどころか、特定の周波数を指定する方法を提供しています。スケーリングドライバは周波数の指定を処理します。\n\n- ネイティブな CPU モジュールは自動的にロードされます。\n- 最近の Intel CPU においては、下記の他のドライバの代わりに intel_pstate CPU パワースケーリングドライバが自動的に使用されます。このドライバは他のドライバよりも優先され、モジュールではなく、組み込まれています。現在、このドライバは Sandy Bridge 及びそれ以降の CPU において自動的に使用されます。intel_pstate は BIOS の P-State 設定を無視する場合があります。古い CPU においては intel_pstate は intel_cpufreq ドライバによって \"passive mode\" で動作する場合があります。このドライバを使用していて問題が発生する場合は、acpi_cpufreq ドライバを使用するようにするために intel_pstate=disable をカーネルラインに追加してください。\n- amd_pstate CPU パワースケーリングドライバはデフォルトで非アクティブです。しかし、サポートされている CPU (Zen 2 及びそれ以降) を使用している場合は、amd_pstate=passive、amd_pstate=active、そして amd_pstate=guided のうちどれかをカーネルパラメータに追加することでこのドライバを手動で有効化することができます。一部のマザーボードは、必要な設定をファームウェア内で有効化しない場合があり、その結果 the _CPC object is not present in SBIOS or ACPI disabled エラーが発生します。UEFI で Enable CPPC やこれと似たような設定を Auto から Enabled に変更してください。この設定が UEFI に存在しない場合は、ベンダーのウェブサイトでアップデートがないか調べてください。\n\ncpupower は、ネイティブな CPU の制限を調べるためにドライバを必要とします:\n\nTable content:\nドライバ | 説明\nintel_pstate | このドライバは、Intel Core (Sandy Bridge 及びそれ以降) プロセッサの内部ガバナーでスケーリングドライバを実装しています。\namd_pstate_epp | この \"active\" ドライバは、AMD Ryzen (一部の Zen 2 及びそれ以降) プロセッサの内部ガバナーでスケーリングドライバを実装しています。\nacpi_cpufreq | ACPI Processor Performance States を使用する CPUFreq ドライバ。このドライバは Intel Enhanced SpeedStep もサポートします (以前は、非推奨の speedstep-centrino モジュールによってサポートされていました)。AMD Ryzen においては、このドライバは 3 つの周波数状態のみを提供します。\nintel_cpufreq | カーネル 5.7 から、intel_pstate スケーリングドライバは、hardware-managed P-states (HWP) をサポートしない CPU (つまり、Intel Core i の第5世代及びそれ以前) においては \"passive mode\" (別名 intel_cpufreq) を選択します。このドライバは、Intel CPU で ACPI ドライバと似たように動作します。ただし、ACPI の 16-pstate の制限は存在しません。\namd_pstate | このドライバは AMD Ryzen において acpi_cpufreq よりも遥かに多くの P-state を公開します。ただし、governing は引き継ぎません。\ncppc_cpufreq | ACPI CPPC システム (以下を参照) をベースとした CPUFreq ドライバ。AArch64 システムにおいては共通のデフォルトです。最近の x86 においても動作しますが、上記 2 つのベンダー固有の選択肢の方が優れています。\nspeedstep_lib | Intel SpeedStep 対応プロセッサ (主に Atom と古い Pentium) 用の CPUFreq ドライバ。\npowernow_k8 | K8/K10 Athlon 64/Opteron/Phenom プロセッサ用の CPUFreq ドライバ。Linux 3.7 から、より最近の AMD CPU においては 'acpi_cpufreq' が自動的に使用されます。\npcc_cpufreq | このドライバは、Hewlett-Packard と Microsoft Corporation による Processor Clocking Control インターフェイスをサポートします。一部の ProLiant サーバにおいて便利です。\np4_clockmod | Intel Pentium 4/Xeon/Celeron プロセッサ用の CPUFreq ドライバ。クロックをスキップすることで CPU 温度を下げます。(代わりに speedstep_lib を使用したほうが良いかもしれません。)\n\n利用可能なモジュールの完全なリストを表示するには、次を実行してください:\n\n```\n$ ls /usr/lib/modules/$(uname -r)/kernel/drivers/cpufreq/\n```\n\n適切なモジュールをロードしてください (詳しくはカーネルモジュールを見て下さい)。適切な cpufreq ドライバーがロードされていれば、次のコマンドで CPU の詳細が表示されます:\n\n```\n$ cpupower frequency-info\n```\n\n"
+    },
+    {
+      "title": "最大・最小周波数を設定する",
+      "level": 3,
+      "content": "一部のケースで、最大・最小周波数を手動で設定する必要があることがあります。\n\n最大クロック周波数を設定するには (clock_freq は単位付きのクロック周波数です: GHz、MHz):\n\n```\n# cpupower frequency-set -u clock_freq\n```\n\n最小クロック周波数を設定するには:\n\n```\n# cpupower frequency-set -d clock_freq\n```\n\n特定の周波数で動作するように CPU を設定するには:\n\n```\n# cpupower frequency-set -f clock_freq\n```\n\n- 単一の CPU コアだけを調整するには、-c core_number をコマンドに加えてください。\n- ガバナーの最大周波数と最小周波数は /etc/default/cpupower で設定できます。\n\nあるいは、手動で周波数を設定することもできます:\n\n```\n# echo value | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq\n```\n\n利用可能な値は /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies などで調べられます。[4]\n\n"
+    },
+    {
+      "title": "周波数ブーストを設定する",
+      "level": 3,
+      "content": "一部のプロセッサでは、適切な温度条件下で短時間、周波数を通常の最大値以上に上げることができます。これは、Intel プロセッサでは Turbo Boost と、AMD プロセッサでは Turbo-Core と呼ばれています。\n\n"
+    },
+    {
+      "title": "sysfs から設定する (intel_pstate)",
+      "level": 4,
+      "content": "intel_pstate には、プロセッサがターボ P-State に入ることを禁止するための、ドライバ固有のインターフェイスが存在します:\n\n```\n# echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo\n```\n\n"
+    },
+    {
+      "title": "sysfs から設定する (古いスケーリングドライバ)",
+      "level": 4,
+      "content": "intel_pstate より古いスケーリングドライバにおいては、ドライバがブーストをサポートしている場合、/sys/devices/system/cpu/cpufreq/boost 属性が存在し、これを使ってブーストを無効化/有効化することができます:\n\n```\n# echo 0 > /sys/devices/system/cpu/cpufreq/boost\n```\n\n"
+    },
+    {
+      "title": "x86_energy_perf_policy から設定する",
+      "level": 4,
+      "content": "Intel プロセッサにおいては、x86_energy_perf_policy を使ってターボブーストを設定することもできます:\n\n```\n# x86_energy_perf_policy --turbo-enable 0\n```\n\n"
+    },
+    {
+      "title": "amd_pstate",
+      "level": 3,
+      "content": "amd_pstate には 3 つのオペレーションモードが存在します: CPPC autonomous (active) モード、CPPC non-autonomous (passive) モード、CPPC guided autonomous (guided) モード。active/passive/guided モードは、それぞれカーネルパラメータ amd_pstate=active、amd_pstate=passive、amd_pstate=guided で選択できます。\n\n"
+    },
+    {
+      "title": "スケーリングガバナー",
+      "level": 2,
+      "content": "スケーリングガバナーとは、望ましい CPU 周波数を決定するパワースキームです。固定の周波数をリクエストするガバナーもありますし、システムの負荷に応じて動的に調節するアルゴリズムを実装しているものもあります。カーネルに含まれているガバナーは以下のとおりです:\n\nTable content:\nガバナー | 説明\nperformance | 最大周波数で CPU を動作させます。最大周波数は /sys/devices/system/cpu/cpuX/cpufreq/scaling_max_freq で得ることができます。\npowersave | 最小周波数で CPU を動作させます。最小周波数は /sys/devices/system/cpu/cpuX/cpufreq/scaling_min_freq で得ることができます。\nuserspace | ユーザーが指定した周波数で CPU を動作させます。/sys/devices/system/cpu/cpuX/cpufreq/scaling_setspeed で設定可能です。\nondemand | 現在の負荷にあわせて周波数を動的に切り替えます。最大周波数に一気に切り替えたあと、アイドル時間が増えるにつれて周波数がもとに戻る可能性があります。\nconservative | 現在の負荷にあわせて周波数を動的に切り替えます。ondemand よりも段階的に周波数を切り替えます。\nschedutil | スケジューラによって CPU の周波数が選択されます [5]、[6]。\n\nスケーリングドライバによっては、以下のガバナーのうちどれかがデフォルトでロードされます:\n\n- Linux 4.9.5 以降 では schedutil\n- Intel CPU で intel_pstate ドライバを使用する場合、内部の powersave ガバナー (上記のノートを参照、schedutil と等価です)。\n\n特定のガバナーをアクティブ化するには、以下のコマンドを実行してください:\n\n```\n# cpupower frequency-set -g governor\n```\n\n- 単一の CPU コアだけを調整するには、上のコマンドに -c core_number を加えて下さい。\n- ガバナーを有効にするには、特定のカーネルモジュール (cpufreq_governor) がロードされている必要があります。カーネル 3.4 現在、これらのモジュールは自動的にロードされます。\n\nもしくは、CPU ごとにガバナーを手動で有効にすることもできます:\n\n```\n# echo governor | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\n```\n\n```\n$ watch cat /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq\n```\n\n"
+    },
+    {
+      "title": "ondemand ガバナーを調整する",
+      "level": 3,
+      "content": "詳細はカーネルドキュメントを見てください。\n\n"
+    },
+    {
+      "title": "閾値を切り替える",
+      "level": 4,
+      "content": "周波数を上げるときの閾値を設定するには:\n\n```\n# echo -n percent > /sys/devices/system/cpu/cpufreq/governor/up_threshold\n```\n\n周波数を下げるときの閾値を設定するには:\n\n```\n# echo -n percent > /sys/devices/system/cpu/cpufreq/governor/down_threshold\n```\n\n"
+    },
+    {
+      "title": "サンプリングレート",
+      "level": 4,
+      "content": "サンプリングレートは、CPU の周波数を変化させるのにガバナーが確認する頻度を決めます。1 より大きく sampling_down_factor を設定すると負担評価のオーバーヘッドが減って、負担が高い時に CPU がずっと最高周波数で動作しパフォーマンスが向上します。sampling_down_factor に設定できる値は 1 から 100000 です。CPU 周波数や負担が低いときの挙動には影響がありません。\n\n値を読み取るには (デフォルト = 1)、次を実行:\n\n```\n$ cat /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor\n```\n\n値を設定するには、次を実行:\n\n```\n# echo -n value > /sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor\n```\n\n"
+    },
+    {
+      "title": "変更を永続化させる",
+      "level": 4,
+      "content": "Linux 5.9 から、cpufreq.default_governor カーネルオプションを設定することが可能になりました。[7] スケーリングパラメータをブート時に設定するには、cpupower ユーティリティを設定して、cpupower の systemd サービスを有効化してください。あるいは、systemd-tmpfiles や udev ルールを使用することもできます。\n\n"
+    },
+    {
+      "title": "自律的な周波数スケーリング",
+      "level": 2,
+      "content": "Intel と AMD は両方とも、(1) システムのパフォーマンスの範囲と、(2) プリファレンスを指定するパフォーマンス/電力のヒントに基づいて CPU に自身の速度を決定させる方法を定義しています。以下の場合に完全自律モードがアクティブ化されます:\n\n- amd-pstate が \"active\" に設定された場合。手動による設定と、CPU と BIOS の両方に CPPC サポートが必要です。\n- intel-pstate が \"active\" に設定され、かつ、ハードウェア P-state (HWP) が利用可能である (つまり、Sandy Bridge 以降) 場合。設定無しで動作します。\n\n能動的な governing の最も重要な特徴は、2つのガバナー (powersave と performance) のみが利用可能であるように見えることです。これらは通常のガバナーのようには動作しません。これらのレベルは、CPU の内部ガバナーの Energy Performance Preference ヒントに変換されます。結果として、これらは両方、動的スケーリングを提供します。schedutil や ondemand に似ていますが、主にレイテンシが異なります。performance アルゴリズムは、Intel HWP に古い ondemand ガバナーよりも優れた省電力機能を提供するはずです。\n\n"
+    },
+    {
+      "title": "Intel active、非 HWP",
+      "level": 3,
+      "content": "紛らわしいことに、intel-pstate ドライバには、CPU の能動的な決定を必要としない \"active\" モードがあります。カーネルコマンドラインによって \"active\" モードが強制されたが、HWP が利用できないか無効化されている場合に、このモードはオンになります。powersave と performance しか提供しませんが、ドライバ自体は schedutil や performance に似た方法で governing を行います (つまり、最大の P-state のままになります)。能動的な intel-pstate に比べて、このモードに実際の利点はありません。\n\n"
+    },
+    {
+      "title": "EPP を設定する",
+      "level": 3,
+      "content": "sysfs インターフェイスが利用可能である場合、中間的なヒントを選択することができます。インターフェイスは AMD と Intel で同じです。/sys/devices/system/cpu/cpu*/power/energy_performance_preference ファイルは現在のプリファレンスを記述し、/sys/devices/system/cpu/cpu*/power/energy_performance_available_preferences は利用可能なプリファレンスのリストを提供します。また、0 (パフォーマンス優先) から 255 (省電力優先) までの間の数値を渡すことができます。EPP がない Intel CPU にはフォールバック実装が提供されています。文字列 を EPB レベル (次のセクションで説明) に変換しますが、数値では失敗します。\n\nx86_energy_perf_policy は、Intel CPU に対してのみ、--hwp-epp スイッチによる EPP ヒントの設定をサポートしています。これは、Intel と AMD で異なるマシン固有のレジスタ (MSR) への直接アクセスにより機能します。このプログラムは、周波数乗数の範囲を使って HWP 周波数の範囲を制限することもできます。\n\n"
+    },
+    {
+      "title": "Collaborative processor performance control",
+      "level": 2,
+      "content": "最近の CPU の電力消費量は、もはや単純に周波数や電圧設定に依存していません。必要に応じて切り替え可能なモジュールが存在しているからです。Collaborative Processor Performance Control (CPPC) は、ACPI 5.0 で提供されている P-state の置き換えです。静的な周波数レベルのテーブルを定義する代わりに、プロセッサは多くの抽象的なパフォーマンスレベルを提供し、オペレーティングシステムはこれらのレベルの中から選択します。これには2つの長所があります:\n\n- 16個の P-state エントリという制限がない。典型的な CPU では数百ものレベルの中から選ぶことができます。\n- CPU は、特定の部品 (例えば、ベクトル FPU) が使用されていない時に、より高い周波数を提供できます。\n\n一方、柔軟な周波数は、schedutil による高速な周波数変更において重要な周波数不変の使用率追跡を破壊します。CPPC において周波数を静的にするために多くのベンダ固有の方法が取られてきましたが、ほとんどの成功例は arm64 におけるものです。\n\ncppc_cpufreq は汎用の CPPC スケーリングドライバです。amd_pstate も、Zen 3 MSR が利用できない場合に、ACPI CPPC を使用して CPU の周波数を管理します。この方法 (\"共有メモリ\" とも呼ばれる) は、MSR よりも高レイテンシです。\n\n"
+    },
+    {
+      "title": "Intel performance and energy bias hint",
+      "level": 2,
+      "content": "Intel performance and energy bias hint (EPB) は、ユーザスペースが電力とパフォーマンスのトレードオフを自由に指定できるようにするための Intel CPU によって提供されているインターフェイスです。0 (最高のパフォーマンス) から 15 (最高の省電力) のスケールで指定できます。FPB レジスタは、周波数スケーリングとは独立して機能する、パフォーマンス管理のもう一つのレイヤーです。P-state と C-state の選択がどの程度積極的に行われるかに関与し、エネルギー消費量に影響を与える内部のモデル固有の決定に影響を与えます。\n\n以下は一般的な値とそれぞれのエイリアスです (sysfs と x86_energy_perf_policy によって認識されます):\n\nTable content:\nEPB 値 | 文字列\n0 | performance\n4 | balance-performance\n6 | normal, default\n8 | balance-power\n15 | power\n\n"
+    },
+    {
+      "title": "sysfs から設定する",
+      "level": 3,
+      "content": "EPB は sysfs 属性を用いて設定できます:\n\n```\n# echo epb | tee /sys/devices/system/cpu/cpu*/power/energy_perf_bias\n```\n\n"
+    },
+    {
+      "title": "x86_energy_perf_policy から設定する",
+      "level": 3,
+      "content": "x86_energy_perf_policy を使って:\n\n```\n# x86_energy_perf_policy --epb epb\n```\n\n"
+    },
+    {
+      "title": "cpupower から設定する",
+      "level": 3,
+      "content": "cpupower を使って:\n\n```\n# cpupower set -b epb_value\n```\n\n"
+    },
+    {
+      "title": "他の x86 エネルギーフラグ",
+      "level": 2,
+      "content": "x86_energy_perf_policy でハードウェア P-State を有効化する:\n\n```\n# x86_energy_perf_policy -H 1\n# x86_energy_perf_policy -U 1\n```\n\n\"default\" ポリシーを設定する:\n\n変更は一時的です。詳細は x86_energy_perf_policy(8) を参照してください。\n\n"
+    },
+    {
+      "title": "CPU idle ドライバ",
+      "level": 2,
+      "content": "intel_idle CPU idle ドライバは、最近の Intel CPU では acpi_idle ドライバの代わりに自動的に使用されます。このドライバは現在 Sandy Bridge およびそれ以降の CPU で自動的に使用されます。intel_idle は BIOS の C-State 設定を無視する場合があります。このドライバを使用中に問題が発生した場合、カーネルラインに intel_idle.max_cstate=0 を追加してください。\n\n"
+    },
+    {
+      "title": "ACPI イベントとの対話",
+      "level": 2,
+      "content": "AC アダプタを接続したときやノートパソコンのフタを閉じたときなど様々な ACPI イベントによってガバナーを自動的に切り替えるように設定することができます。簡単なサンプルは下にありますが、acpid の記事は全部読む価値があります。\n\nイベントは /etc/acpi/handler.sh で定義します。acpid パッケージがインストールされていれば、ファイルは既に存在し実行可能になっているはずです。例えば、AC アダプタが切断されたときにスケーリング governor を performance から conservative に変更して、またアダプタが接続されたときは戻したい場合:\n\n```\n/etc/acpi/handler.sh\n```\n\n```\n[...]\n\nac_adapter)\n    case \"$2\" in\n        AC*)\n            case \"$4\" in\n                00000000)\n                    echo \"conservative\" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor    \n                    echo -n $minspeed >$setspeed\n                    #/etc/laptop-mode/laptop-mode start\n                ;;\n                00000001)\n                    echo \"performance\" >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor\n                    echo -n $maxspeed >$setspeed\n                    #/etc/laptop-mode/laptop-mode stop\n                ;;\n            esac\n        ;;\n        *) logger \"ACPI action undefined: $2\" ;;\n    esac\n;;\n\n[...]\n```\n\n"
+    },
+    {
+      "title": "BIOS の周波数制限",
+      "level": 3,
+      "content": "CPU/BIOS 設定によっては最大周波数までスケールすることができなかったり周波数を上げることが全くできなかったりすることがあります。これは大抵 BIOS イベントが OS に周波数を制限するよう通知しているのが原因であり、結果的に /sys/devices/system/cpu/cpu0/cpufreq/bios_limit が低い値に設定されます。\n\nBIOS のセットアップユーティリティで特定の設定 (Frequency、Thermal Management など) をしたのに変更できない場合、BIOS にバグが存在したり、BIOS 自体のバージョンが古いのかもしれません。または BIOS に何か理由があって CPU の周波数を制限しているということもあります。\n\nそのような理由として、バッテリーが取り除かれた (またはほとんど死んでいる) ことで AC 電源しか使えないようになっているのが原因だということがあります (使用しているマシンがノートパソコンの場合)。この場合、電力が弱い AC 電源だけではピーク性能を発揮するのに十分な電力が供給されておらず、バッテリーの補助がないとデータを喪失したり、破損したり、または最悪の場合ハードウェアに深刻なダメージを与える可能性があります。\n\n全ての BIOS が CPU 周波数を制限するわけではありませんが、例えば IBM/Lenovo のほとんどの Thinkpad は制限を加えます。詳しくは thinkwiki のトピックを参照して下さい。\n\n変な BIOS の設定がないことを確認して、何をするのかちゃんと理解できているのなら、BIOS の制限を無視するようにカーネルを設定することができます。\n\n特殊なパラメータをプロセッサのモジュールに渡す必要があります。\n\n一時的に変更してみたいときは /sys/module/processor/parameters/ignore_ppc の値を 0 から 1 に変更してください。\n\n設定を永続化する方法については、カーネルモジュール#モジュールオプションを設定する でいくつか方法が説明されています。例えば、カーネルブートラインに processor.ignore_ppc=1 を追加することもできますし、以下のようなファイルを作成することもできます:\n\n```\n/etc/modprobe.d/ignore_ppc.conf\n```\n\n```\n# マシンの周波数が BIOS によって間違って制限されている場合、これが役に立つはずです\noptions processor ignore_ppc=1\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Linux CPUFreq - カーネルドキュメント\n- pstate に関する Reddit の投稿\n- プロセッサのブースト制御\n- intel_pstate カーネルドキュメント\n- amd-pstate カーネルドキュメント\n- intel_pstate/intel_cpufreq ドキュメント kernel 5.7+\n\n"
+    }
+  ]
+}

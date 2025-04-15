@@ -1,0 +1,66 @@
+{
+  "title": "EFISTUB (Português)",
+  "url": "https://wiki.archlinux.org/title/EFISTUB_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Processo de inicialização do Arch\n- Unified Extensible Firmware Interface\n\nO kernel Linux suporta a inicialização EFISTUB, que permite que o firmware EFI carregue o kernel como um executável EFI. A opção é ativada por padrão nos kernels do Arch Linux ou, se você estiver compilando o kernel, pode ativá-lo, definindo CONFIG_EFI_STUB=y na configuração do Kernel. Veja The EFI Boot Stub para mais informações.\n\nCom EFISTUB, um kernel pode ser inicializado diretamente por uma placa-mãe UEFI ou indiretamente usando um gerenciador de boot. Recomenda-se o uso de um gerenciador de boot se você tiver vários pares kernel/initramfs e o menu de inicialização UEFI da sua placa-mãe não for fácil de usar.\n\n"
+    },
+    {
+      "title": "Preparando para EFISTUB",
+      "level": 2,
+      "content": "Primeiro, você deve criar uma partição de sistema EFI e escolher como ela é montada. Consulte Partição de sistema EFI#Montar a partição para todas as opções de montagem ESP disponíveis.\n\n- O pacman vai atualizar diretamente o kernel que o firmware EFI vai ler se você montar a ESP para /boot.\n- Você pode manter o kernel e o initramfs fora da ESP se você usar um gerenciador de inicialização que tenha um driver do sistema de arquivos para a partição onde eles residem, por exemplo, rEFInd.\n\n"
+    },
+    {
+      "title": "Usando um gerenciador de boot",
+      "level": 3,
+      "content": "Existem vários gerenciadores de boot UEFI que podem fornecer opções adicionais ou simplificar o processo de inicialização via UEFI - especialmente se você tiver vários kernels/sistemas operacionais. Veja Processo de inicialização do Arch#Gerenciador de boot para mais informações.\n\n"
+    },
+    {
+      "title": "Usando UEFI Shell",
+      "level": 3,
+      "content": "É possível iniciar um kernel EFISTUB a partir do UEFI Shell como se fosse um aplicativo UEFI normal. Neste caso, os parâmetros do kernel são passados como parâmetros normais para o arquivo de kernel EFISTUB lançado.\n\n```\n> fs0:\n> \\vmlinuz-linux root=PARTUUID=3518bb68-d01e-45c9-b973-0b5d918aae96 rw initrd=\\initramfs-linux.img\n```\n\nPara evitar a necessidade de lembrar de todos os seus parâmetros do kernel, você pode salvar o comando executável em um script de shell como archlinux.nsh na sua partição de sistema UEFI e executá-lo com:\n\n```\n> fs0:\n> archlinux\n```\n\n"
+    },
+    {
+      "title": "Usando UEFI diretamente",
+      "level": 3,
+      "content": "O UEFI foi projetado para remover a necessidade de um bootloader intermediário, como o GRUB. Se a sua placa-mãe tiver uma boa implementação de UEFI, é possível embutir os parâmetros do kernel dentro de uma entrada de boot UEFI e para a placa-mãe inicializar o Arch diretamente. Você pode usar o efibootmgr ou o UEFI Shell v2 para modificar as entradas de inicialização da sua placa-mãe.\n\n"
+    },
+    {
+      "title": "efibootmgr",
+      "level": 4,
+      "content": "Para criar uma entrada de inicialização que carregue o kernel usando o efibootmgr, execute um comando similar a este:\n\n```\n# efibootmgr --disk /dev/sdX --part Y --create --label \"Arch Linux\" --loader /vmlinuz-linux --unicode 'root=PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rw initrd=\\initramfs-linux.img' --verbose\n```\n\nsendo /dev/sdX e Y a unidade e o número da partição onde a ESP está localizada. Altere o parâmetro root= para refletir sua partição raiz do Linux, consulte os parâmetros do kernel para formatos de nome de dispositivo suportados e nomeação persistente de dispositivo de bloco para obter o valor correspondente.\n\nNote que o argumento -u/--unicode entre aspas é apenas a lista de parâmetros do kernel, então você pode precisar adicionar parâmetros adicionais (por exemplo, para suspender para o disco ou microcódigo).\n\nApós adicionar a entrada de inicialização, você pode verificar que a entrada foi adiciona corretamente com:\n\n```\n# efibootmgr --verbose\n```\n\nPara definir a ordem de inicialização, execute:\n\n```\n# efibootmgr --bootorder XXXX,XXXX --verbose\n```\n\nsendo XXXX o número que aparece na saída do comando efibootmgr para cada entrada.\n\n"
+    },
+    {
+      "title": "efibootmgr com arquivo .efi",
+      "level": 4,
+      "content": "Se estiver usando cryptbootAUR e sbupdate-gitAUR para gerar suas próprias chaves para Secure Boot e assinar o initramfs e o kernel para, então, criar uma imagem .efi inicializável, o efibootmgr pode ser usado diretamente para inicializar o arquivo .efi:\n\n```\n# efibootmgr --create --disk /dev/sdX --part número_partição --label \"rótulo\" --loader \"EFI\\pasta\\arquivo.efi\" --verbose\n```\n\nConsulte efibootmgr(8) para uma explicação das opções.\n\n"
+    },
+    {
+      "title": "UEFI Shell",
+      "level": 4,
+      "content": "Algumas implementações de UEFI dificultam a modificação do NVRAM usando o efibootmgr. Se o efibootmgr não conseguir criar uma entrada com êxito, você poderá usar o comando bcfg no UEFI Shell v2 (isto é, a partir da iso live do Arch Linux).\n\nPrimeiro, descubra o número do dispositivo onde sua ESP reside usando:\n\n```\nShell> map\n```\n\nNeste exemplo, 1 é usado como o número do dispositivo. Para listar o conteúdo da ESP:\n\n```\nShell> ls fs1:\n```\n\nPara ver as entradas de inicialização atuais:\n\n```\nShell> bcfg boot dump\n```\n\nPara adicionar uma entrada para o seu kernel, use:\n\n```\nShell> bcfg boot add N fs1:\\vmlinuz-linux \"Arch Linux\"\n```\n\nsendo N o local onde a entrada será adicionada no menu de inicialização. 0 é o primeiro item de menu. Os itens de menu já existentes serão deslocados no menu sem serem descartados.\n\nPara adicionar as opções de kernel necessárias, primeiro crie um arquivo na sua ESP:\n\n```\nShell> edit fs1:\\options.txt\n```\n\nNo arquivo, adicione a linha de inicialização. Por exemplo:\n\n```\nroot=/dev/sda2 ro initrd=\\initramfs-linux.img\n```\n\nPressione F2 para salvar e, então, F3 para sair.\n\nPara adicionar essas opções à sua entrada anterior, faça:\n\n```\nShell> bcfg boot -opt N fs1:\\options.txt\n```\n\nRepita este processo para quaisquer entradas adicionais.\n\nPara remover um item adicionado anteriormente, faça:\n\n```\nShell> bcfg boot rm N\n```\n\n"
+    },
+    {
+      "title": "Mais ferramentas",
+      "level": 4,
+      "content": "Algumas das ferramentas acima, e mais, são brevemente discutidas em rEFInd#Tools.\n\n"
+    },
+    {
+      "title": "Usando um script startup.nsh",
+      "level": 4,
+      "content": "Algumas implementações de UEFI não mantêm variáveis EFI entre inicializações \"a frio\" (por exemplo, VirtualBox) e qualquer coisa definida pela interface de firmware UEFI é perdida no desligamento.\n\nO UEFI Shell Specification 2.0 estabelece que um script chamado startup.nsh na raiz da partição ESP sempre ser interpretado e pode conter instruções arbitrárias; entre aquelas que você pode definir uma linha de inicialização. Certifique-se de montar a partição ESP em /boot e crie um script startup.nsh que contenha uma linha de inicialização do kernel. Por exemplo:\n\n```\nvmlinuz-linux rw root=/dev/sdX [rootfs=meufs] [rootflags=minhasopçõesraiz] \\\n [kernel.flag=foo] [meumódulo.flag=bar] \\\n [initrd=\\intel-ucode.img] initrd=\\initramfs-linux.img\n```\n\nEste método funcionará com quase todas as versões de firmware UEFI que você pode encontrar em hardware real, você pode usá-lo como último recurso. O script deve ser uma única linha longa. As seções entre colchetes são opcionais e são fornecidas apenas como um guia. As quebras de linha estilo shell são apenas para esclarecimento visual. Os sistemas de arquivos FAT usam a barra invertida como separador de caminho e, nesse caso, a barra invertida declara que o initramfs está localizado na raiz da partição ESP. Apenas o microcódigo da Intel é carregado na linha de parâmetros de inicialização; O microcódigo da AMD é lido do disco posteriormente durante o processo de inicialização; isso é feito automaticamente pelo kernel.\n\n"
+    },
+    {
+      "title": "Não foi possível criar uma entrada de inicialização com efibootmgr",
+      "level": 3,
+      "content": "Algumas combinações de versões do kernel e do efibootmgr podem se recusar a criar novas entradas de inicialização. Isso pode ser devido à falta de espaço livre na NVRAM. Você pode tentar excluir quaisquer arquivos de despejo EFI:\n\n```\n# rm /sys/firmware/efi/efivars/dump-*\n```\n\nOu, como último recurso, inicialize com o parâmetro do kernel efi_no_storage_paranoia. Você também pode tentar fazer downgrade de sua instalação do efibootmgr para a versão 0.11.0. Esta versão funciona com o Linux versão 4.0.6. Veja a discussão no relatório de erro FS#34641, em particular o comentário final, para mais informações.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Documentação do kernel Linux sobre EFISTUB\n- Commit Git do EFISTUB no kernel Linux\n- Página do Rod Smith sobre EFISTUB\n\n"
+    }
+  ]
+}

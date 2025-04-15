@@ -1,0 +1,46 @@
+{
+  "title": "ZTE MF626 / MF636 (español)",
+  "url": "https://wiki.archlinux.org/title/ZTE_MF626_/_MF636_(espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-12-27** \n\nArtículos relacionados\n\n- USB 3G Modem\n\nEl ZTE MF626 / MF636 es un módem USB que combina 3G+/3G con EDGE/GPRS en un dispositivo compacto. Cuenta con un lector de tarjetas micro-SD integrado. Puede enviar información a velocidades de hasta 4.5 Mbps en redes 3G+ y recibir información a velocidades de hasta 7.2 Mbps. También se le conoce como el adaptador USB rojo Rogers (una compañía telefónica canadiense).\n\n"
+    },
+    {
+      "title": "Deshabilitar el modo CD en el dispositivo",
+      "level": 3,
+      "content": "Con una máquina Windows, conecte el dispositivo USB y complete el breve asistente de instalación. Una vez hecho esto, cierre la aplicación Rogers que se inicia, luego diríjase al Administrador de dispositivos (Panel de control > Sistema > Hardware > Administrador de dispositivos). En la sección Puertos, busque el puerto COM que está conectado al módem USB (ignore el modo de diagnóstico). Conéctese a ese puerto COM a través del Hyperterminal, que se encuentra en el área de Accesorios del Menú de Inicio. Los parámetros de conexión son:\n\n```\nBits per Second: 115200\nData bits: 8\nParity: None\nStop bits: 1\nFlow Control: None\n```\n\nUna vez conectado, escriba las siguientes órdenes:\n\n```\nAT+ZOPRT=5\nAT+ZCDRUN=8\n```\n\nEsto le indica al módem que no use el modo CD cuando se conecta por primera vez a un ordenador. Ahora salga del Hyperterminal y retire el módem USB. Ya ha terminado con Windows.\n\n"
+    },
+    {
+      "title": "Deshabilitar el modo CD en el dispositivo con wvdial",
+      "level": 3,
+      "content": "Primero, elimine el módulo usb-storage. Luego, cargue el módulo usbserial:\n\n```\n# rmmod usb_storage\n# modprobe usbserial\n```\n\nEdite /etc/wvdial.conf:\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB0\nModem Type = Analog Modem\nISDN = 0\nInit1 = AT+ZOPRT=5\nInit2 = AT+ZCDRUN=8\n```\n\nEjecute wvdial, debería usar estas órdenes y fallar al intentar conectarse. Una vez que se salga, desconecte el USB y vuelva a conectarlo, y debería ser reconocido como un módem.\n\n"
+    },
+    {
+      "title": "Configurar las reglas udev",
+      "level": 3,
+      "content": "Cree la siguiente regla udev:\n\n```\n/etc/udev/rules.d/90-zte.conf.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"19d2\", ATTRS{idProduct}==\"0031\", RUN+=\"/sbin/modprobe usbserial vendor=0x19d2 product=0x0031\", MODE=\"660\", GROUP=\"network\"\n```\n\n"
+    },
+    {
+      "title": "Crear una configuración wvdial",
+      "level": 3,
+      "content": "Wvdial es una interfaz fácil de usar para PPPd. Asegúrese de reemplazar la línea /dev/ttyUSB0 con el nodo al que está conectado su módem USB, puede verlo con dmesg. Guárdelo como /etc/wvdial.conf.\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB0\nISDN = off\nModem Type = USB Modem\nBaud = 7200000\nInit = ATZ\nInit2 =\nInit3 =\nInit4 =\nInit5 =\nInit6 =\nInit7 =\nInit8 =\nInit9 =\nPhone = *99#\nPhone1 =\nPhone2 =\nPhone3 =\nPhone4 =\nDial Prefix =\nDial Attempts = 1\nDial Command = ATM1L3DT\nAsk Password = off\nPassword = off\nUsername = na\nAuto Reconnect = off\nAbort on Busy = off\nCarrier Check = off\nCheck Def Route = off\nAbort on No Dialtone = off\nStupid Mode = on\nIdle Seconds = 0\nAuto DNS = on\n```\n\nSi lo anterior no funciona, intente lo siguiente (extraído de sakis3g):\n\nEsto es para Etisalat Misr, pero debería funcionar para todas las demás redes que usan el mismo dispositivo.\n\n```\n[Dialer Defaults]\nModem = /dev/ttyUSB2\nModem Type = Analog Modem\nISDN = 0\nBaud = 7200000\nDial Attempts = 3\nUsername = apn\nPassword = apn\nPhone = *99#\nAuto Reconnect = off\nStupid Mode = 1\nInit1 = ATZ\nInit6 = AT+CGEQMIN=1,4,64,640,64,640\nInit7 = AT+CGEQREQ=1,4,64,640,64,640\n```\n\n"
+    },
+    {
+      "title": "Conectarse a internet",
+      "level": 2,
+      "content": "Ahora simplemente ejecute wvdial para conectarse\n\n```\n# wvdial\n```\n\nSi ve que la salida muestra sus direcciones IP locales y endpoints PPP, entonces, ha funcionado.\n\n"
+    },
+    {
+      "title": "Consejos y trucos",
+      "level": 2,
+      "content": "Todos los pasos anteriores pueden quedar obsoletos si el módem USB se vuelve compatible con sakis3g, que es un script de línea de comandos todo en uno que automatiza todos los pasos anteriores. Los pasos de instalación son los siguientes:\n\n```\nwget \"http://www.sakis3g.org/versions/latest/$ARCH/sakis3g.gz\" # where $ARCH is either i386 or amd64\ngunzip sakis3g.gz\nchmod +x sakis3g\n./sakis3g --interactive\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Publicación 1 del foro de Ubuntu - más detalles\n- Publicación 2 del foro de Ubuntu - más detalles\n\n"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "title": "Microcode (Español)",
+  "url": "https://wiki.archlinux.org/title/Microcode_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-02-12** \n\nLos fabricantes de procesadores lanzan actualizaciones de estabilidad y seguridad para el microcódigo del procesador. Estas actualizaciones proporcionan correcciones de errores que pueden ser críticas para la estabilidad de su sistema. Sin ellas, puede experimentar falsos errores o paradas inesperadas del sistema que pueden ser difíciles de rastrear.\n\nTodos los usuarios con CPU AMD o Intel deben instalar las actualizaciones de microcódigo para garantizar la estabilidad del sistema.\n\nLas actualizaciones de microcódigo generalmente se envían con el firmware de la placa base y se aplican durante la inicialización del firmware. Dado que los OEM podrían no lanzar actualizaciones de firmware de manera oportuna y los sistemas antiguos no reciben nuevas actualizaciones de firmware, se añadió al kernel de Linux la capacidad de aplicar actualizaciones de microcódigo de CPU durante el arranque. El cargador de microcódigo de Linux soporta tres métodos de carga:\n\n1. Carga temprana actualiza el microcódigo muy pronto durante el arranque, antes de la etapa initramfs, por lo que es el método preferido. Esto es obligatorio para las CPU con errores graves de hardware, como las familias de procesadores Intel Haswell y Broadwell.\n1. Carga tardía actualiza el microcódigo después del arranque, lo que podría ser demasiado tarde ya que la CPU podría haber intentado utilizar un conjunto de instrucciones con errores. Incluso si ya está utilizando la carga temprana, la carga tardía puede usarse para aplicar una actualización de microcódigo más nueva sin necesidad de reiniciar.\n1. Microcódigo incorporado se puede compilar en el kernel que luego se aplica mediante el cargador inicial.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Según el procesador, instale el siguiente paquete:\n\n- amd-ucode para procesadores AMD,\n- intel-ucode para procesadores Intel.\n\nEl cargador de arranque debe cargar el microcódigo. Debido a la gran variabilidad en la configuración de inicio de los usuarios, las actualizaciones de microcódigo pueden no ser activadas automáticamente por la configuración predeterminada de Arch. Muchos kernel de AUR han seguido el camino de los kernels oficiales de Arch en este sentido.\n\nEstas actualizaciones deben activarse añadiendo /boot/amd-ucode.img o /boot/intel-ucode.img como el primer initrd en el archivo de configuración del cargador de arranque. Esto es anterior al archivo initrd normal. Véase a continuación las instrucciones para los cargadores de arranque más comunes.\n\nEn las siguientes secciones, reemplace fabricante_de_la_cpu por el fabricante de su CPU, es decir, amd o intel.\n\n"
+    },
+    {
+      "title": "Activar la carga temprana de microcódigo en kernels personalizados",
+      "level": 4,
+      "content": "Para que la carga temprana funcione en kernels personalizados, el \"Soporte de carga de microcódigo de CPU\" debe compilarse en el kernel, \"nunca\" compilarse como un módulo. Esto activará la opción \"Microcódigo de carga temprana\" que debe establecerse en Y.\n\n```\nCONFIG_BLK_DEV_INITRD=Y\nCONFIG_MICROCODE=y\nCONFIG_MICROCODE_INTEL=Y\nCONFIG_MICROCODE_AMD=y\n```\n\n"
+    },
+    {
+      "title": "GRUB",
+      "level": 4,
+      "content": "grub-mkconfig detectará automáticamente la actualización del microcódigo y configurará GRUB de manera apropiada. Después de instalar el paquete de microcódigo, vuelva a generar la configuración de GRUB para activar la carga de la actualización de microcódigo ejecutando:\n\n```\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\nAlternativamente, los usuarios que administran su archivo de configuración GRUB manualmente pueden añadir /boot/fabricante_de_la_cpu-ucode.img (o /fabricante_de_la_cpu-ucode.img si /boot es una partición separada) como sigue:\n\n```\n/boot/grub/grub.cfg\n```\n\n```\n...\necho 'Cargando ramdisk inicial'\ninitrd\t/boot/fabricante_de_la_cpu-ucode.img /boot/initramfs-linux.img\n...\n```\n\nRepítalo para cada entrada del menú.\n\n"
+    },
+    {
+      "title": "Dracut",
+      "level": 4,
+      "content": "Al generar initramfs con dracut, el microcódigo debe incluirse con el paso de carga temprana de microcódigo.\n\nVerifique la salida de esta orden para comprobar que su sistema esté configurado correctamente:\n\n```\n# dracut --kver x.y.z-arch1-1 /boot/initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "systemd-boot",
+      "level": 4,
+      "content": "Utilice la opción initrd para cargar el microcódigo, antes del ramdisk inicial, de la siguiente manera:\n\n```\n/boot/loader/entries/entrada.conf\n```\n\n```\ntitle   Arch Linux\nlinux   /vmlinuz-linux\ninitrd  /fabricante_de_la_cpu-ucode.img\ninitrd  /initramfs-linux.img\n...\n```\n\nEl último microcódigo fabricante_de_la_cpu-ucode.img debe estar disponible durante el arranque en su partición del sistema EFI (ESP). El ESP se debe montar como /boot para que el microcódigo se actualice cada vez que se actualice amd-ucode o intel-ucode. De lo contrario, copie /boot/fabricante_de_la_cpu-ucode.img a su ESP en cada actualización del paquete de microcódigo.\n\nara imágenes de kernel unificadas, primero genere el initrd para integrarlo creando uno nuevo de la siguiente manera:\n\n```\n$ cat /boot/fabricante_de_la_cpu-ucode.img /boot/initramfs-linux.img > mi_nuevo_initrd.img\n$ objcopy ... --add-section .initrd=mi_nuevo_initrd .img\n```\n\n"
+    },
+    {
+      "title": "EFISTUB",
+      "level": 4,
+      "content": "Añada dos opciones initrd=:\n\n```\ninitrd=\\fabricante_de_la_cpu-ucode.img initrd=\\initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "rEFInd",
+      "level": 4,
+      "content": "Edite las opciones de arranque en /boot/refind_linux.conf y añada initrd=/boot/fabricante_de_la_cpu-ucode.img (o initrd=/fabricante_de_la_cpu-ucode.img si /boot está en una partición separada) como el primer initramfs. Por ejemplo:\n\n```\n\"Arrancar utilizando las opciones predeterminadas\"     \"root=PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rw add_efi_memmap initrd=boot\\cpu_manufacturer-ucode.img initrd=boot\\initramfs-%v.img\"\n```\n\nLos usuarios que empleen estancias manuales en esp/EFI/refind/refind.conf para definir los kernels deben añadir simplemente initrd=/boot/fabricante_de_la_cpu-ucode.img (o /fabricante_de_la_cpu-ucode.img si /boot es una partición separada) según sea necesario para las líneas de opciones, y no en la parte principal de la estancia. Por ejemplo:\n\n```\noptions  \"root=PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rw add_efi_memmap initrd=boot\\fabricante_de_la_cpu-ucode.img\"\n```\n\n"
+    },
+    {
+      "title": "Syslinux",
+      "level": 4,
+      "content": "Los múltiples initrd pueden estar separados por comas en /boot/syslinux/syslinux.cfg:\n\n```\nLABEL arch\n    MENU LABEL Arch Linux\n    LINUX ../vmlinuz-linux\n    INITRD ../fabricante_de_la_cpu-ucode.img,../initramfs-linux.img\n...\n```\n\n"
+    },
+    {
+      "title": "LILO",
+      "level": 4,
+      "content": "LILO y posiblemente otros cargadores de arranque antiguos no admitan varias imágenes initrd. En ese caso, fabricante_de_la_cpu-ucode.img y initramfs-linux.img deberán combinarse en una imagen.\n\nNote: **después** \n\nPara combinar ambas imágenes en una imagen llamada initramfs-combinada.img, se puede utilizar el siguiente comando:\n\n```\n# cat /boot/fabricante_de_la_cpu-ucode.img /boot/initramfs-linux.img > /boot/initramfs-combinada.img\n```\n\nAhora, edite /etc/lilo.conf para cargar la nueva imagen.\n\n```\n...\ninitrd=/boot/initramfs-combinada.img\n...\n```\n\nY ejecute lilo como superusuario (root):\n\n```\n# lilo\n```\n\n"
+    },
+    {
+      "title": "Carga tardía",
+      "level": 2,
+      "content": "La carga tardía de las actualizaciones de microcódigo ocurre después de que el sistema se haya iniciado. Utiliza archivos en /usr/lib/firmware/amd-ucode/ y /usr/lib/firmware/intel-ucode/.\n\nPara los procesadores AMD, los archivos de actualización de microcódigo son proporcionados por linux-firmware.\n\nPara los procesadores Intel, ningún paquete proporciona los archivos de actualización de microcódigo (FS#59841). Para utilizar la carga tardía, debe extraer manualmente intel-ucode/ del archivo provisto por Intel.\n\n"
+    },
+    {
+      "title": "Activar las actualizaciones de microcódigo tardías",
+      "level": 3,
+      "content": "A diferencia de la carga temprana, la carga tardía de las actualizaciones de microcódigo en Arch Linux se activa de manera predeterminada utilizando /usr/lib/tmpfiles.d/linux-firmware.conf. Después del arranque, el archivo se analiza mediante systemd-tmpfiles-setup.service(8) y se actualiza el microcódigo de la CPU.\n\nPara recargar manualmente el microcódigo, p.e. tras actualizar los archivos de microcódigo en /usr/lib/firmware/amd-ucode/ o /usr/lib/firmware/intel-ucode/, ejecute:\n\n```\n# echo 1 > /sys/devices/system/cpu/microcode/reload\n```\n\nEsto permite aplicar nuevas actualizaciones de microcódigo sin reiniciar el sistema. Para linux-firmware puede automatizarlo con un hook de pacman, por ejemplo:\n\n```\n/etc/pacman.d/hooks/microcode_reload.hook\n```\n\n```\n[Trigger]\nOperation = Upgrade\nType = Path\nTarget = usr/lib/firmware/amd-ucode/*\n\n[Action]\nDescription = Aplicando actualizaciones de microcódigo de CPU...\nWhen = PostTransaction\nDepends = sh\nExec = /bin/sh -c 'echo 1 > /sys/devices/system/cpu/microcode/reload'\n```\n\n"
+    },
+    {
+      "title": "Desactivar las actualizaciones de microcódigo tardías",
+      "level": 3,
+      "content": "Para los sistemas AMD, el microcódigo de la CPU se actualizará incluso si amd-ucode no está instalado ya que los archivos en /usr/lib/firmware/amd-ucode/ son provistos por el paquete linux-firmware (FS#59840).\n\nPara máquinas virtuales y contenedores (FS#46591) no es posible actualizar el microcódigo de la CPU, por lo que es posible que quiera desactiva las actualizaciones de microcódigo. Para hacerlo, debe anular el tmpfile /usr/lib/tmpfiles.d/linux-firmware.conf que proporciona linux-firmware. Se puede hacer creando un archivo con el mismo nombre en /etc/tmpfiles.d/:\n\n```\n# ln -s /dev/null /etc/tmpfiles.d/linux-firmware.conf\n```\n\n"
+    },
+    {
+      "title": "Comprobar que el microcódigo se actualizó en el arranque",
+      "level": 2,
+      "content": "Utilice dmesg para ver si el microcódigo se ha actualizado:\n\n```\n# dmesg | grep microcode\n```\n\nEn los sistemas Intel, se debería ver algo similar a lo siguiente en cada inicio, lo que indica que el microcódigo se actualiza muy pronto:\n\n```\n[    0.000000] CPU0 microcode updated early to revision 0x1b, date = 2014-05-29\n[    0.221951] CPU1 microcode updated early to revision 0x1b, date = 2014-05-29\n[    0.242064] CPU2 microcode updated early to revision 0x1b, date = 2014-05-29\n[    0.262349] CPU3 microcode updated early to revision 0x1b, date = 2014-05-29\n[    0.507267] microcode: CPU0 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507272] microcode: CPU1 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507276] microcode: CPU2 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507281] microcode: CPU3 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507286] microcode: CPU4 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507292] microcode: CPU5 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507296] microcode: CPU6 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507300] microcode: CPU7 sig=0x306a9, pf=0x2, revision=0x1b\n[    0.507335] microcode: Microcode Update Driver: v2.2.\n```\n\nEs totalmente posible, particularmente con hardware más nuevo, que no haya una actualización de microcódigo para la CPU. En ese caso, la salida puede verse así:\n\n```\n[    0.292893] microcode: CPU0 sig=0x306c3, pf=0x2, revision=0x1c\n[    0.292899] microcode: CPU1 sig=0x306c3, pf=0x2, revision=0x1c\n[    0.292906] microcode: CPU2 sig=0x306c3, pf=0x2, revision=0x1c\n[    0.292912] microcode: CPU3 sig=0x306c3, pf=0x2, revision=0x1c\n[    0.292956] microcode: Microcode Update Driver: v2.2.\n```\n\nEn los sistemas AMD que utilizan la carga temprana, la salida se vería así:\n\n```\n[    2.119089] microcode: microcode updated early to new patch_level=0x0700010f\n[    2.119157] microcode: CPU0: patch_level=0x0700010f\n[    2.119171] microcode: CPU1: patch_level=0x0700010f\n[    2.119183] microcode: CPU2: patch_level=0x0700010f\n[    2.119189] microcode: CPU3: patch_level=0x0700010f\n[    2.119269] microcode: Microcode Update Driver: v2.2.\n```\n\nEn los sistemas AMD que utilizan la carga tardía, la salida mostrará la versión del microcódigo anterior antes de volver a cargar el microcódigo y el nuevo una vez que se vuelva a cargar. Se vería algo como esto:\n\n```\n[    2.112919] microcode: CPU0: patch_level=0x0700010b\n[    2.112931] microcode: CPU1: patch_level=0x0700010b\n[    2.112940] microcode: CPU2: patch_level=0x0700010b\n[    2.112951] microcode: CPU3: patch_level=0x0700010b\n[    2.113043] microcode: Microcode Update Driver: v2.2.\n[    6.429109] microcode: CPU2: new patch_level=0x0700010f\n[    6.430416] microcode: CPU0: new patch_level=0x0700010f\n[    6.431722] microcode: CPU1: new patch_level=0x0700010f\n[    6.433029] microcode: CPU3: new patch_level=0x0700010f\n[    6.433073] x86/CPU: CPU features have changed after loading microcode, but might not take effect.\n```\n\n"
+    },
+    {
+      "title": "Cuales CPU aceptan actualizaciones de microcódigo",
+      "level": 2,
+      "content": "Los usuarios pueden consultar a Intel o AMD en los siguientes enlaces para ver si un modelo en particular es compatible:\n\n- Centro de Investigación de Sistemas Operativos de AMD[enlace roto 2023-06-17].\n- Centro de descarga de Intel[enlace roto 2023-07-30].\n\n"
+    },
+    {
+      "title": "Detectar actualización de microcódigo disponible",
+      "level": 3,
+      "content": "Es posible averiguar si intel-ucode.img contiene una imagen de microcódigo para la CPU en ejecución con iucode-tool.\n\n1. Instale intel-ucode (no es necesario cambiar initrd para la detección)\n1. Instale iucode-tool\n1. Cargue el módulo del nkernel cpuid: # modprobe cpuid\n1. Extraiga la imagen de microcódigo y busque su cpuid:# bsdtar -Oxf /boot/intel-ucode.img | iucode_tool -tb -lS -\n1. Si hay una actualización disponible, debería aparecer debajo de selected microcodes\n1. Es posible que el microcódigo ya esté en la BIOS de su proveedor y no aparezca cargando en dmesg. Compárelo con el microcódigo actual ejecutando grep microcode /proc/cpuinfo\n\n```\n# modprobe cpuid\n```\n\n```\n# bsdtar -Oxf /boot/intel-ucode.img | iucode_tool -tb -lS -\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Actualización de microcódigos - Experiencias en la comunidad\n- Notas sobre actualizaciones de microcódigo de Intel – Ben Hawkes\n- Cargador de microcódigo del kernel - documentación del kernel\n- Errata encontrada en Haswell/Broadwell – AnandTech\n- Proyecto iucode-tool en GitLab\n\n"
+    }
+  ]
+}

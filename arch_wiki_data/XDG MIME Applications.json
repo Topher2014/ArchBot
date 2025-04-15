@@ -1,0 +1,81 @@
+{
+  "title": "XDG MIME Applications",
+  "url": "https://wiki.archlinux.org/title/XDG_MIME_Applications",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Desktop entries\n- Desktop environment\n- Window manager\n- Default applications\n- xdg-utils\n\nThe XDG MIME Applications specification builds upon the shared MIME database and desktop entries to provide default applications.\n\n1. Applications describe what MIME types they can handle using desktop entries.\n1. desktop-file-utils registers a pacman hook to build a cache database of MIME types handled by desktop entries, see update-desktop-database(1).\n1. Applications can install new MIME types by placing XML files in /usr/share/mime/packages/.\n1. shared-mime-info registers a pacman hook to build the Shared MIME-Info database cache, see update-mime-database(1).\n1. Desktop environments and users can change default applications and add or remove MIME type to application associations using mimeapps.list files.\n\n"
+    },
+    {
+      "title": "Shared MIME database",
+      "level": 2,
+      "content": "The XDG Shared MIME-info Database specification facilitates a shared MIME database across desktop environments and allows applications to easily register new MIME types system-wide.\n\nThe database is built from the XML files installed by packages in /usr/share/mime/packages/ using the tools from shared-mime-info.\n\nThe files in /usr/share/mime/ should not be directly edited, however it is possible to maintain a separate database on a per-user basis in the ~/.local/share/mime/ tree.\n\n\"URI scheme handling [..] are handled through applications handling the x-scheme-handler/foo MIME type, where foo is the URI scheme in question.\"[1]\n\n"
+    },
+    {
+      "title": "New MIME types",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nThis example defines a new MIME type application/x-foobar and assigns it to any file with a name ending in .foo. Simply create the following file:\n\n```\n~/.local/share/mime/packages/application-x-foobar.xml\n```\n\n```\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n    <mime-type type=\"application/x-foobar\">\n        <comment>foo file</comment>\n        <icon name=\"application-x-foobar\"/>\n        <glob-deleteall/>\n        <glob pattern=\"*.foo\"/>\n    </mime-type>\n</mime-info>\n```\n\nAnd then update the MIME database:\n\n```\n$ update-mime-database ~/.local/share/mime\n```\n\nOf course this will not have any effect if no desktop entries are associated with the MIME type. You may need to create new desktop entries or modify mimeapps.list.\n\n"
+    },
+    {
+      "title": "mimeapps.list",
+      "level": 2,
+      "content": "The XDG standard is the most common for configuring desktop environments. Default applications for each MIME type are stored in mimeapps.list files, which can be stored in several locations. They are searched in the following order, with earlier associations taking precedence over later ones:\n\nTable content:\nPath | Usage\n~/.config/mimeapps.list | user overrides\n/etc/xdg/mimeapps.list | system-wide overrides\n~/.local/share/applications/mimeapps.list | (deprecated) user overrides\n/usr/local/share/applications/mimeapps.list/usr/share/applications/mimeapps.list | distribution-provided defaults\n\nAdditionally, it is possible to define desktop environment-specific default applications in a file named desktop-mimeapps.list where desktop is the name of the desktop environment (from the XDG_CURRENT_DESKTOP environment variable). For example, /etc/xdg/xfce-mimeapps.list defines system-wide default application overrides for Xfce. These desktop-specific overrides take precedence over the corresponding non-desktop-specific file. For example, /etc/xdg/xfce-mimeapps.list takes precedence over /etc/xdg/mimeapps.list but is still overridden by ~/.config/mimeapps.list.\n\n```\n$ ln -s ~/.config/mimeapps.list ~/.local/share/applications/mimeapps.list\n```\n\nTo discover all the files that are scanned it is possible to enable debug mode by setting the environment variable XDG_UTILS_DEBUG_LEVEL=2: e.g. the xdg-mime query default <type> command will print each configuration file it is searching for MIME information.\n\n"
+    },
+    {
+      "title": "Format",
+      "level": 3,
+      "content": "Consider the following example:\n\n```\nmimeapps.list\n```\n\n```\n[Added Associations]\nimage/jpeg=bar.desktop;baz.desktop\nvideo/H264=bar.desktop\n[Removed Associations]\nvideo/H264=baz.desktop\n[Default Applications]\nimage/jpeg=foo.desktop\n```\n\nEach section assigns one or more desktop entries to MIME types.\n\n- Added Associations indicates that the applications support opening that MIME type. For example, bar.desktop and baz.desktop can open JPEG images. This might affect the application list you see when right-clicking a file in a file browser.\n- Removed Associations indicates that the applications do not support that MIME type. For example, baz.desktop cannot open H.264 video.\n- Default Applications indicates that the applications should be the default choice for opening that MIME type. For example, JPEG images should be opened with foo.desktop. This implicitly adds an association between the application and the MIME type. If there are multiple applications, they are tried in order.\n\nEach section is optional and can be omitted if unneeded.\n\n"
+    },
+    {
+      "title": "Utilities",
+      "level": 2,
+      "content": "While it is possible to configure default applications and MIME types by directly editing mimeapps.list and the shared MIME database, there are many tools that can simplify the process. These tools are also important because applications may delegate opening of files to these tools rather than trying to implement the MIME type standard themselves.\n\nIf you use a desktop environment you should first check if it provides its own utility. That should be preferred over these alternatives.\n\nThe official xdg-utils contain tools for managing MIME types and default applications according to the XDG standard (xdg-mime). Most importantly it provides xdg-open which many applications use to open a file with its default application.\n\n"
+    },
+    {
+      "title": "lsdesktopf",
+      "level": 3,
+      "content": "lsdesktopfAUR provides several methods of searching the MIME database and desktop MIME entries.\n\nFor example, to see all MIME extensions in the system's .desktop files that have MIME type video you can use lsdesktopf --gm -gx video or to search in the XML database files use lsdesktopf --gdx -gx video. To get a quick overview of how many and which .desktop files can be associated with a certain MIME type, use lsdesktopf --gen-mimeapps. To see all file name extensions in XML database files, use lsdesktopf --gdx -gfx.\n\n"
+    },
+    {
+      "title": "selectdefaultapplication",
+      "level": 3,
+      "content": "selectdefaultapplication-gitAUR is GUI application that lists up all applications supporting various mimetypes and lets you quickly set it as default for all or some of the mimetypes it supports (by modifying mimeapps.list).\n\nIt shows the \"readable\" name and file extensions as well, so you do not need to remember the name of the mimetypes.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If a file is not being opened by your desired default application, there are several possible causes. You may need to check each case.\n\n"
+    },
+    {
+      "title": "Missing desktop entry",
+      "level": 3,
+      "content": "A desktop entry is required in order to associate an application with a MIME type. Ensure that such an entry exists and can be used to (manually) open files in the application.\n\n"
+    },
+    {
+      "title": "Missing association",
+      "level": 3,
+      "content": "If the application's desktop entry does not specify the MIME type under its MimeType key, it will not be considered when an application is needed to open that type. Edit mimeapps.list to add an association between the .desktop file and the MIME type.\n\n"
+    },
+    {
+      "title": "Non-default application",
+      "level": 3,
+      "content": "If the desktop entry is associated with the MIME type, it may simply not be set as the default. Edit mimeapps.list to set the default association.\n\n"
+    },
+    {
+      "title": "Nonstandard association",
+      "level": 3,
+      "content": "Applications are free to ignore or only partially implement the XDG standard. Check for usage of deprecated files such as ~/.local/share/applications/mimeapps.list and ~/.local/share/applications/defaults.list. If you are attempting to open the file from another application (e.g. a web browser or file manager) check if that application has its own method of selecting default applications.\n\n"
+    },
+    {
+      "title": "Variables in .desktop files that affect application launch",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nDesktop environments and file managers supporting the specifications launch programs according to definition in the .desktop files. See Desktop entries#Application entry.\n\nUsually, configuration of the packaged .desktop files is not required, but it may not be bug-free. Even if an application containing necessary MIME type description in the .desktop file MimeType variable that is used for association, it can fail to start correctly, not start at all or start without opening a file.\n\nThis may happen, for example, if the Exec variable is missing internal options needed for how to open a file, or how the application is shown in the menu. The Exec variable usually begins with %; for its currently supported options, see exec-variables.\n\nThe following table lists the main variable entries of .desktop files that affect how an application starts, if it has a MIME type associated with it.\n\nTable content:\nVariable names | Example 1 content | Example 2 content | Description\nDBusActivatable | DBusActivatable=true | DBusActivatable=false | Application interact with D-Bus. See also configuration: D-Bus.\nMimeType | MimeType=application/vnd.oasis.opendocument.text | MimeType=application/vnd.sun.xml.math | List of MIME types supported by application\nStartupWMClass | StartupWMClass=google-chrome | StartupWMClass=xpad | Associate windows with the owning application\nTerminal | Terminal=true | Terminal=false | Start in default terminal\n\n"
+    },
+    {
+      "title": "Empty MIME associations / open with menu in KDE",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for moving to KDE#Troubleshooting.** This article or section is a candidate for moving to KDE#Troubleshooting.\n\nThis article or section is a candidate for moving to KDE#Troubleshooting.\n\nInstall archlinux-xdg-menu and run XDG_MENU_PREFIX=arch- kbuildsycoca6 or add export XDG_MENU_PREFIX=plasma- to .xinitrc.\n\n"
+    }
+  ]
+}

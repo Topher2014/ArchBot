@@ -1,0 +1,156 @@
+{
+  "title": "Udev (Français)",
+  "url": "https://wiki.archlinux.org/title/Udev_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- udisks\n\nudev est une interface entre le noyau et l'utilisateur qui permet au système d'exploitation d'enregistrer la gestion des événements en espace utilisateur. Les événements décodés par le daemon d'udev sont en effet principalement déclenchés par le noyau Linux en réponse à des signaux physiques comme la connexion d'un périphérique plug-and-play. De ce point de vue, la principale fonction d'udev est la détection de périphérique et la connexion de ports intelligents, ainsi que la restitution du contrôle au noyau Linux, par ex. le chargement de modules ou de firmwares vers le noyau. Un autre élément de cette détection consiste à ajuster les autorisations de l'appareil pour qu'il soit accessible aux utilisateurs et groupes non root.\n\nEn tant que successeur de devfsd et de hotplug, udev gère également les nœuds de périphériques dans le répertoire /dev en les ajoutant, en créant des liens symboliques et en les renommant. udev remplace les fonctionnalités de hotplug et de hwdetect.\n\nudev traite des événements distincts simultanément (en parallèle), ce qui entraîne une amélioration potentielle des performances par rapport aux anciens systèmes. En même temps, cela peut compliquer l'administration du système, car, par exemple, l'ordre de chargement des modules du noyau n'est pas préservé d'un démarrage à l'autre. Si la machine possède plusieurs périphériques de type bloc, cela peut se manifester sous la forme de nœuds de périphérique changeant de désignation après le redémarrage. Par exemple, si la machine possède deux disques durs, /dev/sda peut devenir /dev/sdb au prochain démarrage. Poursuivez votre lecture pour plus d'informations à ce sujet.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "udev fait partie de systemd et est donc installé par défaut. Consultez systemd-udevd.service(8) pour plus d'informations.\n\n"
+    },
+    {
+      "title": "À propos des règles udev",
+      "level": 2,
+      "content": "Les règles udev écrites par l'administrateur se trouvent dans /etc/udev/rules.d/, leur nom de fichier doit se terminer par .rules. Les règles udev fournies avec divers paquets se trouvent dans /usr/lib/udev/rules.d/. S'il y a deux fichiers du même nom sous /usr/lib et /etc, celui de /etc est prioritaire.\n\nPour en savoir plus sur les règles udev, reportez-vous au manuel udev(7). Consultez également Writing udev rules et des exemples pratiques sont fournis dans le guide : Rédaction des règles udev - Exemples.\n\n"
+    },
+    {
+      "title": "Exemple de règle udev",
+      "level": 3,
+      "content": "Voici un exemple de règle qui crée un lien symbolique /dev/video-cam lorsqu'une webcam est connectée.\n\nDisons que cette caméra est actuellement connectée et a été chargée avec le nom de périphérique /dev/video2. La raison de l'écriture de cette règle est qu'au prochain démarrage, le périphérique pourrait apparaître sous un nom différent, comme /dev/video0.\n\n```\n$ udevadm info --attribute-walk --path=$(udevadm info --query=path --name=/dev/video2)\n```\n\n```\nUdevadm info starts with the device specified by the devpath and then walks up the chain of parent devices.\nIt prints for every device found, all possible attributes in the udev rules key format.\nA rule to match, can be composed by the attributes of the device and the attributes from one single parent device.\n\nlooking at device '/devices/pci0000:00/0000:00:04.1/usb3/3-2/3-2:1.0/video4linux/video2':\n  KERNEL==\"video2\"\n  SUBSYSTEM==\"video4linux\"\n   ...\nlooking at parent device '/devices/pci0000:00/0000:00:04.1/usb3/3-2/3-2:1.0':\n  KERNELS==\"3-2:1.0\"\n  SUBSYSTEMS==\"usb\"\n  ...\nlooking at parent device '/devices/pci0000:00/0000:00:04.1/usb3/3-2':\n  KERNELS==\"3-2\"\n  SUBSYSTEMS==\"usb\"\n  ATTRS{idVendor}==\"05a9\"\n  ATTRS{manufacturer}==\"OmniVision Technologies, Inc.\"\n  ATTRS{removable}==\"unknown\"\n  ATTRS{idProduct}==\"4519\"\n  ATTRS{bDeviceClass}==\"00\"\n  ATTRS{product}==\"USB Camera\"\n  ...\n```\n\nPour identifier la webcam, à partir du périphérique video4linux, nous utilisons KERNEL==\"video2\" et SUBSYSTEM==\"video4linux\", puis nous remontons deux niveaux au-dessus, nous faisons correspondre la webcam en utilisant les identifiants du fournisseur et du produit du parent usb SUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"05a9\" et ATTRS{idProduct}==\"4519\".\n\nNous sommes maintenant en mesure de créer une règle de correspondance pour ce périphérique comme suit :\n\n```\n/etc/udev/rules.d/83-webcam.rules\n```\n\n```\nKERNEL==\"video[0-9]*\", SUBSYSTEM==\"video4linux\", SUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"05a9\", ATTRS{idProduct}==\"4519\", SYMLINK+=\"video-cam\"\n```\n\nNous créons ici un lien symbolique en utilisant SYMLINK+=\"video-cam\" mais nous pourrions facilement définir l'utilisateur OWNER=\"john\" ou le groupe en utilisant GROUP=\"video\" ou définir les autorisations en utilisant MODE=\"0660\".\n\nSi vous avez l'intention d'écrire une règle pour faire quelque chose lorsqu'un périphérique est retiré, sachez que les attributs du périphérique peuvent ne pas être accessibles. Dans ce cas, vous devrez travailler avec des variables d'environnement de périphérique prédéfinies. Pour surveiller ces variables d'environnement, exécutez la commande suivante tout en débranchant votre périphérique :\n\n```\n$ udevadm monitor --environment --udev\n```\n\nDans le résultat de cette commande, vous consulterez des paires de valeurs telles que ID_VENDOR_ID et ID_MODEL_ID, qui correspondent aux attributs précédemment utilisés idVendor et idProduct. Une règle qui utilise les variables d'environnement du périphérique au lieu des attributs du périphérique peut ressembler à ceci :\n\n```\n/etc/udev/rules.d/83-webcam-removed.rules\n```\n\n```\nACTION==\"remove\", SUBSYSTEM==\"usb\", ENV{ID_VENDOR_ID}==\"05a9\", ENV{ID_MODEL_ID}==\"4519\", RUN+=\"/path/to/your/script\"\n```\n\n"
+    },
+    {
+      "title": "Lister les attributs d'un périphérique",
+      "level": 3,
+      "content": "Pour obtenir une liste de tous les attributs d'un périphérique que vous pouvez utiliser pour écrire des règles, exécutez cette commande :\n\n```\n$ udevadm info --attribute-walk --name=device_name\n```\n\nRemplacez device_name par le périphérique présent dans le système, tel que /dev/sda ou /dev/ttyUSB0.\n\nSi vous ne connaissez pas le nom du périphérique, vous pouvez également lister tous les attributs d'un chemin système spécifique :\n\n```\n$ udevadm info --attribute-walk --path=/sys/class/backlight/acpi_video0\n```\n\nPour affiner la recherche d'un périphérique, déterminez sa classe et exécutez :\n\n```\n$ ls /dev/class/by-id\n```\n\nVous pouvez utiliser le lien symbolique ou ce qu'il pointe comme entrée de --name. Par exemple :\n\n```\n$ udevadm info --attribute-walk --name=/dev/input/by-id/usb-foostan_Corne-event-kbd\n```\n\nPour obtenir le chemin d'un périphérique USB nu qui ne contient aucun périphérique subordonné, vous devez utiliser le chemin complet du périphérique USB. Démarrez le mode moniteur, puis branchez le périphérique USB pour l'obtenir :\n\n```\n$ udevadm monitor\n```\n\n```\n...\nKERNEL[26652.638931] add /devices/pci0000:00/0000:00:01.2/0000:02:00.0/0000:03:05.0/0000:05:00.0/usb1/1-3 (usb)\nKERNEL[26652.639153] add /devices/pci0000:00/0000:00:01.2/0000:02:00.0/0000:03:05.0/0000:05:00.0/usb1/1-3/1-3:1.0 (usb)\n...\n```\n\nVous pouvez simplement choisir le chemin le plus profond et --attribute-walk montrera de toute façon tous les attributs du parent :\n\nVous pouvez simplement choisir le chemin le plus profond et --attribute-walk montrera de toute façon tous les attributs du parent :\n\n```\n$ udevadm info --attribute-walk --path=/devices/pci0000:00/0000:00:01.2/0000:02:00.0/0000:03:05.0/0000:05:00.0/usb1/1-3/1-3:1.0\n```\n\n"
+    },
+    {
+      "title": "Test des règles avant le chargement",
+      "level": 3,
+      "content": "```\n# udevadm test $(udevadm info --query=path --name=device_name) 2>&1\n```\n\nCette procédure n'exécutera pas toutes les actions de vos nouvelles règles, mais elle traitera les règles symlink sur les périphériques existants, ce qui peut s'avérer utile si vous ne parvenez pas à les charger autrement. Vous pouvez également fournir directement le chemin du périphérique pour lequel vous voulez tester la règle udev :\n\n```\n# udevadm test /sys/class/backlight/acpi_video0/\n```\n\n"
+    },
+    {
+      "title": "Charger de nouvelles règles",
+      "level": 3,
+      "content": "udev détecte automatiquement les modifications apportées aux fichiers de règles, ainsi les changements prennent effet immédiatement sans nécessiter le redémarrage de udev. Cependant, les règles ne sont pas redéclenchées automatiquement sur les périphériques déjà existants. Les périphériques connectables à chaud, comme les périphériques USB, devront probablement être reconnectés pour que les nouvelles règles prennent effet, ou au moins décharger et recharger les modules du noyau ohci-hcd et ehci-hcd et ainsi recharger tous les pilotes USB.\n\nSi les règles ne se rechargent pas automatiquement :\n\n```\n# udevadm control --reload\n```\n\nPour forcer manuellement udev à déclencher vos règles :\n\n```\n# udevadm trigger\n```\n\n"
+    },
+    {
+      "title": "udisks",
+      "level": 2,
+      "content": "Consultez udisks.\n\n"
+    },
+    {
+      "title": "Montage de lecteurs dans les règles",
+      "level": 3,
+      "content": "Pour monter des disques amovibles, n'appelez pas mount à partir des règles udev. Ceci est déconseillé pour deux raisons :\n\n1. systemd exécute par défaut systemd-udevd.service avec un \"espace de noms mount\" séparé (consultez namespaces(7)), ce qui signifie que les montages ne seront pas visibles pour le reste du système.\n1. Même si vous changez les paramètres du service pour résoudre ce problème (en commentant les lignes PrivateMounts et MountFlags), il y a un autre problème qui est que les processus démarrés depuis Udev sont tués après quelques secondes. Dans le cas des systèmes de fichiers FUSE, tels que NTFS-3G, mount démarre un processus en espace utilisateur pour gérer les internes du système de fichiers ; lorsque celui-ci est tué, vous obtiendrez des erreurs Transport endpoint not connected si vous essayez d'accéder au système de fichiers.\n\nIl existe quelques options qui fonctionnent :\n\n- Démarrer un service systemd personnalisé à partir de la règle Udev ; le service systemd peut invoquer un script qui peut démarrer un nombre quelconque de processus longs (comme FUSE). Un exemple concis qui monte automatiquement les disques USB sous /media est udev-media-automount. Une variante de la même idée est expliquée dans ce post de blog.\n- Utilisez systemd-mount au lieu de mount dans votre règle Udev. Ceci est recommandé par les développeurs de systemd. Par exemple, cette règle Udev devrait monter les disques USB sous /media :\n\n```\nACTION==\"add\", SUBSYSTEMS==\"usb\", SUBSYSTEM==\"block\", ENV{ID_FS_USAGE}==\"filesystem\", RUN{program}+=\"/usr/bin/systemd-mount --no-block --automount=yes --collect $devnode /media\"\n```\n\n- Utilisez un paquet comme udisks ou udiskie. Ils sont très puissants, mais difficiles à mettre en place. De plus, ils sont destinés à être utilisés dans des sessions mono-utilisateur, car ils rendent certains systèmes de fichiers disponibles sous la propriété de l'utilisateur non privilégié dont la session est actuellement active.\n\n"
+    },
+    {
+      "title": "Permettre aux utilisateurs normaux d'utiliser les périphériques",
+      "level": 3,
+      "content": "Lorsqu'un pilote noyau initialise un périphérique, l'état par défaut du nœud de périphérique est d'être la propriété de root:root, avec les permissions 600. [1] Cela rend les périphériques inaccessibles aux utilisateurs normaux, à moins que le pilote ne modifie la valeur par défaut, ou qu'une règle udev dans l'espace utilisateur ne modifie les permissions.\n\nLes valeurs udev OWNER, GROUP, et MODE peuvent être utilisées pour fournir un accès, bien que l'on rencontre le problème de savoir comment rendre un périphérique utilisable par tous les utilisateurs sans être trop permissif. L'approche d'Ubuntu consiste à créer un groupe plugdev auquel les périphériques sont ajoutés, mais cette pratique est non seulement déconseillée par les développeurs de systemd, [2] mais considérée comme un bogue lorsqu'elle est livrée dans les règles udev sur Arch (FS#35602).\n\nL'approche recommandée est d'utiliser un MODE de 660 pour laisser le groupe utiliser le périphérique, puis d'attacher une TAG nommée uaccess. Cette balise spéciale permet à udev d'appliquer une dynamic user ACL au noeud du périphérique, qui se coordonne avec systemd-logind(8) pour rendre le périphérique utilisable par les utilisateurs connectés. Exemple de règle udev implémentant ceci :\n\n```\n/etc/udev/rules.d/71-device-name.rules\n```\n\n```\nSUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"vendor_id\", ATTRS{idProduct}==\"product_id\", MODE=\"0660\", TAG+=\"uaccess\"\n```\n\n"
+    },
+    {
+      "title": "Exécution lorsque le câble HDMI est branché ou débranché",
+      "level": 3,
+      "content": "Créez la règle /etc/udev/rules.d/95-hdmi-plug.rules avec le contenu suivant :\n\n```\nACTION==\"change\", SUBSYSTEM==\"drm\", ENV{DISPLAY}=\":0\", ENV{XAUTHORITY}=\"/home/username/.Xauthority\", RUN+=\"/path/to/script.sh\"\n```\n\n"
+    },
+    {
+      "title": "Exécuter sur le branchement du câble VGA",
+      "level": 3,
+      "content": "Créez la règle /etc/udev/rules.d/95-monitor-hotplug.rules avec le contenu suivant pour lancer arandr lors du branchement d'un câble de moniteur VGA :\n\n```\nKERNEL==\"card0\", SUBSYSTEM==\"drm\", ENV{DISPLAY}=\":0\", ENV{XAUTHORITY}=\"/home/username/.Xauthority\", RUN+=\"/usr/bin/arandr\"\n```\n\nCertains gestionnaires d'affichage stockent le .Xauthority en dehors du répertoire personnel de l'utilisateur. Vous devrez mettre à jour ENV{XAUTHORITY} en conséquence. Par exemple, GNOME Display Manager se présente comme suit :\n\n```\n$ printenv XAUTHORITY\n```\n\n```\n/run/user/1000/gdm/Xauthority\n```\n\n"
+    },
+    {
+      "title": "Détecter les nouveaux lecteurs eSATA",
+      "level": 3,
+      "content": "Si votre lecteur eSATA n'est pas détecté lorsque vous le branchez, vous pouvez essayer plusieurs choses. Vous pouvez redémarrer avec le eSATA branché. Ou vous pouvez essayer :\n\n```\n# echo 0 0 0 > /sys/class/scsi_host/host*/scan\n```\n\nOu vous pouvez installer scsiaddAUR (à partir de l'AUR) et essayer :\n\n```\n# scsiadd -s\n```\n\nAvec un peu de chance, votre disque est maintenant dans /dev. Si ce n'est pas le cas, vous pouvez essayer les commandes ci-dessus en cours d'exécution :\n\n```\n# udevadm monitor\n```\n\npour consulter si quelque chose se passe réellement.\n\n"
+    },
+    {
+      "title": "Marquer les ports SATA internes comme eSATA",
+      "level": 3,
+      "content": "Si vous avez connecté une baie eSATA ou un autre adaptateur eSATA, le système reconnaîtra toujours ce disque comme un lecteur SATA interne. GNOME et KDE vous demanderont en permanence votre mot de passe root. La règle suivante marquera le port SATA spécifié comme un port eSATA externe. Avec cela, un utilisateur normal de GNOME peut connecter ses disques eSATA à ce port comme une clé USB, sans mot de passe root et ainsi de suite.\n\n```\n/etc/udev/rules.d/10-esata.rules\n```\n\n```\nDEVPATH==\"/devices/pci0000:00/0000:00:1f.2/host4/*\", ENV{UDISKS_SYSTEM}=\"0\"\n```\n\n```\n$ udevadm info --query=path /dev/sdb\n```\n\n```\n/devices/pci0000:00/0000:00:1f.2/host4/target4:0:0/4:0:0:0/block/sdb\n```\n\n```\n$ find /sys/devices/ -name sdb\n```\n\n```\n/sys/devices/pci0000:00/0000:00:1f.2/host4/target4:0:0/4:0:0:0/block/sdb\n```\n\n"
+    },
+    {
+      "title": "Définition de noms de périphériques statiques",
+      "level": 3,
+      "content": "Comme udev charge tous les modules de manière asynchrone, ils sont initialisés dans un ordre différent. Cela peut entraîner un changement aléatoire des noms des périphériques. Une règle udev peut être ajoutée pour utiliser des noms de périphériques statiques. Consultez également Nommage persistant des périphériques pour les périphériques de type bloc et Network configuration#Change interface name pour les périphériques réseau.\n\n"
+    },
+    {
+      "title": "Périphérique vidéo",
+      "level": 4,
+      "content": "Pour configurer la webcam en premier lieu, reportez-vous à Webcam setup.\n\nL'utilisation de plusieurs webcams affectera les périphériques vidéo comme /dev/video* de manière aléatoire au démarrage. La solution recommandée est de créer des liens symboliques en utilisant une règle udev comme dans #Exemple de règle udev :\n\n```\n/etc/udev/rules.d/83-webcam.rules\n```\n\n```\nKERNEL==\"video[0-9]*\", SUBSYSTEM==\"video4linux\", SUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"05a9\", ATTRS{idProduct}==\"4519\", SYMLINK+=\"video-cam1\"\nKERNEL==\"video[0-9]*\", SUBSYSTEM==\"video4linux\", SUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"046d\", ATTRS{idProduct}==\"08f6\", SYMLINK+=\"video-cam2\"\n```\n\n"
+    },
+    {
+      "title": "Imprimante",
+      "level": 4,
+      "content": "Si vous utilisez plusieurs imprimantes, les périphériques /dev/lp[0-9] seront attribués de manière aléatoire au démarrage, ce qui perturbera par exemple la configuration de CUPS.\n\nVous pouvez créer la règle suivante, qui créera des liens symboliques sous /dev/lp/by-id et /dev/lp/by-path, de manière similaire au schéma du nommage persistant des périphériques :\n\n```\n/etc/udev/rules.d/60-persistent-printer.rules\n```\n\n```\nACTION==\"remove\", GOTO=\"persistent_printer_end\"\n# Ceci ne devrait pas être nécessaire\n#KERNEL!=\"lp*\", GOTO=\"persistent_printer_end\"\n\nSUBSYSTEMS==\"usb\", IMPORT{builtin}=\"usb_id\"\nENV{ID_TYPE}!=\"imprimante\", GOTO=\"persistent_printer_end\"\n\nENV{ID_SERIAL}==\"?*\", SYMLINK+=\"lp/by-id/$env{ID_BUS}-$env{ID_SERIAL}\"\n\nIMPORT{builtin}=\"path_id\"\nENV{ID_PATH}==\"?*\", SYMLINK+=\"lp/by-path/$env{ID_PATH}\"\n\nLABEL=\"persistent_printer_end\"\n```\n\n"
+    },
+    {
+      "title": "Identifier un disque par son numéro de série",
+      "level": 3,
+      "content": "Pour effectuer une action sur un périphérique disque spécifique /dev/sdX identifié de manière permanente par son numéro de série unique ID_SERIAL_SHORT tel qu'affiché avec udevadm info /dev/sdX, on peut utiliser la règle suivante. Elle passe comme paramètre le nom du périphérique trouvé s'il y en a un pour illustrer :\n\n```\n/etc/udev/rules.d/69-disk.rules\n```\n\n```\nACTION==\"add\", KERNEL==\"sd[a-z]\", ENV{ID_SERIAL_SHORT}==\"X5ER1ALX\", RUN+=\"/path/to/script /dev/%k\"\n```\n\n"
+    },
+    {
+      "title": "Réveil de la suspension avec un périphérique USB",
+      "level": 3,
+      "content": "Une règle udev peut être utile pour activer la fonctionnalité de réveil d'un périphérique USB, comme une souris ou un clavier, afin de pouvoir l'utiliser pour sortir la machine de la veille.\n\nTout d'abord, identifiez les identifiants du fournisseur et du produit du périphérique USB. Ils seront utilisés pour le reconnaître dans la règle udev. Par exemple :\n\n```\n$ lsusb | grep Logitech\n```\n\n```\nBus 007 Device 002: ID 046d:c52b Logitech, Inc. Unifying Receiver\n```\n\nEnsuite, trouvez l'endroit où le périphérique est connecté en utilisant :\n\n```\n$ grep c52b /sys/bus/usb/devices/*/idProduct\n```\n\n```\n/sys/bus/usb/devices/1-1.1.1.4/idProduct:c52b\n```\n\nCréez maintenant la règle pour modifier l'attribut power/wakeup du périphérique et du contrôleur USB auquel il est connecté à chaque fois qu'il est ajouté :\n\n```\n/etc/udev/rules.d/50-wake-on-device.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"usb\", DRIVERS==\"usb\", ATTRS{idVendor}==\"046d\", ATTRS{idProduct}==\"c52b\", ATTR{power/wakeup}=\"enabled\", ATTR{driver/1-1.1.1.4/power/wakeup}=\"enabled\"\n```\n\n"
+    },
+    {
+      "title": "Déclenchement d'événements",
+      "level": 3,
+      "content": "Il peut être utile de déclencher divers événements udev. Par exemple, vous pourriez vouloir simuler la déconnexion d'un périphérique USB sur une machine distante. Dans ce cas, utilisez udevadm trigger :\n\n```\n# udevadm trigger --verbose --type=subsystems --action=remove --subsystem-match=usb --attr-match=\"idVendor=abcd\"\n```\n\nCette commande déclenchera un événement de suppression USB sur tous les périphériques USB avec l'ID du fournisseur abcd.\n\n"
+    },
+    {
+      "title": "Démarrer des processus à long terme",
+      "level": 3,
+      "content": "Les programmes lancés par udev bloqueront les autres événements provenant de ce périphérique, et toutes les tâches créées à partir d'une règle udev seront tuées une fois le traitement des événements terminé. Si vous devez lancer un processus à long terme avec udev, vous pouvez utiliser at. (par exemple, your_command | at now, ou batch), ou créer une unité systemd qui peut être déclenchée directement depuis une règle udev.\n\n"
+    },
+    {
+      "title": "Liste noire de modules",
+      "level": 3,
+      "content": "Dans de rares cas, udev peut faire des erreurs et charger les mauvais modules. Pour l'empêcher de le faire, vous pouvez mettre sur liste noire les modules. Une fois mis sur liste noire, udev ne chargera jamais ce module - ni au démarrage, ni plus tard lorsqu'un événement hot-plug est reçu (par exemple, lorsque vous branchez votre clé USB).\n\n"
+    },
+    {
+      "title": "Sortie de débogage",
+      "level": 3,
+      "content": "Pour obtenir des informations sur le matériel débogage, utilisez le paramètre du noyau udev.log-priority=debug. Vous pouvez également définir\n\n```\n/etc/udev/udev.conf\n```\n\n```\nudev_log=\"debug\"\n```\n\nCette option peut également être compilée dans votre initramfs en ajoutant le fichier de configuration à votre tableau FILES\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nFILES=\"... /etc/udev/udev.conf\"\n```\n\net ensuite régénérez l'initramfs.\n\n"
+    },
+    {
+      "title": "udevd se bloque au démarrage",
+      "level": 3,
+      "content": "Après la migration vers LDAP ou la mise à jour d'un système basé sur LDAP, udevd peut se bloquer au démarrage avec le message \"Starting UDev Daemon\". Cela est généralement dû au fait que udevd essaie de rechercher un nom dans LDAP mais échoue, car le réseau n'est pas encore opérationnel. La solution est de s'assurer que tous les noms de groupes du système sont présents localement.\n\nExtrayez les noms de groupes référencés dans les règles de udev et les noms de groupes réellement présents sur le système :\n\n```\n# grep -Fr GROUP /etc/udev/rules.d/ /usr/lib/udev/rules.d/ | sed 's :.*GROUP=\"\\([-a-z_]\\{1,\\}\\)\".*:\\1:' | sort -u >udev_groups\n# cut -d : -f1 /etc/gshadow /etc/group | sort -u >present_groups\n```\n\nPour consulter les différences, faites une comparaison côte à côte :\n\n```\n# diff -y present_groups udev_groups\n...\nnetwork <\nnobody <\nntp <\noptique optique\npuissance < pcscd\nrfkill <\nroot root\nscanner scanner\nsmmsp <\nstockage stockage\n...\n```\n\nDans ce cas, le groupe pcscd est pour une raison quelconque absent du système. Ajouter les groupes manquants. Assurez-vous également que les ressources locales sont recherchées avant de recourir à LDAP. /etc/nsswitch.conf devrait contenir la ligne suivante :\n\n```\ngroup : files ldap\n```\n\n"
+    },
+    {
+      "title": "Certains périphériques, qui devraient être traités comme amovibles, ne le sont pas",
+      "level": 3,
+      "content": "Vous devez créer une règle udev personnalisée pour ce périphérique particulier. Pour obtenir des informations définitives sur le périphérique, vous pouvez utiliser soit ID_SERIAL, soit ID_SERIAL_SHORT. (n'oubliez pas de modifier /dev/sdb si nécessaire) :\n\n```\n$ udevadm info /dev/sdb | grep ID_SERIAL\n```\n\nEnsuite, définissez UDISKS_AUTO=\"1\" pour marquer le périphérique pour le montage automatique et UDISKS_SYSTEM=\"0\" pour marquer le périphérique comme \"amovible\". Consultez udisks(8) pour plus de détails.\n\n```\n/etc/udev/rules.d/99-removable.rules\n```\n\n```\nENV{ID_SERIAL_SHORT}== \"serial_number\", ENV{UDISKS_AUTO}=\"1\", ENV{UDISKS_SYSTEM}=\"0\"\n```\n\nN'oubliez pas de recharger les règles udev avec udevadm control --reload. La prochaine fois que vous brancherez votre périphérique, il sera traité comme un disque externe.\n\n"
+    },
+    {
+      "title": "Problèmes de son avec certains modules non chargés automatiquement",
+      "level": 3,
+      "content": "Certains utilisateurs ont attribué ce problème à d'anciennes entrées dans /etc/modprobe.d/sound.conf. Essayez de nettoyer ce fichier et réessayez.\n\n"
+    },
+    {
+      "title": "Prise en charge des lecteurs de CD/DVD IDE",
+      "level": 3,
+      "content": "À partir de la version 170, udev ne prend pas en charge les lecteurs de CD-ROM/DVD-ROM qui sont chargés comme des lecteurs IDE traditionnels avec le module ide_cd_mod et qui apparaissent sous la forme /dev/hd*. Le lecteur reste utilisable pour les outils qui accèdent directement au matériel, comme cdparanoia, mais est invisible pour les programmes supérieurs en espace utilisateur, comme KDE.\n\nUne cause pour le chargement du module ide_cd_mod avant les autres, comme sr_mod, pourrait être par exemple que vous avez pour une raison quelconque le module piix chargé avec votre initramfs. Dans ce cas, vous pouvez simplement le remplacer par ata_piix dans votre /etc/mkinitcpio.conf.\n\n"
+    },
+    {
+      "title": "Les lecteurs optiques ont un ID de groupe défini sur \"disk\"",
+      "level": 3,
+      "content": "Si l'ID de groupe de votre lecteur optique est défini sur disk et que vous souhaitez qu'il soit défini sur optical, vous devez créer une règle udev personnalisée :\n\n```\n/etc/udev/rules.d\n```\n\n```\n# Permissions pour les périphériques CD IDE\nSUBSYSTEMS==\"ide\", KERNEL==\"hd[a-z]\", ATTR{removable}==\"1\", ATTRS{media}==\"cdrom*\", GROUP=\"optical\"\n\n# permissions pour les périphériques CD SCSI\nSUBSYSTEMS==\"scsi\", KERNEL==\"s[rg][0-9]*\", ATTRS{type}==\"5\", GROUP=\"optical\"\n```\n\n"
+    },
+    {
+      "title": "Les programmes graphiques dans les règles RUN se bloquent lorsqu'aucun serveur X n'est présent",
+      "level": 3,
+      "content": "Lorsque xrandr ou un autre programme basé sur X tente de se connecter à un serveur X, il se rabat sur une connexion TCP en cas d'échec. Cependant, à cause de IPAddressDeny dans la systemd-udev service configuration, cela se bloque. Finalement, le programme sera tué et le traitement des événements reprendra.\n\nSi la règle est destinée à un périphérique drm et que le blocage entraîne la fin du traitement des événements après le démarrage du serveur X, l'accélération 3D peut cesser de fonctionner avec une erreur failed to authenticate magic.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- udev(7)\n- Une introduction à udev\n- Informations sur la liste de diffusion d'udev\n- Scripting with udev (en anglais)\n- Écriture de règles udev\n- Gestion des périphériques et modules sur un système LFS\n- Exécution de l'interface graphique ou accès aux variables d'affichage à partir des règles udev\n\n"
+    }
+  ]
+}

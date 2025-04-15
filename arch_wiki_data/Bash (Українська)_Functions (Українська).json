@@ -1,0 +1,51 @@
+{
+  "title": "Bash (Українська)/Functions (Українська)",
+  "url": "https://wiki.archlinux.org/title/Bash_(%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0)/Functions_(%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Bash також підтримує функції. Додайте функції до ~/.bashrc або окремого файлу, який є sourceом з ~/.bashrc. Більше прикладів функцій Bash можна знайти в BBS#30155.\n\n"
+    },
+    {
+      "title": "Відображення кодів помилок",
+      "level": 2,
+      "content": "Встановити trap для перехоплення ненульового коду повернення останнього запуску програми:\n\n```\n~/.bashrc\n```\n\n```\nEC() {\n \techo -e '\\e[1;33m'code $?'\\e[m\\n'\n }\n trap EC ERR\n```\n\n"
+    },
+    {
+      "title": "Компіляція та виконання вихідного коду C на льоту",
+      "level": 2,
+      "content": "Наступна функція скомпілює (у каталозі /tmp/) і виконає на льоту аргумент джерела C (причому виконання буде без аргументів). І, нарешті, після завершення роботи програми, вилучить скомпільований файл.\n\n```\n# Compile and execute a C source on the fly\ncsource() {\n\t[[ $1 ]]    || { echo \"Missing operand\" >&2; return 1; }\n\t[[ -r $1 ]] || { printf \"File %s does not exist or is not readable\\n\" \"$1\" >&2; return 1; }\n\tlocal output_path=${TMPDIR:-/tmp}/${1##*/};\n\tgcc \"$1\" -o \"$output_path\" && \"$output_path\";\n\trm \"$output_path\";\n\treturn 0;\n}\n```\n\n"
+    },
+    {
+      "title": "Видобування",
+      "level": 2,
+      "content": "Наступна функція витягує широкий спектр стиснутих типів файлів. Використовуйте її з синтаксисом extract <file1> <file2> ...\n\n```\nextract() {\n    local c e i\n\n    (($#)) || return\n\n    for i; do\n        c=''\n        e=1\n\n        if [[ ! -r $i ]]; then\n            echo \"$0: file is unreadable: \\`$i'\" >&2\n            continue\n        fi\n\n        case $i in\n            *.t@(gz|lz|xz|b@(2|z?(2))|a@(z|r?(.@(Z|bz?(2)|gz|lzma|xz|zst)))))\n                   c=(bsdtar xvf);;\n            *.7z)  c=(7z x);;\n            *.Z)   c=(uncompress);;\n            *.bz2) c=(bunzip2);;\n            *.exe) c=(cabextract);;\n            *.gz)  c=(gunzip);;\n            *.rar) c=(unrar x);;\n            *.xz)  c=(unxz);;\n            *.zip) c=(unzip);;\n            *.zst) c=(unzstd);;\n            *)     echo \"$0: unrecognized file extension: \\`$i'\" >&2\n                   continue;;\n        esac\n\n        command \"${c[@]}\" \"$i\"\n        ((e = e || $?))\n    done\n    return \"$e\"\n}\n```\n\nІнший спосіб зробити це - встановити спеціалізований пакет, див. Archiving and compression tools#Convenience tools.\n\n"
+    },
+    {
+      "title": "cd та ls однією командою",
+      "level": 2,
+      "content": "Дуже часто після переходу до каталогу слідує команда ls для виведення його вмісту. Тому корисно мати другу функцію, яка виконує обидві дії одночасно. У цьому прикладі ми назвемо її cl (список змін) і покажемо повідомлення про помилку, якщо вказаного каталогу не існує..\n\n```\ncl() {\n\tlocal dir=\"$1\"\n\tlocal dir=\"${dir:=$HOME}\"\n\tif [[ -d \"$dir\" ]]; then\n\t\tcd \"$dir\" >/dev/null; ls\n\telse\n\t\techo \"bash: cl: $dir: Directory not found\"\n\tfi\n}\n```\n\n"
+    },
+    {
+      "title": "Простий нотатник",
+      "level": 2,
+      "content": "```\nnote () {\n    # if file doesn't exist, create it\n    if [[ ! -f $HOME/.notes ]]; then\n        touch \"$HOME/.notes\"\n    fi\n\n    if ! (($#)); then\n        # no arguments, print file\n        cat \"$HOME/.notes\"\n    elif [[ \"$1\" == \"-c\" ]]; then\n        # clear file\n        printf \"%s\" > \"$HOME/.notes\"\n    else\n        # add all arguments to file\n        printf \"%s\\n\" \"$*\" >> \"$HOME/.notes\"\n    fi\n}\n```\n\n"
+    },
+    {
+      "title": "Простий планувальник",
+      "level": 2,
+      "content": "Натхненний простим нотатником.\n\n```\ntodo() {\n    if [[ ! -f $HOME/.todo ]]; then\n        touch \"$HOME/.todo\"\n    fi\n\n    if ! (($#)); then\n        cat \"$HOME/.todo\"\n    elif [[ \"$1\" == \"-l\" ]]; then\n        nl -b a \"$HOME/.todo\"\n    elif [[ \"$1\" == \"-c\" ]]; then\n        > $HOME/.todo\n    elif [[ \"$1\" == \"-r\" ]]; then\n        nl -b a \"$HOME/.todo\"\n        eval printf %.0s- '{1..'\"${COLUMNS:-$(tput cols)}\"\\}; echo\n        read -p \"Type a number to remove: \" number\n        sed -i ${number}d $HOME/.todo \"$HOME/.todo\"\n    else\n        printf \"%s\\n\" \"$*\" >> \"$HOME/.todo\"\n    fi\n}\n```\n\n"
+    },
+    {
+      "title": "Калькулятор",
+      "level": 2,
+      "content": "```\ncalc() {\n    echo \"scale=3;$@\" | bc -l\n}\n```\n\n"
+    },
+    {
+      "title": "Інформація про IP-адресу",
+      "level": 2,
+      "content": "Детальна інформація про IP-адресу або hostname в bash за допомогою https://ipinfo.io:\n\n```\nipif() { \n    if grep -P \"(([1-9]\\d{0,2})\\.){3}(?2)\" <<< \"$1\"; then\n\t curl ipinfo.io/\"$1\"\n    else\n\tipawk=($(host \"$1\" | awk '/address/ { print $NF }'))\n\tcurl ipinfo.io/${ipawk[1]}\n    fi\n    echo\n}\n```\n\n"
+    }
+  ]
+}

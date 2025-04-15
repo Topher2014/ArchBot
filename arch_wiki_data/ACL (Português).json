@@ -1,0 +1,51 @@
+{
+  "title": "ACL (Português)",
+  "url": "https://wiki.archlinux.org/title/ACL_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Lista de controle de acesso (ACL, do inglês \"Access Control List\") fornece um mecanismo de permissão adicional e mais flexível para sistemas de arquivos. Ele foi projetado para ajudar com as permissões de arquivo UNIX. A ACL permite conceder permissões para qualquer usuário ou grupo a qualquer recurso de disco.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "O pacote acl é uma dependência do systemd, e já deve estar instalado.\n\n"
+    },
+    {
+      "title": "Habilitar ACL",
+      "level": 2,
+      "content": "Para habilitar a ACL, o sistema de arquivos deve ser montado com a opção acl. Você pode usar fstab para torná-lo permanente em seu sistema.\n\nExiste a possibilidade de a opção acl já estar habilitada como opção de montagem padrão no sistema de arquivos. Btrfs faz e os sistemas de arquivos Ext2/3/4 também. Use o seguinte comando para verificar a opção de partições ext* formatadas:\n\n```\n# tune2fs -l /dev/sdXY | grep \"Default mount options:\"\n```\n\n```\nDefault mount options:    user_xattr acl\n```\n\nVerifique também se a opção de montagem padrão não está substituída; nesse caso, você verá noacl em /proc/mounts na linha relevante.\n\nVocê pode definir as opções de montagem padrão de um sistema de arquivos usando o comando tune2fs -o opção partição, por exemplo:\n\n```\n# tune2fs -o acl /dev/sdXY\n```\n\nUsar as opções de montagem padrão em vez de uma entrada em /etc/fstab é muito útil para unidades externas, essa partição será montada com a opção acl também em outras máquinas Linux. Não há necessidade de editar o /etc/fstab em todas as máquinas.\n\n- acl é especificado como opção de montagem padrão ao criar um sistema de arquivos ext2/3/4. Isso está configurado em /etc/mke2fs.conf.\n- As opções padrão de montagem não estão listadas em /proc/mounts.\n\n"
+    },
+    {
+      "title": "Definir ACL",
+      "level": 3,
+      "content": "A ACL pode ser modificada usando o comando setfacl.\n\nPara definir permissões para um usuário (usuário é o nome do usuário ou o ID):\n\n```\n# setfacl -m \"u:usuário:permissões\" <arquivo/diretório>\n```\n\nPara definir permissões para um grupo (grupo é o nome ou o ID do grupo):\n\n```\n# setfacl -m \"g:grupo:permissões\" <arquivo/diretório>\n```\n\nPara definir permissões para outras pessoas:\n\n```\n# setfacl -m \"other:permissões\" <arquivo/diretório>\n```\n\nPara permitir que todos os arquivos ou diretórios recém-criados herdem entradas do diretório pai (isso não afetará os arquivos que serão copiados para o diretório):\n\n```\n# setfacl -dm \"entrada\" <diretório>\n```\n\nPara remover uma entrada específica:\n\n```\n# setfacl -x \"entrada\" <arquivo/diretório>\n```\n\nPara remover as entradas padrão:\n\n```\n# setfacl -k <arquivo/diretório>\n```\n\nPara remover todas as entradas (as entradas do dono, grupo e outras são mantidas):\n\n```\n# setfacl -b <arquivo/diretório>\n```\n\n"
+    },
+    {
+      "title": "Mostrar ACL",
+      "level": 3,
+      "content": "Para mostrar permissões, use:\n\n```\n# getfacl <arquivo/diretório>\n```\n\n"
+    },
+    {
+      "title": "Exemplos",
+      "level": 2,
+      "content": "Defina todas as permissões para o usuário joao no arquivo chamado abc:\n\n```\n# setfacl -m \"u:joao:rwx\" abc\n```\n\nVerifica permissões:\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: alguém\n# group: alguém\nuser::rw-\nuser:joao:rwx\ngroup::r--\nmask::rwx\nother::r--\n```\n\nAltera permissões para o usuário joao:\n\n```\n# setfacl -m \"u:joao:r-x\" abc\n```\n\nVerifica permissões:\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: alguém\n# group: alguém\nuser::rw-\nuser:joao:r-x\ngroup::r--\nmask::r-x\nother::r--\n```\n\nRemove todas as entradas estendidas ACL:\n\n```\n# setfacl -b abc\n```\n\nVerifica permissões:\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: alguém\n# group: alguém\nuser::rw-\ngroup::r--\nother::r--\n```\n\n"
+    },
+    {
+      "title": "Saída do comando ls",
+      "level": 3,
+      "content": "Você notará que há uma ACL para um determinado arquivo porque ele exibirá um + (sinal de mais) após as permissões do Unix na saída de ls -l.\n\n```\n$ ls -l /dev/audio\n```\n\n```\ncrw-rw----+ 1 root audio 14, 4 nov.   9 12:49 /dev/audio\n```\n\n```\n$ getfacl /dev/audio\n```\n\n```\ngetfacl: Removing leading '/' from absolute path names\n# file: dev/audio\n# owner: root\n# group: audio\nuser::rw-\nuser:solstice:rw-\ngroup::rw-\nmask::rw-\nother::---\n```\n\n"
+    },
+    {
+      "title": "Concedendo permissões de execução para arquivos privados a um servidor web",
+      "level": 3,
+      "content": "A técnica a seguir descreve como um processo como um servidor web pode receber acesso a arquivos que residem no diretório inicial de um usuário, sem comprometer a segurança, fornecendo acesso ao mundo inteiro.\n\nA seguir, presumimos que o servidor web é executado como usuário http e concedemos acesso ao diretório \"home\" do geoffrey /home/geoffrey.\n\nA primeira etapa é conceder permissões de execução para o usuário http:\n\n```\n# setfacl -m \"u:http:--x\" /home/geoffrey\n```\n\nComo o usuário http agora pode acessar arquivos em /home/geoffrey, outros não precisam mais acessar:\n\n```\n# chmod o-rx /home/geoffrey\n```\n\nUse getfacl para verificar as alterações:\n\n```\n$ getfacl /home/geoffrey\n```\n\n```\ngetfacl: Removing leading '/' from absolute path names\n# file: home/geoffrey\n# owner: geoffrey\n# group: geoffrey\nuser::rwx\nuser:http:--x\ngroup::r-x\nmask::r-x\nother::---\n```\n\nComo mostra a saída acima, o other não tem mais permissões, mas o usuário http ainda pode acessar os arquivos, portanto, a segurança pode ser considerada aumentada.\n\n```\n# setfacl -dm \"u:http:rwx\" /home/geoffrey/project1/cache\n```\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- getfacl(1)\n- setfacl(1)\n- Um guia antigo, mas ainda relevante (e completo) sobre ACL\n- Como definir permissões de arquivo padrão para todas as pastas/arquivos em um diretório? (inglês)\n\n"
+    }
+  ]
+}

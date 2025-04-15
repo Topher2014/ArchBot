@@ -1,0 +1,96 @@
+{
+  "title": "Color Bash Prompt (Español)",
+  "url": "https://wiki.archlinux.org/title/Color_Bash_Prompt_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-10-30** \n\nArtículos relacionados\n\n- Bash\n- Variables de entorno\n- Git#Git prompt\n\nBash tiene varios prompts que se pueden personalizar para aumentar la productividad, el atractivo estético y la credibilidad de los nerds.\n\n"
+    },
+    {
+      "title": "Prompts",
+      "level": 2,
+      "content": "Bash tiene cuatro \"cadenas de prompt\" que se pueden personalizar:\n\n- PS0 se muestra después de cada orden, antes de cualquier salida.\n- PS1 es el prompt principal que se muestra antes de cada orden, por lo que es el que la mayoría de la gente personaliza.\n- PS2 es el prompt secundario que se muestra cuando una orden necesita más entrada (por ejemplo, una orden de varias líneas).\n- PS3 no es muy usado. Es el prompt que se muestra para el select incorporado de Bash que muestra menús interactivos. A diferencia de los otros prompts, no expande secuencias de escape Bash. Por lo general, lo personalizaría en el script donde se usa select en lugar de en su .bashrc.\n- PS4 tampoco se usa comúnmente. Se muestra al depurar scripts de bash para indicar los niveles de direccionamiento indirecto. El primer carácter se repite para indicar niveles más profundos.\n\nTodos los prompts se personalizan configurando la variable correspondiente a la cadena deseada (generalmente en ~/.bashrc), por ejemplo:\n\n```\nPS2='> '\n```\n\n"
+    },
+    {
+      "title": "Técnicas",
+      "level": 2,
+      "content": "Si bien uno puede simplemente configurar su prompt en una cadena simple, existe una variedad de técnicas para hacer que el indicador sea más dinámico y útil.\n\n"
+    },
+    {
+      "title": "Secuencias de escape Bash",
+      "level": 3,
+      "content": "Al imprimir la cadena de mensaje, Bash busca ciertos caracteres con barra invertida y los expandirá en cadenas especiales. Por ejemplo, \\u se expande en el nombre de usuario actual y \\A se amplía a la hora actual. Así que un PS1 de '\\A \\u $ ' se imprimiría como 17:35 usuario $ .\n\nVéase la página del manual bash(1) § PROMPTING o el manual de referencia de Bash para obtener una lista de secuencias de escape.\n\n"
+    },
+    {
+      "title": "Secuencias de escape Terminfo",
+      "level": 3,
+      "content": "Además de los caracteres de escape reconocidos por Bash, la mayoría de los terminales reconocen secuencias de escape especiales que afectan a la propia terminal en lugar de imprimir caracteres. Por ejemplo, pueden cambiar el color de los caracteres impresos posteriores, mover el cursor a una ubicación arbitraria o borrar la pantalla. Estas secuencias de escape pueden ser algo ilegibles y pueden variar de un terminal a otro, por lo que están documentadas en la base de datos terminfo. Para ver qué capacidades admite su terminal, ejecute:\n\n```\n$ infocmp\n```\n\nLos nombres de las capacidades (la parte antes de =) se pueden buscar en terminfo(5) para obtener una descripción de lo que hacen. Por ejemplo, setaf establece el color de primer plano de cualquier texto que se imprima después. Para obtener el código de escape de una capacidad, puede utilizar la orden tput. Por ejemplo\n\n```\n$ tput setaf 2\n```\n\nImprime la secuencia de escape para establecer el color de primer plano en verde.\n\nPara incorporar prácticamente estas capacidades en su prompt, puede utilizar la sustitución de órdenes y la interpolación de cadenas de Bash. Por ejemplo\n\n```\nGREEN=\"\\[$(tput setaf 2)\\]\"\nRESET=\"\\[$(tput sgr0)\\]\"\n\nPS1=\"${GREEN}mi prompt${RESET}> \"\n```\n\n"
+    },
+    {
+      "title": "Secuencias de escape ANSI",
+      "level": 3,
+      "content": "Desafortunadamente, es posible que falten secuencias de escape ANSI válidas en la base de datos terminfo de su terminal. Esto es especialmente común con las secuencias de escape para funciones más nuevas, como la compatibilidad con 256 colores. En ese caso, no puede utilizar tput, debe introducir la secuencia de escape manualmente.\n\nVéase Wikipedia:es:Código escape ANSI para ejemplos de secuencias de escape. Cada secuencia de escape comienza con un carácter de escape literal, que puede introducir utilizando la secuencia de escape Bash \\e. Entonces por ejemplo, \\e[48;5;209m establece el fondo en un color melocotón (si tiene compatibilidad con 256 colores) y \\e[2;2H mueve el cursor cerca de la esquina superior izquierda de la pantalla.\n\nEn los casos en que las secuencias de escape de Bash no sean compatibles (como PS3), puede obtener un carácter de escape literal utilizando el printf incorporado de Bash:\n\n```\nESC=$(printf \"\\e\")\nPEACH=\"$ESC[48;5;209m\"\n```\n\n"
+    },
+    {
+      "title": "Incrustar órdenes",
+      "level": 3,
+      "content": "Si desea añadir la salida de algúna orden a su prompt, puede verse tentado a utilizar la sustitución de órdenes. Por ejemplo, para añadir la cantidad de memoria libre a su prompt, podría intentar:\n\n```\nPS1=\"$(awk '/MemFree/{print $2}' /proc/meminfo) prompt > \"\n```\n\n```\n53718 prompt >\n53718 prompt >\n53718 prompt >\n```\n\nPero esto no funciona, ya que la cantidad de memoria que se muestra es la misma cada vez. Esto se debe a que la orden se ejecuta una vez, cuando se configura PS1 por primera vez, y nunca más. El truco es simplemente evitar la sustitución, ya sea escapando $ o definiéndolo entre comillas simples; de cualquier manera, se sustituirá cuando se muestre el prompt:\n\n```\nPS1=\"\\$(awk '/MemFree/{print \\$2}' /proc/meminfo) prompt > \"\n# o\nPS1='$(awk \"/MemFree/{print \\$2}\" /proc/meminfo) prompt > '\n```\n\nPara evitar que las órdenes largas hagan que tu PS1 sea enorme, puedes definir funciones:\n\n```\nfree_mem()\n{\n    awk '/MemFree/{print $2}' /proc/meminfo\n}\n\nPS1='$(free_mem) prompt > '\n```\n\nNote: **no** \n\n"
+    },
+    {
+      "title": "PROMPT_COMMAND",
+      "level": 3,
+      "content": "Si se establece la variable PROMPT_COMMAND, se evaluará justo antes de que se muestre PS1. Esto se puede utilizar para lograr efectos bastante potentes. Por ejemplo, puede reasignar PS1 en función de alguna condición o realizar alguna operación en su historial de Bash cada vez que ejecuta una orden.\n\n"
+    },
+    {
+      "title": "Escapes entre la entrada y la salida de la orden",
+      "level": 3,
+      "content": "Puede afectar su texto de entrada en Bash al no restablecer las propiedades del texto al final de su PS1. Por ejemplo, insertar tput blink al final de su PS1 hará que sus órdfenes escritas parpadeen. Sin embargo, este efecto también continuará a través de la salida de la orden ya que las propiedades del texto no se restablecen cuando pulsa Intro.\n\nPara insertar secuencias de escape después de escribir una orden pero antes de que se muestre la salida, puede configurar PS0. Alternativamente, puede atrapar la señal DEBUG de Bash, que se envía justo antes de que se ejecute cada orden:\n\n```\n$ trap 'tput sgr0' DEBUG\n```\n\n"
+    },
+    {
+      "title": "Personalizar prompts del superusuario",
+      "level": 3,
+      "content": "Para asegurarse de que sabe cuándo está ejecutando como superusuario (root), puede personalizar su prompt de superusuario para que se destaque claramente (¿quizás parpadeando en rojo?). Esto se hace personalizando el prompt de Bash como de costumbre, pero en el directorio de inicio del superusuario, /root. Comience copiando los archivos de esqueleto /etc/skel/.bash_profile y /etc/skel/.bashrc a /root, luego edite /root/.bashrc como desee.\n\n"
+    },
+    {
+      "title": "Colores",
+      "level": 3,
+      "content": "Para ver la gama completa de colores que soporta su terminal, puede utilizar un ciclo simple con tput (cambie setab a setaf para los primeros planos de texto):\n\n```\nfor C in {0..255}; do\n    tput setab $C\n    echo -n \"$C \"\ndone\ntput sgr0\necho\n```\n\nSi eso no funciona (y no puede solucionarlo configurando el valor TERM correcto), puede probar las diferentes secuencias de escape manuales:\n\n```\n# colores estándar\nfor C in {40..47}; do\n    echo -en \"\\e[${C}m$C \"\ndone\n# colores de alta intensidad\nfor C in {100..107}; do\n    echo -en \"\\e[${C}m$C \"\ndone\n# 256 colores\nfor C in {16..255}; do\n    echo -en \"\\e[48;5;${C}m$C \"\ndone\necho -e \"\\e(B\\e[m\"\n```\n\nPara cambiar los escapes manuales de fondo a primer plano, el rango de color estándar es 30..37, el rango de alta intensidad es 90..97, y el 48 debe cambiarse a 38 para 256 colores.\n\n"
+    },
+    {
+      "title": "Capacidades comunes",
+      "level": 3,
+      "content": "Las siguientes capacidades de terminfo son útiles para la personalización de prompt y son compatibles con muchos terminales. #1 y #2 son marcadores de posición para argumentos numéricos.\n\nTable content:\nCapacidad | Secuencia de escape | Descripción\nAtributos de texto\nblink | \\e[5m | activar texto parpadeante\nbold | \\e[1m | activar texto en negrita\ndim | \\e[2m | activar texto atenuado\nrev | \\e[7m | activar vídeo inverso (cambiar texto/colores de fondo)\nsitm | \\e[3m | activar texto en cursiva\nritm | \\e[23m | desactivar texto en cursiva\nsmso | \\e[7m | activar texto resaltado\nrmso | \\e[27m | desactivar texto resaltado\nsmul | \\e[4m | activar texto subrayado\nrmul | \\e[24m | desactivar texto subrayado\nsetab #1 | \\e[4#1m | establecer el color de fondo #1 (0-7)\nsetaf #1 | \\e[3#1m | establecer el color de texto #1 (0-7)\nsgr0 | \\e(B\\e[m | restablecer atributos de texto\nMovimiento del cursor\nsc | \\e7 | guardar la posición del cursor\nrc | \\e8 | restaurar la posición del cursor guardada\nclear | \\e[H\\e[2J | borrar la pantalla y mover el cursor a la parte superior izquierda\ncuu #1 | \\e[#1A | mover el cursor hacia arriba #1 filas\ncud #1 | \\e[#1B | mover el cursor hacia abajo #1 filas\ncuf #1 | \\e[#1C | mover el cursor hacia la derecha #1 columnas\ncub #1 | \\e[#1D | mover el cursor hacia la izquierda #1 columnas\nhome | \\e[H | mover el cursor a la parte superior izquierda\nhpa #1 | \\e[#1G | mover el cursor a la columna #1\nvpa #1 | \\e[#1d | mover el cursor a la fila #1, primera columna\ncup #1 #2 | \\e[#1;#2H | mover el cursor a la fila #1, columna #2\nEliminación de caracteres\ndch #1 | \\e#1P | eliminar #1 caracteres (como el retroceso)\ndl #1 | \\e#1M | eliminar #1 líneas\nech #1 | \\e#1X | borrar #1 caracteres (sin mover el cursor)\ned | \\eE[J | borrar hacia la parte inferior de la pantalla\nel | \\e[K | borrar hacia el final de la línea\nel1 | \\e[1K | borrar hacia el principio de la línea\n\n"
+    },
+    {
+      "title": "Visualizar códigos de salida",
+      "level": 3,
+      "content": "Utilizando el mismo truco de incrustar órdenes, puede retrasar la interpolación de variables especiales de Bash como $?. Entonces, el siguiente mensaje muestra el código de salida de la orden anterior:\n\n```\nPS1=\"\\$? > \"\n# o\nPS1='$? > '\n```\n\nEsto se puede hacer más interesante utilizando condicionales y funciones:\n\n```\nexitstatus()\n{\n    if [[ $? == 0 ]]; then\n        echo ':)'\n    else\n        echo 'D:'\n    fi\n}\nPS1='$(exitstatus) > '\n```\n\n"
+    },
+    {
+      "title": "Posicionar el cursor",
+      "level": 3,
+      "content": "Es posible mover el cursor por la pantalla dentro de PS1 para que aparezcan diferentes partes del prompt en diferentes ubicaciones. Sin embargo, para asegurarse de que Bash coloca el cursor y la salida en la posición correcta, debe mover el cursor a la posición original una vez que haya terminado de imprimir en otro lugar. Esto se puede hacer utilizando las capacidades de tput sc y rc para guardar y restaurar la posición del cursor. El patrón general para un prompt que mueve el cursor es:\n\n```\nPS1=\"\\[$(tput sc; cursor-moving code) positioned prompt stuff $(tput rc)\\] normal prompt stuff\"\n```\n\nDonde todo el bloque del prompt reposicionado está envuelto en \\[ \\] para evitar que Bash lo cuente como parte del prompt normal.\n\n"
+    },
+    {
+      "title": "Texto justificado a la derecha",
+      "level": 4,
+      "content": "La forma más sencilla de imprimir texto en el lado derecho de la pantalla es utilizar printf:\n\n```\nrightprompt()\n{\n    printf \"%*s\" $COLUMNS \"prompt derecho\"\n}\n\nPS1='\\[$(tput sc; rightprompt; tput rc)\\]prompt izquierdo > '\n```\n\nEsto crea un campo de tamaño variable justificado a la derecha %*s y establece su tamaño en el número actual de columnas del terminal $COLUMNS.\n\n"
+    },
+    {
+      "title": "Posicionar arbitrariamente",
+      "level": 4,
+      "content": "La capacidad cup mueve el cursor a una posición específica en la pantalla, por ejemplo tput cup 20 5 mueve el cursor a la línea 20, columna 5 (donde 0 0 es la esquina superior izquierda ). cuu, cud, cuf y cub (arriba, abajo, adelante, atrás) mueven el cursor en relación con su posición actual. Por ejemplo tput cuf 10 mueve el cursor 10 caracteres a la derecha. Puede utilizar las variables LINES y COLUMNS en los argumentos para mover el cursor en relación con los bordes inferior y derecho. Por ejemplo, para alejarse 10 líneas y 5 columnas de la esquina inferior derecha:\n\n```\n$ tput cup $((LINES - 11)) $((COLUMNS - 6))\n```\n\n"
+    },
+    {
+      "title": "Personalizar el título de la ventana del terminal",
+      "level": 3,
+      "content": "El título de la ventana del terminal se puede personalizar de la misma manera que el prompt: imprimiendo secuencias de escape en el intérprete de órdenes. Por lo tanto, es común que los usuarios incluyan personalizaciones de título de ventana en su prompt. Aunque esto es técnicamente una característica de xterm, muchos terminales modernos lo admiten. La secuencia de escape a utilizar es 'ESC]2;nuevo títuloBEL donde ESC y BEL son los caracteres de escape y campana. Al utilizar #Secuencias de escape Bash, cambiar el título en su prompt parece tal que así:\n\n```\nPS1='\\[\\e]2;nuevo título\\a\\]prompt > '\n```\n\nPor supuesto, su cadena del título de la ventana puede incluir resultados de incrustar órdenes o variables como $PWD, de modo que el título cambie con cada orden.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Ejemplos de la comunidad y capturas de pantalla en el hilo del foro: ¿Cuál es tu PS1? (solo accesible si ha iniciado sesión)\n- /etc/bash/bashrc de Gentoo. Véase también gentoo-bashrcAUR.\n- tput(1) Colores y movimiento del cursor con tput\n- COMO del Prompt de Bash\n- Colección de prompts de muestra de Giles Orr\n- Consejos de Bash: Colores y formato\n- Liquid Prompt: Un prompt adaptable y útil para Bash y zsh\n- Bash POWER PROMPT\n- Wikipedia:ANSI escape code\n- Manual de GNU Bash: Control del prompt\n\n- Colores y movimiento del cursor con tput\n\n"
+    }
+  ]
+}

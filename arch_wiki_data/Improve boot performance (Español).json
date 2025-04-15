@@ -1,0 +1,56 @@
+{
+  "title": "Improve boot performance (Español)",
+  "url": "https://wiki.archlinux.org/title/Improve_boot_performance_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-02-14** \n\nArtículos relacionados\n\n- Mejorar el rendimiento\n- Arranque silencioso\n- Daemon\n- Kexec\n\nMejorar el rendimiento de arranque de un sistema puede proporcionar que los tiempos de espera de arranque sean reducidos, para aprender más acerca de cómo ciertos archivos y scripts del sistema interactúan entre sí. En este artículo se intentará agregar métodos sobre cómo mejorar el rendimiento de arranque de un sistema Arch Linux.\n\n"
+    },
+    {
+      "title": "Usando systemd-analyze",
+      "level": 3,
+      "content": "systemd (Español) proporciona una herramienta llamada systemd-analyze que se puede utilizar para mostrar los detalles de temporización sobre los procesos de arranque, incluyendo un diagrama que muestra en SVG, las unidades en espera de sus dependencias. También podemos ver qué archivos de unidades están causando el proceso de arranque para reducir la velocidad. A continuación, puede optimizar su sistema en consecuencia.\n\nPara ver la cantidad de tiempo que hay en el espacio del núcleo y el espacio de usuario en el arranque, basta con utilizar:\n\n```\n$ systemd-analyze\n```\n\nPara listar los archivos en las unidades iniciadas, ordenadas por el tiempo que les tomó iniciar a cada uno:\n\n```\n$ systemd-analyze blame\n```\n\nEn algunos puntos del proceso de arranque, las cosas no pueden continuar hasta que una determinada unidad tiene éxito. Para ver qué unidades se encuentran en éstos puntos críticos en la cadena de inicio, usamos:\n\n```\n$ systemd-analyze critical-chain\n```\n\nTambién podemos crear un archivo SVG que describe el proceso de arranque de forma gráfica simila a Bootchart:\n\n```\n$ systemd-analyze plot > plot.svg\n```\n\nVéase systemd-analyze(1) para más detalles.\n\n"
+    },
+    {
+      "title": "Usando bootchart2",
+      "level": 3,
+      "content": "También es posible usar una versión de bootchart para visualizar la secuencia de arranque. Puesto que no es capaz de poner un segundo inicio en la línea de comandos del kernel que no será capaz de utilizar cualquiera de las configuraciones estándar de Bootchart. Sin embargo el paquete bootchart2AUR desde AUR viene con servicio systemd deshabilitado. Luego de haber instalado bootchart2 hacemos:\n\n```\n# systemctl enable bootchart2\n```\n\nPuede visualizar los resultados por apertura /var/log/bootchart.png, o si desea más detalles de la ejecución:\n\n```\n$ pybootchartgui -i\n```\n\nLea la bootchart2 documentacion para más detalles sobre el uso de ésta versión de bootchart.\n\n"
+    },
+    {
+      "title": "Compilando un custom kernel",
+      "level": 2,
+      "content": "Compilar un kernel personalizado puede reducir el tiempo de arranque y el uso de memoria. A pesar de la normalización de la arquitectura de 64 bits y la naturaleza modular del núcleo de Linux, estos beneficios pueden no ser tan grande como se esperaba. Read more about compiling a kernel\n\n"
+    },
+    {
+      "title": "Initramfs",
+      "level": 2,
+      "content": "Parecido a #Compilando un custom kernel, el initramfs puede ser más ligero. Una forma sencilla es incluir el mkinitcpio (Español) autodetect hook. Si querés ir más allá de éso puedes ver Minimal initramfs.\n\n"
+    },
+    {
+      "title": "Cominezo rápido de los serivicios",
+      "level": 2,
+      "content": "Una característica central de systemd es D-Bus (Español) y la activación de socket. Esto hace que los servicios sean arrancados cuando se accede a la primera y en general ésto es positivo. Sin embargo, si se sabe que un servicio (como ser upower) siempre se pondrá en marcha durante el arranque, el tiempo total de arranque podría reducirse si la comienza tan pronto como sea posible. Esto se puede lograr (si el archivo de servicio está configurado para ello, que en la mayoría de los casos es) de la siguiente manera:\n\n```\n# systemctl enable upower\n```\n\nEsto hará que systemd inicie UPower tan pronto como sea posible sin causar ningún percance con los sockets o la activación de D-Bus.\n\n"
+    },
+    {
+      "title": "Escalonar spin-up",
+      "level": 2,
+      "content": "Algunos equipos implementan staggered spin-up, que hace que el sistema operativo a la sonda interfaces de ATA en serie, que se puede girar hasta las unidades de una en una y reducir el uso de energía de pico. Esto ralentiza la velocidad de arranque, y en la mayoría de los consumidores de hardware no proporciona ningún beneficio en absoluto ya que las unidades serán ya volver a acelerarse inmediatamente cuando la alimentación está activada. Para comprobar si se está utilizando SSS:\n\n```\n# dmesg | grep SSS\n```\n\nSi no se utiliza durante el arranque, no habrá salida.\n\nPara desactivarlo, añada libahci.ignore_sss=1 como parámetro del kernel.\n\n"
+    },
+    {
+      "title": "Montaje de sistemas de archivos",
+      "level": 2,
+      "content": "Gracias a mkinitcpio (Español)'s fsck hook, se puede evitar que se monte de difícil manera cambiando ro a rw en la línea del kernel y sacarlo de /etc/fstab. Las opciones que se pueden setear con rootflags=mount options... en nuestro kernel. Recuerda que debes eliminar la entrada de tu archivo /etc/fstab de lo contrario systemd-remount-fs.service seguirá trabajando. Alternativamente se podría de enmascarar ésa unidad.\n\nSi btrfs está en uso para el sistema de ficheros raíz, no hay necesidad de un fsck en cada arranque al igual que otros sistemas de ficheros. Si este es el caso, mkinitcpio (Español)'s fsck hook puede ser eliminado. También es posible que desee enmascarar el systemd-fsck-root.service, o decirle que no realice el fsck en nuestro sistema usando la línea fsck.mode=skip. Sin mkinitcpio (Español)'s fsck hook, systemd seguirá usando fsckk sin ningún inconveniente con systemd-fsck@.service\n\nTambién puede eliminar la API desde el sistema desde /etc/fstab, como systemd los monta (ver pacman -Ql systemd | grep '\\.mount$' para un listado). No es raro que los usuarios que tienen un /tmp viniendo de sysvinit, pero en el comando anterior puedes ver que systemd se encargó de éso. Ergo, puede ser removido de manera segura.\n\nOtros sistemas de archivos como /home se pueden montar con unidadesd e montaje personalizados. Agregando noauto,x-systemd.automount para montar opciones amortiguar todos los accesos a la partición y se fsck y montarlo en el primer acceso, lo que reduce el número de sistemas de archivos que debe fsck / montaje durante el proceso de arranque.\n\n- Ésto hará que su /home use el sistema de archivos con autofs, el cual se ignora con locate por defecto. The speedup of automounting /home may not be more than a second or two, depending on your system, so this trick may not be worth it.\n- Si el sistema está instalado dentro de un Btrfs (Especialmente: el directorio root / éste sería un volumen secundario) y /home se encuentra separado del sistema, aunque también es posible que desee evitar la creación de /home subvolume. Protegemos el home.conf tmpfile: ln -s /dev/null /etc/tmpfiles.d/home.conf.\n\n"
+    },
+    {
+      "title": "Menos salida durante el arranque",
+      "level": 2,
+      "content": "Para algunos sistemas, particularmente aquellos con SSD, el rendimiento lento del TTY es en realidad un cuello de botella, por lo que menos salida significa un arranque más rápido. Véase el artículo Arranque silencioso para algunas sugerencias.\n\n"
+    },
+    {
+      "title": "Suspender a RAM",
+      "level": 2,
+      "content": "La mejor manera de reducir el tiempo de arranque es que no inicie totalmente. Considere a su vez suspender su sistema a RAM.\n\n"
+    }
+  ]
+}

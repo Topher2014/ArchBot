@@ -1,0 +1,36 @@
+{
+  "title": "Tmpfs (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Tmpfs_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "tmpfs è un filesystem temporaneo che risiede nella memoria e/o nelle partizioni di swap. Montare le directory come tmpfs può velocizzare l'accesso ai loro file e garantire che il loro contenuto venga automaticamente cancellato al riavvio.\n\n"
+    },
+    {
+      "title": "Uso",
+      "level": 2,
+      "content": "Alcune directory su cui tmpfs(5) è comunemente usato sono /tmp, /var/lock e /var/run. Non usarlo su /var/tmp, perché questa directory è destinata ai file temporanei che vengono conservati durante i riavvii.\n\nArch usa come directory tmpfs /run, con /var/run e /var/lock presenti come collegamenti simbolici ad essa per compatibilità. È usata anche per /tmp dalle impostazioni predefinite di systemd e non richiede una voce in fstab a meno che non sia necessaria una configurazione specifica.\n\nglibc 2.2 e superiori si aspettano che tmpfs sia montato su /dev/shm per la memoria condivisa POSIX. Il montaggio del tmpfs su /dev/shm è gestito automaticamente da systemd e la configurazione manuale in fstab non è necessaria.\n\nIn generale, i task e i programmi che eseguono frequenti operazioni di lettura/scrittura possono trarre beneficio dall'uso di una directory tmpfs. Alcune applicazioni possono addirittura ottenere un guadagno sostanziale scaricando alcuni (o tutti) i loro dati sulla memoria condivisa. Ad esempio, riposizionare il profilo di Firefox in RAM mostra un significativo miglioramento delle prestazioni.\n\n"
+    },
+    {
+      "title": "Esempi",
+      "level": 2,
+      "content": "La dimensione massima di una partizione tmfps è, di default, pari alla metà della RAM disponibile, ma è possibile sovrascrivere questo valore. Per impostare una dimensione massima, in questo esempio per sovrascrivere il montaggio predefinito di /tmp, usare l'opzione size:\n\n```\n/etc/fstab\n```\n\n```\ntmpfs /tmp tmpfs rw,nodev,nosuid,size=2G 0 0\n```\n\nPer specificare un montaggio più sicuro, specificare le seguenti opzioni:\n\n```\n/etc/fstab\n```\n\n```\ntmpfs /www/cache tmpfs rw,size=1G,nr_inodes=5k,noexec,nodev,nosuid,uid=user,gid=group,mode=1700 0 0\n```\n\nPer ulteriori informazioni, consultare la pagina man di tmpfs(5) e Security#File systems.\n\nRiavviare per rendere effettive le modifiche. Sebbene si possa essere tentati di eseguire semplicemente mount -a per rendere immediatamente effettive le modifiche, ciò renderà inaccessibili tutti i file che attualmente risiedono in queste directory (questo è particolarmente problematico per l'esecuzione di programmi con lockfile, ad esempio). Tuttavia, se tutte le directory sono vuote, dovrebbe sicuro eseguire mount -a invece di riavviare (o montarle una alla volta).\n\nDopo aver applicato le modifiche, verificare che abbiano avuto effetto controllando /proc/mounts e usando findmnt:\n\n```\n$ findmnt /tmp\n```\n\n```\nTARGET SOURCE FSTYPE OPTIONS\n/tmp tmpfs tmpfs rw,nosuid,nodev,relatime\n```\n\nIl tmpfs può anche essere temporaneamente ridimensionato senza bisogno di riavviare, per esempio quando un lavoro di compilazione di grandi dimensioni deve essere eseguito a breve. In questo caso, eseguire:\n\n```\n# mount -o remount,size=4G /tmp\n```\n\nOppure per ridimensionare in base alla RAM:\n\n```\n# mount -o remount,size=80% /tmp\n```\n\n"
+    },
+    {
+      "title": "Disabilitare il montaggio automatico",
+      "level": 2,
+      "content": "Con systemd, /tmp viene montato automaticamente come tmpfs, se non è già un punto di montaggio dedicato (tmpfs o on-disk) in /etc/fstab. Per disabilitare il mount automatico, effettuare il mask dell'unità systemd tmp.mount.\n\nI file non saranno più memorizzati in un tmpfs, ma sul dispositivo. Il contenuto di /tmp sarà ora conservato tra i riavvii (viene comunque ripulito dopo 10 giorni), il che potrebbe non essere il comportamento desiderato. Per ripristinare il comportamento precedente e pulire automaticamente la cartella /tmp al riavvio, si può usare tmpfiles.d(5):\n\n```\n/etc/tmpfiles.d/tmp.conf\n```\n\n```\n# vedere tmpfiles.d(5)\n# abilita sempre la pulizia della directory /tmp\nD! /tmp 1777 root root 0\n\n# rimuove i file in /var/tmp più vecchi di 10 giorni\nD /var/tmp 1777 root root 10d\n\n# i mountpoint dello spazio dei nomi (PrivateTmp=yes) sono esclusi dalla rimozione\nx /tmp/systemd-private-*\nx /var/tmp/systemd-private-*\nX /tmp/systemd-private-*/tmp\nX /var/tmp/systemd-private-*/tmp\n```\n\n"
+    },
+    {
+      "title": "L'apertura di link simbolici in tmpfs come root fallisce",
+      "level": 3,
+      "content": "Supponendo che /tmp stia usando tmpfs, cambiare la directory corrente in /tmp, creare un file e creare un link simbolico a quel file nella stessa directory /tmp. Al tentativo di lettura del link ci si deve aspettare un errore di autorizzazione negata, dovuto al fatto che /tmp ha il bit sticky impostato.\n\nQuesto comportamento può essere controllato tramite /proc/sys/fs/protected_symlinks o semplicemente tramite sysctl: sysctl -w fs.protected_symlinks=0. Vedere Sysctl#Configuration per renderlo permanente.\n\n"
+    },
+    {
+      "title": "Vedi anche",
+      "level": 2,
+      "content": "- Documentazione del kernel Linux\n\n"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Apache Cassandra",
+  "url": "https://wiki.archlinux.org/title/Apache_Cassandra",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Apache Spark\n\nApache Cassandra is a NoSQL multi-master database with linear scalability and no single point of failure.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the cassandraAUR package.\n\n"
+    },
+    {
+      "title": "Logging to journald",
+      "level": 4,
+      "content": "The package logs to /var/log/cassandra/system.log by default. To instead log to journald you will need to edit the unit and set the service to run in the foreground by adding -f to the ExecStart line, and set Type to simple as the process will no longer fork.\n\nThis can be also done using a systemd drop-in file:\n\n```\n/etc/systemd/system/cassandra.service.d/override.conf\n```\n\n```\n[Service]\nType=simple\nExecStart=\nExecStart=/usr/bin/cassandra -p /run/cassandra/cassandra.pid -f\n```\n\nIf Cassandra was running, you will need to drain, and then restart Cassandra.\n\n```\n$ nodetool drain\n```\n\n"
+    },
+    {
+      "title": "cassandra.yaml",
+      "level": 3,
+      "content": "There is copious amounts of documentation in the default cassandra.yaml. When installed via the cassandraAUR package, it is located in /etc/cassandra/cassandra.yaml\n\n"
+    },
+    {
+      "title": "Basic configuration items to change",
+      "level": 4,
+      "content": "Setting the name of the cluster. This needs to be consistent for all nodes that you intend to have in this cluster.\n\n```\ncluster_name: 'Test Cluster'\n```\n\nSet the directory where cassandra will write too, below is the default that will be used if unset. If possible set this to a disk used only for storing cassandra data\n\n```\ndata_file_directories:\n    - /var/lib/cassandra/data\n```\n\nFor the first node (the seed node) make sure to include its IP address in the seeds, and atleast 1 other node. for all other nodes, try and set a broad range of nodes in the cluster. If a node cannot connect to one of the seeds listed in this configuration at startup - it will fail to start.\n\n```\nseed_provider:\n    - class_name: org.apache.cassandra.locator.SimpleSeedProvider\n      parameters:\n          - seeds: \"192.168.1.53, 192.168.1.52\"\n```\n\nset this based on what type of disk cassandra is using to store data on ssd or spinning\n\n```\ndisk_optimization_strategy: ssd|spinning\n```\n\nThis is the address Cassandra will listen for client connections on\n\n```\nlisten_address: 192.168.1.51\n```\n\nThis is the address this node will advertise itself as, ensure both your clients and nodes can reach this node on this address\n\n```\nbroadcast_address: 192.168.1.51\n```\n\nThis is the address used for thrift connections, set to 0.0.0.0 it will listen on all interfaces, which is fine as long as its firewalled for security\n\n```\nrpc_address: 0.0.0.0\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 4,
+      "content": "If Cassandra fails to run as a service, try running Cassandra\n\n```\n$ cassandra\n```\n\nIf you receive the following error:\n\n```\nImproperly specified VM option 'ThreadPriorityPolicy=42'\nError: Could not create the Java Virtual Machine.\nError: A fatal exception has occurred. Program will exit.\n```\n\nCassandra runs on Java 8 and starting with Cassandra 4.0.2, also on Java 11. You will need to install the proper Java and override the default JVM with a systemd drop-in file:\n\n```\n/etc/systemd/system/cassandra.service.d/override.conf\n```\n\n```\n[Service]\nEnvironment=JAVA_HOME=/usr/lib/jvm/java-8-openjdk\n```\n\nIf this file already exists, simply add the Environment line into the [Service] block.\n\n"
+    }
+  ]
+}

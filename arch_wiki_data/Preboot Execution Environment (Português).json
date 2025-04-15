@@ -1,0 +1,96 @@
+{
+  "title": "Preboot Execution Environment (Português)",
+  "url": "https://wiki.archlinux.org/title/Preboot_Execution_Environment_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Sistema sem disco\n\nDo Wikipédia:\n\nNeste guia, o PXE é usado para inicializar a mídia de instalação com uma opção-rom apropriada que ofereça suporte ao PXE no destino. Isso funciona bem quando você já possui um servidor configurado.\n\n"
+    },
+    {
+      "title": "Preparação",
+      "level": 2,
+      "content": "Obtenha a mídia de instalação oficial mais recente da página de instalação.\n\nEm seguida, monte a imagem:\n\n```\n# mkdir -p /mnt/archiso\n# mount -o loop,ro archlinux-data_lançamento-x86_64.iso /mnt/archiso\n```\n\nsendo data_lançamento a data de lançamento no nome do arquivo ISO como, por exemplo, 2020.03.01.\n\n"
+    },
+    {
+      "title": "Configuração do servidor",
+      "level": 2,
+      "content": "Você precisará configurar um DHCP (para atribuir endereços e anunciar a configuração), TFTP (para transferir pxelinux, kernel e initramfs) e um dos serviços para transferência do sistema de arquivos raiz: servidor HTTP, NFS ou NBD.\n\nNo momento, o Arch ISO possui suporte apenas à inicialização PXE no estilo do BIOS. Veja FS#50188 para mais informações.\n\nArch Netboot possui suporte a inicialização no estilo UEFI se você precisar. Porém, o resto dessa página tem foco na ISO.\n\n"
+    },
+    {
+      "title": "Rede",
+      "level": 3,
+      "content": "Ative sua interface de rede cabeada e atribua-lhe um endereço adequado para sua rede.\n\n```\n# ip link set eth0 up\n# ip addr add 192.168.0.1/24 dev eth0\n```\n\n"
+    },
+    {
+      "title": "DHCP + TFTP",
+      "level": 3,
+      "content": "Você precisará de um servidor DHCP e TFTP para configurar a rede no destino da instalação e facilitar a transferência de arquivos entre o servidor PXE e o cliente; O dnsmasq faz as duas coisas e é extremamente fácil de configurar.\n\nInstale o pacote dnsmasq.\n\nConfigure o dnsmasq:\n\n```\n# /etc/dnsmasq.conf\n```\n\n```\nport=0\ninterface=eth0\nbind-interfaces\ndhcp-range=192.168.0.50,192.168.0.150,12h\ndhcp-boot=/arch/boot/syslinux/lpxelinux.0\ndhcp-option-force=209,boot/syslinux/archiso.cfg\ndhcp-option-force=210,/arch/\ndhcp-option-force=66,192.168.0.1\nenable-tftp\ntftp-root=/mnt/archiso\n```\n\nInicie dnsmasq.service.\n\n"
+    },
+    {
+      "title": "Transferindo o sistema de arquivos raiz do archiso",
+      "level": 3,
+      "content": "Graças aos ganchos de initcpio archiso_pxe_http, archiso_pxe_nfs e archiso_pxe_nbd no archiso, é possível inicializar usando HTTP, NFS ou NBD. O tempo de inicialização é aproximadamente o mesmo nos três métodos, mas o método HTTP permite assistir a um estado de download do airootfs.sfs em porcentagens.\n\n"
+    },
+    {
+      "title": "HTTP",
+      "level": 4,
+      "content": "Entre todas as alternativas, o darkhttpd é de longe o mais trivial de configurar (e o mais leve).\n\nPrimeiro, instale o pacote darkhttpd.\n\nEntão, inicie o darkhttpd usando /mnt/archiso como raiz de documentos:\n\n```\n# darkhttpd /mnt/archiso\n```\n\n```\ndarkhttpd/1.8, copyright (c) 2003-2011 Emil Mikulic.\nlistening on: http://0.0.0.0:80/\n```\n\n"
+    },
+    {
+      "title": "NFS",
+      "level": 4,
+      "content": "Você precisará configurar um servidor NFS com uma exportação na raiz da mídia de instalação montada, que seria /mnt/archiso caso você tenha seguido #Preparação. Depois de configurar o servidor, adicione a seguinte linha ao seu arquivo /etc/exports:\n\n```\n/etc/exports\n```\n\n```\n/mnt/archiso 192.168.0.0/24(ro,no_subtree_check)\n```\n\nSe o servidor já estiver em execução, reexporte os sistemas de arquivos com exportfs -r -a -v.\n\nAs configurações padrão no instalador esperam encontrar o NFS em /run/archiso/bootmnt, então você precisará editar as opções de inicialização. Para fazer isso, pressione Tab na opção apropriada do menu de inicialização e edite a opção archiso_nfs_srv de acordo:\n\n```\narchiso_nfs_srv=${pxeserver}:/mnt/archiso\n```\n\nAlternativamente, você pode usar /run/archiso/bootmnt para todo o processo.\n\nApós o carregamento do kernel, a imagem de inicialização do Arch copiará o sistema de arquivos raiz via NFS para o host de inicialização. Isso pode demorar um pouco. Quando isso for concluído, você deverá ter um sistema em execução.\n\n"
+    },
+    {
+      "title": "NBD",
+      "level": 4,
+      "content": "Instale o pacote nbd e configure-o:\n\n```\n/etc/nbd-server/config\n```\n\n```\n[generic]\n[archiso]\n    readonly = true\n    exportname = /srv/archlinux-data_lançamento-x86_64.iso\n```\n\nsendo data_lançamento a data de lançamento no nome do arquivo ISO como, por exemplo, 2020.03.01.\n\nInicie nbd.service.\n\n"
+    },
+    {
+      "title": "Servidor PXE existente",
+      "level": 3,
+      "content": "Se você já possui um servidor PXE com uma configuração de sistema PXELINUX (por exemplo, uma combinação de DHCP e TFTP), pode adicionar os seguintes itens de menu ao seu arquivo /tftpboot/pxelinux.cfg/default para inicializar o Arch através do seu método preferido:\n\n```\nLABEL archlinux\n        MENU LABEL Arch Linux x86_64\n        LINUX /caminho/extração/Arch/ISO/arch/boot/x86_64/vmlinuz\n        INITRD /caminho/extração/Arch/ISO/arch/boot/intel_ucode.img,/caminho/extração/Arch/ISO/arch/boot/amd_ucode.img,/caminho/extração/Arch/ISO/arch/boot/x86_64/archiso.img\n        APPEND archisobasedir=arch archiso_http_srv=http://servidorhttp/caminho/extração/Arch/ISO/\n        SYSAPPEND 3\n        TEXT HELP\n        Arch Linux 2018.09.01 x86_64\n        ENDTEXT\n```\n\nVocê pode substituir archiso_http_srv por archiso_nfs_srv para NFS ou archiso_nbd_srv para NBD (consulte exemplos de uso no arquivo arch/boot/syslinux/archiso_pxe.cfg que resido na ISO do Arch). Seja qual for o método escolhido, você deve passar o parâmetro ip= para instruir o kernel a abrir a interface de rede antes de tentar montar a mídia de instalação na rede. É necessário passar BOOTIF= quando houver várias interfaces com fio no lado do cliente e/ou você desejar que o resolv.conf já esteja configurado no archiso inicializado. Você pode usar máscara de sysappend 3 (que é 1+2) para passar esses parâmetros automaticamente. Para obter os parâmetros de inicialização disponíveis, consulte README.bootparams.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Para esta parte, você precisará descobrir como informar o cliente para tentar uma inicialização do PXE; no canto da tela, junto com as mensagens normais de postagem, geralmente haverá alguma dica sobre qual tecla pressionar para tentar inicializar o PXE primeiro. Em um IBM x3650, o F12 exibe um menu de inicialização, cuja primeira opção é Network; em um Dell PE 1950/2950, pressionar F12 entra na inicialização do PXE diretamente.\n\n"
+    },
+    {
+      "title": "Inicialização",
+      "level": 3,
+      "content": "Examinar journald no servidor PXE fornecerá algumas informações adicionais sobre o que exatamente está acontecendo durante os estágios iniciais do processo de inicialização do PXE:\n\n```\n# journalctl -u dnsmasq.service -f\n```\n\n```\ndnsmasq-dhcp[2544]: DHCPDISCOVER(eth1) 00:1a:64:6a:a2:4d \ndnsmasq-dhcp[2544]: DHCPOFFER(eth1) 192.168.0.110 00:1a:64:6a:a2:4d \ndnsmasq-dhcp[2544]: DHCPREQUEST(eth1) 192.168.0.110 00:1a:64:6a:a2:4d \ndnsmasq-dhcp[2544]: DHCPACK(eth1) 192.168.0.110 00:1a:64:6a:a2:4d \ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/pxelinux.0 to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/whichsys.c32 to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_pxe_choose.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/ifcpu64.c32 to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_pxe_both_inc.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_head.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_pxe32.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_pxe64.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/archiso_tail.cfg to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/vesamenu.c32 to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/syslinux/splash.png to 192.168.0.110\n```\n\nDepois de carregar o pxelinux.0 e o archiso.cfg via TFTP, esperamos que você seja apresentado a um menu de inicialização syslinux com várias opções, onde é possível selecionar Boot Arch Linux (x86_64) (HTTP).\n\nEm seguida, o kernel e o initramfs (apropriados para a arquitetura que você selecionou) serão transferidos, novamente via TFTP:\n\n```\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/x86_64/vmlinuz to 192.168.0.110\ndnsmasq-tftp[2544]: sent /mnt/archiso/arch/boot/x86_64/archiso.img to 192.168.0.110\n```\n\nSe tudo correr bem, você deverá ver a atividade no darkhttpd vinda do destino PXE; nesse ponto, o kernel seria carregado no destino PXE e no init:\n\n```\n1348347586 192.168.0.110 \"GET /arch/aitab\" 200 678 \"\" \"curl/7.27.0\"\n1348347587 192.168.0.110 \"GET /arch/x86_64/root-image.fs.sfs\" 200 107860206 \"\" \"curl/7.27.0\"\n1348347588 192.168.0.110 \"GET /arch/x86_64/usr-lib-modules.fs.sfs\" 200 36819181 \"\" \"curl/7.27.0\"\n1348347588 192.168.0.110 \"GET /arch/any/usr-share.fs.sfs\" 200 63693037 \"\" \"curl/7.27.0\"\n```\n\nApós o download do sistema de arquivos raiz via HTTP, você acabará no prompt normal de raiz do sistema ativo zsh.\n\n"
+    },
+    {
+      "title": "Pós-inicialização",
+      "level": 3,
+      "content": "A menos que você deseje que todo o tráfego seja roteado através do servidor PXE (que não funcionará de qualquer maneira, a menos que você configure corretamente, você pode querer parar dnsmasq.service e obter uma nova concessão no alvo da instalação, conforme apropriado para a disposição da sua rede.\n\nVocê também pode matar darkhttpd; o alvo já baixou o sistema de arquivos raiz, portanto, não é mais necessário. Enquanto você está nisso, também pode desmontar a imagem de instalação:\n\n```\n# umount /mnt/archiso\n```\n\nNeste ponto, você pode seguir o guia de instalação.\n\n"
+    },
+    {
+      "title": "Sistemas com pouca memória",
+      "level": 3,
+      "content": "A opção copytoram do initramfs pode ser usada para controlar se o sistema de arquivos raiz deve ser copiado para RAM na sua totalidade na inicialização antecipada.\n\nÉ altamente recomendável deixar essa opção em branco e só deve ser desativada se for totalmente necessário (sistemas com menos de ~256MB de memória física). Acrescente copytoram=n à sua linha do kernel, se desejar.\n\n"
+    },
+    {
+      "title": "Compartilhando internet com clientes PXE",
+      "level": 3,
+      "content": "Se sua rede para clientes PXE for privada (por exemplo, 192.168.1.0/24) e você desejar que eles possam acessar a Internet (por exemplo, para instalação de pacotes), configure o mascaragem/NAT de origem corretamente. Seu servidor PXE deve ter uma interface de rede separada conectada à Internet. Você pode usar esse comando para passar pela Internet para os clientes:\n\n```\niptables -t nat -A POSTROUTING -s 192.168.1.0/24 -j MASQUERADE\n```\n\nPara tornar essa regra persistente após a reinicialização, execute o seguinte comando:\n\n```\niptables-save -f /etc/iptables/iptables.rules\n```\n\ne habilite iptables.service.\n\nConsulte Simple stateful firewall#Setting up a NAT gateway e Internet sharing#Enable NAT para mais informações.\n\n"
+    },
+    {
+      "title": "Bug ao renomear interface DHCP",
+      "level": 3,
+      "content": "FS#36749 faz com que a renomeação previsível da interface de rede padrão falhe e, em seguida, o cliente DHCP falhe por causa disso. Uma solução alternativa é adicionar o parâmetro de inicialização do kernel net.ifnames=0 para desativar os nomes de interface previsíveis.\n\n"
+    },
+    {
+      "title": "VirtualBox não consegue inicializar enquanto a máquina física consegue",
+      "level": 3,
+      "content": "Ao usar o VirtualBox para testar sua configuração, a máquina virtual pode ficar travada em:\n\n```\nProbing EDD (edd=off to disable)... ok\n```\n\nMas a inicialização por PXE com uma máquina real funciona bem. O problema pode ser porque você configurou vários núcleos de CPU para a máquina cliente e definiu o tipo como Other e a versão como Other/Unknown (64 bit). Então, o VirtualBox não sabe qual interface de paravirtualização usar por padrão.\n\nAdicionar o parâmetro do kernel loglevel=7 permite que você veja que máquina realmente estava travada em:\n\n```\n[    0.063697] smp: Bringing up secondary CPUs...\n[    0.103768] x86: Booting SMP configuration:\n```\n\nPara resolver isso, use um núcleo da CPU ou acesse Máquina > Configurações > Sistema > Aceleração e defina uma das seguintes interfaces de paravirtualização: Mínima, Hyper-V ou KVM.\n\n"
+    },
+    {
+      "title": "VirtualBox cai no shell do EFI",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nAtualmente, o VirtualBox não oferece suporte à inicialização PXE no modo UEFI. Veja isto. Você pode tentar o QEMU. Como alternativa, você pode usar o VMware Workstation 15.0.2 (ele suporta inicialização UEFI PXE) ou apenas um hardware real.\n\n"
+    }
+  ]
+}

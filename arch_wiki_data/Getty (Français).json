@@ -1,0 +1,61 @@
+{
+  "title": "Getty (Français)",
+  "url": "https://wiki.archlinux.org/title/Getty_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Display manager (Français)\n\nUn «getty» est une façon générale de parler d'un programme qui gère un terminal et la ligne à laquelle il est connecté. Sa principale utilité est de protéger le système des accès non-autorisés.\n\nGénéralement, un processus getty est démarré à la demande par systemd et ne gère qu'une seule ligne.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "agetty est le getty par défaut sous Arch Linux, il fait partie de util-linux.\n\nParmi les alternatives:\n\n- mingetty — Un getty minimaliste qui prends en charge la connexion automatique.\n\n- mgetty — Un programme capable de gérer tous les différents aspects d'une connexion par un modem sur les Unix modernes.\n\n"
+    },
+    {
+      "title": "Effet d'escalier",
+      "level": 3,
+      "content": "agetty modifie les paramètres du TTY en attendant une connexion afin que les nouvelles lignes ne soient pas traduites en CR-LF. Cela a tendance à provoquer un \"effet d'escalier\" pour les messages imprimés sur la console.\n\nC'est totalement inoffensif, mais dans le cas où il persiste une fois connecté, vous pouvez corriger ce comportement avec :\n\n```\n$ stty onlcr\n```\n\nVoir cette discussion sur les forums à ce sujet.\n\n"
+    },
+    {
+      "title": "Ajouter des consoles virtuelles",
+      "level": 3,
+      "content": "Agetty gère les consoles virtuelles et six de ces consoles virtuelles sont fournies par défaut dans Arch Linux. Elles sont généralement accessibles en appuyant sur Ctrl+Alt+F1 à Ctrl+Alt+F6.\n\nOuvrez le fichier /etc/systemd/logind.conf et ajustez l'option NAutoVTs=6 au nombre de terminaux que vous souhaitez.\n\nSi besoin, démarrez temporairement un service getty@ttyN.service directement.\n\n"
+    },
+    {
+      "title": "Connexion automatique à la console",
+      "level": 3,
+      "content": "La configuration repose sur les fichiers de substitution de systemd pour changer les paramètres fournis par défaut à agetty.\n\nElle diffère entre les consoles virtuelles et série. Dans la majorité des cas, la connexion se fait sur une console virtuelle, dont le nom est ttyN, où N est un entier. La configuration pour une console série est légèrement différente, et le nom de la console sera ttySN, N étant un nombre.\n\n"
+    },
+    {
+      "title": "Console virtuelle",
+      "level": 4,
+      "content": "Créez un fichier de substitution getty@tty1 avec le contenu suivant:\n\n```\n/etc/systemd/system/getty@tty1.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin username %I $TERM\n```\n\n- L'option Type=idle présente dans le getty@.service par défaut retardera le démarrage du service jusqu'à ce que toutes les t (demandes de changement d'état adressées aux unités) soient terminés afin d'éviter de polluer l'invite de connexion avec des messages de démarrage. Lorsque X est démarré automatiquement, il peut être utile de démarrer getty@tty1.service immédiatement en ajoutant Type=simple dans le fichier de substitution. Le système init et startx peuvent être réduit au silence pour éviter l'entrelacement de leurs messages pendant le démarrage.\n- L'exemple ci-dessus fera en sorte que le type de session de loginctl soit défini sur tty. Si cela est souhaitable (par exemple si vous démarrez X automatiquement), il est possible de définir manuellement le type de session à wayland ou x11 en ajoutant Environment=XDG_SESSION_TYPE=x11 ou Environment=XDG_SESSION_TYPE=wayland dans ce fichier.\n\nSi vous ne souhaitez pas une connexion automatique complète, mais que vous ne voulez pas non plus taper votre nom d'utilisateur, consultez #Ne demander que le mot de passe pour la connexion d'un utilisateur par défaut dans une console virtuelle.\n\nSi vous voulez utiliser un tty autre que tty1, voyez la FAQ de systemd en anglais.\n\n"
+    },
+    {
+      "title": "Console série",
+      "level": 4,
+      "content": "Créez un fichier de substitution:\n\n```\n/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --keep-baud --autologin username 115200,57600,38400,9600 - $TERM\n```\n\n"
+    },
+    {
+      "title": "Console nspawn",
+      "level": 4,
+      "content": "Pour configurer la connexion automatique pour un conteneur systemd, surchargez console-getty.service en créant un fichier de substitution:\n\n```\n/etc/systemd/system/console-getty.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --keep-baud --autologin username - 115200,38400,9600 $TERM\n```\n\nSi machinectl login my-container est la méthode utilisée pour accéder au conteneur, modifiez aussi container-getty@.service, l'unité qui gère les pseudo ttys pts/[0-9]:\n\n```\n/etc/systemd/system/container-getty@.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --keep-baud --autologin username - 115200,38400,9600 $TERM\n```\n\n"
+    },
+    {
+      "title": "Ne demander que le mot de passe pour la connexion d'un utilisateur par défaut dans une console virtuelle",
+      "level": 3,
+      "content": "Getty peut être utilisé pour se connecter depuis une console virtuelle au moyen d'un utilisateur par défaut. On entre le mot de passe sans avoir préalablement entré le nom d'utilisateur. Par exemple, pour reclamer le mot de passe d'un utilisateur username sur tty1:\n\n```\n/etc/systemd/system/getty@tty1.service.d/skip-username.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -- username' --noclear --skip-login - $TERM\n```\n\net ensuite activez getty@tty1\n\n"
+    },
+    {
+      "title": "Garder les messages de démarrage sur tty1",
+      "level": 3,
+      "content": "Par défaut, service getty@tty1 est activé sur Arch. Le fichier de service passe déjà --noclear, ce qui empêche agetty d'effacer l'écran. Cependant, systemd efface l'écran avant de le démarrer. Pour désactiver ce comportement, créez un fichier de substitution:\n\n```\n/etc/systemd/system/getty@tty1.service.d/noclear.conf\n```\n\n```\n[Service]\nTTYVTDisallocate=no\n```\n\n- Assurez-vous de supprimer quiet des paramètres du noyau.\n- Un démarrage tardif de KMS peut entraîner l'effacement des premiers messages de démarrage. Consultez Kernel mode setting (Français)#Démarrage précoce de KMS ou Kernel mode setting (Français)#Désactiver modesetting.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- systemd (Français)#Changer la cible par défaut pour le démarrage\n- Le TTY démystifié\n- Wikipedia:fr:tty (Unix)\n\n"
+    }
+  ]
+}

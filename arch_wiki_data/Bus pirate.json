@@ -1,0 +1,36 @@
+{
+  "title": "Bus pirate",
+  "url": "https://wiki.archlinux.org/title/Bus_pirate",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "The Bus Pirate is a versatile tool for communicating with various hardware.\n\nInterfacing a new microchip can be a hassle. Breadboarding a circuit, writing code, hauling out the programmer, or maybe even prototyping a PCB. We never seem to get it right on the first try.\n\nThe Bus Pirate is a universal bus interface that talks to most chips from a PC serial terminal, eliminating a ton of early prototyping effort when working with new or unknown chips. Many serial protocols are supported at 0–5.5 volts, more can be added.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The drivers for the FTDI chip is included in the kernel, so it should be detected as soon as it is plugged in, and assigned to device /dev/ttyUSB[0-9]. To check where it got assigned, run:\n\n```\n# journalctl -k\n```\n\nThe output will contain a line that looks something like this:\n\n```\n# usb 1-4.4: FTDI USB Serial Device converter now attached to ttyUSB0\n```\n\n"
+    },
+    {
+      "title": "Rename the device with udev",
+      "level": 3,
+      "content": "It can be annoying to have to look up what /dev/ttyUSB[0-9] the device gets assigned, so it is a good idea to add a simple udev rule that creates the symlink from /dev/buspirate to /dev/ttyUSBX when it is plugged in.\n\nTo figure out the current path to the bus pirate you can use the udevadm(8) monitor command and then plugging in the device the output should be some thing like this:\n\n```\n$ udevadm monitor --environment --udev\n```\n\n```\n...\nDEVICENAME=/dev/ttyUSBX\nDRIVER=tty\nPRODUCT=403/6001/600\n...\n```\n\nAfter you have plugged it in and the output is given press Ctrl+c to break the text stream.\n\n"
+    },
+    {
+      "title": "Using the Product/Vendor ID",
+      "level": 4,
+      "content": "By using the Vendor/Product ID the bus pirate device can be replaced without needing to change the configuration again. To use this method, add the following lines:\n\n```\n/etc/udev/rules.d/98-buspirate.rules\n```\n\n```\n# Bus pirate v3\nSUBSYSTEM==\"tty\", ATTRS{idVendor}==\"0403\", ATTRS{idProduct}==\"6001\", GROUP=\"users\", MODE=\"0666\", SYMLINK+=\"buspirate\"\n# Bus pirate v4\nSUBSYSTEM==\"tty\", ATTRS{idVendor}==\"04d8\", ATTRS{idProduct}==\"fb00\", GROUP=\"users\", MODE=\"0666\", SYMLINK+=\"buspirate\"\n```\n\n"
+    },
+    {
+      "title": "Using the serial number",
+      "level": 4,
+      "content": "You can also do it by serial number, to do this, you will need to find out the serial number of FTDI chip on the bus pirate. This can be achieved by running the following, assuming your device is plugged in:\n\n```\n# udevadm info --attribute-walk -n /dev/ttyUSBX  | sed -n '/FTDI/,/serial/p'\n```\n\nNow add/create the following udev rule:\n\n```\n/etc/udev/rules.d/98-buspirate.rules\n```\n\n```\nSUBSYSTEM==\"tty\", ATTRS{serial}==\"MYSERIALNUMBER\", GROUP=\"users\", MODE=\"0660\", SYMLINK+=\"buspirate\"\n```\n\nLoad the new rule: at this point, whenever you plug in the device, the symlink should be created.\n\nTo verify that, run the udev monitor command mentioned above and it should report some thing like this:\n\n```\nDEVLINKS=/dev/buspirate\n```\n\n"
+    },
+    {
+      "title": "Communication",
+      "level": 2,
+      "content": "To communicate with the device, you can use any of the following, to name a few:\n\n- minicom:\n\n```\n# minicom -b 115200 -8 -D /dev/buspirate\n```\n\n- screen:\n\n```\n# screen /dev/buspirate 115200 8N1\n```\n\n- picocom:\n\n```\n# picocom -b 115200 /dev/buspirate\n```\n\n- cu from the uucp package:\n\n```\n# cu -l /dev/buspirate\n```\n\nType ? and press Enter and the device should reply with a list of possible commands.\n\n"
+    }
+  ]
+}

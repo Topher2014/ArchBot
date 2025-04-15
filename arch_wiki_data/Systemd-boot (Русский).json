@@ -1,0 +1,126 @@
+{
+  "title": "Systemd-boot (Русский)",
+  "url": "https://wiki.archlinux.org/title/Systemd-boot_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Процесс загрузки Arch\n- Secure Boot\n- Unified Extensible Firmware Interface (Русский)\n\nsystemd-boot(7) (ранее известный как gummiboot) — это простой менеджер загрузки для UEFI. Он предоставляет текстовое меню для выбора загрузочной записи и редактор параметров ядра. Он входит в состав пакета systemd.\n\nИмейте в виду, что systemd-boot умеет запускать только EFI-приложения (например, ядро Linux через EFISTUB, UEFI Shell, GRUB или Windows Boot Manager).\n\n"
+    },
+    {
+      "title": "Установка менеджера загрузки EFI",
+      "level": 3,
+      "content": "Перед установкой systemd-boot убедитесь, что система загружена в режиме UEFI и что есть доступ к переменным UEFI. Это можно проверить командой efivar --list или, если efivar не установлен, командой ls /sys/firmware/efi/efivars (если каталог существует, то система загружена в режиме UEFI).\n\nВ примерах ниже esp обозначает точку монтирования системного раздела EFI, например /efi или /boot. Также предполагается, что вы выполнили chroot в точку монтирования корневого раздела системы.\n\nИспользуйте команду bootctl(1) для установки systemd-boot в системный раздел EFI:\n\n```\n# bootctl install\n```\n\nОна скопирует менеджер загрузки EFI systemd-boot в ESP, создаст загрузочную запись в UEFI и изменит порядок загрузки.\n\n- На x64 UEFI выполняется копирование /usr/lib/systemd/boot/efi/systemd-bootx64.efi в esp/EFI/systemd/systemd-bootx64.efi и esp/EFI/BOOT/BOOTX64.EFI.\n- На IA32 UEFI выполняется копирование /usr/lib/systemd/boot/efi/systemd-bootia32.efi в esp/EFI/systemd/systemd-bootia32.efi и esp/EFI/BOOT/BOOTIA32.EFI.\n\nЗагрузочная запись UEFI будет иметь название «Linux Boot Manager» и указывать, в зависимости от разрядности UEFI, на файл \\EFI\\systemd\\systemd-bootx64.efi или \\EFI\\systemd\\systemd-bootia32.efi в ESP.\n\n- При запуске bootctl install systemd-boot попробует найти системный раздел EFI в /efi, /boot и /boot/efi. Если он примонтирован в другое место, нужно добавить опцию --esp-path=esp (смотрите bootctl(1) § OPTIONS).\n- Установка systemd-boot перезапишет существующие файлы esp/EFI/BOOT/BOOTX64.EFI (или esp/EFI/BOOT/BOOTIA32.EFI на IA32 UEFI), в частности, версию файла от Microsoft.\n\nЗатем переходите к настройке systemd-boot.\n\n"
+    },
+    {
+      "title": "Установка с использованием XBOOTLDR",
+      "level": 3,
+      "content": "Для хранения ядра и initramfs отдельно от ESP можно создать отдельный раздел /boot типа «Linux extended boot» (XBOOTLDR). Это особенно удобно при двойной загрузке с Windows, когда уже имеющийся ESP слишком маленький.\n\nПодготовьте ESP как обычно и создайте на том же физическом диске ещё один раздел для XBOOTLDR. Он должен иметь GUID типа раздела bc13c2ff-59e6-4262-a352-b275fd6f7172 [1]. Размер раздела XBOOTLDR должен быть достаточно большим для размещения всех устанавливаемых ядер.\n\n- systemd-boot не выполняет проверку файловой системы, как это делается для ESP. Таким образом, можно использовать любую файловую систему, которую может прочитать ваша реализация UEFI.\n- При включении быстрой загрузки («fast boot») UEFI может пропустить загрузку разделов, отличных от ESP. Это может привести к тому, что systemd-boot не сможет найти загрузочные записи на разделе XBOOTLDR; в этом случае отключите режим быстрой загрузки.\n- Раздел XBOOTLDR должен находиться на том же физическом диске, что и ESP, чтобы systemd-boot мог его найти.\n\nВ процессе установки примонтируйте ESP в /mnt/efi и XBOOTLDR в /mnt/boot.\n\nНа этапе chroot используйте команду:\n\n```\n# bootctl --esp-path=/efi --boot-path=/boot install\n```\n\nЗатем переходите к настройке systemd-boot.\n\n"
+    },
+    {
+      "title": "Обновление менеджера загрузки EFI",
+      "level": 3,
+      "content": "При выходе новой версии systemd-boot менеджер загрузки EFI можно по желанию переустановить. Это можно сделать вручную или автоматически; ниже описаны оба способа.\n\n"
+    },
+    {
+      "title": "Вручную",
+      "level": 4,
+      "content": "Используйте команду bootctl для обновления systemd-boot:\n\n```\n# bootctl update\n```\n\n"
+    },
+    {
+      "title": "Автоматически",
+      "level": 4,
+      "content": "Для автоматического обновления systemd-boot можно использовать службу systemd или хук pacman.\n\nНачиная с версии 250, systemd предоставляет юнит systemd-boot-update.service. Включите его, чтобы при следующей загрузке выполнилось обновление загрузчика.\n\nПакет systemd-boot-pacman-hookAUR предоставляет хук pacman, который будет выполняться при каждом обновлении пакета systemd.\n\nВ качестве альтернативы, вы можете разместить следующий pacman hook в каталоге /etc/pacman.d/hooks/:\n\n```\n/etc/pacman.d/hooks/95-systemd-boot.hook\n```\n\n```\n[Trigger]\nType = Package\nOperation = Upgrade\nTarget = systemd\n\n[Action]\nDescription = Gracefully upgrading systemd-boot...\nWhen = PostTransaction\nExec = /usr/bin/systemctl restart systemd-boot-update.service\n```\n\nПри включенном Secure Boot стоит добавить ещё один хук, который автоматически подпишет загрузчик при обновлении пакета:\n\n```\n/etc/pacman.d/hooks/80-secureboot.hook\n```\n\n```\n[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Path\nTarget = usr/lib/systemd/boot/efi/systemd-boot*.efi\n\n[Action]\nDescription = Signing systemd-boot EFI binary for Secure Boot\nWhen = PostTransaction\nExec = /bin/sh -c 'while read -r i; do sbsign --key /путь/к/keyfile.key --cert /путь/к/certificate.crt \"$i\"; done;'\nDepends = sh\nDepends = sbsigntools\nNeedsTargets\n```\n\nЗамените /путь/к/keyfile.key и /путь/к/certificate.crt на ваши ключ подписи и сертификат соответственно. Для лучшего понимания, как работает этот хук, можно почитать sbsign(1).\n\n"
+    },
+    {
+      "title": "Настройка загрузчика",
+      "level": 3,
+      "content": "Базовая конфигурация хранится в файле esp/loader/loader.conf. Полный список опций описан в loader.conf(5) § OPTIONS. Некоторые важные опции:\n\n- default – выбираемая по умолчанию запись; можно использовать подстановку, например arch-*\n\n- timeout – задержка меню в секундах. При значении menu-hidden или 0 (по умолчанию) меню будет скрыто.\n\n- console-mode — разрешение экрана в консоли. Значение keep (по умолчанию) оставляет то разрешение, которое было выбрано прошивкой. Значение max выбирает максимальный доступный режим.\n\n- editor — включение редактора параметров ядра. Значение yes (по умолчанию) — включить, no — отключить. Если к машине имеют физический доступ недоверенные пользователи, редактор лучше отключить (иначе они смогут обойти проверки доступа, например, добавив init=/bin/bash в параметры ядра).\n\nПример:\n\n```\nesp/loader/loader.conf\n```\n\n```\ndefault  arch.conf\ntimeout  4\nconsole-mode max\neditor   no\n```\n\n- Используйте пробелы; systemd-boot не поддерживает символы табуляции.\n- Опции default и timeout могут быть изменены в само́м меню загрузки, эти изменения будут храниться как переменные EFI LoaderEntryDefault и LoaderConfigTimeout, переопределяя настройки из файла конфигурации.\n- Можно использовать bootctl set-default \"\" и bootctl set-timeout \"\" для сброса переменных EFI, переопределяющих опции default и timeout соответственно.\n- Если вы указали timeout 0, вы можете получить доступ к меню, удерживая клавишу Space.\n- Пример базового конфигурационного файла расположен как /usr/share/systemd/bootctl/loader.conf.\n- Если в загрузчике (во время выбора загрузочной записи) появляются искажения/используется неправильное разрешение, попробуйте установить console-mode в auto (использует эвристику для выбора оптимального разрешения), keep (сохраняет разрешение, предоставленное прошивкой) или 2 (пытается выбрать первое нестандартное для UEFI разрешение).\n\n"
+    },
+    {
+      "title": "Добавление загрузочных записей",
+      "level": 3,
+      "content": "systemd-boot ищет элементы для загрузочного меню в esp/loader/entries/*.conf, а при использовании XBOOTLDR — также в boot/loader/entries/*.conf. Имейте в виду, что записи в esp могут использовать только файлы (ядра, initramfs и т. п.) только из esp. Аналогично, записи из раздела boot могут использовать только файлы из boot.\n\nВозможными опциями являются:\n\n- title – название операционной системы. Обязательная.\n- version – версия ядра, отображаемая только если существуют несколько записей с одинаковым названием. Не обязательная.\n- machine-id – идентификатор машины из /etc/machine-id, отображаемый только если существуют несколько записей с одинаковым названием и одинаковой версией. Не обязательная.\n- efi – EFI-приложение для запуска, путь относительно esp; например, /vmlinuz-linux. Либо это, либо linux (смотрите ниже) является обязательным.\n- options – опции командной строки для передачи в EFI приложение или параметры ядра. Не обязательная, но вам нужно будет передать как минимум root=dev rw для загрузки Linux, где dev — блочное устройство, содержащее корневую файловую систему (смотрите Постоянные имена для блочных устройств#Параметры ядра). Эту опцию можно опустить, если корневому разделу присвоен правильный Root Partition Type GUID, как определено в Discoverable Partitions Specification, и если используется mkinitcpio-хук systemd.\n\nДля загрузки Linux можно вместо опции efi использовать опцию linux. Или initrd в дополнение к options. Синтаксис такой:\n\n- linux или initrd, за которыми следует относительный путь к соответствующим файлам в ESP; например, /vmlinuz-linux; это будет автоматически преобразовано в efi путь и options initrd=путь — данный синтаксис поддерживается только для удобства и не имеет отличий в работе.\n\nПример файлов, запускающих Arch из тома с меткой Arch OS и загружающих микрокод процессора Intel:\n\n```\nesp/loader/entries/arch.conf\n```\n\n```\ntitle   Arch Linux\nlinux   /vmlinuz-linux\ninitrd  /intel-ucode.img\ninitrd  /initramfs-linux.img\noptions root=\"LABEL=Arch OS\" rw\n```\n\n```\nesp/loader/entries/arch-fallback.conf\n```\n\n```\ntitle   Arch Linux (fallback initramfs)\nlinux   /vmlinuz-linux\ninitrd  /intel-ucode.img\ninitrd  /initramfs-linux-fallback.img\noptions root=\"LABEL=Arch OS\" rw\n```\n\nsystemd-boot при загрузке автоматически проверяет наличие Windows Boot Manager в /EFI/Microsoft/Boot/Bootmgfw.efi, UEFI Shell в /shellx64.efi и EFI Default Loader в /EFI/BOOT/bootx64.efi, а также специально подготовленных файлов ядра, находящихся в /EFI/Linux/. При их обнаружении будут сгенерированы записи с названиями auto-windows, auto-efi-shell и auto-efi-default соответственно. Эти записи не требуют ручной настройки загрузчика. Однако автоопределение других EFI-приложений не выполняется (в отличие от rEFInd), поэтому для загрузки ядра Linux необходимо создать загрузочные записи вручную.\n\n- Доступные загрузочные записи, которые были настроены, можно посмотреть с помощью команды bootctl list.\n- Пример файла есть в /usr/share/systemd/bootctl/arch.conf.\n- Необходимые параметры ядра при использовании LVM, dm-crypt или Btrfs описаны в соответствующих статьях.\n\n"
+    },
+    {
+      "title": "EFI Shell или другие EFI-приложения",
+      "level": 4,
+      "content": "Если вы установили UEFI Shell с помощью пакета edk2-shell, systemd-boot автоматически найдёт его и добавит загрузочную запись, если есть файл в esp/shellx64.efi. Для этого можно сделать так:\n\n```\n# cp /usr/share/edk2-shell/x64/Shell.efi /boot/shellx64.efi\n```\n\nЕсли вы установили другие EFI-приложения в ESP, можно создать для них загрузочные записи, подобные приведённым ниже.\n\n```\nesp/loader/entries/fwupd.conf\n```\n\n```\ntitle  Firmware updator\nefi     /EFI/tools/fwupdx64.efi\n```\n\n```\nesp/loader/entries/gdisk.conf\n```\n\n```\ntitle  GPT fdisk (gdisk)\nefi     /EFI/tools/gdisk_x64.efi\n```\n\n"
+    },
+    {
+      "title": "Загрузка с другого диска",
+      "level": 4,
+      "content": "systemd-boot не может запускать исполняемые файлы с разделов, отличных от ESP или XBOOTLDR, но может запустить для этого внешний скрипт.\n\nСначала установите edk2-shell (будет использоваться как интерпретатор). Также нужен PARTUUID раздела, на котором находится целевой EFI-файл, который можно получить с помощью команды blkid. Используя EFI Shell (как описано выше), мы можем с помощью команды map узнать FS alias (например: HD0a66666a2) и полный путь к целевому EFI-файлу (например: EFI\\Microsoft\\Boot\\Bootmgfw.efi). FS alias соответствует PARTUUID раздела, в котором находится целевой EFI-файл.\n\nЗатем с помощью команды exit мы можем загрузиться обратно в Linux, где создадим новую запись. Для этого необходимо сначала создать в корне esp файл с расширением .nsh, содержащий FS alias, двоеточие и путь к EFI-файлу, например:\n\n```\nesp/windows.nsh\n```\n\n```\nHD0a66666a2:EFI\\Microsoft\\Boot\\Bootmgfw.efi\n```\n\nПосле создания файла можно создать загрузочную запись, запускающую скрипт:\n\n```\nesp/loader/entries/windows.conf\n```\n\n```\ntitle  Windows\nefi     /shellx64.efi\noptions -nointerrupt -noconsolein -noconsoleout windows.nsh\n```\n\nВажно, чтобы путь к efi совпадал с местом, куда был скопирован edk2-shell на esp, а последний аргумент в options совпадал с именем файла .nsh в корне esp. Также обратите внимание, что EFI-файл edk2-shell можно переместить в другое место, чтобы избежать автоматического создания загрузочной записи.\n\n"
+    },
+    {
+      "title": "Загрузка в настройки EFI",
+      "level": 3,
+      "content": "systemd-boot автоматически добавит запись UEFI Firmware Setup, если прошивка вашего устройства поддерживает перезагрузку в настройки EFI.\n\n"
+    },
+    {
+      "title": "Поддержка спящего режима",
+      "level": 3,
+      "content": "Смотрите статью Ждущий и спящий режимы.\n\n"
+    },
+    {
+      "title": "Редактор параметров ядра с защитой паролем",
+      "level": 3,
+      "content": "В качестве альтернативы можете установить systemd-boot-passwordAUR который поддерживает password опцию базовой конфигурации. Используйте sbpctl generate для генерации значения для этой опции.\n\nУстановка systemd-boot-password следующей командой:\n\n```\n# sbpctl install esp\n```\n\nС включенным редактором будет запрошен ваш пароль, перед тем как вы сможете редактировать параметры ядра.\n\n"
+    },
+    {
+      "title": "Клавиши в меню загрузки",
+      "level": 3,
+      "content": "Находясь в меню, вы можете использовать клавиши t и T для настройки таймаута меню и e для редактирования параметров ядра для выбранной загрузочной записи. Нажатие h покажет краткий список полезных горячих клавиш. Полный список доступных в меню сочетаний клавиш приведён в systemd-boot(7) § KEY BINDINGS.\n\n"
+    },
+    {
+      "title": "Выбор записи для следующей загрузки",
+      "level": 3,
+      "content": "Менеджер загрузки интегрирован с командой systemctl, что позволяет выбрать, какой вариант загрузки будет использоваться после перезагрузки. Например, если вы собрали своё ядро и создали загрузочную запись esp/loader/entries/arch-custom.conf, для её загрузки можно просто выполнить:\n\n```\n$ systemctl reboot --boot-loader-entry=arch-custom.conf\n```\n\nи система перезагрузится с использованием указанной записи, но не изменит опцию по умолчанию для последующих загрузок. Для просмотра списка возможных вариантов используйте опцию --boot-loader-entry=help.\n\nДля перезагрузки в настройки прошивки используйте команду:\n\n```\n$ systemctl reboot --firmware-setup\n```\n\n"
+    },
+    {
+      "title": "Unified kernel image",
+      "level": 3,
+      "content": "systemd-boot автоматически находит Unified kernel image в каталоге esp/EFI/Linux/ и добавляет для них загрузочные записи, поэтому создавать их вручную в esp/loader/entries/ не нужно. (Обратите внимание, что образы должны иметь расширение .efi, чтобы systemd-boot их распознал.)\n\n"
+    },
+    {
+      "title": "Grml на ESP",
+      "level": 3,
+      "content": "Grml — это небольшая live-система с набором программ для системного администрирования и восстановления.\n\nДля установки Grml на ESP достаточно скопировать ядро vmlinuz, initramfs initrd.img и образ grml64-small.squashfs из файла iso в ESP. Для этого сначала скачайте grml64-small.iso и смонтируйте его (здесь точка монтирования обозначается как mnt); ядро и initramfs находятся в каталоге mnt/boot/grml64small/, а образ — в каталоге mnt/live/grml64-small/.\n\nДалее создайте в ESP каталог для Grml:\n\n```\n# mkdir -p esp/grml\n```\n\nИ скопируйте в него вышеупомянутые файлы:\n\n```\n# cp mnt/boot/grml64small/vmlinuz esp/grml\n# cp mnt/boot/grml64small/initrd.img esp/grml\n# cp mnt/live/grml64-small/grml64-small.squashfs esp/grml\n```\n\nЗатем создайте загрузочную запись для systemd-boot:\n\n```\nesp/loader/entries/grml.conf\n```\n\n```\ntitle   Grml Live Linux\nlinux   /grml/vmlinuz\ninitrd  /grml/initrd.img\noptions apm=power-off boot=live live-media-path=/grml/ nomce net.ifnames=0\n```\n\nСписок доступных опций можно посмотреть здесь: cheatcode for Grml.\n\n"
+    },
+    {
+      "title": "systemd-boot на системах BIOS",
+      "level": 3,
+      "content": "Если вам нужен загрузчик для BIOS-систем, соответствующий The Boot Loader Specification, то можно использовать systemd-boot. Загрузчик Clover поддерживает загрузку в режиме BIOS и имитирует среду EFI.\n\n"
+    },
+    {
+      "title": "Установка после загрузки в режиме BIOS",
+      "level": 3,
+      "content": "Вы с таким же успехом можете установить systemd-boot, если загружаетесь в режиме BIOS. Тем не менее, от вас всё равно требуется сообщить прошивке запускать EFI файл systemd-boot при загрузке:\n\n- у вас есть работающий EFI shell где-нибудь.\n- ваш интерфейс прошивки предоставляет вам соответствующий способ настройки EFI файла, который будет загружен во время загрузки.\n\nЕсли вы имеете такую возможность, процесс установки будет проще: перейдите в ваш EFI shell или интерфейс настройки вашей прошивки и измените EFI файл по умолчанию вашей машины на esp/EFI/systemd/systemd-bootx64.efi ( или systemd-bootia32.efi если у вас 32 битная системная прошивка).\n\n"
+    },
+    {
+      "title": "Создание записи вручную с помощью efibootmgr",
+      "level": 3,
+      "content": "Если команда bootctl install не сработала, вы можете создать загрузочную запись EFI самостоятельно с помощью утилиты efibootmgr:\n\n```\n# efibootmgr --create --disk /dev/sdX --part Y --loader \"\\EFI\\systemd\\systemd-bootx64.efi\" --label \"Linux Boot Manager\" --unicode\n```\n\nгде /dev/sdXY — это системный раздел EFI.\n\n"
+    },
+    {
+      "title": "Создание записи вручную с помощью bcdedit из Windows",
+      "level": 3,
+      "content": "Если по какой-то причине нужно создать загрузочную запись EFI из Windows, можно выполнить следующие команды в командной строке, запущенной с правами администратора:\n\n```\n> bcdedit /copy {bootmgr} /d \"Linux Boot Manager\"\n> bcdedit /set {guid} path \\EFI\\systemd\\systemd-bootx64.efi\n```\n\nЗамените guid на id, возвращённый первой командой. Также можно сделать эту запись записью по умолчанию:\n\n```\n> bcdedit /default {guid}\n```\n\n"
+    },
+    {
+      "title": "Меню не отображается после обновления Windows",
+      "level": 3,
+      "content": "Обратитесь к разделу соответствующей статьи: Unified Extensible Firmware Interface (Русский)#Windows изменяет порядок загрузки.\n\n"
+    },
+    {
+      "title": "Добавление поддержки разблокировки TPM для Windows BitLocker",
+      "level": 3,
+      "content": "Чтобы BitLocker перестал запрашивать ключ восстановления, добавьте в файл loader.conf:\n\n```\nesp/loader/loader.conf\n```\n\n```\nreboot-for-bitlocker yes\n```\n\nЭто установит UEFI-переменную BootNext, благодаря которой Windows Boot Manager будет загружаться без необходимости использования ключа восстановления BitLocker. Это однократное изменение, и systemd-boot остается загрузчиком по умолчанию. Нет необходимости добавлять загрузочную запись для Windows, если она была определена автоматически.\n\nЭто экспериментальная функция, поэтому прочитайте loader.conf(5).\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- https://systemd.io/BOOT/\n- https://github.com/systemd/systemd/tree/master/src/boot/efi[устаревшая ссылка 2024-12-15 ⓘ]\n- https://bbs.archlinux.org/viewtopic.php?id=254374\n- https://uapi-group.org/specifications/specs/boot_loader_specification/\n\n"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "title": "Espaço swap",
+  "url": "https://wiki.archlinux.org/title/Espa%C3%A7o_swap",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- fstab\n- Hibernação\n- Zswap\n- Swap on video ram\n- ZFS#Swap volume\n- dm-crypt/Swap criptografada\n\nEssa página fornece uma introdução a espaço swap e paginação no GNU/Linux. Ele cobre a criação e ativação de partições swap e arquivos swap.\n\nDo All about Linux swap space:\n\nSuporte para swap é fornecido pelo kernel Linux e utilitários de espaço de usuário do pacote util-linux.\n\n"
+    },
+    {
+      "title": "Espaço swap",
+      "level": 2,
+      "content": "O espaço swap pode assumir a forma de uma partição de disco ou de um arquivo. Os usuários podem criar um espaço swap durante a instalação ou em qualquer momento posterior, conforme desejado. O espaço swap pode ser usado para duas finalidades, estender a memória virtual além da memória física instalada (RAM), também conhecido como \"ativar swap\", e também para suporte de suspensão para disco.\n\nSe for benéfico ativar o swap, depende da quantidade de memória física instalada e da quantidade de memória necessária para executar todos os programas desejados. Se a quantidade de memória física for menor que a quantidade necessária, é benéfico ativar a troca. Isso evita condições de falta de memória, onde o mecanismo matador de OOM do kernel do Linux tentará automaticamente liberar memória matando processos. Para aumentar a quantidade de memória virtual para o valor necessário, adicione a diferença necessária como espaço swap. Por exemplo, se os seus programas precisarem de 7,5 GB de memória para serem executados e houver 4 GB de memória física instalada, adicione a diferença de 3,5 GB no espaço swap. Adicione mais espaço swap para atender aos requisitos futuros. É uma questão de preferência pessoal se você preferir que os programas sejam eliminados ao ativar swap. A maior desvantagem de ativar o swap é seu desempenho inferior, consulte a seção #Desempenho.\n\nPara verificar o estado do swap, use:\n\n```\n$ swapon --show\n```\n\nOu\n\n```\n$ free -h\n```\n\nfree também indica se a memória está em falta, o que pode ser remediado habilitando swap ou aumentando swap.\n\n"
+    },
+    {
+      "title": "Partição swap",
+      "level": 2,
+      "content": "Uma partição swap pode ser criada com a maioria das ferramentas de particionamento do GNU/Linux. Partições swap são tipicamente designadas como tipo 82. Mesmo que seja possível usar qualquer tipo de partição como swap, é recomendado usar o tipo 82 na maioria dos casos, já que o systemd detectará e montará automaticamente (veja abaixo).\n\nPara configurar uma partição como área swap do Linux, o comando mkswap é usado. Por exemplo:\n\n```\n# mkswap /dev/sdxy\n```\n\nPara habilitar o dispositivo para paginação:\n\n```\n# swapon /dev/sdxy\n```\n\nPara habilitar essa partição swap na inicialização, adicione uma entrada ao /etc/fstab:\n\n```\nUUID=UUID_dispositivo none swap defaults 0 0\n```\n\nsendo que UUID_dispositivo é o UUID do espaço swap.\n\nVeja: fstab para a sintaxe do arquivo\n\n- A entrada fstab é opcional se a partição swap estiver localizada em um dispositivo usando o GPT. Veja a próxima subseção.\n- Se estiver usando um SSD com suporte a TRIM, considere usar defaults,discard na linha de swap no fstab. Se estiver ativando o swap manualmente com swapon, o parâmetro -d/--discard atinge o mesmo objetivo. Veja swapon(8) para detalhes.\n\n"
+    },
+    {
+      "title": "Ativação por systemd",
+      "level": 3,
+      "content": "O systemd ativa partições swap com base em dois mecanismos diferentes. Ambos são executáveis em /usr/lib/systemd/system-generators. Os geradores são executados na inicialização e criam unidades systemd nativas para montagens. O primeiro, systemd-fstab-generator, lê o fstab para gerar unidades, incluindo uma unidade para swap. O segundo, systemd-gpt-auto-generator inspeciona o disco raiz para gerar unidades. Ele opera somente nos discos GPT e pode identificar as partições swap pelo tipo GUID, consulte systemd (Português)#Montagem automática de partição GPT para obter mais informações.\n\n"
+    },
+    {
+      "title": "Desabilitando swap",
+      "level": 3,
+      "content": "Para desabilitar um espaço swap específico:\n\n```\n# swapoff /dev/sdxy\n```\n\nAlternativamente, use a opção -a para desabilitar todos os espaços swap.\n\nComo o swap é gerenciado pelo systemd, ele será ativado novamente na próxima inicialização do sistema. Para desabilitar a ativação automática do espaço de swap detectado permanentemente, execute systemctl --type swap para encontrar a unit responsável .swap e aplique mask.\n\n"
+    },
+    {
+      "title": "Arquivo swap",
+      "level": 2,
+      "content": "Como uma alternativa para criar uma partição inteira, um arquivo swap oferece a capacidade de variar seu tamanho em execução, e é mais facilmente removido completamente. Isto pode ser especialmente desejável se o espaço em disco for precioso (por exemplo, um SSD de tamanho modesto).\n\n"
+    },
+    {
+      "title": "Criação de arquivo swap",
+      "level": 4,
+      "content": "Para sistemas de arquivos \"copy-on-write\", como o Btrfs, primeiro crie um arquivo de tamanho zero, defina o atributo No_COW nele com chattr e certifique-se que a compressão está desabilitada:\n\n```\n# truncate -s 0 /swapfile\n# chattr +C /swapfile\n # btrfs property set /swapfile compression none\n```\n\nVeja Btrfs#Arquivo swap para mais informações. Use fallocate para criar um arquivo swap com o tamanho de sua escolha (M = Mebibytes, G = Gibibytes). Por exemplo, para criar um arquivo swap de 512 MiB:\n\n```\n# fallocate -l 512M /swapfile\n```\n\n```\n# dd if=/dev/zero of=/swapfile bs=1M count=512 status=progress\n```\n\nDefina as permissões certas (um arquivo swap legível por todos é uma imensa vulnerabilidade local):\n\n```\n# chmod 600 /swapfile\n```\n\nApós criar o arquivo no tamanho correto, formate-o para swap:\n\n```\n# mkswap /swapfile\n```\n\nAtive o arquivo swap:\n\n```\n# swapon /swapfile\n```\n\nFinalmente, edite a configuração do fstab para adicionar uma entrada para o arquivo swap:\n\n```\n/etc/fstab\n```\n\n```\n/swapfile none swap defaults 0 0\n```\n\nPara informações adicionais, veja fstab#Uso.\n\n"
+    },
+    {
+      "title": "Remover arquivo swap",
+      "level": 4,
+      "content": "Para remover um arquivo swap, ele deve primeiro ser desligado:\n\n```\n# swapoff /swapfile\n# rm -f /swapfile\n```\n\nPor fim, remova a entrada relevante do /etc/fstab.\n\n"
+    },
+    {
+      "title": "systemd-swap",
+      "level": 4,
+      "content": "systemd-swap é um script para criar um espaço de swap híbrido a partir de swaps de zram, arquivos swap e partições swap. Não é um afiliado com o projeto systemd.\n\nInstale o pacote systemd-swapAUR. Defina swapfc_enabled=1 NA seção Swap File Chunked do /etc/systemd/swap.conf. Inicie/habilite o serviço systemd-swap.\n\nVisite a página do autor no GitHub para mais informações e instalação da configuração recomendada.\n\n"
+    },
+    {
+      "title": "Criptografia swap",
+      "level": 2,
+      "content": "Veja dm-crypt/Swap criptografada.\n\n"
+    },
+    {
+      "title": "Desempenho",
+      "level": 2,
+      "content": "As operações de swap geralmente são significativamente mais lentas do que acessar diretamente os dados na RAM. A desativação total da swap para melhorar o desempenho pode levar a uma degradação, pois diminui a memória disponível para caches VFS, causando E/S de disco mais frequente e dispendiosa.\n\nOs valores de swap podem ser ajustados para ajudar no desempenho:\n\n"
+    },
+    {
+      "title": "Swappiness",
+      "level": 3,
+      "content": "O parâmetro de sysctl para swappiness (isto é, a capacidade de realizar swap) representa a preferência (ou evitação) do kernel a cerca do espaço de swap. Swappiness pode ter um valor entre 0 e 100, o valor padrão é 60. Um valor baixo faz com que o kernel evite swap, um valor mais alto faz com que o kernel tente usar o espaço de swap. Sabe-se que usar um valor baixo em memória suficiente melhora a capacidade de resposta em muitos sistemas.\n\nPara verificar o valor atual de swappiness:\n\n```\n$ sysctl vm.swappiness\n```\n\nAlternativamente, os arquivos /sys/fs/cgroup/memory/memory.swappiness ou /proc/sys/vm/swappiness podem ser lido para obter o valor inteiro não tratado.\n\nPara definir temporariamente o valor do swappiness:\n\n```\n# sysctl -w vm.swappiness=10\n```\n\nPara definir permanentemente o valor de swappiness, crie um arquivo de configuração sysctl.d(5). Por exemplo:\n\n```\n/etc/sysctl.d/99-swappiness.conf\n```\n\n```\nvm.swappiness=10\n```\n\nPara testar e mais sobre por que isso pode funcionar, dê uma olhada neste artigo.\n\n"
+    },
+    {
+      "title": "Pressão de cache VFS",
+      "level": 3,
+      "content": "Outro parâmetro sysctl que afeta o desempenho da swap é vm.vfs_cache_pressure, que controla a tendência do kernel para recuperar a memória que é usada para armazenamento em cache de caches VFS, versus cache de páginas e swap. Aumentar esse valor aumenta a taxa na qual os caches VFS são recuperados [2]. Para mais informações, consulte a documentação do kernel Linux.\n\n"
+    },
+    {
+      "title": "Prioridade",
+      "level": 3,
+      "content": "Se você tiver mais de um arquivo de swap ou partição de swap, considere atribuir um valor de prioridade (0 a 32767) para cada área de swap. O sistema usará áreas de swap de prioridade mais alta antes de usar áreas de swap de menor prioridade. Por exemplo, se você tiver um disco mais rápido (/dev/sda) e um disco mais lento (/dev/sdb), atribua uma prioridade mais alta à área de troca localizada no mais rápido dispositivo. Prioridades podem ser atribuídas em fstab através do parâmetro pri:\n\n```\n/dev/sda1 none swap defaults,pri=100 0 0\n/dev/sdb2 none swap defaults,pri=10  0 0\n```\n\nOu por meio do parâmetro --priority de swapon:\n\n```\n# swapon --priority 100 /dev/sda1\n```\n\nSe duas ou mais áreas tiverem a mesma prioridade e for a prioridade mais alta disponível, as páginas serão alocadas em uma base round-robin entre elas.\n\n"
+    },
+    {
+      "title": "Usando zswap ou zram",
+      "level": 3,
+      "content": "O zswap é um recurso de kernel do Linux que fornece um cache de write-back compactado para páginas do swap. Isso aumenta o desempenho e diminui o operações de E/S. ZRAM cria um arquivo swap compactado virtual na memória como alternativa a um arquivo swap no disco.\n\n"
+    },
+    {
+      "title": "Distribuição",
+      "level": 3,
+      "content": "Não há necessidade de usar RAID por motivos de desempenho de swap. O kernel em si pode distribuir a troca em vários dispositivos, se você apenas der a mesma prioridade no arquivo /etc/fstab. Consulte o The Software-RAID HOWTO para obter detalhes.\n\n"
+    }
+  ]
+}

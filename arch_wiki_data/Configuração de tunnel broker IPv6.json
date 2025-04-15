@@ -1,0 +1,31 @@
+{
+  "title": "Configuração de tunnel broker IPv6",
+  "url": "https://wiki.archlinux.org/title/Configura%C3%A7%C3%A3o_de_tunnel_broker_IPv6",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "A Hurricane Electric oferece um serviço gratuito de tunnel broker que é relativamente fácil de usar sob o Arch se você deseja adicionar conectividade IPv6 a um host somente IPv4.\n\n"
+    },
+    {
+      "title": "Registrando por um tunnel",
+      "level": 2,
+      "content": "Não é tão difícil de fazer. Sinta-se à vontade para preencher as instruções aqui se algo parecer complicado, mas, caso contrário, basta ir ao site do tunnel broker e completar o registro.\n\n"
+    },
+    {
+      "title": "Configurando um túnel Hurricane Electric",
+      "level": 2,
+      "content": "Crie a seguinte unidade systemd, substituindo o texto em negrito pelos endereços IP que você obteve do HE:\n\nNote: **endereço_IPv4_cliente** \n\n```\n/etc/systemd/system/he-ipv6.service\n```\n\n```\n[Unit]\nDescription=he.net IPv6 tunnel\nAfter=network.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/ip tunnel add he-ipv6 mode sit remote endereço_IPv4_servidor local endereço_IPv4_cliente ttl 255\nExecStart=/usr/bin/ip link set he-ipv6 up mtu 1480\nExecStart=/usr/bin/ip addr add endereço_IPv6_cliente dev he-ipv6\nExecStart=/usr/bin/ip -6 route add ::/0 dev he-ipv6\nExecStop=/usr/bin/ip -6 route del ::/0 dev he-ipv6\nExecStop=/usr/bin/ip link set he-ipv6 down\nExecStop=/usr/bin/ip tunnel del he-ipv6\n\n[Install]\nWantedBy=multi-user.target\n```\n\nEntão, inicie/habilite he-ipv6.service.\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 2,
+      "content": "Se systemd-networkd lida suas conexões de rede, é provavelmente uma idea melhor para deixá-lo lidar com tunnel broker também (em vez de usar um arquivo .service).\n\n```\n/etc/systemd/network/he-tunnel.netdev\n```\n\n```\n[Match]\n \n[NetDev]\nName=he-ipv6\nKind=sit\nMTUBytes=1480\n \n[Tunnel]\nLocal=<IPv4 local>\nRemote=<outro lado do túnel>\nTTL=255\n```\n\n```\n/etc/systemd/network/he-tunnel.network\n```\n\n```\n[Match]\nName=he-ipv6\n \n[Network]\nAddress=<IPv6 local>\nGateway=<gateway IPv6>\nDNS=2001:4860:4860::8888\nDNS=2001:4860:4860::8844\n```\n\ne adicione essa linha à seção [Network] de seu arquivo .network padrão de conexão internet:\n\n```\nTunnel=he-ipv6\n```\n\n"
+    },
+    {
+      "title": "Usando tunelamento com IP IPv4 dinâmico",
+      "level": 2,
+      "content": "A maneira mais simples de usar o tunelamento com um IP IPv4 dinâmico é configurar um cronjob que atualizará periodicamente seu endereço atual. O URL de exemplo e uma Chave de atualização podem ser encontrados na aba Avançado da página Detalhes do túnel.\n\nPara verificar se a atualização funciona, execute o seguinte comando (substitua USERNAME, UPDATEKEY e TUNNELID pelo detalhes de sua conta e túnel):\n\n```\n$ wget -O - https://USERNAME:UPDATEKEY@ipv4.tunnelbroker.net/nic/update?hostname=TUNNELID\n```\n\nSe funcionar, crie um cronjob abrindo crontab -e e adicionando uma nova linha:\n\n```\n*/10 * * * * wget -q -O /dev/null https://USERNAME:UPDATEKEY@ipv4.tunnelbroker.net/nic/update?hostname=TUNNELID\n```\n\n"
+    }
+  ]
+}

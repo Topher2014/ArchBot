@@ -1,0 +1,106 @@
+{
+  "title": "LIRC (日本語)",
+  "url": "https://wiki.archlinux.org/title/LIRC_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "official website から:\n\nこの記事ではシリアル・USB 赤外線デバイスを使って LIRC \"Linux Infrared Remote Control\" を設定・使用する方法を説明しています。\n\nLIRC はサポートしているリモコンのキーが押されたときにプログラムにあわせて特定のコマンドに変換することができるデーモンです。ここで、「プログラムにあわせて」とは同じキーでも実行しているプログラムによって異なる動作をさせることができることを意味します。LIRC から取得されたリモコンの情報は以下のようにプログラムに流れます:\n\n1. ユーザーがリモコンのボタンを押すことで IR または RF 信号が送信されます。\n1. Linux パソコンに接続されたレシーバーによって信号が受信されます。\n1. カーネル (のモジュール) によってリモコンから送信されたパルス信号が /dev/lirc0, /dev/input/eventX, /dev/ttyUSBX, /dev/ttyS0 などのデバイスに変換されます。\n1. /usr/bin/lircd は /etc/lirc/lircd.conf.d/foo.conf の情報を使ってパルス信号をボタンの押下情報に変換します。\n1. LIRC を使用するプログラムは ~/.lircrc に書かれている情報に従って /usr/bin/lircd のボタン押下情報をユーザーが定義した操作に解釈します。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 受信機と送信機の設定 2.1.1 シリアルポート 2.1.2 サウンドカード 2.2 リモート設定 2.2.1 リモート設定の検索 2.2.2 リモート設定の作成 2.3 アプリケーション固有のアクション 2.4 通常のユーザーとして実行する 2.4.1 lirc-user-service の AUR パッケージを使用する\n- 3 テスト 3.1 コマンドの受信 3.2 コマンドの送信\n- 4 トラブルシューティング 4.1 リモコンがキーボードとして機能する 4.1.1 Xorg を使用している場合 4.1.2 Xorg を使用していない場合 4.2 デフォルト設定を変更する 4.2.1 サンプル\n- 5 参照\n\n- 2.1 受信機と送信機の設定 2.1.1 シリアルポート 2.1.2 サウンドカード\n- 2.2 リモート設定 2.2.1 リモート設定の検索 2.2.2 リモート設定の作成\n- 2.3 アプリケーション固有のアクション\n- 2.4 通常のユーザーとして実行する 2.4.1 lirc-user-service の AUR パッケージを使用する\n\n- 2.1.1 シリアルポート\n- 2.1.2 サウンドカード\n\n- 2.2.1 リモート設定の検索\n- 2.2.2 リモート設定の作成\n\n- 2.4.1 lirc-user-service の AUR パッケージを使用する\n\n- 3.1 コマンドの受信\n- 3.2 コマンドの送信\n\n- 4.1 リモコンがキーボードとして機能する 4.1.1 Xorg を使用している場合 4.1.2 Xorg を使用していない場合\n- 4.2 デフォルト設定を変更する 4.2.1 サンプル\n\n- 4.1.1 Xorg を使用している場合\n- 4.1.2 Xorg を使用していない場合\n\n- 4.2.1 サンプル\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "lirc パッケージをインストールします。オーディオドライバーが必要な場合は、lirc-gitAUR をインストールしてください。\n\n"
+    },
+    {
+      "title": "受信機と送信機の設定",
+      "level": 3,
+      "content": "適切に実行するには、LIRC サービスの ドライバー および/または デバイス を指定する必要がある場合があります。irrecord などの LIRC 依存プログラムの実行中にサービスが突然停止した場合は、journalctl 出力で次のようなメッセージを探してください。\n\n```\nDriver `devinput' not found or not loadable (wrong or missing -U/--plugindir?).\nreadlink() failed for \"auto\": No such file or directory\n```\n\nこれらを設定ファイルに設定し、サービスを再起動します。\n\n```\n/etc/lirc/lirc_options.conf\n```\n\n```\n[lircd]\ndriver = driver-name\ndevice = /dev/path-to-dev\n```\n\n"
+    },
+    {
+      "title": "シリアルポート",
+      "level": 4,
+      "content": "最新のカーネルには、古い lirc_serial ドライバーに代わる serial_ir モジュールがあります。マザーボードのシリアルポートに接続された DIY 受信機および送信機もサポートします。setserialAUR をインストールして実行します:\n\n```\n# setserial /dev/ttyS0 uart none\n# modprobe serial_ir\n```\n\nserial_ir モジュールをロードすると、デバイス /dev/lirc0 が、カーネルによって created になります。そうでない場合は、ジャーナル で関連するエラーがないか確認してください。シリアルデバイスの LIRC 設定例:\n\n```\n/etc/lirc/lirc_options.conf\n```\n\n```\n[lircd]\ndriver          = default\ndevice          = auto\n\n[modinit]\ncode = /usr/bin/setserial /dev/ttyS0 uart none\ncode1 = /usr/sbin/modprobe serial_ir\n```\n\n"
+    },
+    {
+      "title": "サウンドカード",
+      "level": 4,
+      "content": "外部 DIY 回路が接続されたサウンドカードは、受信 および IR コードを 送受信 できます。\n\naudio_alsa driver は lirc に含まれていますが、受信のみをサポートしています。\n\nalsamixer でマイク入力のミュートを解除し、十分なゲインを設定します。audacity で波形とゲインを確認できます。区別できる方形パルスが存在する必要があります。平坦でも過負荷でもありません。また、良好に復調されたパルスは耳で簡単に認識できます。LIRC と irrecord は 右オーディオチャネルの正のパルス を読み取ることに注意してください。負のパルスは機能しません。\n\n```\n/etc/lirc/lirc_options.conf\n```\n\n```\ndriver          = audio_alsa\ndevice          = default\n```\n\nlirc-gitAUR に含まれる audio driver が受信と送信の両方をサポートします。デフォルトの遅延が 0.02 程度であると、\"Warning: Output underflow\" が発生し、送信が破損する可能性があることに注意してください。受信機はそれに応答しません。0.05 などのより高い値を試してください。\n\nサウンドカードの出力音量を上げて下さい。そうしないと、LED 信号が弱く、範囲が狭くなります。LEDフラッシュは赤外線の波長に敏感であるため、スマートフォンのカメラで検出できます。\n\n```\n/etc/lirc/lirc_options.conf\n```\n\n```\ndriver          = audio\ndevice          = ALSA:default@48000:0.05\n```\n\n"
+    },
+    {
+      "title": "リモート設定",
+      "level": 3,
+      "content": "ディレクトリ /etc/lirc/lircd.conf.d/ には、リモートのシステム全体の設定ファイルが含まれています。各 *.conf ファイルは 1 つのデバイスに対応し、そのプロトコル、スキャンコード、キーコードが記述されています。これにより、LIRC が特定のハードウェアに対して信号を送受信できるようになります。これらのファイルは lirc パッケージには含まれていないため、ユーザーが作成する必要があります。\n\n"
+    },
+    {
+      "title": "リモート設定の検索",
+      "level": 4,
+      "content": "多くの設定ファイルは LIRC リモートデータベース にあります。URL に従うか、irdb-get(1) を使用してデータベースを検索します。\n\nirdb-get を使用して \"Streamzap\" リモートの設定ファイルを検索する例:\n\n```\n$ irdb-get find stream\n```\n\n```\natiusb/atiusb.lircd.conf\ndigital_stream/DTX9900.lircd.conf\nsnapstream/Firefly-Mini.lircd.conf\nstreamzap/PC_Remote.lircd.conf\nstreamzap/streamzap.lircd.conf\nx10/atiusb.lircd.conf\n```\n\n```\n$ irdb-get download streamzap/streamzap.lircd.conf\n```\n\n```\nDownloaded sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/streamzap/streamzap.lircd.conf as streamzap.lircd.conf\n```\n\n特定したら、必要な .conf を /etc/lirc/lircd.conf.d/ にコピーして、デーモンがそのサポートを初期化できるようにします。\n\n```\n# cp streamzap.lircd.conf /etc/lirc/lircd.conf.d/\n```\n\n"
+    },
+    {
+      "title": "リモート設定の作成",
+      "level": 4,
+      "content": "リモートコントロール設定は、ユーザーがプロセスをガイドする irrecord(1) を使用して作成できます。検出されたリモートを使用する場合は、次のように呼び出します。\n\n```\n# irrecord --device=/dev/lirc0 MyRemote\n```\n\nプログラムはユーザーにリモコンのキーを押して学習するよう指示し、最終的にすべてのボタンとそれに対応するスキャンコードをマッピングします。完了したら、結果のファイルを /etc/lirc/lircd.conf.d/foo.conf に保存します。設定ファイルを他の人と共有することを検討してください。\n\n"
+    },
+    {
+      "title": "アプリケーション固有のアクション",
+      "level": 3,
+      "content": "キーコードをアプリケーション固有のアクションにバインドするには、それぞれの設定ファイルを ~/.config/lircrc/ に配置します。必要に応じて手動で作成する必要があります。lircrc(5) を参照してください。これは、MPlayer、VLC、MythTV、totem などの LIRC 対応アプリケーションでのみ機能します (Kodi も LIRC をサポートしていますが、非対応-標準的な方法、Kodi#リモートコントロールの使用を参照してください。\n\nこれらのアプリケーション固有の設定を別のファイルで定義し、次のように lircrc に含めます。\n\n```\ninclude \"~/.config/lircrc/mplayer\"\ninclude \"~/.config/lircrc/mythtv\"\ninclude \"~/.config/lircrc/vlc\"\n```\n\n"
+    },
+    {
+      "title": "通常のユーザーとして実行する",
+      "level": 3,
+      "content": "デフォルトでは、lircd は root として実行されます。安定性とセキュリティを向上させるために、アップストリームでは通常のユーザーとして実行することをお勧めします。このリンクにある付録 14 を参照してください。\n\n"
+    },
+    {
+      "title": "lirc-user-service の AUR パッケージを使用する",
+      "level": 4,
+      "content": "すべてを自動的に行う lirc-user-serviceAUR が提供されています。\n\n"
+    },
+    {
+      "title": "テスト",
+      "level": 2,
+      "content": "lircd.service を 起動/有効化 して下さい。\n\n"
+    },
+    {
+      "title": "コマンドの受信",
+      "level": 3,
+      "content": "irw(1) を実行し、リモコンを受信機に向けていくつかのボタンを押します。受信したコードは標準出力に出力されます。\n\n```\n$ irw\n```\n\n```\n000000037ff07bfe 00 One mceusb\n000000037ff07bfd 00 Two mceusb\n000000037ff07bfd 01 Two mceusb\n000000037ff07bf2 00 Home mceusb\n000000037ff07bf2 01 Home mceusb\n```\n\nirw が出力を返さない場合:\n\n- mode2 または xmode2 を実行して、LIRC が実際に IR センサーから何かを読み取ったかどうかを確認します。読み取っていない場合は、ハードウェアを確認してください\n- mode2 がパルスデータを受信した場合は、/etc/lirc/lircd.conf.d/ の設定ファイルにエラーがないか確認してください。\n\n"
+    },
+    {
+      "title": "コマンドの送信",
+      "level": 3,
+      "content": "登録されているリモート (設定ファイル) をリストします。\n\n```\n$ irsend LIST \"\" \"\"\n```\n\n```\nLG_6710CMAP01A\n```\n\n特定のデバイスで利用可能なコードをリストします:\n\n```\n$ irsend LIST LG_6710CMAP01A \"\"\n```\n\n```\n0000000000007887 KEY_POWER\n000000000000f807 KEY_MUTE\n000000000000e817 KEY_VOLUMEUP\n...\n```\n\n検出されたデバイス LG_6710CMAP01A を選択し、コマンド KEY_POWER を送信します。\n\n```\n$ irsend SEND_ONCE LG_6710CMAP01A KEY_POWER\n```\n\n"
+    },
+    {
+      "title": "Xorg を使用している場合",
+      "level": 4,
+      "content": "Streamzap USB PC Remote など、リモコンによっては Xorg によって Human Interface Device (HID) と認識されるものがあり、物理キーボードからの入力のようにキーの一部または全てがキーストロークとして認識されます。この挙動は LIRC でデバイスを管理しようとしたときに問題になります。\n\n無効にするには、以下のファイルを作成して X を再起動してください:\n\n```\n/etc/X11/xorg.conf.d/90-streamzap.conf\n```\n\n```\nSection \"InputClass\"\n  Identifier \"Ignore Streamzap IR\"\n  MatchProduct \"Streamzap\"\n  MatchIsKeyboard \"true\"\n  Option \"Ignore\" \"true\"\nEndSection\n```\n\n次のコマンドで得られる出力の Name に合わせて MatchProduct は適切に変更するようにしてください:\n\n```\n$ cat /proc/bus/input/devices | grep -e IR\n```\n\n例えば N: Name=\"cx88 IR (WinFast DTV2000 H rev.\" の場合 WinFast にします。\n\n"
+    },
+    {
+      "title": "Xorg を使用していない場合",
+      "level": 4,
+      "content": "/etc/modprobed.d/streamzap.conf を作成して問題を起こすモジュールをブラックリストに追加してください。例えば Streamzap のリモコンの場合:\n\n```\ninstall ir_sharp_decoder /bin/false\ninstall ir_xmp_decoder /bin/false\ninstall ir_rc5_decoder /bin/false\ninstall ir_nec_decoder /bin/false\ninstall ir_sony_decoder /bin/false\ninstall ir_mce_kbd_decoder /bin/false\ninstall ir_jvc_decoder /bin/false\ninstall ir_rc6_decoder /bin/false\ninstall ir_sanyo_decoder /bin/false\n```\n\n"
+    },
+    {
+      "title": "デフォルト設定を変更する",
+      "level": 3,
+      "content": "irw で何も出力されない場合、/etc/lirc/lirc_options.conf のデフォルト設定が原因である可能性があります (あるいはアップデートによって上書きされた可能性もあります)。\n\nまず、/dev/lirc0 が存在するかどうか確認してください:\n\n```\n$ mode2 --driver default --device /dev/lirc0\n```\n\nリモコンのボタンを押してみて何か出力されないか確認してください。出力がある場合、/etc/lirc/lirc_options.conf を編集して driver と device を適当な値に変更してください。\n\n何も出力されない場合、適切なドライバーとデバイスの組み合わせを探します。最初に lirc がデフォルトでどの組み合わせを認識しているのか確認します。v4l-utils パッケージに含まれている ir-keytable を実行して出力を確認してください。以下のように出力されます:\n\n```\nFound /sys/class/rc/rc0/ (/dev/input/event5) with:\n      Driver ite-cir, table rc-rc6-mce\n      Supported protocols: unknown other lirc rc-5 jvc sony nec sanyo mce-kbd rc-6 sharp xmp\n      Enabled protocols: lirc\n      Extra capabilities: <access denied>\n```\n\n上記の場合、lirc は /dev/input/event5 を赤外線デバイスとして自動的に認識して、devinput ドライバーが使われています。以下のコマンドを実行することで組み合わせが正しいか確認します:\n\n```\n$ mode2 --driver devinput --device /dev/input/event5\n```\n\nリモコンのボタンを押してみてください。何も出力されない場合、別のドライバーとデバイスの組み合わせを試してみてください。機能する組み合わせを発見したら、/etc/lirc/lirc_options.conf の driver と device を変更してください。\n\n"
+    },
+    {
+      "title": "サンプル",
+      "level": 4,
+      "content": "MCE RC6 互換レシーバの設定例:\n\n```\n/etc/lirc/lirc_options.conf\n```\n\n```\n[lircd]\nnodaemon        = False\ndriver          = default\ndevice          = /dev/lirc0\noutput          = /var/run/lirc/lircd\npidfile         = /var/run/lirc/lircd.pid\nplugindir       = /usr/lib/lirc/plugins\npermission      = 666\nallow-simulate  = No\nrepeat-max      = 600\n\n[lircmd]\nuinput          = False\nnodaemon        = False\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- 開発元のドキュメント\n- リモコンデータベース\n- プロジェクトサイト\n- 開発元の設定ガイド\n- MythTV Wiki:Remotes article\n- サポートしているハードウェアの公式リスト\n- Linux Streamzap config files\n\n"
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "title": "Acer C7",
+  "url": "https://wiki.archlinux.org/title/Acer_C7",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Chrome OS devices/Crostini\n- Chrome OS devices/Chromebook\n- Chrome OS devices/Custom firmware\n- Installation guide\n- Laptop\n\nThis article was created to provide information on how to get Arch installed on the series of Chrome OS devices built by Acer, HP, Samsung, Toshiba, and Google. Currently this page is being overhauled, and more model specific pages are being built with some of the information listed below.\n\n"
+    },
+    {
+      "title": "Legacy Boot Mode",
+      "level": 3,
+      "content": "All recent Intel-based Chrome OS devices (starting with the 2013 Chromebook Pixel) feature a Legacy Boot Mode, designed to allow the user to boot Linux. Legacy Boot Mode has a dedicated firmware region, RW_LEGACY, which is designed to be user-writeable (hence the 'RW' notation) and is completely separate from the ChromeOS portion of the firmware (ie, it is safe to update and cannot brick the device). It is enabled by the SeaBIOS payload of coreboot, the open-source firmware used for all Chrome OS devices (with the exception of the first generation of Chromebooks and a few early ARM models). SeaBIOS behaves like a traditional BIOS that boots into the MBR of the disk, and from there into standard boot loaders like Syslinux and GRUB.\n\nModels with a Core-i based SoC (Haswell, Broadwell, Skylake, KabyLake) mostly ship with a functional Legacy Boot Mode payload; updating to a 3rd party build can provide bug fixes and additional features. Models with an Atom-based SoC (Baytrail, Braswell, Apollolake) have Legacy Boot Mode capability, but do not ship with a RW_LEGACY/SeaBIOS payload (that part of the firmware is blank). These models require a 3rd party RW_LEGACY firmware to be loaded for Legacy Boot Mode to be functional.\n\n"
+    },
+    {
+      "title": "Models without Legacy Boot Mode/SeaBIOS",
+      "level": 4,
+      "content": "One of the following approaches can be taken in order to install Arch Linux on Chrome OS devices which did not ship with SeaBIOS as part of the installed firmware:\n\n- If the device supports Legacy Boot Mode, but does not ship with a functional RW_LEGACY payload (or does not ship with one at all), one can flash a SeaBIOS payload to the RW_LEGACY part of the firmware. This is 100% safe, as it writes to a user-writeable area of the firmware image which is completely separate from/does not affect ChromeOS. The easiest way to install/update the RW_LEGACY firmware on your ChromeOS device is via MrChromebox's Firmware Utility Script, which supports the widest range of devices and offers the most up-to-date SeaBIOS builds; one can also update the RW_LEGACY firmware manually with Chrome OS' flashrom (requires downloading/compiling your own build), or use John Lewis' flash_chromebook_rom.sh script (no longer supported).\n- Flash a full custom firmware which includes either a SeaBIOS or UEFI payload, and removes all the ChromeOS-specific parts.\n- Flash the BOOT_STUB part of the firmware. This method replaces the stock ChromeOS payload (depthcharge) with SeaBIOS. This is theoretically a safer approach than flashing the full firmware but there might be some limitations (e.g. no support in suspend or VMX). This is the Modify ROM to run SeaBIOS exclusively option in John Lewis' flash_chromebook_rom.sh script and Flash BOOT_STUB firmware option in MrChromebox's.\n- Take the ChrUbuntu approach which uses the Chrome OS kernel and modules.\n- Build and sign your own kernel, see [1] [2].\n\nThe Installation process described on this page tries to cover the method of installing Arch Linux on models without SeaBIOS by flashing a custom firmware.\n\n"
+    },
+    {
+      "title": "Firmware write protection intro",
+      "level": 3,
+      "content": "All Chrome OS devices features firmware write protection, which restricts write access to certain regions of the flash chip. It is important to be aware of it as one might need to disable the hardware write protection as part of the installation process (to update GBB flags or flash a custom firmware).\n\nFor more details see Custom firmware for Chrome OS devices#Firmware write protection.\n\n"
+    },
+    {
+      "title": "Prerequisites",
+      "level": 3,
+      "content": "- Visit the ArchWiki page for your Chrome OS device.\n- If there is no ArchWiki page for your device then before proceeding, gather information about the device and if you succeed in installing Arch Linux, then consider adding a new ArchWiki page for your model (you can use existing pages in Category:Chrome OS devices as examples).\n- Read this guide completely and make sure you understand all the steps before making any changes.\n\n"
+    },
+    {
+      "title": "Chrome OS devices",
+      "level": 2,
+      "content": "See Chrome OS devices/Chromebook for hardware comparison with details about SeaBIOS availability and storage expansion.\n\n"
+    },
+    {
+      "title": "General hardware recommendations and remarks",
+      "level": 3,
+      "content": "- MyDigitalSSD M.2 NGFF SSD drives are probably the most popular choice when upgrading the internal SSD of a Chrome OS device. There are multiple accounts of failing MyDigitalSSD SSD drives at the Acer C720 topic on the Arch forums [3] [4] [5] and much more on the web. If the SSD was upgraded to a MyDigitalSSD model then it is highly recommended to backup the system and data frequently. It might be advisable to upgrade the SSD with a different brand. Notice that this might be due to a SSD firmware issue so updating the SSD firmware is highly recommended.\n- Transcend MTS400 M.2 NGFF SSD drives are failing (at least with stock Coreboot firmware) when ALPM is enabled, ATM there is no SSD firmware update that fixing this bug, so it is highly advisable to disabled ALPM if a power management daemon has been installed (which enabled it), see Resolving SATA power management related errors and how to disable ALPM in Chrome OS.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The general installation procedure:\n\n- Enable developer mode.\n- ChromeOS device with functional Legacy Boot Mode/SeaBIOS: Enable Legacy Boot Mode. Set SeaBIOS as default (optional but highly recommended, requires disabling the write protection).\n- ChromeOS device without functional Legacy Boot Mode: Flash one of the following types of custom firmware Flash RW_LEGACY firmware (zero risk) Flash BOOT_STUB firmware (very low risk). Flash Full custom firmware (low risk).\n- Prepare the installation media.\n- Boot Arch Linux installation media and install Arch.\n\n- Enable Legacy Boot Mode.\n- Set SeaBIOS as default (optional but highly recommended, requires disabling the write protection).\n\n- Flash one of the following types of custom firmware Flash RW_LEGACY firmware (zero risk) Flash BOOT_STUB firmware (very low risk). Flash Full custom firmware (low risk).\n\n- Flash RW_LEGACY firmware (zero risk)\n- Flash BOOT_STUB firmware (very low risk).\n- Flash Full custom firmware (low risk).\n\n"
+    },
+    {
+      "title": "Enabling developer mode",
+      "level": 3,
+      "content": "Developer Mode is necessary in order to access the superuser shell inside ChromeOS, which is required for making changes to the system like allow booting through SeaBIOS.\n\nTo enable developer mode:\n\n- Press and hold the Esc+⟳ (where F3 would normally be) keys, then press the Power button. This enters Recovery Mode. Chromeboxes have a dedicated Recovery button, which should be pressed/held while powering on\n- Press Ctrl+d (no prompt). It will ask you to confirm, then the system will revert its state and enable Developer Mode.\n\n- Chromeboxes have a dedicated Recovery button, which should be pressed/held while powering on\n\n- Sometimes, pressing Ctrl+d will prompt you to turn off OS Verification. Do so, then press and hold Ctrl+d again, until the system reboots into a warning for developer mode.\n- Press Ctrl+d (or wait 30 seconds for the beep and boot) at the white boot splash screen to enter ChromeOS.\n\n"
+    },
+    {
+      "title": "Accessing the superuser shell",
+      "level": 3,
+      "content": "After you have enabled the Developer Mode, you will need to access the superuser shell. How you do this depends on whether you have configured ChromeOS or not.\n\n"
+    },
+    {
+      "title": "Accessing the superuser shell without logging into ChromeOS",
+      "level": 4,
+      "content": "If you have not configured ChromeOS, just press Ctrl+Alt+F2 (F2 is the \"forward\" arrow on the top row, →), you will see a login prompt.\n\n- Use chronos as the username, it should not prompt you for a password.\n- Become superuser with sudo, use the command sudo su -.\n\n"
+    },
+    {
+      "title": "Accessing the superuser shell when logged into ChromeOS",
+      "level": 4,
+      "content": "If you have configured ChromeOS already:\n\n- Open a crosh window with Ctrl+Alt+t.\n- Open a bash shell with the shell command.\n- Become superuser with sudo, use the command sudo su - to accomplish that.\n\n"
+    },
+    {
+      "title": "Enabling Legacy Boot Mode",
+      "level": 3,
+      "content": "If your ChromeOS device did not ship with Legacy Boot Mode support via SeaBIOS, or you prefer to install a custom firmware, then continue to #Flashing a custom firmware.\n\nThis will enable the pre-installed version of SeaBIOS through the Developer Mode screen in coreboot.\n\n- Inside your superuser shell enter:\n\n```\n# crossystem dev_boot_legacy=1\n```\n\n- Reboot the machine.\n\nYou can now start SeaBIOS by pressing Ctrl+l at the white boot splash screen.\n\nYou should now have SeaBIOS enabled on your ChromeOS device, if you choose to not set it as default then you can continue to #Installing Arch Linux.\n\n"
+    },
+    {
+      "title": "Boot to SeaBIOS by default",
+      "level": 4,
+      "content": "To boot SeaBIOS by default, you will need to run the set_gbb_flags.sh script, which is part of ChromeOS. The script uses flashrom and gbb_utility to read the RO_GBB firmware region, modify the flags, and write it back to flash. The GBB flags can also be set using MrChromebox's Firmware Utility Script under either ChromeOS or Arch (the latter requiring booting with specific kernel parameters to relax memory access restrictions).\n\n- Disable the hardware write protection.\n\n- Switch to the superuser shell.\n- Disable the software write protection.\n\n```\n# flashrom --wp-disable\n```\n\n- Check that write protection is disabled.\n\n```\n# flashrom --wp-status\n```\n\n- Run set_gbb_flags.sh with no parameters.\n\n```\n# /usr/share/vboot/bin/set_gbb_flags.sh\n```\n\n- This will list all of the available flags. The ones of interest to us are:\n\n```\nGBB_FLAG_DEV_SCREEN_SHORT_DELAY 0x00000001\nGBB_FLAG_FORCE_DEV_SWITCH_ON 0x00000008\nGBB_FLAG_FORCE_DEV_BOOT_LEGACY 0x00000080\nGBB_FLAG_DEFAULT_DEV_BOOT_LEGACY 0x00000400\n```\n\n- So, to set SeaBIOS as default, with a 1s timeout, prevent accidentally exiting Developer Mode via spacebar, and ensure Legacy Boot Mode remains enabled in the event of battery drain/disconnect, we set the flags as such:\n\n```\n# /usr/share/vboot/bin/set_gbb_flags.sh 0x489\n```\n\n- Enable back the software write protection.\n\n```\n# flashrom --wp-enable\n```\n\nYour ChromeOS device now will boot to SeaBIOS by default, you can continue to Installing Arch Linux, if your device is booting correctly then you can optionally re-enable the hardware write protection.\n\n"
+    },
+    {
+      "title": "Flashing a custom firmware",
+      "level": 3,
+      "content": "- Disable the hardware write protection.\n\n- Enter the command to run either MrChromebox's or John Lewis's firmware script. Note: The reason for not posting here is to force you to visit the site and read the instructions before proceeding.\n- After the exiting the script, be sure to copy the backed up firmware to an external storage before rebooting the system (if the script does not provide that option for you).\n\nYou should now have a custom firmware installed on your device, cross your fingers and reboot.\n\nAfter flashing the firmware you can continue to #Installing Arch Linux.\n\n"
+    },
+    {
+      "title": "Preparing the installation media",
+      "level": 4,
+      "content": "Create an Arch Linux Installer USB drive.\n\n"
+    },
+    {
+      "title": "Booting the installation media",
+      "level": 4,
+      "content": "- Plug the USB drive to the ChromeOS device and start SeaBIOS with Ctrl+l at the white boot splash screen (if SeaBIOS is not set as default).\n- Press Esc to get a boot menu and select the number corresponding to your USB drive.\n\nThe Arch Linux installer boot menu should appear and the installation process can proceed as normal.\n\nAfter finishing installing Arch Linux continue by following the Post Installation Configuration.\n\n"
+    },
+    {
+      "title": "Patched kernels",
+      "level": 3,
+      "content": "It is recommended to use the official linux package for most Chrome OS devices with the exception being newer devices which might need patched kernel support.\n\nIf your devices requires a patched kernel, it is advised to review the list of patches and decide if the patch list is getting decidedly small enough that you no longer require a patched kernel and instead you can use the official linux package instead.\n\nSee kernels for more information.\n\n"
+    },
+    {
+      "title": "Video driver",
+      "level": 3,
+      "content": "See Intel graphics.\n\n"
+    },
+    {
+      "title": "Touchpad and touchscreen",
+      "level": 3,
+      "content": "See Touchpad Synaptics, libinput, and Touchscreen.\n\n"
+    },
+    {
+      "title": "Touchpad and touchscreen kernel modules",
+      "level": 4,
+      "content": "Since kernel 3.17 all the related patches merged into the upstream sources, meaning the linux package in core supports these devices.\n\n- Do not worry as the developers should be able to add it by request as the Chromium OS sources includes the related changes.\n- You can also try to find the related commits by yourself and create a proper patch, some hints: Dig into your Chrome OS system, look at the obvious suspects like boot log, /proc/bus/input/devices and /sys/devices. The Linux kernel sources for Chromium OS are at [6]. Each kernel source for the latest Chromium OS release has its own branch, name convention: release-R*-*-chromeos-KERNELVER, where R*-* is the Chromium OS release and KERNELVER is the kernel version. Review the git log of drivers/platform, drivers/i2c/busses and drivers/input/touchscreen.\n\n- Dig into your Chrome OS system, look at the obvious suspects like boot log, /proc/bus/input/devices and /sys/devices.\n- The Linux kernel sources for Chromium OS are at [6].\n- Each kernel source for the latest Chromium OS release has its own branch, name convention: release-R*-*-chromeos-KERNELVER, where R*-* is the Chromium OS release and KERNELVER is the kernel version.\n- Review the git log of drivers/platform, drivers/i2c/busses and drivers/input/touchscreen.\n\n"
+    },
+    {
+      "title": "Touchpad configuration",
+      "level": 4,
+      "content": "There are few options how to set the touchpad:\n\n- Visit the ArchWiki page for your Chromebook model (see Chrome OS devices/Chromebook) for touchpad xorg.conf.d file.\n- Use a touchpad configuration tool.\n\n"
+    },
+    {
+      "title": "Chromium OS input drivers",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nxf86-input-cmtAUR offers a port of the Chromium OS input driver: xf86-input-cmt as an alternative for the Synaptics input driver. It provides tweaked configuration files for most devices, and provides functionality that the Synaptics input driver does not such as palm rejection. Additionally, it enables functionality not enabled by default in the Chromium OS input driver such as tap-to-drag.\n\nPlease note, the input driver does not work under some circumstances where you have insufficient permissions to access /dev/input/event This will affect you if you use startx to load a DE/WM session. If this is the case or if the driver does not load for any other cases, you should run:\n\n```\n# usermod -a -G input $USER\n```\n\nWhere $USER is the current user wanting to use the input driver.\n\nIt should also be noted that some users have reported the driver does not work in GDM but works normally after log in. If you are affected by this, you should run:\n\n```\n# usermod -a -G input gdm\n```\n\nAfter reboot, you should be able to use the touchpad normally.\n\n"
+    },
+    {
+      "title": "Fixing suspend",
+      "level": 3,
+      "content": "The following are instructions to fix the suspend functionality. Users of a pre-installed SeaBIOS or John Lewis' pre-built SeaBIOS you will need this fix. This procedure is not needed with Matt DeVillier's custom firmware since problematic ACPI wake devices (such as TPAD) are firmware-disabled.\n\nThere have been a few alternatives discussed and those may work better for some. [7] [8]\n\nTo fix suspend, the general idea is to disable the EHCI_PCI module, which interferes with the suspend cycle. There are multiple ways to achieve this.\n\n"
+    },
+    {
+      "title": "With kernel parameters",
+      "level": 4,
+      "content": "Add the following to your GRUB configuration:-\n\n```\n/etc/default/grub\n```\n\n```\nGRUB_CMDLINE_LINUX_DEFAULT=\"modprobe.blacklist=ehci_pci\"\n```\n\nThen rebuild your grub config. After rebuilding your GRUB config, reboot your computer.\n\nUser reports needing to blacklist atmel_mxt_ts and cros_ec_typec instead of the above module to get suspend & resume working on an 11th gen Acer Chromebook CX5500 running Arch Linux via SeaBIOS.\n\n"
+    },
+    {
+      "title": "With systemd",
+      "level": 4,
+      "content": "Sometimes the synaptics touchpad, and various other parts of the laptop are used as wakeup devices causing certain movements of the laptop during suspend to end suspend. In order to disable all wakeup devices except for the laptop lid sensor, create the following suspend-device-fix.sh file.\n\n```\n/usr/local/sbin/suspend-device-fix.sh\n```\n\n```\n#!/bin/bash\n\nawk '{if ($1 != \"LID0\" && $3 == \"*enabled\") print $1}' < /proc/acpi/wakeup | while read NAME\ndo echo \"$NAME\" > /proc/acpi/wakeup\ndone\n\nexit 0\n```\n\nNow make the file executable\n\nCreate a systemd service to execute the script on every boot.\n\n```\n/etc/systemd/system/suspend-fix.service\n```\n\n```\n[Unit]\nDescription=Suspend Fix\n\n[Service]\nType=simple\nExecStart=/usr/local/sbin/suspend-device-fix.sh\n\n[Install]\nWantedBy=multi-user.target\n```\n\nFirst start suspend-fix.service. If it properly starts, then enable it to be started on bootup.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nAdd the following line at the end of /etc/rc.d/rc.local (if it does not exist, just create it) to prevent bad handling of EHCI USB:\n\n```\n/etc/rc.d/rc.local\n```\n\n```\necho 1 > /sys/devices/pci0000\\:00/0000\\:00\\:1d.0/remove\n```\n\nThen, create the following cros-sound-suspend.sh file. Only the Ath9k binding/unbinding lines are listed below; see the alternatives linked above for additional sound suspend handling if you experience issues.\n\n```\n/usr/lib/systemd/system-sleep/cros-sound-suspend.sh\n```\n\n```\n#!/bin/bash\n\ncase $1/$2 in\n  pre/*)\n    # Unbind ath9k for preventing error and full sleep mode (wakeup by LID after hibernating)\n    echo -n \"0000:01:00.0\" | tee /sys/bus/pci/drivers/ath9k/unbind\n    # Unbind snd_hda_intel for sound\n    echo -n \"0000:00:1b.0\" | tee /sys/bus/pci/drivers/snd_hda_intel/unbind\n    echo -n \"0000:00:03.0\" | tee /sys/bus/pci/drivers/snd_hda_intel/unbind\n    ;;\n  post/*)\n    # Bind ath9k for preventing error and and full sleep mode (wakeup by LID after hibernating)\n    echo -n \"0000:01:00.0\" | tee /sys/bus/pci/drivers/ath9k/bind\n    # bind snd_hda_intel for sound\n    echo -n \"0000:00:1b.0\" | tee /sys/bus/pci/drivers/snd_hda_intel/bind\n    echo -n \"0000:00:03.0\" | tee /sys/bus/pci/drivers/snd_hda_intel/bind\n    ;;\nesac\n```\n\nMake sure to make the script executable.\n\nThen rebuild your grub config.\n\n"
+    },
+    {
+      "title": "Apollolake based models",
+      "level": 4,
+      "content": "A potential solution for solving audio issues on Apollolake based models is using the SOF DSP driver and redefining the topology used in the audio processing pipeline by the firmware.\n\nThis will most likely solve issues relating to no audio devices being found or errors relating to topology in the kernel buffer.\n\nThe topology was created by a Sound Open Firmware maintainer and tested by MrChromebox (see Github discussion). As stated by MrChromebox, this may introduce audio scaling issues (E.g. audio output range is 0-10 instead of 0-100) and incorrect audio output device types (E.g. headphones instead of speaker).\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n- Install sof-firmware.\n- Download and uncompress sof-apl-da7219.tplg.gz.\n- Copy the .tplg topology file to /lib/firmware/intel/sof-tplg.\n- Manually select the SOF DSP driver and specify an alternate path for the SOF firmware by editing two kernel module settings using either modprobe or another method (E.g. boot loader kernel parameters).\n\n```\n/etc/modprobe.d/inteldspcfg.conf\n```\n\n```\noptions snd-intel-dspcfg dsp_driver=3\noptions snd-sof-pci fw_path=\"intel/sof\"\n```\n\n"
+    },
+    {
+      "title": "Baytrail based models",
+      "level": 4,
+      "content": "Audio on most Baytrail models should work on linux since fix merged into 4.19.7 [9], to fix regression in 4.18.15, see bug report [10].\n\nIt is likely that you will also need to use alsamixer from alsa-utils to turn on \"Left Speaker Mixer Left DAC\" and \"Right Speaker Mixer Right DAC\". For more information, see FS#48936.\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf you use max98090, you may also need to install Sound Open Firmware and symbolically link /usr/lib/firmware/sof-cht-max98090.tplg to /usr/lib/firmware/sof-byt-max98090.tplg.\n\n"
+    },
+    {
+      "title": "Haswell based models",
+      "level": 4,
+      "content": "One or more of followings might help solving audio related issues, setting snd_hda_intel module index reported the most useful. It is highly possible that you will not need to make any change.\n\n- Create /etc/modprobe.d/alsa.conf, the option index will make sure the analog output is the default (and not HDMI), the option model will notify the driver our board model which will make the built-in microphone usable (you can try instead model=alc283-sense-combo or model=,alc283-dac-wcaps).\n\n```\n/etc/modprobe.d/alsa.conf\n```\n\n```\noptions snd_hda_intel index=1 model=,alc283-chrome\n```\n\n- Use the ~/.asoundrc file from [11].\n\n- If having problems with headphones (perhaps no audio playing), try alsactl restore (requires alsa-utils) in terminal. Now, ALSA should automatically switch between channels when using headphones/speakers.\n\n- To fix Flash audio with PulseAudio, use the ~/.asoundrc file from [12].\n\n"
+    },
+    {
+      "title": "Hotkeys",
+      "level": 3,
+      "content": "The Chromebook function keys recognized as standard F1–F10 by the kernel, it is preferable to map them accordingly to their appearance. It would also be nice to get the keys Delete, Home, End, PgUp, PgDown which in Chrome OS mapped to Alt+: BackSpace, Right, Left, Up, Down.\n\n"
+    },
+    {
+      "title": "Using xkeyboard",
+      "level": 4,
+      "content": "xkeyboard-config 2.16-1 added a chromebook model that enables the Chrome OS style functions for the function keys. You can, for example, set this using localectl set-x11-keymap us chromebook. See the chromebook definition in /usr/share/X11/xkb/symbols/inet for the full mappings.\n\n"
+    },
+    {
+      "title": "Using keyd",
+      "level": 4,
+      "content": "keyd (keyd) is a powerful low-level tool that intercepts evdev events and allows to remap them in a flexible way (e.g. using arbitrary key combinations or allowing different behaviors on key tap or hold). Unlike other tools the chosen keys are sent using an emulated evdev device, so it works transparently on shell, X11, or Wayland.\n\nThe main configuration file is stored on /etc/keyd/default.conf. To remap the upper row to send function key events if pressed by itself, and F1-F10 when pressed together with the Meta key the following configuration may be used:\n\n```\n/etc/keyd/default.conf\n```\n\n```\n[ids]\n*\n\n[main]\nf1 = back\nf2 = forward\nf3 = f5\nf4 = f11\nf5 = M-f8\nf6 = brightnessdown\nf7 = brightnessup\nf8 = mute\nf9 = volumedown\nf10= volumeup\n\n[meta]\nf1 = f1\nf2 = f2\nf3 = f3\nf4 = f4\nf5 = f5\nf6 = f6\nf7 = f7\nf8 = f8\nf9 = f9\nf10= f10\n\nleft  = home\nright = end\nup    = pageup\ndown  = pagedown\n\nbackspace = delete\n\n[shift]\nmeta = capslock\n```\n\nThe last rows allows to remap Meta+<arrow> to Home, End, PgUp, PgDown, Meta+Backspace to Delete, and Shift+Meta to Capslock.\n\nTo invert the upper row behavior (i.e. F1-F10 by default, multimedia keys if pressed together with Meta) it is sufficient to move the contenents of the two stanzas:\n\n```\n/etc/keyd/default.conf\n```\n\n```\n[ids]\n*\n\n[meta]\nf1 = back\nf2 = forward\nf3 = f5\nf4 = f11\nf5 = M-f8\nf6 = brightnessdown\nf7 = brightnessup\nf8 = mute\nf9 = volumedown\nf10= volumeup\n\nleft  = home\nright = end\nup    = pageup\ndown  = pagedown\n\nbackspace = delete\n\n[shift]\nmeta = capslock\n```\n\nIt is also possible to use other keys instead of Meta, all is needed is to change the name of the stanza to the desired key (e.g. control, alt, or shift instead of meta).\n\n"
+    },
+    {
+      "title": "Using Sxhkd",
+      "level": 4,
+      "content": "One way to set the hotkeys would be by using the Sxhkd daemon. Besides sxhkd, this also requires amixer(1), xorg-xbacklight, and xautomation.\n\nSee [13] for an example configuration in ~/.config/sxhkd/sxhkdrc.\n\n"
+    },
+    {
+      "title": "Using Xbindkeys",
+      "level": 4,
+      "content": "Another way to configure hotkeys would be by using Xbindkeys. Besides xbindkeys this also requires amixer(1), xorg-xbacklight and xvkbdAUR.\n\n- See [14] for an example configuration in ~/.xbindkeysrc.\n- See vilefridge's xbindkeys configuration for another example.\n\nVolchange (originated in the Debian User Forums) can manipulate the volume with PulseAudio instead of using amixer(1). Besides Volchange this requires xorg-xbacklight and xvkbdAUR.\n\n- Download the script from [15].\n- Make it executable.\n\nSee [16] for a matching ~/.xbindkeysrc.\n\n"
+    },
+    {
+      "title": "Patch xkeyboard-config",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nAnother option is to install xkeyboard-config-chromebookAUR[broken link: package not found], for more details visit [18].\n\n"
+    },
+    {
+      "title": "Mapping in GNOME with gsettings set",
+      "level": 4,
+      "content": "Some of the function keys can be mapped in Gnome with the advantage of HUD notifications on changes (like volume and brightness changes) which can supplement one of the mapping methods mentioned above. This linked example maps the brightness and volume actions. Notice that xdotool is required.\n\n"
+    },
+    {
+      "title": "Ignore using logind",
+      "level": 4,
+      "content": "Out of the box, systemd-logind will catch power key and lid switch events and handle them: it will shut down the Chromebook on a power key press, and a suspend on a lid close. However, this policy might be a bit harsh given that the power key is an ordinary key at the top right of the keyboard that might be pressed accidentally.\n\nTo configure logind to ignore power key presses and lid switches, add the lines to logind.conf below.\n\n```\n/etc/systemd/logind.conf\n```\n\n```\nHandlePowerKey=ignore\nHandleLidSwitch=ignore\n```\n\nThen restart logind for the changes to take effect.\n\nPower key and lid switch events will still be logged to journald by logind. See Power management#ACPI events.\n\n"
+    },
+    {
+      "title": "Ignore by Gnome",
+      "level": 4,
+      "content": "Install gnome-tweaks, open the Tweak Tool and under Power change the Power Button Action.\n\n"
+    },
+    {
+      "title": "Syslinux",
+      "level": 3,
+      "content": "Follow Syslinux installation instructions carefully. Try manual installation to see where the problem comes from. If you see Missing Operation System then it may be because you need to use correct boot loader binary. If syslinux does not work try another boot loader such as GRUB.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Chrultrabook Community driven site with up to date documentation for converting a Chromebook into an Ultrabook.\n- Developer Information for Chrome OS Devices at the Chromium Projects site\n- BBS topic about the Acer C720 which include generic information on Haswell Based Chromebooks.\n- Re-partitioning in Chrome OS [19], [20]\n\n"
+    }
+  ]
+}

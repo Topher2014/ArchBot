@@ -1,0 +1,106 @@
+{
+  "title": "Lenovo ThinkPad T14s (AMD) Gen 3",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T14s_(AMD)_Gen_3",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nGPU | 1002:1681 | Has issues\nWireless | 17cb:1103 | Yes\nAudio | 1022:15e3 | Yes\nTrackPoint |  | Yes\nTouchpad |  | Yes\nWebcam | 04f2:b74f | Yes\nFingerprint reader | 27c6:6594 | Yes\nMobile broadband | 2c7c:030a | Yes\nBluetooth | 10ab:9309 | Yes\nSmartcard reader | 058f:9540 | Yes\n\nThis article covers the installation and configuration of Arch Linux on a Lenovo Thinkpad T14s (AMD) Gen 3 laptop. Almost everything seems to work pretty much out the box.\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "Updating the firmware using the fwupd utility works as long as all the relevant options are enabled in the BIOS (Enable Windows Update UEFI Update).\n\nUpdating the BIOS firmware also fixes some error that produces the following output from linux:\n\n```\n[Hardware Error]: Corrected error, no action required.\n[Hardware Error]: CPU:0 (19:44:1) MC15_STATUS[Over|CE|MiscV|AddrV|-|-|SyndV|CECC|-|-|-]: 0xdc204000000c011b\n[Hardware Error]: Error Addr: 0x00000001faa88180\n[Hardware Error]: IPID: 0x0000009600050f00, Syndrome: 0x000001ff0a240700\n...\n```\n\n"
+    },
+    {
+      "title": "CPU",
+      "level": 2,
+      "content": "There are a number of frequency-scaling issues surrounding ACPI-cpufreq causing the internal GPU to reset at seemingly random times. This can be fixed by using \"amd_pstate\" (see below). GPU resets are infrequent, but should be considered prior to purchase of laptop if intending to stick with the ACPI-cpufreq performance scaling driver. The resets cause the screen to turn black, forcing the user to either reboot or relogin via a login manager. Switching to a TTY during a GPU reset is sometimes possible.\n\nTo follow these issues, see:\n\nhttps://bugzilla.kernel.org/show_bug.cgi?id=213145\n\nhttps://gitlab.freedesktop.org/drm/amd/-/issues/1974\n\nhttps://gitlab.freedesktop.org/drm/amd/-/issues/2068\n\nhttps://gitlab.freedesktop.org/drm/amd/-/issues/2443\n\nThe overvolting workaround provided does not affect the ThinkPad T14s Gen 3 (AMD) processors because ultrabook processors are unable to be overvolted.\n\nOn kernels < 6.5, if using ACPI-cpufreq is not a requirement, it is possible to use the experimental amd-pstate frequency-scaling driver, by adding the amd_pstate=passive kernel parameter (prior to Kernel 6.3) or amd_pstate=active kernel parameter (for Kernel 6.3 or newer). Note that the kernel parameter is only available for kernel versions 5.17 and up. This driver appears to be more stable than the ACPI-cpufreq driver, not only reducing the number of GPU resets, but also lowering idle CPU temperatures.\n\nSince kernel 6.5, the AMD P-State EPP driver with \"Active\" profile applied by default, so normally no changes are needed.\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 2,
+      "content": "The touchpad works fine on Wayland.\n\nHowever, some people have an occasional freeze of 3-4 seconds on Xorg.\n\n"
+    },
+    {
+      "title": "Disable wakeup from sleep on touchpad activity",
+      "level": 3,
+      "content": "Use the following to disable wake-up events caused by the touchpad. Note that this only applies to the touchpad itself and the integrated buttons for left/right click at its bottom, not the 3 buttons at its top or any other input.\n\n```\n/etc/udev/rules.d/99-disable-touchpad-wakeup.rules\n```\n\n```\nKERNEL==\"i2c-SYNA8018:00\", SUBSYSTEM==\"i2c\", ATTR{power/wakeup}=\"disabled\"\n```\n\n"
+    },
+    {
+      "title": "Speakers",
+      "level": 2,
+      "content": "Speakers work out of the box. How ever, they won't have the same sound quality as on Windows due to the missing Dolby Atmos Convolver.\n\nTo enable Dolby Atmos Convolver install EasyEffects, go to Effects > Add Convolver > Import Impulse\n\nYou can download the \"Movie\" and \"Music\" preset here:\n\nhttps://files.bestmail.ws/Arch/T14s_G3_AMD/T14S_G3_Music_Movies.irs\n\nThey were created on the T14s G3 AMD with Windows 10.\n\n"
+    },
+    {
+      "title": "Display",
+      "level": 2,
+      "content": "You can download a calibrated color profile for the 400nits IPS panel.\n\nSome users reported crashes / issue of the display, especially after hibernate/suspend: a fix is to disable panel self refresh by adding amdgpu.dcdebugmask=0x10 to the kernel parameters.\n\nFor full multi display support across USB-C, see DisplayLink#USB 3.0 DL-6xxx, DL-5xxx, DL-41xx, DL-3xxx Devices.\n\n"
+    },
+    {
+      "title": "Network / Wi-Fi",
+      "level": 2,
+      "content": "There was a known bug in the ath11k module that could block the resume process, freeze the graphics interface and cause loss of wireless card interface. A manual fix is to disable the ath11k_pci module before hibernate and re-enable it after resume. However, this issue shouldn't be present anymore.\n\nIf you still face the issue: See Dell XPS 13 (9310)#Wi-Fi for a systemd service to automate this procedure.\n\nThis can be automated via sleep hooks - if the module is unloaded before hibernating or suspending it unloads immediately with no delay, and the resume kernel bug does not happen:\n\n```\n/etc/systemd/system/ath11k-suspend.service\n```\n\n```\n[Unit]\nDescription=Suspend: rmmod ath11k_pci\nBefore=sleep.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/rmmod ath11k_pci\n\n[Install]\nWantedBy=sleep.target\n```\n\n```\n/etc/systemd/system/ath11k-resume.service\n```\n\n```\n[Unit]\nDescription=Resume: modprobe ath11k_pci\nAfter=suspend.target suspend-then-hibernate.target hibernate.target hybrid-sleep.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/modprobe ath11k_pci\n\n[Install]\nWantedBy=suspend.target suspend-then-hibernate.target hibernate.target hybrid-sleep.target\n```\n\nYou need to enable ath11k-suspend.service and ath11k-resume.service.\n\nAdditionally it might be required to also restart NetworkManager.service.\n\n"
+    },
+    {
+      "title": "Mobile broadband",
+      "level": 2,
+      "content": "Works correctly. Follow instruction from Mobile broadband modem especially section FCC unlocking.\n\n"
+    },
+    {
+      "title": "Smartcard reader",
+      "level": 2,
+      "content": "Seems to work and read cards. Follow instructions from smartcards.\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 2,
+      "content": "Work as expected. Follow fprintd\n\n"
+    },
+    {
+      "title": "S3 sleep / s2idle",
+      "level": 3,
+      "content": "S3 sleep is not supported. However, s2idle works out of the box and causes no problems with sleep / hibernation.\n\n"
+    },
+    {
+      "title": "Hibernate",
+      "level": 3,
+      "content": "Works fine. If you face Wi-Fi issues after hibernation see: Network / Wi-Fi\n\n"
+    },
+    {
+      "title": "Battery thresholds",
+      "level": 3,
+      "content": "Battery charge thresholds can be correctly set with TLP, within KDE / GNOME power management or from the command line:\n\n```\n# echo 75 > /sys/class/power_supply/BAT0/charge_start_threshold\n# echo 80 > /sys/class/power_supply/BAT0/charge_stop_threshold\n```\n\n"
+    },
+    {
+      "title": "AMD P-State EPP",
+      "level": 3,
+      "content": "Use power-profiles-daemon or this udev rule + script to apply different AMD P-State EPP states depending on whether the laptop is running on battery or charger.\n\n```\n/etc/udev/rules.d/99-battery.rules\n```\n\n```\nSUBSYSTEM==\"power_supply\", ATTR{online}==\"0\", RUN+=\"/usr/local/bin/on_battery.sh\"\nSUBSYSTEM==\"power_supply\", ATTR{online}==\"1\", RUN+=\"/usr/local/bin/on_ac.sh\"\n```\n\n```\n/usr/local/bin/on_battery.sh\n```\n\n```\n#!/usr/bin/bash\n\n# Change Dirty Writeback Centisecs according to TLP / Powertop\necho '5000' > '/proc/sys/vm/dirty_writeback_centisecs';\n\n# Change AMD Paste EPP energy preference\n# Available profiles: performance, balance_performance, balance_power, power\necho 'balance_power' | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference;\n\n# If required, change cpu scaling governor\n# Possible options are: conservative ondemand userspace powersave performance schedutil\n#cpupower frequency-set -g powersave;\n\n# Platform Profiles Daemon will do this automatically, based on your settings in KDE / GNOME\n# You can how ever, set this manually as well\n# Possible profile options are: performance, powersave, low-power\n#echo 'powersave' > '/sys/firmware/acpi/platform_profile';\n\n# Radeon AMDGPU DPM switching doesn't seem to be supported.\n# Possible options should be: battery, balanced, performance, auto\n#echo 'battery' > '/sys/class/drm/card0/device/power_dpm_state'; \n\n# Should always be auto (TLP default = auto)\n# Possible options are: auto, high, low\n#echo 'auto' > '/sys/class/drm/card0/device/power_dpm_force_performance_level';\n\n# Runtime PM for PCI Device to auto\nfind /sys/bus/pci/devices/*/power -name control -exec sh -c 'echo \"auto\" > \"$1\"' _ {} \\;\nfor i in $(find /sys/devices/pci0000\\:00/0* -maxdepth 3 -name control); do\n    echo auto > $i;\ndone\n```\n\n```\n/usr/local/bin/on_ac.sh\n```\n\n```\n#!/usr/bin/bash\n\n# Change Dirty Writeback Centisecs according to TLP / Powertop\necho '500' > '/proc/sys/vm/dirty_writeback_centisecs';\n\n# Change AMD Paste EPP energy preference\n# Available profiles: performance, balance_performance, balance_power, power\necho 'balance_performance' | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference;\n\n# If required, change cpu scaling governor\n# Possible options are: conservative ondemand userspace powersave performance schedutil\n#cpupower frequency-set -g performance;\n\n# Platform Profiles Daemon will do this automatically, based on your settings in KDE / GNOME\n# You can how ever, set this manually as well\n# Possible profile options are: performance, powersave, low-power\n#echo 'performance' > '/sys/firmware/acpi/platform_profile';\n\n# Radeon AMDGPU DPM switching doesn't seem to be supported.\n# Possible options should be: battery, balanced, performance, auto\n#echo 'performance' > '/sys/class/drm/card0/device/power_dpm_state';\n\n# Should always be auto (TLP default = auto)\n# Possible options are: auto, high, low\n#echo 'auto' > '/sys/class/drm/card0/device/power_dpm_force_performance_level';\n\n# Runtime PM for PCI Device to on\nfind /sys/bus/pci/devices/*/power -name control -exec sh -c 'echo \"on\" > \"$1\"' _ {} \\;\nfor i in $(find /sys/devices/pci0000\\:00/0* -maxdepth 3 -name control); do\n    echo on > $i;\ndone\n```\n\nAdditionally make /usr/local/bin/on_battery.sh and /usr/local/bin/on_ac.sh executable.\n\n"
+    },
+    {
+      "title": "Power Profiles Daemon",
+      "level": 3,
+      "content": "The package power-profiles-daemon is the standard power management service for KDE#Power management and GNOME#Power modes. It conflicts with TLP and the reasons for that are described here: https://gitlab.freedesktop.org/upower/power-profiles-daemon#why-not\n\n1. Install power-profiles-daemon\n1. Start/enable the power-profiles-daemon service.\n\n"
+    },
+    {
+      "title": "Microphone LED",
+      "level": 2,
+      "content": "Some users reported that the Mic LED is always on.\n\nThis doesn't always happen but if you face the issue see: Lenovo ThinkPad T14 (AMD) Gen 3#Mute Mic LED always on.\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Table content:\nKey | Visible?1 | Marked?2 | Effect | Note\nFn | Yes | No | XF86WakeUp | \nFn+4 | Yes | Yes | XF86Sleep | \nFn+Esc | No | Yes | Toggles Fn lock | Has status led\nFn+F1 | Yes | Yes | XF86AudioMute | Has status led\nFn+F2 | Yes | Yes | XF86AudioLowerVolume | \nFn+F3 | Yes | Yes | XF86AudioRaiseVolume | \nFn+F4 | Yes | Yes | XF86AudioMicMute | Has status led\nFn+F5 | Yes | Yes | XF86MonBrightnessDown | \nFn+F6 | Yes | Yes | XF86MonBrightnessUp | \nFn+F7 | Yes | Yes | XF86Display | \nFn+F8 | Yes | Yes | XF86WLAN | Marked with airplane mode\nFn+F9 | Yes | Yes | XF86Messenger | Marked with message box\nFn+F10 | Yes | Yes | XF86Go | Marked with phone answer call\nFn+F11 | Yes | Yes | Cancel | Marked with phone end call\nFn+F12 | Yes | Yes | XF86Favorites | \nFn+Left | Yes | No | Home | \nFn+Right | Yes | No | End | \nFn+P | Yes | No | Pause | \nFn+S | Yes | No | Sys_Req | \nFn+K | Yes | No | Scroll_Lock | \nFn+B | Yes | No | Break | \nStamp | Yes | Yes | Print | \nFn+Space | No | Yes | Change keyboard backlight level | \n\n1. The key is visible to xev and similar tools.\n1. The physical key has a symbol on it, which describes its function.\n\n"
+    },
+    {
+      "title": "Laptop cannot suspend/reboot/shutdown",
+      "level": 3,
+      "content": "If your laptop cannot suspend, reboot or even shutdown, it might be due to the UEFI Firmware 0.1.40, released on May 5th, 2024. This firmware has been reported to cause several issues such as (and possibly not limited to):\n\n1. Laptop cannot suspend/reboot/shutdown;\n1. TLP and fwupdmgr services cannot start;\n1. Regenerating the initramfs is not possible, as the mkinitcpio autodetect hook hangs indefinitely.\n\nAll these issues might be related to the malfunctioning of the AMD Sensor Fusion HUB device. Running dmesg will reveal similar errors:\n\n```\n[    5.547449] BUG: unable to handle page fault for address: 000000010000003a\n[    5.547474] #PF: supervisor read access in kernel mode\n[    5.547486] #PF: error_code(0x0000) - not-present page\n[    5.547497] PGD 0 P4D 0 \n[    5.547509] Oops: Oops: 0000 [#1] PREEMPT SMP NOPTI\n[    5.547522] CPU: 13 PID: 466 Comm: (udev-worker) Not tainted 6.10.2-arch1-2 #1 \n[    5.547557] RIP: 0010:amd_sfh_get_report+0x1c/0x110 [amd_sfh]\n...\n[    5.557018] CR2: 000000010000003a\n[    5.557524] ---[ end trace 0000000000000000 ]---\n```\n\nTo solve this issue, blacklist the amd_sfh kernel module. Notice that, since you cannot rebuild the initramfs, you should first blacklist the module from your boot loader, and later make it permanent. See also here and here.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Lenovo ThinkPad T14 (AMD) Gen 3\n\n"
+    }
+  ]
+}

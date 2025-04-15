@@ -1,0 +1,61 @@
+{
+  "title": "Etckeeper (Español)",
+  "url": "https://wiki.archlinux.org/title/Etckeeper_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-02-19** \n\nArtículos relacionados\n\n- Git\n- Cron\n\nEtckeeper es una colección de herramientas para realizar un seguimiento de /etc/ en un repositorio (Git, Mercurial, Bazaar o Darcs son ​​compatibles). Un hook de pacman confirma automáticamente los cambios antes de realizar un seguimiento de la actualización del sistema y de los permisos de los archivos, cuyo control de versión normalmente no admite, pero es importante para archivos como /etc/shadow.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete etckeeper.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "El sistema de control de versiones preferido (el predeterminado es git) y otras opciones se configura en /etc/etckeeper/etckeeper.conf.\n\nEtckeeper admite el uso de pacman como LOWLEVEL_PACKAGE_MANAGER y HIGHLEVEL_PACKAGE_MANAGER en etckeeper.conf.\n\n"
+    },
+    {
+      "title": "Utilización",
+      "level": 2,
+      "content": "Después de la configuración, el repositorio de la ruta /etc debe inicializarse:\n\n```\n# etckeeper init\n```\n\nY realice una primera confirmación para realizar un seguimiento de los cambios, este es un paso necesario para que etckeeper pueda trabajar automáticamente:\n\n```\n# etckeeper commit \"first commit\"\n```\n\nA partir de la versión 1.18.3-1 de etckeeper, los hooks de pacman de antes y después de la instalación se ejecutan automáticamente en la instalación, actualización y eliminación de paquetes. Ya no es necesario un #Script contenedor manual.\n\nPara rastrear otros cambios en la ruta /etc, debe confirmar los cambios manualmente (véase la página de manual etckeeper(8) para las órdenes) o utilice una de las soluciones de interrupción siguientes.\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 3,
+      "content": "Las unidades de servicio y temporizador están incluidas en el paquete. Simplemente habilite etckeeper.timer.\n\nVéase Systemd/Timers para obtener más información y Modificar los archivos de unidad suministrados si desea editar las unidades proporcionadas.\n\n"
+    },
+    {
+      "title": "Cron",
+      "level": 3,
+      "content": "Hay un script de cron en la distribución de origen. Puede utilizar este script para confirmar automáticamente los cambios en una programación.\n\nPor ejemplo, para hacerlo funcionar diariamente:\n\n1. Tenga cron instalado y habilitado.\n1. Coloque el script como /etc/cron.daily/nombre_del_script\n1. Permita la ejecución del archivo para el superusuario root (# chmod u+x /etc/cron.daily/'nombre_del_script ).\n\nVéase cron#Cronie, cron para más información.\n\n"
+    },
+    {
+      "title": "Incron",
+      "level": 3,
+      "content": "Para crear confirmaciones automáticamente en cada modificación de los archivos dentro de /etc/, utilice incron. Este utiliza la señalización nativa del sistema de archivos a través de inotify(7).\n\nDespués de instalar incron e inicializar etckeeper, añada root a los usuarios autorizados para ejecutar los scripts de incron:\n\n```\n# echo root | sudo tee -a /etc/incron.allow\n```\n\nLuego edite incrontab con:\n\n```\n# sudo incrontab -e\n```\n\nAñada en el texto:\n\n```\n# /etc IN_MODIFY,IN_NO_LOOP /bin/etckeeper commit \"[mensaje]\"\n```\n\nIN_NO_LOOP es un indicador que espera a que finalice la confirmación antes de ejecutar la siguiente orden, y evita un bucle infinito.\n\nDonde [mensaje] podría ser algo así como \"modificado $#\" donde $# es un comodín incrontab especial expandido al nombre del archivo modificado.\n\nTenga en cuenta que Incron no es capaz de ver subdirectorios. Solo los archivos dentro de la ruta serán monitorizados. Si necesita que se supervisen los subdirectorios, debe darles su propia entrada. Sin embargo, los commits cuando se modifican los archivos de nivel superior seguirán confirmando todos los cambios.\n\nVéase: [1], incrond(8)\n\n"
+    },
+    {
+      "title": "Escritura automática en un repositorio remoto",
+      "level": 3,
+      "content": "Si bien tener una copia de seguridad local en /etc/.git es un buen primer paso, etckeeper puede enviar automáticamente los cambios en cada confirmación a un repositorio remoto como Github.\n\nPrimero, edite etc/.git y añada su repositorio remoto de Github:\n\n```\n# git remote add origin https://github.com/user/repo.git\n```\n\nA continuación, se debe usar o configurar un hook para escribir.\n\n"
+    },
+    {
+      "title": "Utilizando el hook proporcionado por etckeeper",
+      "level": 4,
+      "content": "Edite la opción PUSH_REMOTE en /etc/etckeeper/etckeeper.conf, con el nombre del repositorio remoto en el que desea que etckeeper escriba. Por ejemplo:\n\n```\nPUSH_REMOTE=\"origin\"\n```\n\nSe pueden añadir múltiples repositorios remotos separados con espacios.\n\n"
+    },
+    {
+      "title": "A través de un hook personalizado",
+      "level": 4,
+      "content": "Cree un archivo ejecutable /etc/etckeeper/commit.d/40github-push:\n\n```\n#!/bin/sh\nset -e\n\nif [ \"$VCS\" = git ] && [ -d .git ]; then\n  cd /etc/\n  git push origin master\nfi\n```\n\nAhora, cada vez que ejecute su script contenedor o el alias de antes, los cambios se asignarán automáticamente a su repositorio de Github.\n\n"
+    },
+    {
+      "title": "Script contenedor",
+      "level": 3,
+      "content": "Si desea realizar el seguimiento de los cambios de una orden ejecutada frecuentemente (por ejemplo, orden), un simple script contenedor puede ayudar a automatizarlo. Por ejemplo, cree:\n\n```\n/usr/local/bin/checketc.sh\n```\n\n```\n#!/bin/bash\n\netckeeper pre-install\norden\netckeeper post-install\n```\n\ny hágalo ejecutable. Alternativamente, puede llamar las órdenes de Etckeeper a través de un alias o función bash, véase Alias en Bash para obtener más información.\n\n"
+    }
+  ]
+}

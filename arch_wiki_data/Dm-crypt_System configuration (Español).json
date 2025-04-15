@@ -1,0 +1,121 @@
+{
+  "title": "Dm-crypt/System configuration (Español)",
+  "url": "https://wiki.archlinux.org/title/Dm-crypt/System_configuration_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-11-22** \n\n"
+    },
+    {
+      "title": "mkinitcpio",
+      "level": 2,
+      "content": "Dependiendo de los escenarios particulares, tendrá que activarse un conjunto de los siguientes hooks de mkinitcpio (Español):\n\nTable content:\nbusybox | systemd | Caso de uso\nencrypt | sd-encrypt | Siempre necesario cuando se cifra la partición raíz, o una partición que necesita ser montada antes de la raíz. No es necesario en todos los demás casos, ya que los scripts de inicialización del sistema como /etc/crypttab se encargan de desbloquear otras particiones cifradas. Este enlace debe colocarse después del hook udev o systemd.\nkeyboard | Necesario para hacer que los teclados funcionen en el espacio temprano del usuario.\nkeymap | sd-vconsole | Proporciona soporte para mapas de teclas no estadounidenses para escribir contraseñas de cifrado; debe colocarse antes del hook encrypt. Configure su mapa de teclas en /etc/vconsole.conf, vea Keyboard configuration in console (Español)#Configuración persistente.\nconsolefont | Carga un titpo de letra de consola alternativo en el espacio temprano del usuario. Configure su tipo de letra en /etc/vconsole.conf, vea Linux console#Persistent configuration.\n\nOtros hooks[enlace roto: sección no válida] necesarios deben quedar limpios en otros pasos manuales seguidos durante la instalación del sistema.\n\nRecuerde regenerar initramfs[enlace roto: sección no válida] después de guardar los cambios.\n\n"
+    },
+    {
+      "title": "Ejemplos",
+      "level": 3,
+      "content": "He aquí una configuración típica del archivo /etc/mkinitcpio.conf utilizando el hook encrypt:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nHOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)\n...\n```\n\nAquí una configuración con initramfs basada ​​en systemd utilizando el hook sd-encrypt:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nHOOKS=(base systemd autodetect keyboard sd-vconsole modconf block sd-encrypt sd-lvm2 filesystems fsck)\n...\n```\n\n"
+    },
+    {
+      "title": "Cargador de arranque",
+      "level": 2,
+      "content": "Para activar el arranque de una partición raíz cifrada, es necesario configurar un conjunto de los siguientes parámetros del kernel. Consulte los parámetros del kernel para obtener instrucciones específicas para su cargador de arranque.\n\nPor ejemplo, si utiliza GRUB, los parámetros relevantes se añadirán a /etc/default/grub antes de generar el archivo de configuración principal. Vea también GRUB (Español)#Advertencias cuando se instala en entorno chroot como otro punto a tener en cuenta al instalar el cargador GRUB.\n\nLos parámetros del kernel que necesita especificar dependen de si está utilizando el hook encrypt o sd-encrypt.\n\n"
+    },
+    {
+      "title": "Parámetros del Kernel",
+      "level": 3,
+      "content": "Los parámetros del kernel como root y resume se especifican de la misma manera que los hooks encrypt y sd-encrypt.\n\n"
+    },
+    {
+      "title": "root",
+      "level": 4,
+      "content": "El parámetro root= especifica el dispositivo del sistema de archivos raíz real (descifrado):\n\n```\nroot=dispositivo\n```\n\n- Si el sistema de archivos está formateado directamente en el dispositivo descifrado, este será /dev/mapper/nombre_del_dispositivo_mapeado.\n- Si un LVM se activa primero y contiene un volumen lógico raíz cifrado, el formato anterior se aplica igual.\n- Si el sistema de archivos raíz está contenido en un volumen lógico de un LVM cifrado, el mapeador de dispositivos para él vendrá formulado de forma general como root=/dev/grupo de volúmenes/volumen lógico.\n\n"
+    },
+    {
+      "title": "resume",
+      "level": 4,
+      "content": "```\nresume=dispositivo\n```\n\n- dispositivo es el dispositivo del sistema de archivos descifrado (espacio de intercambio) utilizado para suspender en disco. Si el espacio de intercambio está en una partición separada, lo estará en el formato /dev/mapper/swap. Véase también dm-crypt/Swap encryption (Español).\n\n"
+    },
+    {
+      "title": "Utilizar el hook encrypt",
+      "level": 3,
+      "content": "Note: **un** \n\n- desbloquear varios discos cifrados (FS#23182). Solo un dispositivo se puede desbloquear en initramfs;\n- utilizar un encabezado LUKS separado (FS#42851).\n\n"
+    },
+    {
+      "title": "cryptdevice",
+      "level": 4,
+      "content": "Este parámetro hará que el sistema solicite la contraseña para desbloquear el dispositivo que contiene la raíz cifrada en un arranque en frío. Es analizado mediante el hook encrypt para identificar qué dispositivo contiene el sistema cifrado:\n\n```\ncryptdevice=dispositivo:nombre del dipositivo mapeado\n```\n\n- dispositivo es la ruta al dispositivo que contiene al dispositivo cifrado. Se recomienda el uso de nombres de dispositivos de bloques persistentes.\n- nombre del dipositivo mapeado es el nombre del dispositivo - mapeado dado al dispositivo después de descifrarlo, que estará disponible como /dev/mapper/nombre del dipositivo mapeado.\n- Si un LVM contiene el volúmen root cifrado, el LVM se activa primero y el grupo de volúmenes que contiene el volumen lógico de la raíz cifrada sirve como dispositivo. A continuación, lo que sigue al grupo de volúmenes le corresponderá la raíz mapeada. El parámetro sigue el formato siguiente: cryptdevice=/dev/nombre_del_grupo_de_volúmenes/nombre_del_volumen_lógico:nombre_del_dispositivo_mapeado\n\n"
+    },
+    {
+      "title": "cryptkey",
+      "level": 4,
+      "content": "Este parámetro especifica la ubicación de un archivo de claves y es requerido por el hook encrypt para leer dicho archivo de claves para desbloquear cryptdevice (a menos que haya una clave en la ubicación por defecto, ver más abajo). Puede tener tres conjuntos de parámetros, dependiendo de si el archivo de claves existe como un archivo en un dispositivo en particular, como un flujo de bits que comienza en una ubicación específica o como un archivo en initramfs.\n\nPara un archivo en un dispositivo, el formato es:\n\n```\ncryptkey=dispositivo:tipo de sistema de archivos:ruta\n```\n\n- dispositivo es el dispositivo de bloque sin formato donde existe la clave.\n- tipo de sistema de archivos es el tipo de sistema de archivos del dispositivo (o auto).\n- ruta es la ruta absoluta del archivo de claves dentro del dispositivo.\n\nEjemplo: cryptkey=/dev/usbstick:vfat:/secretkey\n\nPara un flujo de bits en un dispositivo, la ubicación de la clave se especifica con el formato siguiente:\n\n```\ncryptkey=dispositivo:desplazamiento:tamaño\n```\n\ndonde el desplazamiento («offset») y el tamaño («size») están en bytes. Ejemplo: cryptkey=/dev/sdZ:0:512 lee un archivo de claves de 512 bytes desde el principio del dispositivo.\n\nPara un archivo incrustado[enlace roto: sección no válida] en initramfs el formato sería [1]:\n\n```\ncryptkey=rootfs:ruta'\n```\n\nEjemplo: cryptkey=rootfs:/secretkey\n\nTambién tenga en cuenta que si cryptkey no se especifica, por defecto es /crypto_keyfile.bin (en initramfs).[2]\n\nVéase también dm-crypt/Device encryption (Español)#Archivos de claves.\n\n"
+    },
+    {
+      "title": "crypto",
+      "level": 4,
+      "content": "Este parámetro es específico para pasar las opciones de la modalidad plain de dm-crypt al hook encrypt.\n\nToma el formato siguiente:\n\n```\ncrypto=<hash>:<algoritmo de cifrado>:<tamaño clave>:<desplazamiento>:<salto>\n```\n\nLos argumentos se relacionan directamente con las opciones de cryptsetup. Consulte dm-crypt/Device encryption (Español)#Opciones de cifrado para la modalidad plain\n\nPara un disco cifrado con solo las opciones predeterminadas de plain, se deben especificar los argumentos de crypto, pero cada entrada se puede dejar en blanco:\n\n```\ncrypto=::::\n```\n\nUn ejemplo específico de argumentos sería:\n\n```\ncrypto=sha512:twofish-xts-plain64:512:0:\n```\n\n"
+    },
+    {
+      "title": "Utilizar el hook sd-encrypt",
+      "level": 3,
+      "content": "En todo lo que sigue rd.luks puede reemplazarse con luks. Los parámetros rd.luks solo son respetados por initrd. Los parámetros luks son respetados tanto por el sistema principal como por initrd. A menos que desee controlar dispositivos que se desbloqueen después del inicio desde la línea de órdenes del kernel, use rd.luks. Vea systemd-cryptsetup-generator(8) para más opciones y detalles.\n\n- Si existe el archivo /etc/crypttab.initramfs, mkinitcpio (Español) lo agregará a initramfs como /etc/crypttab, pudiendo especificar allí los dispositivos que deben desbloquearse en el arranque. La sintaxis está documentada en #crypttab y crypttab(5).\n- /etc/crypttab.initramfs no se limita a usar solo UUID como rd.luks. Puede usar cualquiera de los métodos para asignar nombres permanentes a dispositivos de bloques.\n\n- Todos los parámetros de rd.luks se pueden especificar reiteradas veces para desbloquear varios volúmenes cifrados con LUKS.\n- Los parámetros rd.luks solo admiten el desbloqueo de dispositivos LUKS detectables. Para desbloquear un dispositivo dm-crypt sin formato o un dispositivo LUKS con un encabezado separado, debe especificarlo en /etc/crypttab.initramfs. Vea #crypttab para la sintaxis.\n\n"
+    },
+    {
+      "title": "rd.luks.uuid",
+      "level": 4,
+      "content": "```\nrd.luks.uuid=UUID\n```\n\nEspecifique el UUID del dispositivo que se va a descifrar en el arranque con este indicador. Si el UUID está en /etc/crypttab.initramfs, se usarán las opciones enumeradas allí. Para luks.uuid se usarán las opciones de /etc/crypttab.initramfs o /etc/crypttab.\n\nDe forma predeterminada, el dispositivo mapeado estará ubicado en /dev/mapper/luks-UUID donde UUID es el UUID de la partición LUKS.\n\n"
+    },
+    {
+      "title": "rd.luks.name",
+      "level": 4,
+      "content": "```\nrd.luks.name=UUID=nombre\n```\n\nEspecifique el nombre del dispositivo mapeado después de que la partición LUKS esté abierta. Por ejemplo, al especificar UUID=cryptroot indica que el dispositivo desbloqueado se encuentra en /dev/mapper/cryptroot. Si no se especifica nada, el dispositivo mapeado se entenderá ubicado en /dev/mapper/luks-UUID donde UUID es el UUID de la partición LUKS. Cuando use este parámetro, puede omitir rd.luks.uuid.\n\nEsto es equivalente al segundo parámetro de cryptdevice para encrypt.\n\n"
+    },
+    {
+      "title": "rd.luks.options",
+      "level": 4,
+      "content": "```\nrd.luks.options=UUID=opciones\n```\n\no\n\n```\nrd.luks.options=opciones\n```\n\nEspecifique las opciones para el dispositivo listado después de UUID o, si no se especifica, para todos los UUID no especificados en otra parte (por ejemplo, crypttab).\n\nEsto es aproximadamente equivalente al tercer parámetro de cryptdevice para encrypt.\n\nSigue un formato similar a las opciones en crypttab: las opciones están separadas por comas, y, a su vez, las opciones con valores se especifican usando option=valores.\n\nPor ejemplo:\n\n```\nrd.luks.options=timeout=10s,swap,cipher=aes-cbc-essiv:sha256,size=256\n```\n\n"
+    },
+    {
+      "title": "rd.luks.key",
+      "level": 4,
+      "content": "```\nrd.luks.key=UUID=archivo de claves\n```\n\no\n\n```\nrd.luks.key=archivo de claves\n```\n\nIndique la ubicación de un archivo de claves utilizado para descifrar el dispositivo especificado en rd.luks.UUID. No hay una ubicación predeterminada como la que hay con el hook encrypt para el parámetro cryptkey.\n\n"
+    },
+    {
+      "title": "Tiempo de espera («timeout»)",
+      "level": 4,
+      "content": "Hay dos opciones que afectan el tiempo de espera para ingresar la contraseña durante el inicio:\n\n- rd.luks.options=timeout=tiempo de espera especifica el tiempo de espera para consultar una contraseña.\n- rootflags=x-systemd.device-timeout=tiempo de espera especifica cuánto tiempo debe esperar systemd para que se muestre el dispositivo rootfs antes de retirarlo (el valor predeterminado es 90 segundos).\n\nSi desea desactivar el tiempo de espera por completo, establezca ambos tiempos en cero:\n\n```\nrd.luks.options=timeout=0 rootflags=x-systemd.device-timeout=0\n```\n\n"
+    },
+    {
+      "title": "crypttab",
+      "level": 2,
+      "content": "El archivo /etc/crypttab (tabla de dispositivos cifrados) es similar al archivo fstab y contiene una lista de dispositivos cifrados que se desbloquearán durante el inicio del sistema. Este archivo se puede utilizar para montar automáticamente dispositivos de intercambio cifrados o sistemas de archivos secundarios.\n\ncrypttab se lee antes que fstab, por lo que los contenedores de dm-crypt se pueden desbloquear antes de que se monte el sistema de archivos que contiene en su interior. Tenga en cuenta que crypttab se lee después de que el sistema se haya iniciado, por lo tanto, no reemplaza el desbloqueo de particiones cifradas mediante el uso de hooks de mkinitcpio y opciones del cargador de arranque como en el caso de la partición raíz cifrada. El procesado de crypttab en el momento del arranque se realiza mediante systemd-cryptsetup-generator automáticamente.\n\nConsulte crypttab(5) para obtener detalles, lea a continuación algunos ejemplos, y la sección #Montaje en el momento del arranque para obtener instrucciones sobre cómo usar los UUID para montar un dispositivo cifrado.\n\nNote: **No** \n\n- Si se especifica la opción nofail, la pantalla de ingreso de la contraseña puede desaparecer mientras se escribe la contraseña. nofail, por lo tanto, solo debe usarse junto con los archivos de claves.\n- Hay problemas con systemd (Español) al procesar la entradas de crypttab para dispositivos cifrados en modo plain de dm-crypt (--type plain): Para los dispositivos --type plain con un archivo de claves, es necesario agregar la opción hash=plain a crypttab debido a una incompatibilidad de systemd. No utilice systemd-cryptsetup manualmente para que la creación del dispositivo funcione a su alrededor. También puede ser necesario agregar la opción plain explícitamente para forzar a systemd-cryptsetup reconocer un dispositivo --type plain) en el arranque. Consulte systemd número 442.\n\n- Para los dispositivos --type plain con un archivo de claves, es necesario agregar la opción hash=plain a crypttab debido a una incompatibilidad de systemd. No utilice systemd-cryptsetup manualmente para que la creación del dispositivo funcione a su alrededor.\n- También puede ser necesario agregar la opción plain explícitamente para forzar a systemd-cryptsetup reconocer un dispositivo --type plain) en el arranque. Consulte systemd número 442.\n\n```\n/etc/crypttab\n```\n\n```\n# Ejemplo de archivo crypttab. Los campos son: nombre, dispositivo subyacente, contraseña, opciones de cryptsetup.\n\n# Montar /dev/lvm/swap recifrándolo con una clave nueva en cada reinicio.\n swap\t/dev/lvm/swap\t/dev/urandom\tswap,cipher=aes-xts-plain64,size=256\n\n# Montar /dev/lvm/tmp como /dev/mapper/tmp utilizando modalidad plain de dm-crypt con una contraseña aleatoria, haciendo que su contenido no se pueda recuperar después de que se desmonte.\ntmp\t/dev/lvm/tmp\t/dev/urandom\ttmp,cipher=aes-xts-plain64,size=256 \n\n# Montar /dev/lvm/home como /dev/mapper/home utilizando LUKS, y solicitar la contraseña en el momento del arranque.\nhome   /dev/lvm/home\n\n# Montar /dev/sdb1 como /dev/mapper/backup utilizando LUKS, con una contraseña almacenada en un archivo.\nbackup /dev/sdb1       /home/alice/backup.key\n```\n\n"
+    },
+    {
+      "title": "Montaje en el momento del arranque",
+      "level": 3,
+      "content": "Si desea montar una unidad cifrada en el momento del arranque, ingrese el UUID del dispositivo en /etc/crypttab. Obtenga el UUID (de la partición) usando la orden lsblk -f y agregándolo a crypttab como sigue:\n\n```\n/etc/crypttab\n```\n\n```\nexternaldrive         UUID=2f9a8428-ac69-478a-88a2-4aa458565431        none    luks,timeout=180\n```\n\nEl primer parámetro es el nombre que prefiera del dispositivo mapeado para la unidad cifrada. La opción none expondrá un prompt durante el inicio para escribir la contraseña que desbloquee la partición. La opción timeout define un tiempo de espera en segundos para ingresar la contraseña de descifrado durante el arranque.\n\nTambién se puede configurar un archivo de claves y remitirse a él en lugar de esteblecer none. Esto da como resultado un desbloqueo automático, si se puede acceder al archivo de claves durante el inicio. Dado que LUKS ofrece la opción de tener varias claves, la opción elegida también se puede cambiar más adelante.\n\nUtilice el nombre que ha definido en /etc/crypttab para el mapeado del dispositivo en /etc/fstab de la siguiente manera:\n\n```\n/etc/fstab\n```\n\n```\n/dev/mapper/externaldrive      /mnt/backup               ext4    defaults,errors=remount-ro  0  2\n```\n\nDado que /dev/mapper/externaldrive ya es el resultado de un mapeado de partición único, no es necesario especificar un UUID para ello. En cualquier caso, el dispositivo mapeado con el sistema de archivos tendrá un UUID diferente al de la partición en la que está cifrado.\n\n"
+    },
+    {
+      "title": "Desbloquear con archivo de claves",
+      "level": 4,
+      "content": "If the keyfile for a secondary file system is itself stored inside an encrypted root, it is safe while the system is powered off and can be sourced to automatically unlock the mount during with boot via crypttab. For example, unlock a crypt specified by UUID:\n\n```\n/etc/crypttab\n```\n\n```\nhome-crypt    UUID=<UUID identifier>    /etc/mykeyfile\n```\n\nThen use the device mapper's name (defined in /etc/crypttab) to make an entry in /etc/fstab:\n\n```\n/etc/fstab\n```\n\n```\n/dev/mapper/home-crypt        /home   ext4        defaults        0       2\n```\n\nSince /dev/mapper/externaldrive already is the result of a unique partition mapping, there is no need to specify an UUID for it. In any case, the mapper with the filesystem will have a different UUID than the partition it is encrypted in.\n\n"
+    },
+    {
+      "title": "Montaje de un dispositivo de bloque apilado",
+      "level": 4,
+      "content": "Los generadores de systemd también procesan automáticamente los dispositivos de bloque apilados en el arranque.\n\nPor ejemplo, puede crear una configuración RAID (Español), utilizar cryptsetup para cifrarlo y crear un volumen lógico LVM (Español) con el sistema de archivos correspondiente dentro del dispositivo de bloque cifrado. El resultado será esto:\n\n```\n$ lsblk -f\n```\n\n```\n─sdXX                  linux_raid_member    \n│ └─md0                 crypto_LUKS   \n│   └─cryptedbackup     LVM2_member \n│     └─vgraid-lvraid   ext4              /mnt/backup\n└─sdYY                  linux_raid_member    \n  └─md0                 crypto_LUKS       \n    └─cryptedbackup     LVM2_member \n      └─vgraid-lvraid   ext4              /mnt/backup\n```\n\nque le pedirá la contraseña y se montará automáticamente en el arranque.\n\nDado que se han especificado las entradas correctas para crypttab (por ejemplo, UUID para el dispositivo crypto_LUKS) y para fstab (/dev/vgraid/lvraid) respectivametne, no hay necesidad de agregar más configuraciones/hooks de mkinitcpio, porque el procesamiento de /etc/crypttab se aplica solo a montajes no root. Una excepción es cuando el hook mdadm_udev se usa ya (por ejemplo, para el dispositivo raíz). En este caso, /etc/madadm.conf e initramfs necesitan actualizarse para lograr que la correcta raid de la raíz se elija primero.\n\n"
+    },
+    {
+      "title": "Montaje bajo demanda",
+      "level": 3,
+      "content": "Puede iniciar systemd-cryptsetup@externaldrive.service en lugar de usar:\n\n```\n# cryptsetup luksOpen UUID=... externaldrive\n```\n\ncuando tenga una entrada como sigue en su /etc/crypttab:\n\n```\n/etc/crypttab\n```\n\n```\nexternaldrive UUID=... none noauto\n```\n\nDe esa manera no necesita recordar las opciones exactas de crypttab. Le pedirá la contraseña si es necesario.\n\nEl archivo unit correspondiente será generado automáticamente por systemd-cryptsetup-generator(8). Puede listar todos los archivos unit generados usando:\n\n```\n$ systemctl list-unit-files | grep systemd-cryptsetup\n```\n\n"
+    },
+    {
+      "title": "El espacio del sistema en el arranque/solicitud de contraseña no se muestra",
+      "level": 3,
+      "content": "Si está usando Plymouth (Español), asegúrese de cargar los módulos correctos (vea: Plymouth#The plymouth hook[enlace roto: sección no válida]) o desactívelos. De lo contrario, Plymouth no asumirá la solicitud de contraseña, haciendo imposible el inicio del sistema.\n\n"
+    }
+  ]
+}

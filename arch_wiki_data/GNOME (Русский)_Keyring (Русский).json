@@ -1,0 +1,141 @@
+{
+  "title": "GNOME (Русский)/Keyring (Русский)",
+  "url": "https://wiki.archlinux.org/title/GNOME_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)/Keyring_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- GnuPG\n- OpenPGP\n\nGNOME Keyring - это «набор компонентов в GNOME, которые хранят пароли, ключи, сертификаты и делают их доступными для приложений».\n\nОн предоставляет org.freedesktop.secrets, API, который позволяет клиентским приложениям безопасно хранить пароли, используя службу, работающую в сессии входа пользователя в систему.\n\n"
+    },
+    {
+      "title": "Защита от вредоносных приложений",
+      "level": 3,
+      "content": "В прошлом сообщалось о проблеме безопасности (известной как CVE-2018-19358), связанной с поведением GNOME/Keyring API. Любое приложение может легко прочитать любой пароль, если связка ключей разблокирована. А если пользователь вошел в систему, то разблокирована коллекция логинов/дефолтов. Доступные механизмы защиты D-Bus (включающие XML-элементы busconfig и policy) не используются по умолчанию и в любом случае легко обходятся.\n\nПроект GNOME не согласен с этим сообщением об уязвимости, поскольку, согласно заявленной ими модели безопасности, недоверенным приложениям не должно быть позволено общаться с секретной службой.\n\nПриложения, помещенные в песочницу с помощью Flatpak, имеют только фильтрованный доступ к шине сессий.\n\n"
+    },
+    {
+      "title": "Связка ключей не блокируется, когда сессия заблокирована",
+      "level": 3,
+      "content": "Когда сессия заблокирована, связка ключей не блокируется автоматически.[1] Это означает, что пароли остаются в памяти, что открывает систему для атаки DMA.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "gnome-keyring входит в группу gnome и поэтому обычно присутствует на системах с GNOME. В противном случае пакет может быть установлен самостоятельно. libsecret также должен быть установлен, для предоставления другим приложениям доступа к вашим связкам ключей. Хотя libgnome-keyring устарел (и заменен на libsecret), он все еще может быть необходим некоторым приложениям.\n\nДемон gnome-keyring-daemon автоматически запускается через пользовательскую службу systemd при входе в систему. Он также может быть запущен по запросу через сокет.\n\nДополнительные утилиты, связанные с GNOME Keyring, включают:\n\n- secret-tool — Доступ к GNOME Keyring (и любой другой службе, реализующей DBus Secret Service API) из командной строки.\n\n- lssecret — Список всех секретных элементов, использующих libsecret (например, GNOME Keyring).\n\n"
+    },
+    {
+      "title": "Управление с помощью графического интерфейса",
+      "level": 2,
+      "content": "Вы можете управлять содержимым GNOME Keyring с помощью Seahorse; установив пакет seahorse.\n\nПароли для связок ключей (например, для связки по умолчанию «Login») можно изменять и даже удалять. Дополнительную информацию см. в разделах Создать новую связку ключей и Обновить пароль связки ключей в Справке GNOME.\n\n"
+    },
+    {
+      "title": "Использование keyring",
+      "level": 2,
+      "content": "Модуль PAM (Русский) pam_gnome_keyring.so частично инициализирует GNOME Keyring, разблокируя при этом связку ключей login. Демон gnome-keyring-daemon автоматически запускается с помощью пользовательской службы systemd.\n\n"
+    },
+    {
+      "title": "Шаг PAM",
+      "level": 3,
+      "content": "Note: **без автоматического входа** \n\n- Чтобы использовать автоматическую разблокировку с автоматическим входом в систему, можно задать пустой пароль для связки ключей. Обратите внимание, что в этом случае содержимое связки ключей хранится в незашифрованном виде.\n- В качестве альтернативы, при использовании GDM и LUKS, GDM может разблокировать вашу связку ключей, если он соответствует вашему паролю LUKS. Чтобы это работало, необходимо использовать systemd init в mkinitcpio.conf, а также appropriate kernel parameters. Более подробную информацию см. в [2].\n- Если вы хотите пропустить шаг PAM, связка ключей должна быть разблокирована вручную или другим способом. См. #Использование_gnome-keyring-daemon_вне_окружения_рабочего_стола_(KDE,_GNOME,_XFCE,_...) и GnomeKeyring wiki.\n\nПри использовании менеджера дисплеев связка ключей работает «из коробки» в большинстве случаев. GDM, LightDM, LXDM и SDDM уже имеют необходимую конфигурацию PAM. Для менеджера дисплеев, который не разблокирует связку ключей автоматически, отредактируйте соответствующий файл вместо /etc/pam.d/login, как указано ниже.\n\nПри использовании входа через консоль отредактируйте /etc/pam.d/login:\n\nДобавьте auth optional pam_gnome_keyring.so в конец раздела auth и session optional pam_gnome_keyring.so auto_start в конец раздела session.\n\n```\n/etc/pam.d/login\n```\n\n```\n#%PAM-1.0\n\nauth       required     pam_securetty.so\nauth       requisite    pam_nologin.so\nauth       include      system-local-login\nauth       optional     pam_gnome_keyring.so\naccount    include      system-local-login\nsession    include      system-local-login\nsession    optional     pam_gnome_keyring.so auto_start\n```\n\n"
+    },
+    {
+      "title": "SSH ключи",
+      "level": 2,
+      "content": "GNOME Keyring может выступать в качестве обертки для ssh-agent. В этом режиме он будет отображать диалог ввода пароля в графическом интерфейсе каждый раз, когда вам нужно разблокировать SSH-ключ. Диалог включает в себя флажок запоминания введенного пароля, который, если его выбрать, позволит использовать этот ключ без пароля в будущем, пока ваша связка ключей для входа в систему разблокирована.\n\nФункциональность SSH отключена по умолчанию в сборках gnome-keyring-daemon начиная с версии 1:46. Она была перенесена в /usr/lib/gcr-ssh-agent, который является частью пакета gcr-4.\n\n"
+    },
+    {
+      "title": "Установка gcr",
+      "level": 3,
+      "content": "Все, что вам нужно сделать, это:\n\n1. Включить gcr-ssh-agent.socket systemd user unit.\n1. Запустить один раз gcr-ssh-agent.socket systemd user unit. При этом будет создан файл сокета $XDG_RUNTIME_DIR/gcr/ssh. После создания файла достаточно выполнить 1 шаг для автоматического запуска блока сокетов.\n1. Ручная настройка переменной окружения SSH_AUTH_SOCK не требуется, если активен блок gcr-ssh-agent.socket. Значение переменной окружения SSH_AUTH_SOCK должно быть установлено в $XDG_RUNTIME_DIR/gcr/ssh после выхода и входа пользователя. Известно, что это работает с приложением Gnome Console для пользователей, использующих fish в качестве оболочки по умолчанию.\n\nСуществует множество способов для установки переменных среды и тот, который вы будете использовать, будет зависеть от ваших конкретных настроек и предпочтений.\n\n"
+    },
+    {
+      "title": "Использование",
+      "level": 3,
+      "content": "Вы можете запустить\n\n```\n$ ssh-add -L\n```\n\nдля получения списка загруженных SSH-ключей в запущенном агенте. Это поможет убедиться, что вы запустили соответствующую службу и правильно установили SSH_AUTH_SOCK.\n\nЧтобы навсегда сохранить ключевую фразу в связке ключей, используйте ssh-askpass из пакета seahorse:\n\n```\n$ /usr/lib/seahorse/ssh-askpass my_key\n```\n\nЧтобы вручную добавить ключ SSH из другого каталога:\n\n```\n$ ssh-add ~/.private/id_rsa\nEnter passphrase for ~/.private/id_rsa:\n```\n\nЧтобы отключить все добавленные вручную ключи:\n\n```\n$ ssh-add -D\n```\n\n"
+    },
+    {
+      "title": "Отключение",
+      "level": 3,
+      "content": "Если вы хотите запустить альтернативный SSH-агент (например, ssh-agent напрямую или gpg-agent), будет полезно отключить обертку ssh-agent в GNOME Keyring. Это не является строго необходимым, поскольку каждый агент слушает на разных сокетах, и SSH_AUTH_SOCK можно использовать для выбора между ними, но это может облегчить отладку проблем. Обратите внимание, что реализация GNOME не поддерживает многие функции сценариев, например BatchMode [3].\n\nДля отключения gcr-ssh-agent, убедитесь, что gcr-ssh-agent.socket и gcr-ssh-agent.service отключены и остановлены в systemd.\n\n"
+    },
+    {
+      "title": "Интеграция с приложениями",
+      "level": 3,
+      "content": "- Chromium\n\n"
+    },
+    {
+      "title": "Блокировка связки ключей",
+      "level": 3,
+      "content": "```\n$ dbus-send --session --dest=org.freedesktop.secrets \\\n   --type=method_call  \\\n   /org/freedesktop/secrets \\\n   org.freedesktop.Secret.Service.Lock \\\n   array:objpath:/org/freedesktop/secrets/collection/login\n```\n\nЭта команда выполняет вызов метода D-Bus для блокировки связки ключей login. В качестве альтернативы, если вы хотите использовать графический интерфейс, можно использовать Seahorse для блокировки связки ключей.\n\n"
+    },
+    {
+      "title": "Удаление парольных фраз",
+      "level": 3,
+      "content": "```\n$ gnome-keyring-daemon -r -d\n```\n\nЭта команда запускает gnome-keyring-daemon, завершая работу ранее запущенных экземпляров.\n\n"
+    },
+    {
+      "title": "Интеграция git",
+      "level": 3,
+      "content": "Связка ключей GNOME полезна в сочетании с Gitом при работе по HTTPS. Пакет libsecret должен быть установлен, чтобы эта функциональность стала доступна.\n\nНастройте Git на использование помощника libsecret:\n\n```\n$ git config --global credential.helper /usr/lib/git-core/git-credential-libsecret\n```\n\nВ следующий раз, когда вы запустите git push, вам будет предложено разблокировать связку ключей, если она еще не разблокирована.\n\n"
+    },
+    {
+      "title": "Интеграция GnuPG",
+      "level": 3,
+      "content": "Некоторые приложения, использующие GnuPG, требуют установки pinentry-program. Установите следующее значение, чтобы использовать GNOME 3 pinentry для GNOME Keyring для управления запросами парольной фразы.\n\n```\n~/.gnupg/gpg-agent.conf\n```\n\n```\npinentry-program /usr/bin/pinentry-gnome3\n```\n\nДругой вариант - принудительная петля для GPG, которая позволит вводить ключевую фразу в приложении.\n\n"
+    },
+    {
+      "title": "Переименование связки ключей",
+      "level": 3,
+      "content": "Отображаемое имя брелока (т. е. имя, которое отображается в Seahorse и в file) можно изменить, изменив значение display-name в незашифрованном файле брелока. Обычно брелоки хранятся в ~/.local/share/keyrings/ с расширением файла .keyring.\n\n"
+    },
+    {
+      "title": "Автоматическая смена пароля связки ключей на пароль пользователя",
+      "level": 3,
+      "content": "Добавить password optional pam_gnome_keyring.so в /etc/pam.d/passwd:\n\n```\n/etc/pam.d/passwd\n```\n\n```\n...\npassword\toptional\tpam_gnome_keyring.so\n```\n\n"
+    },
+    {
+      "title": "Запуск",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nЕсли вы используете sway, i3 или любой другой оконный менеджер, который не выполняет\n\n- /etc/xdg/autostart/gnome-keyring-*.desktop\n- /etc/X11/xinit/xinitrc.d/50-systemd-user.sh\n\nвашему оконному менеджеру необходимо выполнить следующие команды во время его запуска. Команды необязательно должны выполняться в каком-либо определенном порядке.\n\n```\ndbus-update-activation-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY\n```\n\nили\n\n```\ndbus-update-activation-environment --all\n```\n\nЭта команда передает переменные окружения из оконного менеджера в сессию dbus. Без этого GUI-запросы не могут быть вызваны через DBus. Например, это необходимо для запроса пароля seahorse.\n\nЭто необходимо потому, что сессия dbus запускается до запуска графического окружения. Таким образом, сессия dbus не знает о графическом окружении, в котором вы находитесь. Кто-то или что-то должно научить сессию dbus графическому окружению, передавая переменные окружения, описывающие графическое окружение, в сессию dbus.\n\n```\ngnome-keyring-daemon --start --components=secrets\n```\n\nВо время входа в систему PAM запускает gnome-keyring-daemon --login, отвечающий за поддержание gnome-keyring разблокированным с помощью пароля для входа. Если gnome-keyring-daemon --login не подключается к сессии dbus в течение нескольких минут, gnome-keyring-daemon --login умирает. Если gnome-keyring-daemon --start ... запущен против сессии dbus в оконном менеджере, gnome-keyring-daemon --login подключается к сессии dbus. Если ваша сессия входа не запустится gnome-keyring-daemon --start ... до того, как gnome-keyring-daemon --login выйдет из системы, вы также можете использовать любую программу, использующую gnome-keyring или API службы паролей до того, как gnome-keyring-daemon --login умрет.\n\n"
+    },
+    {
+      "title": "GNOME связка ключей XDG Portal",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nGNOME Keyring открывает бэкенд XDG Portal (например, для использования с приложениями, помещенными в песочницу через flatpak). Чтобы он работал вне GNOME, необходимо добавить свое окружение рабочего стола в конфигурационный файл /usr/share/xdg-desktop-portal/portals/gnome-keyring.portal, изменив ключ UseIn. Например, чтобы добавить sway:\n\n```\n/usr/share/xdg-desktop-portal/portals/gnome-keyring.portal\n```\n\n```\n[portal]\nDBusName=org.freedesktop.secrets\nInterfaces=org.freedesktop.impl.portal.Secret\nUseIn=gnome;sway\n```\n\nДополнительную информацию о бэкендах XDG Desktop Portal см. в разделе XDG Desktop Portal#Backends.\n\n"
+    },
+    {
+      "title": "Пароли не запоминаются",
+      "level": 3,
+      "content": "Если после входа в систему вам предлагается ввести пароль и вы обнаруживаете, что ваши пароли не сохраняются, возможно, вам нужно создать/установить связку ключей по умолчанию. Чтобы сделать это с помощью Seahorse (он же Пароли и ключи), смотрите Создание новой связки ключей и Изменение связки ключей по-умолчанию в справке GNOME.\n\n"
+    },
+    {
+      "title": "Сброс связки ключей",
+      "level": 3,
+      "content": "Вам необходимо изменить пароль связки ключей для входа, если вы получаете следующее сообщение об ошибке: «Пароль, используемый для входа на компьютер, больше не соответствует паролю вашего брелока для входа».\n\nВ качестве альтернативы вы можете удалить файлы login.keyring и user.keystore из ~/.local/share/keyrings/. Предупреждаем, что при этом все сохраненные ключи будут удалены навсегда. После удаления файлов просто выйдите из системы и войдите снова.\n\n"
+    },
+    {
+      "title": "Unable to locate daemon control file",
+      "level": 3,
+      "content": "После входа в систему в journal может появиться следующая ошибка:\n\n```\ngkr-pam: unable to locate daemon control file\n```\n\nЭто сообщение «можно смело игнорировать», если нет других связанных с ним проблем [4].\n\n"
+    },
+    {
+      "title": "No such secret collection at path: /",
+      "level": 3,
+      "content": "Если вы попытаетесь добавить новый брелок с помощью Seahorse, вы можете получить эту ошибку по следующим причинам:\n\n- Директория ~/.local/share/keyrings/ не существует. Создайте её, если она отсутствует.\n- Используется пользовательский ~/.xinitrc. Эту проблему можно решить, добавив следующую строку [5].\n\n```\n~/.xinitrc\n```\n\n```\nsource /etc/X11/xinit/xinitrc.d/50-systemd-user.sh\n```\n\n"
+    },
+    {
+      "title": "Терминал выдает сообщение \"discover_other_daemon: 1\"",
+      "level": 3,
+      "content": "Это происходит из-за того, что gnome-keyring-daemon запускается во второй раз. Поскольку вместе с демоном поставляется служба systemd, вам не нужно запускать её другим способом. Поэтому убедитесь, что команда start удалена из ваших .zshenv, .bash_profile, .xinitrc, config.fish или других подобных файлов. Также вы можете отключить пользовательские модули gnome-keyring-daemon.service и gnome-keyring-daemon.socket.\n\n"
+    },
+    {
+      "title": "Неправильная инициализация связки ключей",
+      "level": 3,
+      "content": "Есть несколько симптомов этого:\n\n- Такие программы, как SSH или Git, зависают, ожидая, пока связка ключей предоставит пароль, и в итоге завершаются с ошибками типа \"agent refused operation\".\n- Seahorse не отображает никаких связок ключей, и ручное создание связки ключей с именем «login», похоже, ничего не дает.\n- В выводе seahorse появляется следующее сообщение об ошибке: couldn't load all secret collections: No such secret collection at path: /org/freedesktop/secrets/collection/login\n\n```\ncouldn't load all secret collections: No such secret collection at path: /org/freedesktop/secrets/collection/login\n```\n\nДля решения этой проблемы, сделайте следующее:\n\n1. Перезапустите пользовательский юнит systemd gnome-keyring-daemon.service. Это должно правильно инициализировать связку ключей login.\n1. Перезапустите пользовательский юнит systemd gcr-ssh-agent.service, если он используется. Другие агенты также могут нуждаться в перезапуске.\n\nЕсли это не устранит проблему, рассмотрите переустановку связки ключей.\n\n"
+    },
+    {
+      "title": "Смотри также",
+      "level": 2,
+      "content": "- https://help.gnome.org/users/seahorse/stable/\n- GNOME вики-страница (архивная)\n- Пакеты, предоставляющие org.freedesktop.secrets\n\n"
+    }
+  ]
+}

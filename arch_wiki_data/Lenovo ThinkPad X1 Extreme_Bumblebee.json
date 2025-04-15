@@ -1,0 +1,241 @@
+{
+  "title": "Lenovo ThinkPad X1 Extreme/Bumblebee",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_X1_Extreme/Bumblebee",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- PRIME\n- Nvidia-xrun\n- NVIDIA Optimus\n- Nouveau\n- NVIDIA\n- Intel graphics\n\nFrom Bumblebee's FAQ:\n\n"
+    },
+    {
+      "title": "Bumblebee: Optimus for Linux",
+      "level": 2,
+      "content": "Optimus Technology is a hybrid graphics implementation without a hardware multiplexer. The integrated GPU manages the display while the dedicated GPU manages the most demanding rendering and ships the work to the integrated GPU to be displayed. When the laptop is running on battery supply, the dedicated GPU is turned off to save power and prolong the battery life. It has also been tested successfully with desktop machines with Intel integrated graphics and an nVidia dedicated graphics card.\n\nBumblebee is a software implementation comprising two parts:\n\n- Render programs off-screen on the dedicated video card and display it on the screen using the integrated video card. This bridge is provided by VirtualGL or primus (read further) and connects to a X server started for the discrete video card.\n- Disable the dedicated video card when it is not in use (see the #Power management section)\n\nIt tries to mimic the Optimus technology behavior; using the dedicated GPU for rendering when needed and power it down when not in use. The present releases only support rendering on-demand, automatically starting a program with the discrete video card based on workload is not implemented.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Before installing Bumblebee, check your BIOS and activate Optimus (older laptops call it \"switchable graphics\") if possible (BIOS does not have to provide this option). If neither \"Optimus\" or \"switchable\" is in the BIOS, still make sure both GPUs will be enabled and that the integrated graphics (igfx) is initial display (primary display). The display should be connected to the onboard integrated graphics, not the discrete graphics card. If integrated graphics had previously been disabled and discrete graphics drivers installed, be sure to remove /etc/X11/xorg.conf or the conf file in /etc/X11/xorg.conf.d related to the discrete graphics card.\n\nInstall:\n\n- bumblebee - The main package providing the daemon and client programs.\n- mesa - An open-source implementation of the OpenGL specification.\n- An appropriate version of the NVIDIA driver, see NVIDIA#Installation.\n- Optionally install xf86-video-intel - Intel Xorg driver.\n\nFor 32-bit application support, enable the multilib repository and install:\n\n- lib32-virtualgl - A render/display bridge for 32 bit applications.\n- lib32-nvidia-utils or lib32-nvidia-340xx-utilsAUR (match the version of the regular NVIDIA driver).\n\nIn order to use Bumblebee, it is necessary to add your regular user to the bumblebee group:\n\n```\n# gpasswd -a user bumblebee\n```\n\nAlso enable bumblebeed.service. Reboot your system and follow #Usage.\n\n- The bumblebee package will install a kernel module blacklist file that prevents the nvidia-drm module from loading on boot. Remember to uninstall this if you later switch away to other solutions.\n- The package does not blacklist the nvidiafb module. You probably do not have it installed, because the default kernels do not ship it. However, with other kernels you must explicitly blacklist it too, otherwise optirun and primusrun will not run. See FS#69018.\n\n"
+    },
+    {
+      "title": "Test",
+      "level": 3,
+      "content": "Install mesa-utils and use glxgears to test if Bumblebee works with your Optimus system:\n\n```\n$ optirun glxgears -info\n```\n\nIf it fails, try the following command (from virtualgl):\n\n```\n$ optirun glxspheres64\n```\n\nIf the window with animation shows up, Optimus with Bumblebee is working.\n\n"
+    },
+    {
+      "title": "General usage",
+      "level": 3,
+      "content": "```\n$ optirun [options] application [application-parameters]\n```\n\nFor example, start Windows applications with Optimus:\n\n```\n$ optirun wine application.exe\n```\n\nFor another example, open NVIDIA Settings panel with Optimus:\n\n```\n$ optirun -b none nvidia-settings -c :8\n```\n\nFor a list of all available options, see optirun(1).\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "You can configure the behaviour of Bumblebee to fit your needs. Fine tuning like speed optimization, power management and other stuff can be configured in /etc/bumblebee/bumblebee.conf\n\n"
+    },
+    {
+      "title": "Optimizing speed",
+      "level": 3,
+      "content": "One disadvantage of the offscreen rendering methods is performance. The following table gives a raw overview of a Lenovo ThinkPad T480 in an eGPU setup with NVIDIA GTX 1060 6GB and unigine-heavenAUR benchmark (1920x1080, max settings, 8x AA):\n\nTable content:\nCommand | Display | FPS | Score | Min FPS | Max FPS\noptirun unigine-heaven | internal | 20.7 | 521 | 6.9 | 26.6\nprimusrun unigine-heaven | internal | 36.9 | 930 | 15.3 | 44.1\nunigine-heaven | internal in Nvidia-xrun | 51.3 | 1293 | 8.4 | 95.6\nunigine-heaven | external in Nvidia-xrun | 56.1 | 1414 | 8.4 | 111.9\n\n"
+    },
+    {
+      "title": "Using VirtualGL as bridge",
+      "level": 4,
+      "content": "Bumblebee renders frames for your Optimus NVIDIA card in an invisible X Server with VirtualGL and transports them back to your visible X Server. Frames will be compressed before they are transported - this saves bandwidth and can be used for speed-up optimization of bumblebee:\n\nTo use another compression method for a single application:\n\n```\n$ optirun -c compress-method application\n```\n\nThe method of compress will affect performance in the GPU/CPU usage. Compressed methods will mostly load the CPU. However, uncompressed methods will mostly load the GPU.\n\nCompressed methods:\n\n- jpeg\n- rgb\n- yuv\n\nUncompressed methods:\n\n- proxy\n- xv\n\nHere is a performance table tested with ASUS N550JV laptop and benchmark app unigine-heavenAUR:\n\nTable content:\nCommand | FPS | Score | Min FPS | Max FPS\noptirun unigine-heaven | 25.0 | 630 | 16.4 | 36.1\noptirun -c jpeg unigine-heaven | 24.2 | 610 | 9.5 | 36.8\noptirun -c rgb unigine-heaven | 25.1 | 632 | 16.6 | 35.5\noptirun -c yuv unigine-heaven | 24.9 | 626 | 16.5 | 35.8\noptirun -c proxy unigine-heaven | 25.0 | 629 | 16.0 | 36.1\noptirun -c xv unigine-heaven | 22.9 | 577 | 15.4 | 32.2\n\nTo use a standard compression for all applications, set the VGLTransport to compress-method in /etc/bumblebee/bumblebee.conf:\n\n```\n/etc/bumblebee/bumblebee.conf\n```\n\n```\n[...]\n[optirun]\nVGLTransport=proxy\n[...]\n```\n\nYou can also play with the way VirtualGL reads back the pixels from your graphics card. Setting VGL_READBACK environment variable to pbo should increase the performance. Compare the following:\n\nPBO should be faster:\n\n```\nVGL_READBACK=pbo optirun glxgears\n```\n\nThe default value is sync:\n\n```\nVGL_READBACK=sync optirun glxgears\n```\n\n"
+    },
+    {
+      "title": "Primusrun",
+      "level": 4,
+      "content": "primusrun (from primus) is becoming the default choice, because it consumes less power and sometimes provides better performance than optirun/virtualgl. It may be run separately, but it does not accept options as optirun does. Setting primus as the bridge for optirun provides more flexibility.\n\nFor 32-bit applications support on 64-bit machines, install lib32-primus (multilib must be enabled).\n\nYou can either run it separately:\n\n```\n$ primusrun glxgears\n```\n\nOr as a bridge for optirun. The default configuration sets virtualgl as the bridge. Override that on the command line:\n\n```\n$ optirun -b primus glxgears\n```\n\nAlternatively, set Bridge=primus in /etc/bumblebee/bumblebee.conf and you will not have to specify it on the command line.\n\n"
+    },
+    {
+      "title": "Pvkrun",
+      "level": 4,
+      "content": "pvkrun from the package primus_vk is a drop-in replacement for primusrun that enables to run Vulkan-based applications. A quick check can be done with vulkaninfo from vulkan-tools.\n\n```\n$ pvkrun vulkaninfo\n```\n\n"
+    },
+    {
+      "title": "Power management",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Hybrid graphics#Using bbswitch.** This article or section is a candidate for merging with Hybrid graphics#Using bbswitch.\n\nThis article or section is a candidate for merging with Hybrid graphics#Using bbswitch.\n\nThe goal of the power management feature is to turn off the NVIDIA card when it is not used by Bumblebee any more. If bbswitch (for linux) or bbswitch-dkms (for linux-lts or custom kernels) is installed, it will be detected automatically when the Bumblebee daemon starts. No additional configuration is necessary. However, bbswitch is for Optimus laptops only and will not work on desktop computers. So, Bumblebee power management is not available for desktop computers, and there is no reason to install bbswitch on a desktop. (Nevertheless, the other features of Bumblebee do work on some desktop computers.)\n\nTo manually turn the card on or off using bbswitch, write into /proc/acpi/bbswitch:\n\n```\n# echo OFF > /proc/acpi/bbswitch\n# echo ON > /proc/acpi/bbswitch\n```\n\n"
+    },
+    {
+      "title": "Default power state of NVIDIA card using bbswitch",
+      "level": 4,
+      "content": "The default behavior of bbswitch is to leave the card power state unchanged. bumblebeed does disable the card when started, so the following is only necessary if you use bbswitch without bumblebeed.\n\nSet load_state and unload_state kernel module parameters according to your needs (see bbswitch documentation).\n\n```\n/etc/modprobe.d/bbswitch.conf\n```\n\n```\noptions bbswitch load_state=0 unload_state=1\n```\n\nTo run bbswitch without bumblebeed on system startup, do not forget to add bbswitch to /etc/modules-load.d, as explained in Kernel module#systemd.\n\n"
+    },
+    {
+      "title": "Enable NVIDIA card during shutdown",
+      "level": 4,
+      "content": "On some laptops, the NVIDIA card may not correctly initialize during boot if the card was powered off when the system was last shutdown. Therefore the Bumblebee daemon will power on the GPU when stopping the daemon (e.g. on shutdown) due to the (default) setting TurnCardOffAtExit=false in /etc/bumblebee/bumblebee.conf. Note that this setting does not influence power state while the daemon is running, so if all optirun or primusrun programs have exited, the GPU will still be powered off.\n\nWhen you stop the daemon manually, you might want to keep the card powered off while still powering it on on shutdown. To achieve the latter, add the following systemd service (if using bbswitch):\n\n```\n/etc/systemd/system/nvidia-enable.service\n```\n\n```\n[Unit]\nDescription=Enable NVIDIA card\nDefaultDependencies=no\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -c 'echo ON > /proc/acpi/bbswitch'\n\n[Install]\nWantedBy=shutdown.target\n```\n\nThen enable the nvidia-enable.service unit.\n\n"
+    },
+    {
+      "title": "Enable NVIDIA card after waking from suspend",
+      "level": 4,
+      "content": "The bumblebee daemon may fail to activate the graphics card after suspending. A possible fix involves setting bbswitch as the default method for power management:\n\n```\n/etc/bumblebee/bumblebee.conf\n```\n\n```\n[driver-nvidia]\nPMMethod=bbswitch\n\n[driver-nouveau]\nPMMethod=bbswitch\n```\n\nIf the above fix fails, try the following command:\n\n```\n# echo 1 > /sys/bus/pci/rescan\n```\n\nTo rescan the PCI bus automatically after a suspend, create a script as described in Power management/Suspend and hibernate#Hooks in /usr/lib/systemd/system-sleep.\n\n"
+    },
+    {
+      "title": "Outputs wired to the Intel chip",
+      "level": 4,
+      "content": "If the port (DisplayPort/HDMI/VGA) is wired to the Intel chip, you can set up multiple monitors with xorg.conf. Set them to use the Intel card, but Bumblebee can still use the NVIDIA card. One example configuration is below for two identical screens with 1080p resolution and using the HDMI out.\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"Screen\"\n    Identifier     \"Screen0\"\n    Device         \"intelgpu0\"\n    Monitor        \"Monitor0\"\n    DefaultDepth    24\n    Option         \"TwinView\" \"0\"\n    SubSection \"Display\"\n        Depth          24\n        Modes          \"1920x1080_60.00\"\n    EndSubSection\nEndSection\n\nSection \"Screen\"\n    Identifier     \"Screen1\"\n    Device         \"intelgpu1\"\n    Monitor        \"Monitor1\"\n    DefaultDepth   24\n    Option         \"TwinView\" \"0\"\n    SubSection \"Display\"\n        Depth          24\n        Modes          \"1920x1080_60.00\"\n    EndSubSection\nEndSection\n\nSection \"Monitor\"\n    Identifier     \"Monitor0\"\n    Option         \"Enable\" \"true\"\nEndSection\n\nSection \"Monitor\"\n    Identifier     \"Monitor1\"\n    Option         \"Enable\" \"true\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"intelgpu0\"\n    Driver         \"intel\"\n    Option         \"UseEvents\" \"true\"\n    Option         \"AccelMethod\" \"UXA\"\n    BusID          \"PCI:0:2:0\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"intelgpu1\"\n    Driver         \"intel\"\n    Option         \"UseEvents\" \"true\"\n    Option         \"AccelMethod\" \"UXA\"\n    BusID          \"PCI:0:2:0\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"nvidiagpu1\"\n    Driver         \"nvidia\"\n    BusID          \"PCI:0:1:0\"\nEndSection\n```\n\nYou need to probably change the BusID for both the Intel and the NVIDIA card.\n\n```\n$ lspci | grep VGA\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation 2nd Generation Core Processor Family Integrated Graphics Controller (rev 09)\n```\n\nThe BusID is 0:2:0. Note that lspci outputs hexadecimal values, but Xorg expects decimal values.\n\n"
+    },
+    {
+      "title": "Output wired to the NVIDIA chip",
+      "level": 4,
+      "content": "On some notebooks, the digital Video Output (HDMI or DisplayPort) is hardwired to the NVIDIA chip. If you want to use all the displays on such a system simultaneously, the easiest solution is to use intel-virtual-output, a tool provided in the xf86-video-intel driver set, as of v2.99. It will allow you to extend the existing X session onto other screens, leveraging virtual outputs to work with the discrete graphics card. Usage is as follows:\n\n```\n$ intel-virtual-output [OPTION]... [TARGET_DISPLAY]...\n```\n\n```\n-d <source display>  source display\n-f                   keep in foreground (do not detach from console and daemonize)\n-b                   start bumblebee\n-a                   connect to all local displays (e.g. :1, :2, etc)\n-S                   disable use of a singleton and launch a fresh intel-virtual-output process\n-v                   all verbose output, implies -f\n-V <category>        specific verbose output, implies -f\n-h                   this help\n```\n\nIf this command alone does not work, you can try running it with optirun to enable the discrete graphics and allow it to detect the outputs accordingly. This is known to be necessary on Lenovo's Legion Y720.\n\n```\n$ optirun intel-virtual-output\n```\n\nIf no target displays are parsed on the commandline, intel-virtual-output will attempt to connect to any local display. The detected displays will be manageable via any desktop display manager such as xrandr or KDE Display. The tool will also start bumblebee (which may be left as default install). See the Bumblebee wiki page for more information.\n\nWhen run in a terminal, intel-virtual-output will daemonize itself unless the -f switch is used. Games can be run on the external screen by first exporting the display export DISPLAY=:8, and then running the game with optirun game_bin, however, cursor and keyboard are not fully captured. Use export DISPLAY=:0 to revert back to standard operation.\n\nIf intel-virtual-output does not detect displays, or if a no VIRTUAL outputs on \":0\" message is obtained, then create:\n\n```\n/etc/X11/xorg.conf.d/20-intel.conf\n```\n\n```\nSection \"Device\"\n    Identifier     \"intelgpu0\"\n    Driver         \"intel\"\nEndSection\n```\n\nwhich does exist by default, and:\n\n```\n/etc/bumblebee/xorg.conf.nvidia\n```\n\n```\nSection \"ServerLayout\"\n    Identifier     \"Layout0\"\n    Option         \"AutoAddDevices\" \"true\"\n    Option         \"AutoAddGPU\" \"false\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"DiscreteNvidia\"\n    Driver         \"nvidia\"\n    VendorName     \"NVIDIA Corporation\"\n    Option         \"ProbeAllGpus\" \"false\"\n    Option         \"NoLogo\" \"true\"\n    Option         \"UseEDID\" \"true\"\n    Option         \"AllowEmptyInitialConfiguration\"\n#    Option         \"UseDisplayDevice\" \"none\"\nEndSection\n\nSection \"Screen\"\n    Identifier     \"Screen0\"\n    Device         \"DiscreteNvidia\"\nEndSection\n```\n\nSee [3] for further configurations to try. If the laptop screen is stretched and the cursor is misplaced while the external monitor shows only the cursor, try killing any running compositing managers.\n\nIf you do not want to use intel-virtual-output, another option is to configure Bumblebee to leave the discrete GPU on and directly configure X to use both the screens, as it will be able to detect them.\n\nAs a last resort, you can run 2 X Servers. The first will be using the Intel driver for the notebook's screen. The second will be started through optirun on the NVIDIA card, to show on the external display. Make sure to disable any display/session manager before manually starting your desktop environment with optirun. Then, you can log in the integrated-graphics powered one.\n\nYou can disable screen blanking when using intel-virtual-output with xset by setting the DISPLAY environment variable appropriately (see DPMS for more info):\n\n```\n$ DISPLAY=:8 xset -dpms s off\n```\n\n"
+    },
+    {
+      "title": "Multiple NVIDIA graphics cards or NVIDIA Optimus",
+      "level": 3,
+      "content": "If you have multiple NVIDIA graphics cards (eg. when using an eGPU with a laptop with another built in NVIDIA graphics card) or NVIDIA Optimus, you need to make a minor edit to /etc/bumblebee/xorg.conf.nvidia. If this change is not made the daemon may default to using the internal NVIDIA card.\n\nFirst, determine the BusID of the external card:\n\n```\n$ lspci | grep -E \"VGA|3D\"\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation HD Graphics 530 (rev 06)\n01:00.0 3D controller: NVIDIA Corporation GM107M [GeForce GTX 960M] (rev a2)\n0b:00.0 VGA compatible controller: NVIDIA Corporation GP104 [GeForce GTX 1070] (rev a1)\n```\n\nIn this case, the BusID is 0b:00.0.\n\nNow edit /etc/bumblebee/xorg.conf.nvidia and add the following line to Section \"Device\":\n\n```\n/etc/bumblebee/xorg.conf.nvidia\n```\n\n```\nSection \"Device\"\n    ...\n    BusID          \"PCI:11:00:0\"\n    Option         \"AllowExternalGpus\" \"true\"  # If the GPU is external\n    ...\nEndSection\n```\n\n"
+    },
+    {
+      "title": "[VGL] ERROR: Could not open display :8",
+      "level": 3,
+      "content": "There is a known problem with some wine applications that fork and kill the parent process without keeping track of it (for example the free to play online game \"Runes of Magic\").\n\nThis is a known problem with VirtualGL. As of bumblebee 3.1, so long as you have it installed, you can use Primus as your render bridge:\n\n```\n$ optirun -b primus wine windows program.exe\n```\n\nIf this does not work, an alternative walkaround for this problem is:\n\n```\n$ optirun bash\n$ optirun wine windows program.exe\n```\n\nIf using NVIDIA drivers a fix for this problem is to edit /etc/bumblebee/xorg.conf.nvidia and change Option ConnectedMonitor to CRT-0.\n\n"
+    },
+    {
+      "title": "Xlib: extension \"GLX\" missing on display \":0.0\"",
+      "level": 3,
+      "content": "If you tried to install the NVIDIA driver from NVIDIA website, this is not going to work.\n\n1. Uninstall that driver in the similar way: # ./NVIDIA-Linux-*.run --uninstall\n1. Remove the Xorg configuration file generated by NVIDIA: # rm /etc/X11/xorg.conf\n1. (Re)install the correct NVIDIA driver: See #Installation.\n\n```\n# ./NVIDIA-Linux-*.run --uninstall\n```\n\n```\n# rm /etc/X11/xorg.conf\n```\n\n"
+    },
+    {
+      "title": "[ERROR]Cannot access secondary GPU: No devices detected",
+      "level": 3,
+      "content": "In some instances, running optirun will return:\n\n```\n[ERROR]Cannot access secondary GPU - error: [XORG] (EE) No devices detected.\n[ERROR]Aborting because fallback start is disabled.\n```\n\nIn this case, you will need to move the file /etc/X11/xorg.conf.d/20-intel.conf to somewhere else, restart the bumblebeed daemon and it should work. If you do need to change some features for the Intel module, a workaround is to merge /etc/X11/xorg.conf.d/20-intel.conf to /etc/X11/xorg.conf.\n\nIt could be also necessary to comment the driver line in /etc/X11/xorg.conf.d/10-monitor.conf.\n\nIf you are using the nouveau driver you could try switching to the nvidia driver.\n\nYou might need to define the NVIDIA card somewhere (e.g. file /etc/bumblebee/xorg.conf.nvidia), using the correct BusID according to lspci output:\n\n```\nSection \"Device\"\n    Identifier     \"nvidiagpu1\"\n    Driver         \"nvidia\"\n    BusID          \"PCI:0:1:0\"\nEndSection\n```\n\nObserve that the format of lspci output is in HEX, while in xorg it is in decimals. So if the output of lspci is, for example, 0a:00.0 the BusID should be PCI:10:0:0.\n\n"
+    },
+    {
+      "title": "NVIDIA(0): Failed to assign any connected display devices to X screen 0",
+      "level": 4,
+      "content": "If the console output is:\n\n```\n[ERROR]Cannot access secondary GPU - error: [XORG] (EE) NVIDIA(0): Failed to assign any connected display devices to X screen 0\n[ERROR]Aborting because fallback start is disabled.\n```\n\nIf the following line in /etc/bumblebee/xorg.conf.nvidia does not exist, you can add it to the \"Device\" section:\n\n```\nOption \"ConnectedMonitor\" \"DFP\"\n```\n\nIf it does already exist, you can try changing it to:\n\n```\nOption \"ConnectedMonitor\" \"CRT\"\n```\n\nAfter that, restart the Bumblebee service to apply these changes.\n\n"
+    },
+    {
+      "title": "Failed to initialize the NVIDIA GPU at PCI:1:0:0 (GPU fallen off the bus / RmInitAdapter failed!)",
+      "level": 4,
+      "content": "Add rcutree.rcu_idle_gp_delay=1 to the kernel parameters of the boot loader configuration (see also the original BBS post for a configuration example).\n\n"
+    },
+    {
+      "title": "Failed to initialize the NVIDIA GPU at PCI:1:0:0 (Bumblebee daemon reported: error: [XORG] (EE) NVIDIA(GPU-0))",
+      "level": 4,
+      "content": "You might encounter an issue when after resume from sleep, primusrun or optirun command does not work anymore. there are two ways to fix this issue - reboot your system or execute the following command:\n\n```\n# echo 1 > /sys/bus/pci/rescan\n```\n\nAnd try to test if primusrun or optirun works.\n\nIf the above command did not help, try finding your NVIDIA card's bus ID:\n\n```\n$ lspci | grep VGA\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation Core Processor Integrated Graphics Controller (rev 02)\n01:00.0 VGA compatible controller: nVidia Corporation Device 0df4 (rev a1)\n```\n\nFor example, above command showed 01:00.0 so we use following commands with this bus ID:\n\n```\n# echo 1 > /sys/bus/pci/devices/0000:01:00.0/remove\n# echo 1 > /sys/bus/pci/rescan\n```\n\n"
+    },
+    {
+      "title": "Could not load GPU driver",
+      "level": 4,
+      "content": "If the console output is:\n\n```\n[ERROR]Cannot access secondary GPU - error: Could not load GPU driver\n```\n\nand if you try to load the nvidia module:\n\n```\n# modprobe nvidia\n```\n\n```\nmodprobe: ERROR: could not insert 'nvidia': Exec format error\n```\n\nThis could be because the nvidia driver is out of sync with the Linux kernel, for example if you installed the latest nvidia driver and have not updated the kernel in a while. A full system update , followed by a reboot into the updated kernel, might resolve the issue. If the problem persists you should try manually compiling the nvidia packages against your current kernel, for example with nvidia-dkms or by compiling nvidia from the ABS.\n\n"
+    },
+    {
+      "title": "NOUVEAU(0): [drm] failed to set drm interface version",
+      "level": 4,
+      "content": "Consider switching to the official nvidia driver. As commented here, nouveau driver has some issues with some cards and bumblebee.\n\n"
+    },
+    {
+      "title": "[ERROR]Cannot access secondary GPU - error: X did not start properly",
+      "level": 3,
+      "content": "Set the \"AutoAddDevices\" option to \"true\" in /etc/bumblebee/xorg.conf.nvidia (see here):\n\n```\nSection \"ServerLayout\"\n    Identifier     \"Layout0\"\n    Option         \"AutoAddDevices\" \"true\"\n    Option         \"AutoAddGPU\" \"false\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "/dev/dri/card0: failed to set DRM interface version 1.4: Permission denied",
+      "level": 3,
+      "content": "This could be worked around by appending following lines in /etc/bumblebee/xorg.conf.nvidia (see here):\n\n```\nSection \"Screen\"\n    Identifier     \"Default Screen\"\n    Device         \"DiscreteNvidia\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "ERROR: ld.so: object 'libdlfaker.so' from LD_PRELOAD cannot be preloaded: ignored",
+      "level": 3,
+      "content": "You probably want to start a 32-bit application with bumblebee on a 64-bit system. See the \"For 32-bit...\" section in #Installation. If the problem persists or if it is a 64-bit application, try using the primus bridge.\n\n"
+    },
+    {
+      "title": "Fatal IO error 11 (Resource temporarily unavailable) on X server",
+      "level": 3,
+      "content": "Change KeepUnusedXServer in /etc/bumblebee/bumblebee.conf from false to true. Your program forks into background and bumblebee do not know anything about it.\n\n"
+    },
+    {
+      "title": "Video tearing",
+      "level": 3,
+      "content": "Video tearing is a somewhat common problem on Bumblebee. To fix it, you need to enable vsync. It should be enabled by default on the Intel card, but verify that from Xorg logs. To check whether or not it is enabled for NVIDIA, make sure nvidia-settings is installed and run:\n\n```\n$ optirun nvidia-settings -c :8\n```\n\nX Server XVideo Settings -> Sync to VBlank and OpenGL Settings -> Sync to VBlank should both be enabled. The Intel card has in general less tearing, so use it for video playback. Especially use VA-API for video decoding (e.g. mplayer-vaapi and with -vsync parameter).\n\nRefer to Intel graphics#Tearing on how to fix tearing on the Intel card.\n\nIf it is still not fixed, try to disable compositing from your desktop environment. Try also disabling triple buffering.\n\n"
+    },
+    {
+      "title": "Bumblebee cannot connect to socket",
+      "level": 3,
+      "content": "You might get something like:\n\n```\n$ optirun glxspheres64\n```\n\nor (for 32 bit):\n\n```\n$ optirun glxspheres32\n```\n\n```\n[ 1648.179533] [ERROR]You have no permission to communicate with the Bumblebee daemon. Try adding yourself to the 'bumblebee' group\n[ 1648.179628] [ERROR]Could not connect to bumblebee daemon - is it running?\n```\n\nIf you are already in the bumblebee group (groups | grep bumblebee), you may try removing the socket /var/run/bumblebeed.socket.\n\nAnother reason for this error could be that you have not actually turned on both GPUs in your BIOS, and as a result, the Bumblebee daemon is in fact not running. Check the BIOS settings carefully and be sure Intel graphics (integrated graphics - may be abbreviated in BIOS as something like igfx) has been enabled or set to auto, and that it is the primary GPU. Your display should be connected to the onboard integrated graphics, not the discrete graphics card.\n\nIf you mistakenly had the display connected to the discrete graphics card and Intel graphics was disabled, you probably installed Bumblebee after first trying to run NVIDIA alone. In this case, be sure to remove the /etc/X11/xorg.conf or /etc/X11/xorg.conf.d/20-nvidia.conf configuration files. If Xorg is instructed to use NVIDIA in a configuration file, X will fail.\n\n"
+    },
+    {
+      "title": "Running X.org from console after login (rootless X.org)",
+      "level": 3,
+      "content": "See Xorg#Rootless Xorg.\n\n"
+    },
+    {
+      "title": "Using Primus causes a segmentation fault",
+      "level": 3,
+      "content": "In some instances, using primusrun instead of optirun will result in a segfault. This is caused by an issue in code auto-detecting faster upload method, see FS#58933.\n\nThe workaround is skipping auto-detection by manually setting PRIMUS_UPLOAD environment variable to either 1 or 2, depending on which one is faster on your setup.\n\n```\n$ PRIMUS_UPLOAD=1 primusrun ...\n```\n\n"
+    },
+    {
+      "title": "Primusrun mouse delay (disable VSYNC)",
+      "level": 3,
+      "content": "For primusrun, VSYNC is enabled by default and as a result, it could make mouse input delay lag or even slightly decrease performance. Test primusrun with VSYNC disabled:\n\n```\n$ vblank_mode=0 primusrun glxgears\n```\n\nIf you are satisfied with the above setting, create an alias (e.g. alias primusrun=\"vblank_mode=0 primusrun\").\n\nPerformance comparison:\n\nTable content:\nVSYNC enabled | FPS | Score | Min FPS | Max FPS\nFALSE | 31.5 | 793 | 22.3 | 54.8\nTRUE | 31.4 | 792 | 18.7 | 54.2\n\nTested with ASUS N550JV notebook and benchmark app unigine-heavenAUR.\n\n"
+    },
+    {
+      "title": "Primus issues under compositing window managers",
+      "level": 3,
+      "content": "Since compositing hurts performance, invoking primus when a compositing WM is active is not recommended.[4] If you need to use primus with compositing and see flickering or bad performance, synchronizing primus' display thread with the application's rendering thread may help:\n\n```\n$ PRIMUS_SYNC=1 primusrun ...\n```\n\nThis makes primus display the previously rendered frame.\n\n"
+    },
+    {
+      "title": "Problems with bumblebee after resuming from standby",
+      "level": 3,
+      "content": "In some systems, it can happens that the nvidia module is loaded after resuming from standby. One possible solution for this is to install the acpi_call and acpi package.\n\n"
+    },
+    {
+      "title": "Optirun does not work, no debug output",
+      "level": 3,
+      "content": "Users are reporting that in some cases, even though Bumblebee was installed correctly, running\n\n```\n$ optirun glxgears -info\n```\n\ngives no output at all, and the glxgears window does not appear. Any programs that need 3d acceleration crashes:\n\n```\n$ optirun bash\n$ glxgears\nSegmentation fault (core dumped)\n```\n\nApparently it is a bug of some versions of virtualgl. So a workaround is to use #Primusrun instead. See this forum post for more information.\n\n"
+    },
+    {
+      "title": "Broken power management with kernel 4.8",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Hybrid graphics#Using bbswitch.** This article or section is a candidate for merging with Hybrid graphics#Using bbswitch.\n\nThis article or section is a candidate for merging with Hybrid graphics#Using bbswitch.\n\nIf you have a newer laptop (BIOS date 2015 or newer), then Linux 4.8 might break bbswitch (bbswitch issue 140) since bbswitch does not support the newer, recommended power management method. As a result, the GPU may fail to power on, fail to power off or worse.\n\nAs a workaround, add pcie_port_pm=off to your Kernel parameters.\n\nAlternatively, if you are only interested in power saving (and perhaps use of external monitors), remove bbswitch and rely on Nouveau runtime power-management (which supports the new method).\n\n"
+    },
+    {
+      "title": "Lockup issue (lspci hangs)",
+      "level": 3,
+      "content": "See NVIDIA Optimus#Lockup issue (lspci hangs) for an issue that affects new laptops with a GTX 965M (or alike).\n\n"
+    },
+    {
+      "title": "Discrete card always on and acpi warnings",
+      "level": 3,
+      "content": "Add acpi_osi=Linux to your Kernel parameters. See [6] and [7] for more information.\n\n"
+    },
+    {
+      "title": "Screen 0 deleted because of no matching config section",
+      "level": 3,
+      "content": "Modify the configuration as follows:\n\n```\n/etc/bumblebee/xorg.conf.nvidia\n```\n\n```\n...\nSection \"ServerLayout\"\n...\n    Screen 0       \"nvidia\"\n...\nEndSection\n...\nSection \"Screen\"\n    Identifier     \"nvidia\"\n    Device         \"DiscreteNvidia\"\nEndSection\n...\n```\n\n"
+    },
+    {
+      "title": "Erratic, unpredictable behaviour",
+      "level": 3,
+      "content": "If Bumblebee starts/works in a random manner, check that you have set your Network configuration#Local network hostname resolution (details here).\n\n"
+    },
+    {
+      "title": "Discrete card always on and nvidia driver cannot be unloaded",
+      "level": 3,
+      "content": "Make sure nvidia-persistenced.service is disabled and not currently active. It is intended to keep the nvidia driver running at all times [8], which prevents the card being turned off.\n\n"
+    },
+    {
+      "title": "Discrete card is silently activated when EGL is requested by some application",
+      "level": 3,
+      "content": "If the discrete card is activated by some program (e.g. mpv with its GPU backend), it might stays on. The problem might be libglvnd which is loading the nvidia drivers and activating the card.\n\nTo disable this set environment variable __EGL_VENDOR_LIBRARY_FILENAMES (see documentation) to only load mesa configuration file:\n\n```\n__EGL_VENDOR_LIBRARY_FILENAMES=\"/usr/share/glvnd/egl_vendor.d/50_mesa.json\"\n```\n\nnvidia-utils (and its branches) is installing the configuration file at /usr/share/glvnd/egl_vendor.d/10_nvidia.json which has priority and causes libglvnd to load the nvidia drivers and enable the card.\n\nThe other solution is to avoid installing the configuration file provided by nvidia-utils.\n\n"
+    },
+    {
+      "title": "Framerate drops to 1 FPS after a fixed period of time",
+      "level": 3,
+      "content": "With the nvidia 440.36 driver, the DPMS setting is enabled by default resulting in a timeout after a fixed period of time (e.g. 10 minutes) which causes the frame rate to throttle down to 1 FPS. To work around this, add the following line to the \"Device\" section in /etc/bumblebee/xorg.conf.nvidia\n\n```\nOption \"HardDPMS\" \"false\"\n```\n\n"
+    },
+    {
+      "title": "Application cannot record screen",
+      "level": 3,
+      "content": "Using Bumblebee, applications cannot access the screen to identify and record it. This happens, for example, using obs-studio with NVENC activated. To solve this, disable the bridging mode with optirun -b none command.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Bumblebee project repository\n- Bumblebee project wiki\n- Bumblebee project bbswitch repository\n\n"
+    }
+  ]
+}

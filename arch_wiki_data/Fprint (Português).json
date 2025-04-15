@@ -1,0 +1,36 @@
+{
+  "title": "Fprint (Português)",
+  "url": "https://wiki.archlinux.org/title/Fprint_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Fingerprint-gui\n- ThinkFinger\n\nDo site oficial do fprint:\n\nA ideia é usar o leitor de impressão digital embutido em alguns notebooks para fazer login usando PAM. Este artigo também explicará como usar a senha normal para o método de login de backup (somente o leitor de impressão digital não é recomendado devido a vários motivos).\n\n"
+    },
+    {
+      "title": "Pré-requisitos",
+      "level": 2,
+      "content": "Verifique se você possui um dos leitores biométricos compatíveis. Você pode verificar se o seu dispositivo é suportado, verificando lista de dispositivos suportados. Para verificar qual você possui, digite:\n\n```\n$ lsusb\n```\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Instale o pacote fprintd. imagemagick também pode ser necessário.\n\nAlguns disposições exigem um fork diferente do libfprint feito especificamente para sensores baseados em toques e não (ainda?) mesclado ao libfprint principal: libfprint-tod. Isto está disponível como libfprint-tod-gitAUR\n\n"
+    },
+    {
+      "title": "Configuração de login",
+      "level": 3,
+      "content": "- Se você usa GDM, a opção de impressão digital já estará disponível no menu de login (se não estiver, adicione você mesmo ao grupo input). Você pode pular esta seção!\n- Se você usa SDDM, consulte SDDM#Using a fingerprint reader.\n\nAdicione pam_fprintd.so como sufficient ao topo da seção de auth de /etc/pam.d/system-local-login:\n\n```\n/etc/pam.d/system-local-login\n```\n\n```\nauth      sufficient pam_fprintd.so\nauth      include   system-login\n...\n```\n\nEle tenta usar o login de impressão digital primeiro e, se falhar ou se não encontrar assinaturas de impressão digital no diretório inicial do usuário, prossegue para o login com senha.\n\nVocê também pode modificar outros arquivos no /etc/pam.d/{login,su,sudo,gdm,lightdm} da mesma maneira, por exemplo /etc/pam.d/polkit-1 para autenticação de polkit do GNOME.\n\nAdicionar pam_fprintd.so como sufficient a qualquer arquivo de configuração em /etc/pam.d/ quando houver uma assinatura de impressão digital, solicitará apenas a autenticação de impressão digital, impedindo o uso de uma senha.\n\nPara usar uma senha ou uma impressão digital, adicione a seguinte linha ao topo de todos os arquivos necessários:\n\n```\n/etc/pam.d/sudo\n```\n\n```\nauth        sufficient      pam_unix.so try_first_pass likeauth nullok\nauth        sufficient      pam_fprintd.so\n...\n```\n\nIsso solicitará uma senha; se o campo for deixado em branco e pressionar for pressionado, continuará a autenticação de impressão digital\n\n"
+    },
+    {
+      "title": "Criar assinatura de impressão digital",
+      "level": 3,
+      "content": "Para adicionar uma assinatura para um dedo, execute:\n\n```\n$ fprintd-enroll\n```\n\nou crie uma assinatura para todos os dedos:\n\n```\n$ fprintd-delete \"$USER\"\n$ for dedo in {left,right}-{thumb,{index,middle,ring,little}-finger}; do fprintd-enroll -f \"$dedo\" \"$USER\"; done\n```\n\nVocê será solicitado a fazer a leitura do dedo informado, considerando que \"thumb\" é polegar, \"index\" é o dedo indicador, \"middle\" é o dedo médio, \"ring\" é o dedo anelar, \"little\" é o dedo mínimo. Passe o dedo indicador direito cinco vezes. Depois disso, a assinatura é criada em /var/lib/fprint/.\n\nPara mais informações, consulte fprintd(1).\n\n"
+    },
+    {
+      "title": "Restringir registro",
+      "level": 3,
+      "content": "Por padrão, você tem permissão para registrar novas impressões digitais sem solicitar a senha ou a impressão digital. Você pode alterar esse comportamento usando as regras do Polkit.\n\nExistem dois locais que contêm os arquivos de configuração do polkit:\n\n- /etc/polkit-1/rules.d/\n- /usr/share/polkit-1/rules.d/\n\nNote: **não** \n\nNo exemplo a seguir, apenas o superusuário pode registrar impressões digitais:\n\n```\n/usr/share/polkit-1/rules.d/50-net.reactivated.fprint.device.enroll.rules\n```\n\n```\npolkit.addRule(function (action, subject) {\n  if (action.id == \"net.reactivated.fprint.device.enroll\") {\n    return subject.user == \"root\" ? polkit.Result.YES : polkit.result.NO\n  }\n})\n```\n\n"
+    }
+  ]
+}

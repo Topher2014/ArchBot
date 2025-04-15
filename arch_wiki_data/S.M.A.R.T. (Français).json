@@ -1,0 +1,91 @@
+{
+  "title": "S.M.A.R.T. (Français)",
+  "url": "https://wiki.archlinux.org/title/S.M.A.R.T._(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology, qu'on peut traduire par technique d'auto-diagnostic, d'analyse et de signalement) est un composant supplémentaire intégré à de nombreux dispositifs de stockage modernes grâce auquel les périphériques surveillent, stockent et analysent la «santé» de leur fonctionnement. Des statistiques sont collectées (température, nombre de secteurs réalloués, erreurs d'accès...) que les logiciels peuvent utiliser pour mesurer l'état de santé d'un périphérique, prédire une éventuelle défaillance du périphérique et fournir des notifications lorsque les valeurs annoncent un danger.\n\n"
+    },
+    {
+      "title": "Smartmontools",
+      "level": 2,
+      "content": "Le paquet smartmontools comporte deux utilitaires permettant d'analyser et de surveiller des périphériques de stockage : smartctl et smartd.\n\nLa prise en charge de SMART doit être disponible et activée sur chaque périphérique de stockage pour utiliser efficacement ces outils. Vous pouvez utiliser #smartctl pour vérifier et activer la prise en charge de SMART. Ceci fait, vous pouvez manuellement #Lancer un test et #Voir les résultats du test, ou vous pouvez utiliser #smartd pour exécuter automatiquement des tests et envoyer des notifications par courriel.\n\n"
+    },
+    {
+      "title": "smartctl",
+      "level": 3,
+      "content": "smartctl est un outil en ligne de commande qui contrôle le système SMART intégré dans la plupart des disques durs ou à mémoire flash en ATA/SATA et SCSI/SAS.\n\nL'option -i/--info imprime une variété d'informations sur un périphérique, y compris si SMART est disponible et activé :\n\n```\n# smartctl --info /dev/sda | grep 'SMART support is:'\n```\n\n```\nSMART support is: Available - device has SMART capability.\nSMART support is: Enabled\n```\n\nSi la prise en charge de SMART est disponible mais inactif, vous pouvez l'activer :\n\n```\n# smartctl --smart=on /dev/device\n```\n\nVous devrez peut-être préciser le type de périphérique. Par exemple, spécifier --device=ata indique à smartctl que le type de périphérique est ATA, ce qui empêche smartctl d'envoyer des commandes SCSI à ce périphérique.\n\n"
+    },
+    {
+      "title": "Lancer un test",
+      "level": 4,
+      "content": "Un périphérique de stockage peut effectuer trois types d'auto-tests (tous préserveront les données utilisateur!) :\n\n- Short (Court): exécute des tests qui ont une forte probabilité de détecter les problèmes du périphérique,\n- Extended (Long) : mêmes tests que short mais sans limitation sur le temps de réponse et avec examen exhaustif des secteurs,\n- Conveyance (Acheminement) : identifie les dommages physiques survenus pendant le transport du périphérique.\n\nL'option -c/--capabilities affiche les tests disponibles pour le périphérique et leur durée d'exécution approximative. Par exemple:\n\n```\n# smartctl -c /dev/sda\n```\n\n```\n...\nShort self-test routine\nrecommended polling time:        (   1) minutes.\nExtended self-test routine\nrecommended polling time:        (  74) minutes.\nConveyance self-test routine\nrecommended polling time:        (   2) minutes.\n...\n```\n\nPour lancer le test, utilisez l'option -t/--test=test_name :\n\n```\n# smartctl -t short /dev/device\n# smartctl -t long /dev/device\n# smartctl -t conveyance /dev/device\n```\n\n"
+    },
+    {
+      "title": "Voir les résultats du test",
+      "level": 4,
+      "content": "Vous pouvez afficher l'état de santé général d'un périphérique avec l'option -H. Si le périphérique signale un état de santé défaillant, cela signifie soit que le périphérique est déjà tombé en panne, soit qu'il prévoit sa propre panne dans les 24 heures à venir. Si cela se produit [...], retirez vos données du disque et mettez-les en lieu sûr dès que possible.\n\n```\n# smartctl -H /dev/device\n```\n\nVous pouvez également afficher une liste des résultats de tests récents et des informations détaillées sur un périphérique :\n\n```\n# smartctl -l selftest /dev/device\n# smartctl -a /dev/device\n```\n\n"
+    },
+    {
+      "title": "Générer une table avec les attributs de tous les disques",
+      "level": 4,
+      "content": "```\n#!/bin/bash\nfunction drives_csv {\n\tdeclare -A drive_values\n\tfor d in `smartctl --scan -d scsi | cut -d' ' -f1`; do\n\t\tdrive_values[\"-Drive-----------------\"]=\"${drive_values[-Drive-----------------]},$d\"\n\t\tfor l in `smartctl -A $d | grep ATTRIBUTE_NAME -A30 | grep -v ATTRIBUTE_NAME | column -H1,3,4,5,6,7,8,9,11,12,13,14,15 -t -o, | sed 's/ //g'`; do\n\t\t\tkey=`echo $l | cut -d',' -f1`\n\t\t\tvalue=`echo $l | cut -d',' -f2`\n\t\t\texisting=${drive_values[\"$key\"]}\n\t\t\tdrive_values[\"${key}\"]=\"${existing},${value}\"\n\t\t\t#~ echo \"${key},${drive_values[$key]}\"\n\t\tdone\n\tdone\n\tfor key in \"${!drive_values[@]}\"; do\n\t\techo \"${key}${drive_values[$key]}\"\n\tdone | sort\n}\ndrives_csv | column -s, -t\n```\n\n"
+    },
+    {
+      "title": "smartd",
+      "level": 3,
+      "content": "Le daemon smartd surveille les états SMART et émet des notifications lors d'une anomalie. Il est géré par systemd et configuré par le fichier /etc/smartd.conf. La syntaxe de ce fichier de configuration est plutôt ésotérique, et nous n'en donnons ici qu'un aperçu ; vous trouverez des exemples dans les sections commentées de /etc/smartd.conf et plus dans smartd.conf(5).\n\n"
+    },
+    {
+      "title": "Gestion du daemon",
+      "level": 4,
+      "content": "Pour démarrer le daemon, vérifier son état, le faire démarrer automatiquement au démarrage du système et lire les entrées récentes du fichier journal, démarrez et activez simplement l'unité smartd.service de systemd.\n\nsmartd reconnaît toutes les commandes courantes des commandes systemctl et journalctl.\n\n"
+    },
+    {
+      "title": "Définir les périphériques à surveiller",
+      "level": 4,
+      "content": "Pour surveiller toutes les erreurs SMART possibles sur tous les disques, le paramètre suivant doit être ajouté dans le fichier de configuration.\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -a\n```\n\nNotez que ceci est la configuration par défaut de smartd et que le paramètre -a, qui est le paramètre par défaut, peut être omis.\n\nPour surveiller toutes les erreurs SMART possibles sur /dev/sda et /dev/sdb, et ignorer tous les autres périphériques :\n\n```\n/etc/smartd.conf\n```\n\n```\n/dev/sda -a\n/dev/sdb -a\n```\n\nPour surveiller toutes les erreurs SMART possibles sur les périphériques de stockage externes (des clefs USB par exemple), il est préférable d'indiquer à smartd l'UUID du périphérique puisque le /dev/sdX du lecteur peut changer lors d'un redémarrage.\n\nIl vous faut donc d'abord récupérer l'UUID du périphérique en question. Cherchez dans les lignes affichées par la commande ls -lah /dev/disk/by-uuid/ :\n\n```\nls -lah /dev/disk/by-uuid/\n```\n\n```\nlrwxrwxrwx 1 root root   9 Nov  5 22:41 820cdd8a-866a-444d-833c-1edb0f4becac -> ../../sde\nlrwxrwxrwx 1 root root  10 Nov  5 22:41 b51b87f3-425e-4fe7-883f-f4ff1689189e -> ../../sdf2\nlrwxrwxrwx 1 root root   9 Nov  5 22:42 ea2199dd-8f9f-4065-a7ba-71bde11a462c -> ../../sda\nlrwxrwxrwx 1 root root  10 Nov  5 22:41 fe9e886a-8031-439f-a909-ad06c494fadb -> ../../sdf1\n```\n\nSupposons qu'ici la clef USB que nous voulions contrôler soit celle adressée par /dev/sde au démarrage. Maintenant, pour demander à smartd de surveiller ce disque, il suffit d'utiliser le chemin /dev/disk/by-uuid/.\n\n```\n/etc/smartd.conf\n```\n\n```\n/dev/disk/by-uuid/820cdd8a-866a-444d-833c-1edb0f4becac -a\n```\n\nNotez que vous pouvez avoir besoin en plus de -d removable pour que smartd fonctionne.\n\nMaintenant, votre clef USB sera surveillé même si le chemin /dev/sdX change pendant le redémarrage.\n\n"
+    },
+    {
+      "title": "Notifier des problèmes potentiels",
+      "level": 4,
+      "content": "Pour qu'un courriel soit envoyé lorsqu'un échec ou une nouvelle erreur se produit, utilisez l'option -m :\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com\n```\n\nPour que le courriel parvienne à un compte utilisateur (et non au compte root), il faut que vous ayez préalablement installé et configuré un service MTA (Mail Transport Agent) ou MUA (Mail User Agent). Les MTA les plus connus sont Msmtp (en) et sSMTP (en), mais un simple dma (en) suffira sans doute. Les MTU les plus connus sont sendmail et Postfix (en). Si vous n'avez pas d'autres usages, il vous suffit de configurer S-nail (en), mais en suivant ces instructions.\n\nL'option -M test envoie un courriel à chaque lancement du daemon smartd :\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com -M test\n```\n\nLes courriels peuvent mettre du temps à vous parvenir. Pour être sûr d'être averti immédiatement en cas de défaillance de votre disque dur, vous pouvez également définir un script qui sera exécuté en plus de l'envoi du courriel :\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m address@domain.com -M exec /usr/local/bin/smartdnotify\n```\n\nPour envoyer un courriel et une notification système, mettez quelque chose comme ceci dans /usr/local/bin/smartdnotify :\n\n```\n#!/bin/sh\n# Envoyer un courriel\necho \"$SMARTD_MESSAGE\" | mail -s \"$SMARTD_FAILTYPE\" \"$SMARTD_ADDRESS\"\n# Notification a l'utilisateur\nwall \"$SMARTD_MESSAGE\"\n```\n\nSi vous utilisez un environnement de bureau, vous pouvez également préférer qu'une fenêtre contextuelle apparaisse sur votre bureau. Dans ce cas, vous pouvez utiliser ce script (remplacez X_user et X_userid par l'utilisateur et l'identifiant de l'utilisateur exécutant X respectivement) :\n\n```\n/usr/local/bin/smartdnotify\n```\n\n```\n#!/bin/sh\n\nsudo -u X_user DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/X_userid/bus notify-send \"S.M.A.R.T Error ($SMARTD_FAILTYPE)\" \"$SMARTD_MESSAGE\" --icon=dialog-warning -u critical\n```\n\nCe script nécessite libnotify et un environnement de bureau compatible. Consultez l'article anglais Desktop notifications pour plus de détails.\n\nVous pouvez aussi placer vos scripts personnalisés dans le répertoire /usr/share/smartmontools/smartd_warning.d/:\n\nCe script prévient tous les utilisateurs connectés au système via libnotify.\n\n```\n/usr/share/smartmontools/smartd_warning.d/smartdnotify\n```\n\n```\n#!/bin/sh\n\nIFS=$'\\n'\nfor LINE in `w -hs`\ndo\n    USER=`echo $LINE | awk '{print $1}'`\n    USER_ID=`id -u $USER`\n    DISP_ID=`echo $LINE | awk '{print $8}'`\n    sudo -u $USER DISPLAY=$DISP_ID DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus notify-send \"S.M.A.R.T Error ($SMARTD_FAILTYPE)\" \"$SMARTD_MESSAGE\" --icon=dialog-warning -u critical\ndone\n```\n\nCe script nécessite libnotify et procps-ng ainsi qu'un environnement de bureau compatible.\n\nVous pouvez exécuter vos scripts personnalisés avec\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -m @smartdnotify\n```\n\n"
+    },
+    {
+      "title": "Gestion de l'alimentation",
+      "level": 4,
+      "content": "Si vous utilisez un ordinateur avec gestion de l'énergie, vous devez indiquer à smartd comment gérer les disques en mode de faible consommation. Habituellement, en réponse aux commandes SMART émises par smartd, les plateaux de disques sont mis en rotation. Ainsi, si cette option n'est pas utilisée, un disque qui est en mode basse consommation peut être mis en rotation et passer en mode haute consommation lorsqu'il est interrogé périodiquement par smartd.\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -n standby,15,q\n```\n\nPlus d'informations sur le wiki smartmontools.\n\nSur certains périphériques, le -n ne fonctionne pas. Vous obtenez le message d'erreur suivant dans le syslog :\n\n```\n# journalctl -u smartd\n```\n\n```\nCHECK POWER MODE: incomplete response, ATA output registers missing\nDevice: /dev/sdb [SAT], no ATA CHECK POWER STATUS support, ignoring -n Directive\n```\n\nComme alternative, vous pouvez utiliser l'option -i de smartd. Elle contrôle la fréquence à laquelle smartd fait tourner les disques pour vérifier leur état. La valeur par défaut est de 30 minutes. Pour la modifier, créez et éditez /etc/default/smartmontools.\n\n```\n/etc/default/smartmontools\n```\n\n```\nSMARTD_ARGS=\"-i 10800\"  Check status every 10800 seconds (3 hours)\n```\n\nPour plus d'informations, consultez smartd(8).\n\n"
+    },
+    {
+      "title": "Planifier les auto-tests",
+      "level": 4,
+      "content": "smartd peut demander aux disques d'effectuer des auto-tests selon un calendrier. La configuration suivante /etc/smartd.conf lancera un autotest court chaque jour entre 2 et 3 heures du matin, et un autotest étendu chaque semaine le samedi entre 3 et 4 heures du matin :\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -s (S/../.././02|L/../../6/03)\n```\n\n"
+    },
+    {
+      "title": "Alerte sur les changements de température",
+      "level": 4,
+      "content": "smartd peut suivre les températures des disques et alerter si elles augmentent trop rapidement ou atteignent une limite élevée. Ce qui suit enregistrera les changements de 4 degrés ou plus, enregistrera lorsque la température atteint 35 degrés, et enregistrera/enverra par courriel un avertissement lorsque la température atteint 40 :\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -W 4,35,40\n```\n\n- Vous pouvez déterminer la température actuelle du disque avec la commande smartctl -A /dev/device | grep Temperature_Celsius.\n- Si vous avez des disques qui fonctionnent beaucoup plus chauds/froids que d'autres, supprimez DEVICESCAN et définissez une configuration séparée pour chaque périphérique avec des paramètres de température appropriés.\n\n"
+    },
+    {
+      "title": "Exemple complet de smartd.conf",
+      "level": 4,
+      "content": "En rassemblant tout ce qui précède, on obtient l'exemple de configuration suivant :\n\n- DEVICESCAN smartd recherche les disques et surveille tous ceux qu'il trouve.\n- -a surveiller tous les attributs\n- -o on activer la collecte automatique de données hors ligne\n- -S on activer la sauvegarde automatique des attributs\n- -n standby,q ne pas vérifier si le disque est en veille et supprimer le message de journal à cet effet afin de ne pas provoquer une écriture sur le disque.\n- -s ... programmer des autotests courts et longs\n- -W ... surveiller la température\n- -m ... alertes par mail\n\n```\n/etc/smartd.conf\n```\n\n```\nDEVICESCAN -a -o on -S on -n standby,q -s (S/../.././02|L/../../6/03) -W 4,35,40 -m nom-ou-courriel\n```\n\n"
+    },
+    {
+      "title": "Applications en console",
+      "level": 2,
+      "content": "- skdump — utilitaire d'interrogation du composant SMART des supports de stockage.\n\n- iostat -x (fourni par sysstat) affiche également certaines mesures de santé du disque : en particulier, des valeurs élevées dans la colonne f_await signifient que le disque ne répond pas rapidement aux requêtes et qu'il peut être défaillant.\n\n"
+    },
+    {
+      "title": "Applications en GUI",
+      "level": 2,
+      "content": "- DisKMonitor — Outil KDE d'interrogation des composants SMART et MDRaid.\n\n- Plasma Disks — Système de contrôle des disques de KDE Plasma.\n\n- Gnome Disks — Interface GNOME exploitant l'API libatasmart (Gnome Disks, avec l’utilitaire d'alerte gsd-disk-utility-notify, est inclus nativement dans l'environnement de bureau gnome).\n\n- GSmartControl — Interface GNOME à smartctl.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Pages d’accueil du projet Smartmontools\n- Smartmontools sur le Wiki d'Ubuntu\n- Gentoo: smartmontools\n\n"
+    }
+  ]
+}

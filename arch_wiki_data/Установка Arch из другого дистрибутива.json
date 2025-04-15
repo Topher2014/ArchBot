@@ -1,0 +1,106 @@
+{
+  "title": "Установка Arch из другого дистрибутива",
+  "url": "https://wiki.archlinux.org/title/%D0%A3%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BA%D0%B0_Arch_%D0%B8%D0%B7_%D0%B4%D1%80%D1%83%D0%B3%D0%BE%D0%B3%D0%BE_%D0%B4%D0%B8%D1%81%D1%82%D1%80%D0%B8%D0%B1%D1%83%D1%82%D0%B8%D0%B2%D0%B0",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Install from SSH (Русский)\n\nЭтот документ описывает bootstrapping process, нужный для того, чтобы установить Arch Linux из уже работающего хоста Linux. После bootstrapping, установка продолжается так, как описано в руководстве по установке Arch Linux.\n\nУстановка Arch Linux из-под другого Linux полезна для:\n\n- удалённой установки Arch Linux, например на виртуальном сервере\n- замены существующего Linux без LiveCD (смотрите #Замена уже существующей системы без LiveCD)\n- создания нового дистрибутива Linux или LiveCD основанного на Arch Linux\n- создания chroot окружения Arch Linux, например для контейнеров Docker\n- rootfs-over-NFS для бездисковых систем\n\nЦель процедуры начальной загрузки в том, чтобы настроить окружение, из которого можно будет запустить arch-install-scripts (содержит такие скрипты как pacstrap и arch-chroot).\n\nЕсли хост работает под Arch Linux, этого можно достичь простой установкой пакета arch-install-scripts. На других дистрибутивах Linux потребуется подготовить chroot-окружение на базе Arch Linux.\n\n"
+    },
+    {
+      "title": "Резервное копирование и подготовка",
+      "level": 2,
+      "content": "Сделайте резервную копию всех ваших данных, включая почту, веб-серверы и т. д. Держите всю нужную информацию всегда под рукой. Сохраните все конфигурации вашего сервера, имена хостов и т. д.\n\nСписок информации, которая вам скорее всего понадобится:\n\n- IP-адреса\n- имена хостов (проверьте ваш /etc/hosts)\n- DNS-серверы (проверьте /etc/resolv.conf)\n- SSH-ключи (если на сервере работают другие люди, то им придётся подтверждать использование новых ключей в случае их замены. Сюда входят ключи от вашего Apache, ваших почтовых серверов, вашего SSH-сервера и др.)\n- Информация об оборудовании (сетевая карта и т. д. Проверьте /etc/modules.conf)\n- Настройки Grub.\n\nВ целом, хорошей идеей является копирование оригинального каталога /etc на ваш локальный диск.\n\n"
+    },
+    {
+      "title": "Из хоста, работающего на Arch Linux",
+      "level": 2,
+      "content": "Установите пакет arch-install-scripts.\n\nПримонтируйте файловую систему, которая в новой установке будет корневой, как описано в статье Руководство по установке#Монтирование разделов. Если каталог /mnt уже занят, просто используйте какой-нибудь другой каталог, например /mnt/install и используйте его в процессе установки.\n\nНа этом этапе Arch Linux можно либо установить с нуля, либо он может скопировать установку хоста. Эти два варианта описаны ниже.\n\n"
+    },
+    {
+      "title": "Установка Arch Linux с нуля",
+      "level": 3,
+      "content": "Смотрите Руководство по установке#Установка.\n\nПервый шаг (выбор зеркал) можно пропустить, так как зеркала на хосте скорее всего уже настроены.\n\n- Чтобы избежать повторной загрузки всех пакетов, посмотрите Pacman/Советы и приёмы#Сетевой кэш pacman с совместным доступом или используйте pacstrap с параметром -c для использования кеша пакетов вашего хост-компьютера.\n- Если используется загрузчик grub, команда grub-mkconfig может определять устройства неправильно. Это приведёт к ошибке Error:no such device при попытке загрузки с флешки. Чтобы решить проблему, с хоста, на котором запущен Arch Linux, смонтируйте вновь установленные разделы, выполните arch-chroot в новый раздел, затем установите и настройте grub. Для последнего шага может потребоваться отключить lvmetad в файле /etc/lvm/lvm.conf путём установки use_lvmetad=0.\n\n"
+    },
+    {
+      "title": "Создание копии существующей установки Arch Linux",
+      "level": 3,
+      "content": "Можно реплицировать существующую установку Arch Linux, скопировав файловую систему хоста в новый раздел и внеся в неё некоторые изменения, чтобы сделать её загрузочной и уникальной.\n\nПервый шаг — скопировать файлы хоста в смонтированный новый раздел, например с помощью rsync (Русский)#Полная резервная копия системы.\n\nЗатем нужно выполнить процедуры, описанные в Руководство по установке#Настройка системы, с некоторыми оговорками и дополнительными шагами:\n\n- Настройку часовых поясов, локализации и паролей можно пропустить\n- Initramfs может понадобиться обновить в случае изменения файловой системы, например с ext4 на Btrfs\n- Загрузчик необходимо переустановить\n- Удалите /etc/machine-id, чтобы при следующей загрузке сгенерировался новый\n\nЕсли эта копия может использоваться в другой конфигурации или с другим оборудованием, рассмотрите следующие дополнительные операции:\n\n- Настройте обновление микрокода под целевой процессор\n- Если есть какие-то настройки Xorg и они могут оказаться несовместимы с новой системой, отключите их (смотрите Moving an existing install into (or out of) a virtual machine#Disable any Xorg-related files)\n- Обновите другие необходимые настройки, например перенастройте сеть или звук.\n\n"
+    },
+    {
+      "title": "Из хоста, работающего на другом дистрибутиве Linux",
+      "level": 2,
+      "content": "Существуют инструменты, которые автоматизируют большую часть шагов, описанных в следующих подразделах. Смотрите их домашние страницы для получения подробных инструкций.\n\n- arch-bootstrap (Bash)\n- digitalocean-debian-to-arch (repartition disk, DigitalOcean specific)\n- image-bootstrap (Python)\n- vps2arch (Bash)\n- archbashstrap (Bash)\n\nРучной способ описан в следующих подразделах. Идея состоит в том, чтобы либо pacman работал непосредственно в хост-системе, либо запустить систему Arch внутри хост-системы, при этом фактическая установка выполняется из системы Arch. Вложенная система содержится внутри chroot.\n\n"
+    },
+    {
+      "title": "Использование pacman из хост-системы",
+      "level": 3,
+      "content": "Pacman может быть скомпилирован в большинстве дистрибутивов Linux и использоваться непосредственно в хост-системе для начальной установки Arch Linux. arch-install-scripts должны запускаться без проблем непосредственно из загруженных исходником в любом современном дистрибутиве.\n\nНекоторые дистрибутивы предоставляют пакеты для pacman и/или arch-install-scripts в своих официальных репозиториях, которые можно использовать для этой цели. По состоянию на июль 2020 года известно, что Void Linux предоставляет пакет pacman, а Alpine Linux и Fedora предоставляют pacman и arch-install-scripts.\n\n"
+    },
+    {
+      "title": "Создаём chroot",
+      "level": 3,
+      "content": "Есть два способа настроить и войти в chroot, они представлены ниже. Выберите только один из двух методов. Затем перейдите к #Используем наше chroot окружение.\n\n"
+    },
+    {
+      "title": "Способ 1: Использование Bootstrap образа (рекомендуется)",
+      "level": 4,
+      "content": "Скачиваем образ bootstrap с любого желаемого зеркала в /tmp. Также можно скачать подпись (тот же URL с суффиксом .sig) и проверить её подлинность с помощью GnuPG.\n\nРаспаковываем его:\n\n```\n# cd /tmp\n # tar xzf <путь-к-каталогу-где-образ>/archlinux-bootstrap-*-x86_64.tar.gz --numeric-owner\n```\n\nОбратите внимание на последнюю опцию --numeric-owner, которая важна для сохранения правильных номеров UID и GID извлечённых файлов в случае, если ваша существующая система Linux использует номера, отличные от Arch Linux.\n\nВыбираем подходящий для вашего интернета сервер, откуда будут загружаться основные репозитории, путём редактирования файла /tmp/root.x86_64/etc/pacman.d/mirrorlist.\n\nВойдём в chroot\n\n- Если установлен bash 4 или новее и команда unshare поддерживает опции --fork и --pid, то:\n\n```\n# /tmp/root.x86_64/bin/arch-chroot /tmp/root.x86_64/\n```\n\n- Иначе:\n\n```\n# mount --bind /tmp/root.x86_64 /tmp/root.x86_64\n  # cd /tmp/root.x86_64\n  # cp /etc/resolv.conf etc\n  # mount -t proc /proc proc\n  # mount --make-rslave --rbind /sys sys\n  # mount --make-rslave --rbind /dev dev\n  # mount --make-rslave --rbind /run run\n    (при условии, что /run существует)\n  # chroot /tmp/root.x86_64 /bin/bash\n```\n\n"
+    },
+    {
+      "title": "Способ 2: Используя образ LiveCD",
+      "level": 4,
+      "content": "Можно смонтировать корневой образ последнего установочного диска Arch Linux и затем заchroot'ить туда. Плюс этого способа в том, что у вас будет сразу рабочий Arch Linux installation прямо внутри хост-системы без надобности в его настройки.\n\n- Корневой образ можно скачать с одного из зеркал в папке iso/latest/arch/x86_64/. Образ имеет формат squashfs, который является read-only, поэтому нам надо распаковать его и смонтировать корневой образ.\n\n- Чтобы распаковать корневой образ, надо\n\n```\n# unsquashfs airootfs.sfs\n```\n\n- Выберите сервер с репозиториями путём редактирования файла squashfs-root/etc/pacman.d/mirrorlist.\n\n- Перед тем как chrooting to it, нужно смонтировать некоторые виртуальные системные разделы, а затем скопировать resolv.conf для интернета.\n\n```\n# mount --bind squashfs-root squashfs-root\n# mount -t proc none squashfs-root/proc\n# mount -t sysfs none squashfs-root/sys\n# mount -o bind /dev squashfs-root/dev\n# mount -o bind /dev/pts squashfs-root/dev/pts  # важно для pacman (для проверки подписей)\n# cp -L /etc/resolv.conf squashfs-root/etc  # а это, чтобы мог работать интернет в chroot\n```\n\n- Теперь всё готово, чтобы to chroot в только что установленное окружение Arch\n\n```\n# chroot squashfs-root bash\n```\n\n"
+    },
+    {
+      "title": "Используем наше chroot окружение",
+      "level": 3,
+      "content": "Среда начальной загрузки является почти пустой основой (без nano или lvm2). Поэтому нужно настроить pacman, чтобы загружать другие необходимые пакеты.\n\n"
+    },
+    {
+      "title": "Начальная настройка хранилища ключей pacman",
+      "level": 4,
+      "content": "Перед установкой, ключи pacman должны быть настроены. Перед тем как вводить следующие две команды, можете почитать pacman/Подпись пакета#Инициализация связки ключей, чтобы узнать entropy requirements:\n\n```\n# pacman-key --init\n# pacman-key --populate archlinux\n```\n\nNote: **на хост-системе** Если вы предпочитаете генерировать энтропию за счёт активности системы и решили запустить ls -Ra / в другой консоли (TTY, терминал, сеанс SSH ...), не бойтесь запускать его в цикле несколько раз: пяти или шести запусков с хоста оказалось достаточно, чтобы сгенерировать достаточную энтропию на удалённом headless-сервере.\n\nЕсли вы предпочитаете генерировать энтропию за счёт активности системы и решили запустить ls -Ra / в другой консоли (TTY, терминал, сеанс SSH ...), не бойтесь запускать его в цикле несколько раз: пяти или шести запусков с хоста оказалось достаточно, чтобы сгенерировать достаточную энтропию на удалённом headless-сервере.\n\n"
+    },
+    {
+      "title": "Скачивание базовых утилит",
+      "level": 4,
+      "content": "Обновите списки пакетов и установите что вам нужно: base-devel, parted и т. д.\n\n```\nmount --bind каталог-livecd-или-bootstrap каталог-livecd-или-bootstrap\n```\n\n"
+    },
+    {
+      "title": "Советы по установке",
+      "level": 3,
+      "content": "Дальнейшая установка выполняется как описано в руководстве: Руководство по установке#Монтирование разделов и далее.\n\nНекоторые хост-системы или конфигурации могут потребовать дополнительных действий. Ниже описаны советы для них.\n\n"
+    },
+    {
+      "title": "Хост Debian",
+      "level": 4,
+      "content": "На хостах Debian pacstrap выводит следующую ошибку:\n\n```\n# pacstrap /mnt base\n# ==> Creating install root at /mnt\n# mount: mount point /mnt/dev/shm is a symbolic link to nowhere\n# ==> ERROR: failed to setup API filesystems in new root\n```\n\nЭто потому, что в Debian /dev/shm ссылается на /run/shm, который в Arch-based chroot не существует, поэтому ссылка не рабочая. Чтобы исправить это, просто создайте каталог /run/shm:\n\n```\n# mkdir /run/shm\n```\n\nПри установке archlinux-2015.07.01-x86_64 с хоста Debian 7 следующая ошибка мешает работе pacstrap и arch-chroot:\n\n```\n# pacstrap -i /mnt\n```\n\n```\nmount: mount point /mnt/dev/pts does not exist\n==> ERROR: failed to setup chroot /mnt\n```\n\nПохоже, это из-за того, что эти два скрипта используют общую функцию. chroot_setup()[1] полагается на новые возможности util-linux, которые несовместимы со средой средой Debian 7 (смотрите FS#45737).\n\nРешение для pacstrap состоит в том, чтобы вручную выполнять его задачи, но использовать обычную процедуру для монтирования файловых систем ядра в целевой каталог (\"$newroot\"):\n\n```\n# newroot=/mnt\n# mkdir -m 0755 -p \"$newroot\"/var/{cache/pacman/pkg,lib/pacman,log} \"$newroot\"/{dev,run,etc}\n# mkdir -m 1777 -p \"$newroot\"/tmp\n# mkdir -m 0555 -p \"$newroot\"/{sys,proc}\n# mount --bind \"$newroot\" \"$newroot\"\n# mount -t proc /proc \"$newroot/proc\"\n# mount --rbind /sys \"$newroot/sys\"\n# mount --rbind /run \"$newroot/run\"\n# mount --rbind /dev \"$newroot/dev\"\n# pacman -r \"$newroot\" --cachedir=\"$newroot/var/cache/pacman/pkg\" -Sy base base-devel ... ## add the packages you want\n# cp -a /etc/pacman.d/gnupg \"$newroot/etc/pacman.d/\"       ## copy keyring\n# cp -a /etc/pacman.d/mirrorlist \"$newroot/etc/pacman.d/\"  ## copy mirrorlist\n```\n\nВместо использования arch-chroot просто выполните:\n\n```\n# chroot \"$newroot\"\n```\n\nПопытка создать логические тома LVM из archlinux-bootstrap-2015.07.01-x86_64 на хосте Debian 7 приводит к следующей ошибке:\n\n```\n# lvcreate -L 20G lvm -n root\n```\n\n```\n/run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n  /dev/lvm/root: not found: device not cleared\n  Aborting. Failed to wipe start of new LV.\n```\n\n(Создание физического тома и группы томов работало, несмотря на ошибку /run/lvm/lvmetad.socket: connect failed: No such file or directory.)\n\nЭто можно легко обойти, создав логические тома вне chroot (с хоста Debian). После этого они остаются доступными в chroot.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nКроме того, если в вашей системе есть lvm, вы можете получить следующий вывод:\n\n```\n# grub-install --target=i386-pc --recheck /dev/main/archroot\n```\n\n```\nInstalling for i386-pc platform.\n  /run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n  /run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n  /run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n  /run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n  /run/lvm/lvmetad.socket: connect failed: No such file or directory\n  WARNING: Failed to connect to lvmetad. Falling back to internal scanning.\n```\n\nЭто потому, что по умолчанию debian не использует lvmetad. Нужно изменить /etc/lvm/lvm.conf и установить для use_lvmetad значение 0:\n\n```\nuse_lvmetad = 0\n```\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nПозже это вызовет ошибку при загрузке на этапе initrd. Следовательно, вы должны изменить его обратно после генерации grub. В программном RAID + LVM шаги будут следующими:\n\n- После установки системы дважды перепроверьте ваш mkinitcpio и настройки загрузчика. Смотрите список загрузчиков на странице Процесс загрузки Arch#Загрузчик.\n- Может понадобиться изменить /etc/mdadm.conf для RAID.\n- Может понадобиться изменить HOOKS и MODULES в соответствии с требованиями ваших LVM и RAID: MODULES=\"dm_mod\" HOOKS=\"base udev mdadm_udev ... block lvm2 filesystems ...\"\n- Скорее всего нужно сгенерировать новый образ initrd с помощью mkinitcpio. Смотрите mkinitcpio (Русский)#Создание загрузочного образа.\n- Пропишите use_lvmetad = 0 в /etc/lvm/lvm.conf.\n- Обновите настройки загрузчика. Подробности смотрите на странице вашего загрузчика в этой вики.\n- Пропишите use_lvmetad = 1 в /etc/lvm/lvm.conf.\n\n"
+    },
+    {
+      "title": "Хост Fedora",
+      "level": 4,
+      "content": "На хостах Fedora и Live USB, если у вас не получается сгенерировать ваш fstab с помощью genfstab, то удалите из fstab одинаковые записи и везде опции seclabel (это опция специфична для Fedora и поэтому не даст вам загрузиться).\n\n"
+    },
+    {
+      "title": "Что нужно проверить перед перезагрузкой",
+      "level": 2,
+      "content": "Перед перезагрузкой дважды проверьте несколько деталей в своей установке, чтобы добиться успешной установки. Для этого сначала выполните chroot во вновь установленной системе, а затем:\n\n- создайте пользователя с паролем, чтобы можно было войти по ssh. Это важно, так как вход в пользователя root отключен по умолчанию начиная с OpenSSH-7.1p2.\n- установите пароль для root, чтобы вы могли переключиться в него с помощью su.\n- установите какой-нибудь SSH-сервер и включите его автозагрузку.\n- настройте сеть, чтобы подключение выполнялось автоматически при загрузке.\n- установите загрузчик и настройте его на использование раздела подкачки, который вы присвоили ранее в качестве корневого раздела. Возможно, вы захотите настроить загрузчик так, чтобы он мог загружаться в вашу старую систему; для этой цели полезно повторно использовать существующий раздел /boot в новой системе.\n\n"
+    },
+    {
+      "title": "Замена уже существующей системы без LiveCD",
+      "level": 2,
+      "content": "Если вы хотите заменить хост-систему на Arch Linux, но не можете использовать LiveCD, можно сделать временную установку Arch Linux на отдельный небольшой раздел (например swap) и использовать его для установки основной системы.\n\nОсвободите ~700МБ, например, переформатировав существующий swap-раздел (после окончания установки, можете обратно создать swap).\n\n"
+    },
+    {
+      "title": "Использование старого раздела подкачки в качестве нового корневого раздела",
+      "level": 3,
+      "content": "Проверьте cfdisk, /proc/swaps или /etc/fstab чтобы найти ваш раздел подкачки. Для примера предположим, что это раздел sdaX (X будет числом).\n\nВыполните следующее:\n\nОтключите подкачку:\n\n```\n# swapoff /dev/sdaX\n```\n\nСоздайте файловую систему на месте отключенного раздела подкачки\n\n```\n# fdisk /dev/sda\n(поле ID для /dev/sdaX выставьте в \"Linux\" - Hex 83)\n# mke2fs -j /dev/sdaX\n```\n\nСоздайте каталог, в который раздел будет примонтирован\n\n```\n# mkdir /mnt/newsys\n```\n\nНаконец, примонтируйте бывший раздел подкачки в новый каталог и установите в него промежуточную систему.\n\n```\n# mount -t ext4 /dev/sdaX /mnt/newsys\n```\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 3,
+      "content": "Установите основные пакеты и другие необходимые вам пакеты для получения системы в /mnt/newsys с работающим интернетом. Если в этом разделе места не очень много, выбирайте пакеты для установки через pacstrap с умом и по возможности используйте опцию -c чтобы избежать переполнения маленького раздела.\n\nПосле установки обновите настройки загрузчика и перезагрузитесь в свежеустановленный Arch Linux и Rsync (Русский)#Полная резервная копия системы на основной раздел.\n\n"
+    }
+  ]
+}

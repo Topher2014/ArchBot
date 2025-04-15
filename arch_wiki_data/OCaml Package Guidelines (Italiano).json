@@ -1,0 +1,41 @@
+{
+  "title": "OCaml Package Guidelines (Italiano)",
+  "url": "https://wiki.archlinux.org/title/OCaml_Package_Guidelines_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Scrivere PKGBUILD per software scritto in OCaml.\n\n"
+    },
+    {
+      "title": "Nominazione dei pacchetti",
+      "level": 2,
+      "content": "Per le librerie, si usi ocaml-modulename. Per le applicazioni, si usi il nome del programma. In entrambi i casi, il nome del pacchetto dev'essere interamente in caratteri minuscoli.\n\n"
+    },
+    {
+      "title": "Librerie",
+      "level": 3,
+      "content": "Le librerie OCaml devono essere installate sotto /usr/lib/ocaml. Precedentemente, le librerie venivano installate sia sotto /usr/lib/ocaml che sotto /usr/lib/ocaml/site-lib, a seconda del pacchetto. Questa confusione impediva ad alcuni pacchetti di funzionare con altri, ed inoltre frammentava lo sviluppo in OCaml su Arch Linux. Per questo l'uso di /usr/lib/ocaml/site-lib è stato interrotto.\n\nLe librerie OCaml devono essere installate utilizzando ocaml-findlib. ocaml-findlib include dei metadata nel pacchetto che facilitano la gestione delle librerie. È uno standard de-facto ed un requisito di gran parte dell'attuale software in OCaml.\n\nocaml-findlib estrae i dati necessari da un file chiamato META che deve essere incluso nell'archivio dei sorgenti. Se questo file non è incluso, è possibile ottenerne uno dal corrispondente pacchetto per Debian, Ubuntu o Fedora, altrimenti deve esserne creato uno apposito dal maintainer del pacchetto. La richiesta di includere tale file potrebbe anche essere fatta direttamente agli sviluppatori originali del pacchetto.\n\nQuando si installano pacchetti con ocaml-findlib è necessario usare la variabile OCAMLFIND_DESTDIR. Vedere il PKGBUILD di esempio riportato sotto per i dettagli.\n\n"
+    },
+    {
+      "title": "OASIS",
+      "level": 3,
+      "content": "I pacchetti OCaml che installano eseguibili usando OASIS ignorano DESTDIR. Questa è una limitazione conosciuta di OASIS (issue #493). Una maniera per abilitare funzionalità simili a DESTDIR è lanciare lo script configure con l'argomento --destdir, ad esempio:\n\n```\nbuild() {\n    cd \"${srcdir}/${srcname}-${pkgver}\"\n    ./configure --prefix /usr --destdir \"$pkgdir\"\n\n    # build commands\n}\n```\n\n"
+    },
+    {
+      "title": "Bytecode e Livelli di OCaml",
+      "level": 2,
+      "content": "OCaml può eseguire il codice su vari \"livelli\": il livello principale (\"top level\") interpreta il codice OCaml senza compilarlo, il livello bytecode crea appunto del bytecode indipendente dalla macchina, e il livello nativo crea dei binari con codice macchina (proprio come C/C++).\n\nQuando si compilano pacchetti OCaml è necessario sapere se il processo di build compila codice macchina nativo, bytecode, o, come in molti casi, entrambi. Questo genera svariate situazioni in cui possono crearsi problemi con le opzioni dei pacchetti e le loro corrette dipendenze.\n\nSe viene creato del bytecode, il PKGBUILD deve contenere la seguente linea per proteggerlo:\n\n```\noptions=('!strip')\n```\n\nSe il pacchetto non contiene bytecode ma distribuisce solamente file binari, ocaml non è richiesto come dipendenza, ma è invece ovviamente necessario come makedepends, dato che il compilatore di OCaml è fornito dal pacchetto ocaml. Se il pacchetto contiene sia codice nativo che bytecode, ocaml deve essere sia una dipendenza che un makedepends.\n\nIl codice OCaml è molto raramente distribuito solo come bytecode, infatti quasi sempre include del codice nativo: l'unico caso in cui è consigliabile usare any come arch è quando viene distribuito solamente codice sorgente non compilato, di solito con una libreria, benché appunto molte librerie distribuiscano anche codice nativo.\n\nPer riassumere, è bene essere sempre coscienti di ciò che si va a distribuire, la probabilità maggiore è che il proprio pacchetto contenga sia codice macchina nativo che bytecode.\n\n"
+    },
+    {
+      "title": "Esempio di PKGBUILD usando Dune",
+      "level": 2,
+      "content": "Dune è un nuovo sistema di compilazione che sta diventando sempre più usato dai progetti OCaml.\n\nUna cosa da sapere è che un singolo progetto può costruire diversi \"pacchetti\" nel senso di OPAM/findlib, ognuno con la propria directory in /usr/lib/ocaml/. Vedi ocaml-cairo per un esempio. Per le build di rilascio, tutti i \"pacchetti\" devono essere esplicitamente elencati.\n\n```\n# Contributor: Your Name <youremail@domain.com>\n\npkgname=ocaml-<package name>\npkgver=4.2\npkgrel=1\nlicense=()\narch=('x86_64')\npkgdesc=\"An OCaml Package\"\nurl=\"\"\ndepends=('ocaml')\nmakedepends=('dune')\nsource=()\noptions=('!strip')\nsha256sums=()\n\nbuild() {\n  cd \"${srcdir}/${pkgname}-${pkgver}\"\n  # The \"-p\" flag is necessary for release builds, see the Dune manpage. Dune will complain if you forget some packages.\n  dune build -p package1,package1-extension,package2\n}\n\npackage() {\n  cd \"${srcdir}/${pkgname}-${pkgver}\"\n  DESTDIR=\"${pkgdir}\" dune install --prefix \"/usr\" --libdir \"lib/ocaml\"\n\n  # Dune installs documentation in /usr/doc, fix that.\n  install -dm755 \"${pkgdir}/usr/share/\"\n  mv \"${pkgdir}/usr/doc\" \"${pkgdir}/usr/share/\"\n}\n```\n\n"
+    },
+    {
+      "title": "Esempio di PKGBUILD OCaml usando il semplice findlib",
+      "level": 2,
+      "content": "```\n# Contributor: Your Name <youremail@domain.com>\n\npkgname=ocaml-<package name>\npkgver=4.2\npkgrel=1\nlicense=()\narch=('i686' 'x86_64')\npkgdesc=\"An OCaml Package\"\nurl=\"\"\ndepends=('ocaml')\nmakedepends=('ocaml-findlib')\nsource=()\noptions=('!strip')\nmd5sums=()\n\nOCAMLFIND_DESTDIR=\"${pkgdir}$(ocamlfind printconf destdir)\"\n\nbuild() {\n  cd \"${srcdir}/${pkgname}-${pkgver}\"\n  mkdir -p \"$OCAMLFIND_DESTDIR\"\n  ./configure --prefix=/usr\n  make\n}\n\npackage() {\n  cd \"${srcdir}/${pkgname}-${pkgver}\"\n  env DESTDIR=\"${pkgdir}\" \\\n    OCAMLFIND_DESTDIR=\"$OCAMLFIND_DESTDIR\" \\\n    make install\n}\n```\n\nTenere sempre presente che molti pacchetti OCaml avranno spesso bisogno che siano passati ulteriori parametri a make e make install. Ricordarsi anche di rimuovere l'opzione !strip e cambiare l'architettura se il pacchetto non fornisce bytecode.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "title": "Creación de paquetes estándar para Arch",
+  "url": "https://wiki.archlinux.org/title/Creaci%C3%B3n_de_paquetes_est%C3%A1ndar_para_Arch",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-10-10** \n\nArtículos relacionados\n\n- Crear paquetes\n- PKGBUILD\n- makepkg\n- Sistema de construcción de Arch\n- Repositorio de usuarios de Arch\n\nAl crear paquetes para Arch Linux deberá adherirse a las pautas para los paquetes de abajo, especialmente si desea contribuir con un nuevo paquete a Arch Linux. También debería leer los manuales de PKGBUILD y makepkg.\n\n"
+    },
+    {
+      "title": "Prototipo de PKGBUILD",
+      "level": 2,
+      "content": "```\n# Maintainer: su nombre <su-email@mail.com>\npkgname=NOMBRE_DEL_PAQUETE\npkgver=VERSIÓN_DEL_PAQUETE\npkgrel=1\npkgdesc=\"\"\narch=()\nurl=\"\"\nlicense=('GPL')\ngroups=()\ndepends=()\nmakedepends=()\noptdepends=()\nprovides=()\nconflicts=()\nreplaces=()\nbackup=()\noptions=()\ninstall=\nchangelog=\nsource=($pkgname-$pkgver.tar.gz)\nnoextract=()\nmd5sums=() #generar con 'makepkg -g'\n\nbuild() {\n  cd \"$srcdir/$pkgname-$pkgver\"\n\n  ./configure --prefix=/usr\n  make\n}\n\npackage() {\n  cd \"$srcdir/$pkgname-$pkgver\"\n\n  make DESTDIR=\"$pkgdir/\" install\n}\n```\n\nPuede encontrar otros prototipos en /usr/share/pacman para los paquetes de pacman y abs.\n\n"
+    },
+    {
+      "title": "Reglas de etiquetado de paquetes",
+      "level": 2,
+      "content": "- Los paquetes nunca deben ser instalados en /usr/local\n- No introduzca nuevas variables o funciones en el script PKGBUILD, excepto cuando el paquete no puede ser compilado sin ellas, debido a que puede haber posibles confictos con las variables usadas por el propio makepkg.\n- Si una nueva variable o función es absolutamente requerida, añádale a su nombre un guión bajo de prefijo (_), por ejemplo variable-personal=\n- Evite utilizar /usr/libexec/. Utilice /usr/lib/$pkgname/ en su lugar.\n- El campo packager del metaarchivo del paquete puede ser personalizado por el creador del paquete modificando la opción apropiada en el archivo /etc/makepkg.conf, o alternativamente sobrescribiendo al crear ~/.makepkg.conf.\n- Todos los mensajes importantes deben ser mostrados con la orden echo durante la instalación mediante el uso del archivo .install. Por ejemplo, si un paquete necesita trabajo adicional de configuración, las instrucciones deberían ser incluidas.\n- Las dependencias son el error de empaquetado más común. Tómese un tiempo para verificarlas cuidadosamente, por ejemplo ejecutando ldd en ejecutables dinámicos, verificando las herramientas requeridas por los scripts o mirando la documentación del software. La utilidad namcap puede ayudarle en este sentido. Esta herramienta puede analizar tanto los PKGBUILD como el paquete resultante y le advertirá sobre permisos incorrectos, las dependencias que faltan, las dependencias redundantes y otros errores comunes.\n- Cualquier dependencia opcional que no sea necesaria para ejecutar el paquete o para su funcionamiento general, no debe ser incluida, en su lugar, la información deberá añadirse en la matriz optdepends:\n\n```\nvariable-personal=\n```\n\n```\noptdepends=('cups: printing support'\n            'sane: scanners support'\n            'libgphoto2: digital cameras support'\n            'alsa-lib: sound support'\n            'giflib: GIF images support'\n            'libjpeg: JPEG images support'\n            'libpng: PNG images support')\n```\n\n- Al escribir la descripción del paquete, no incluya el nombre del paquete en un formato autorreferencial. Por ejemplo «Nedit es un editor de texto para X11» debería ser simplificado a «Editor de texto para X11». Intente mantener las descripciones dentro de aproximadamente 80 caracteres o menos.\n- Intente mantener el ancho de linea del PKGBUILD por debajo de los 100 caracteres.\n- Cuando sea posible elimine las líneas vacías de PKGBUILD (provides, replaces, etc.)\n- Es una practica común el preservar el orden de los campos en el PKGBUILD como se muestra más abajo. Aunque no es obligatorio debido a que el único requerimiento para esto es mantener la corrección de la sintaxis de bash.\n- Entrecomille variables que pueden contener espacios, como \"$pkgdir\" y \"$srcdir\".\n- Para garantizar la integridad de los paquetes, asegúrese de que las variables de integridad contengan los valores correctos. Estas se pueden actualizar utilizando la herramienta updpkgsums.\n\n"
+    },
+    {
+      "title": "Nominación de paquetes",
+      "level": 2,
+      "content": "- Los nombres de paquetes deben contener solamente caracteres alfanuméricos, incluido los siguientes @, ., _, +, -. No se permite que los nombres comiencen con guiones o puntos. Todas las letras deben estar en minúsculas.\n- Los nombres de los paquetes NO deben tener el sufijo del número de versión de lanzamiento principal en sentido ascendente (por ejemplo, no usaremos libfoo2 si el flujo ascendente lo llama libfoo v2.3.4) en caso de que la biblioteca y sus dependencias que se esperan puedan seguir usando la versión de la biblioteca más reciente con su respectivo lanzamiento en sentido ascendente. Sin embargo, para algunos programas o dependencias, esto no puede ser asumido. En el pasado, esto ha sido especialmente cierto para los conjuntos de herramientas de widgets como GTK y Qt. El software que depende de dichos conjuntos de herramientas generalmente no puede ser portado si más a una nueva versión principal. Como tal, en los casos en que el software no puede seguir funcionando sin más junto con sus dependencias, los nombres de los paquetes deben incluir el sufijo de la versión principal (por ejemplo, gtk2, gtk3, qt4, qt5). Para los casos en los que la mayoría de las dependencias pueden continuar con la versión más reciente, pero algunas no pueden (por ejemplo, el código privativo que necesita libpng12 o similar), una versión obsoleta de ese paquete podría llamarse libfoo1, mientras que la versión actual sería solo libfoo.\n- Las versiones de los paquetes deben ser las mismas que las usadas por el autor original del software. Las versiones pueden incluir letras si es necesario (por ejemplo, la versión de nmap es 2.54BETA32). Las etiquetas de la versión no deben incluir guiones, solo letras, numeros y puntos.\n- Las liberacones de paquetes son especificos para Arch Linux. Estos permiten a los usuarios diferenciar entre un paquete viejo y uno nuevo. Cuando una nueva versión del paquete es liberada el contador se pone en 1. Cuando se realizan correcciones y optimizaciones, el paquete es redistribuido incremento en 1 su numero de liberación. Cuando sale una nueva versión, el recuento de lanzamientos se restablece en 1. Las etiquetas de liberación de paquetes siguen las mismas restricciones de denominación que las etiquetas de versión.\n\n"
+    },
+    {
+      "title": "Directorios",
+      "level": 2,
+      "content": "- Los archivos de configuración deben localizarse en el directorio /etc. Si existe mas de un archivo de configuración es costumbre utilizar un subdirectorio para mantener /etc lo mas limpio posible. Utilice /etc/{pkgname}/ donde {pkgname} es el nombre del paquete (o un lugar alternativo, por ejemplo, apache utiliza /etc/httpd/).\n\n- Los archivos de cada paquete deben seguir estas 'directrices generales de directorios:\n\nTable content:\n/etc | Archivos de configuración esenciales del sistema\n/usr/bin | Binarios de aplicaciones\n/usr/lib | Bibliotecas\n/usr/include | Cabeceras de archivos\n/usr/lib/{pkg} | Módulos, complementos, etc.\n/usr/share/doc/{pkg} | Application documentation\n/usr/share/info | Archivos info del sistema GNU\n/usr/share/man | Páginas de manuales\n/usr/share/{pkg} | Datos de aplicaciones\n/var/lib/{pkg} | Almacén persistente de aplicaciones\n/etc/{pkg} | Archivos de configuración para {pkg}\n/opt/{pkg} | Paquetes grandes y autocontenidos\n\n- Los paquetes no deben contener ninguno de los siguientes directorios: /bin /sbin /dev /home /srv /media /mnt /proc /root /selinux /sys /tmp /var/tmp /run\n\n- /bin\n- /sbin\n- /dev\n- /home\n- /srv\n- /media\n- /mnt\n- /proc\n- /root\n- /selinux\n- /sys\n- /tmp\n- /var/tmp\n- /run\n\n"
+    },
+    {
+      "title": "Deberes de makepkg",
+      "level": 2,
+      "content": "Cuando se utiliza makepkg para compilar un paquete, este hace lo siguiente automáticamente:\n\n1. Comprueba si el paquete tiene dependencias y makedepends instaladas.\n1. Descarga las fuentes desde los servidores.\n1. Comprueba la integridad de los archivos fuentes.\n1. Desempaca los archivos fuentes.\n1. Realiza cualquier parche necesario.\n1. Compila el software y lo instala en una raíz falsa.\n1. Quita los símbolos de los binarios.\n1. Quita y depuralos símbolos de las bibliotecas.\n1. Comprime las páginas de manual y/o información.\n1. Genera el archivo meta del paquete que se incluye con cada paquete.\n1. Comprime la raíz falsa en el archivo del paquete.\n1. Almacena el archivo del paquete en el directorio de destino configurado (cwd por defecto).\n\n"
+    },
+    {
+      "title": "Arquitecturas",
+      "level": 2,
+      "content": "La variable arch debe contener 'x86_64' si el paquete compilado es específico de dicha arquitectura. Utilice 'any' para paquetes que no dependen de la arquitectura.\n\n"
+    },
+    {
+      "title": "Licencias",
+      "level": 2,
+      "content": "Véase PKGBUILD (Español)#license.\n\n"
+    },
+    {
+      "title": "Guías adicionales",
+      "level": 2,
+      "content": "Asegúrate de leer antes esta guía. Hay puntos importantes listados en esta página que no se van a repetir en las siguientes páginas de guías. Las guías específicas se han creado como un añadido a los estándares listados en esta página.\n\n32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nLos paquetes enviados a AUR deben además cumplir con Arch User Repository (Español)#Reglas de envío.\n\n"
+    }
+  ]
+}

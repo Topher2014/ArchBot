@@ -1,0 +1,106 @@
+{
+  "title": "Disable PC Speaker Beep (Українська)",
+  "url": "https://wiki.archlinux.org/title/Disable_PC_Speaker_Beep_(%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Advanced Linux Sound Architecture\n- Kernel modules\n\nPC speaker (beeper) is a built-in loudspeaker in most personal computers since the first IBM PC. This speaker is not capable of high quality playback and merely serves as a simple means of auditory feedback in the form of beeps. Some software, e.g. web browsers, editors and terminals, may produce beeps which may or may not be desired by the user. This article serves as a guide for configuring and/or disabling the speaker entirely. For situations where no sound card or speakers are available and a simple audio notification is desired, see #Beep.\n\n"
+    },
+    {
+      "title": "Mechanism",
+      "level": 2,
+      "content": "The PC speaker is typically a physical unit connected on the front connections header of the motherboard. Some motherboard manufacturers do not ship their motherboards with a PC speaker at all, whereas others may have the PC speaker soldered directly onto the surface. Laptops typically have no physical PC speaker but have the beeper routed to the laptop's internal speakers. In some cases, the beeper is heard on the regular output (i.e. speakers, headphones) of the soundcard, which tends to be unexpectedly loud.\n\nUpon boot the UEFI/BIOS will traditionally generate a beep during power-on self-test (POST). Recent motherboard models omit the POST beep in favor of rapidly booting into the OS. The UEFI user interface typically allows for toggling the POST beeps but it cannot configure the PC speaker to be turned off completely.\n\nOnce the system has booted into Linux and the pcspkr kernel module is loaded, the PC speaker can be used by the environment, be invoked manually by the user, and be configured to some extent. Because the PC speaker is controlled directly by the CPU, along with the fact that they are built for beeping only, PC speakers cannot be used for playing back audio files. If this is really desired, unloading pcspkr and installing snd-pcsp-dkmsAUR provides a rudimentary audio output.\n\n"
+    },
+    {
+      "title": "Physically",
+      "level": 3,
+      "content": "By removing the PC speaker the system will not be able to produce beeps. This can be achieved by physically removing the unit from the motherboard (if possible). Some manufacturers may provide a jumper header to switch it off.\n\n"
+    },
+    {
+      "title": "Globally",
+      "level": 3,
+      "content": "The PC speaker can be disabled by unloading the pcspkr and snd_pcsp kernel modules:\n\n```\n# rmmod pcspkr\n# rmmod snd_pcsp\n```\n\nBlacklisting the pcspkr and snd_pcsp modules will prevent udev from loading them at boot. Create the file:\n\n```\n/etc/modprobe.d/nobeep.conf\n```\n\n```\nblacklist pcspkr\nblacklist snd_pcsp\n```\n\nBlacklisting it on the kernel command line is yet another way. Simply add module_blacklist=pcspkr,snd_pcsp to your boot loader kernel line.\n\n"
+    },
+    {
+      "title": "Virtual console",
+      "level": 4,
+      "content": "In virtual console (TTY) you can set the bell duration to zero milliseconds with setterm(1):\n\n```\n$ setterm --blength=0\n```\n\n"
+    },
+    {
+      "title": "Readline-aware shell",
+      "level": 4,
+      "content": "For a shell which utilizes the Readline library (e.g. Bash), uncomment this line in /etc/inputrc (or add it to ~/.inputrc):\n\n```\nset bell-style none\n```\n\n"
+    },
+    {
+      "title": "Less pager",
+      "level": 4,
+      "content": "To disable PC speaker in less(1) pager, you can launch it with less --quiet to mute PC speaker for end of file events, or less --QUIET to mute it altogether. For man pages, launch man --pager=\"less --QUIET\" or set the $MANPAGER or $PAGER environment variables.\n\nAlternatively, you can add these lines to your shell configuration file:\n\n```\nalias less='less --QUIET'\nalias man='man --pager=\"less --QUIET\"'\n```\n\n"
+    },
+    {
+      "title": "Arch Linux ISO",
+      "level": 4,
+      "content": "If you want to disable the init tune on the Arch Linux ISO, you will need to repack the ISO. To do so, first install the libisoburn and mtools packages.\n\nExtract the El Torito boot images and systemd-boot configuration (loader.conf) from the ISO:\n\n```\n$ osirrox -indev archlinux-YYYY.MM.DD-x86_64.iso -extract_boot_images ./ -extract /loader/loader.conf loader.conf\n```\n\nMake loader.conf writable and remove the beep option from it:\n\n```\n$ chmod +w loader.conf\n$ sed '/^beep on/d' -i loader.conf\n```\n\nAdd the modified loader.conf to the El Torito UEFI boot image:\n\n```\n$ mcopy -D oO -i eltorito_img2_uefi.img loader.conf ::/loader/\n```\n\nFinally, repack the ISO using the modified boot image and loader.conf:\n\n```\n$ xorriso -indev archlinux-YYYY.MM.DD-x86_64.iso \\\n\t-outdev archlinux-YYYY.MM.DD-x86_64-silent.iso \\\n\t-map loader.conf /loader/loader.conf \\\n\t-boot_image any replay \\\n\t-append_partition 2 0xef eltorito_img2_uefi.img\n```\n\n"
+    },
+    {
+      "title": "ALSA",
+      "level": 3,
+      "content": "For most sound cards the PC speaker is listed as an ALSA channel, named either PC Speaker, PC Beep, or Beep. To mute the speaker, either use alsamixer(1) or amixer(1), for example:\n\n```\n$ amixer set 'PC Speaker' 0% mute\n```\n\nTo unmute the channel, see Advanced Linux Sound Architecture#Unmuting the channels.\n\n"
+    },
+    {
+      "title": "Cinnamon",
+      "level": 3,
+      "content": "Cinnamon seems to play a \"water drop\" sound. To disable it, set in gsettings(1):\n\n```\n$ gsettings set org.cinnamon.desktop.wm.preferences audible-bell false\n```\n\n"
+    },
+    {
+      "title": "GNOME",
+      "level": 3,
+      "content": "Using GSettings:\n\n```\n$ gsettings set org.gnome.desktop.wm.preferences audible-bell false\n```\n\n"
+    },
+    {
+      "title": "GTK",
+      "level": 3,
+      "content": "Append this line to ~/.gtkrc-2.0:\n\n```\ngtk-error-bell = 0\n```\n\nAdd the same line to the [Settings] section of $XDG_CONFIG_HOME/gtk-3.0/settings.ini:\n\n```\n[Settings]\ngtk-error-bell = 0\n```\n\nThis is documented in the Gnome Developer Handbook.\n\n"
+    },
+    {
+      "title": "Plasma",
+      "level": 3,
+      "content": "Bell notification settings can be modified in System Settings > Accessibility Options > Bell.\n\n"
+    },
+    {
+      "title": "PulseAudio",
+      "level": 3,
+      "content": "Play a sound instead of a PC speaker beep using PulseAudio.\n\n"
+    },
+    {
+      "title": "Xorg",
+      "level": 3,
+      "content": "```\n$ xset -b\n```\n\nYou can add this command to a startup file such as /etc/xprofile to make it permanent. See xprofile and xset(1) for more information.\n\n"
+    },
+    {
+      "title": "Beep",
+      "level": 2,
+      "content": "Beep is an advanced PC speaker beeping program. It is useful for situations where no sound card and/or speakers are available, and simple audio notification is desired.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 3,
+      "content": "Install the beep package.\n\nYou may also need to unmute the PC speaker in ALSA.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "beep uses /dev/input/by-path/platform-pcspkr-event-spkr to control the PC speaker. For the root user no configuration is needed. To access this device file as a non-root user, one has to set the proper permissions.\n\nThe following rule will allow any user, who is logged into the currently active virtual console session, to use the PC speaker:\n\n```\n/etc/udev/rules.d/70-pcspkr-beep.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"input\", ATTRS{name}==\"PC Speaker\", ENV{DEVNAME}!=\"\", TAG+=\"uaccess\"\n```\n\nPrevious solution does not allow to use beep for users logged in remotely—e.g. via OpenSSH,—or processes running as any user other than the one logged into the currently active virtual console session. Alternatively, a new user group may be created with the corresponding rule to set the right permissions on the device file. With this solution any user in the beep group will be able to control the PC speaker:\n\n```\nACTION==\"add\", SUBSYSTEM==\"input\", ATTRS{name}==\"PC Speaker\", ENV{DEVNAME}!=\"\", GROUP=\"beep\", MODE=\"0620\"\n```\n\nTo force reloading rules and device file to apply new user permission without a reboot, execute:\n\n```\n# udevadm control --reload && rmmod pcspkr && modprobe pcspkr\n```\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 3,
+      "content": "The following example plays slightly higher and shorter sound than beep default—see beep(1) § Tone options,—and repeats it two times:\n\n```\n# beep -f 500 -l 50 -r 2\n```\n\nRepositories collecting shell scripts playing various music using beep:\n\n- https://github.com/NaWer/beep\n- https://github.com/ShaneMcC/beeps\n\nSee also beep(1) § Sound Volume.\n\n"
+    },
+    {
+      "title": "The HD Audio power-saving mode mutes the PC speaker",
+      "level": 3,
+      "content": "The PC speaker might remain silent when the HD Audio sound card is in power-saving mode. Apparently—depending on hardware—the beeps are actually fed as an analog input into the card, and will be ignored if the card is asleep. You can debug this by playing music (to keep the card awake) in one virtual console and then beeping in another.\n\nFor more information, see Advanced Linux Sound Architecture/Troubleshooting#Power saving.\n\n"
+    }
+  ]
+}

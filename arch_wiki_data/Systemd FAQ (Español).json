@@ -1,0 +1,71 @@
+{
+  "title": "Systemd FAQ (Español)",
+  "url": "https://wiki.archlinux.org/title/Systemd_FAQ_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-11-25** \n\nArtículos relacionados\n\n- systemd (Español)\n- systemd/User (Español)\n- Daemons (Español)\n\n"
+    },
+    {
+      "title": "FAQ",
+      "level": 2,
+      "content": "Para obtener una lista actualizada de problemas conocidos, consulte TODO de los desarrolladores.\n\n"
+    },
+    {
+      "title": "¿Por qué recibo mensajes de registro en mi consola?",
+      "level": 3,
+      "content": "Debe establecer el nivel del registro del propio kernel. Históricamente, /etc/rc.sysinit hacía esto por nosotros y establecía el nivel del registro de dmesg a 3, que era un nivel de registro razonablemente moderado. O bien, añada loglevel=3 o quiet en los parámetros del kernel.\n\n"
+    },
+    {
+      "title": "¿Cómo puedo cambiar el número de gettys ejecutadas por defecto?",
+      "level": 3,
+      "content": "Actualmente, solo un getty (abreviatura de «get teletype») se inicia de forma predeterminada. Si cambia a otra tty, se lanzará un getty allí (estilo de activación por socket). En otras palabras, [Ctl] [Alt] [F2] lanzará un nuevo getty en tty2.\n\nPor defecto, el número de gettys autoactivados está limitado a seis. Por lo tanto [F7] a [F12] no lanzará un getty.\n\nSi desea cambiar este comportamiento, edite /etc/systemd/logind.conf y cambie el valor de NAutoVTs. Si desea que todas las teclas [Fx] inicien un getty, aumente el valor de NAutoVTs a 12. Si está Systemd (Español)/Journal (Español)#Limpiar manualmente archivos journal, ponga el valor de NAutoVTs a 11 (dejando tty12 libre).\n\nTambién puede preactivar gettys para que se ejecuten desde el arranque.\n\nPara agregar otro getty preactivada, solo tiene que colocar otro enlace simbólico para crear instancias a otro getty en la carpeta /etc/systemd/system/getty.target.wants/:\n\n```\n# ln -sf /usr/lib/systemd/system/getty@.service /etc/systemd/system/getty.target.wants/getty@tty9.service\n# systemctl start getty@tty9.service\n```\n\nPara eliminar un getty, simplemente elimine los enlaces simbólicos del getty de la que quiera deshacerse en la carpeta /etc/systemd/system/getty.target.wants/:\n\n```\n# rm /etc/systemd/system/getty.target.wants/getty@{tty5,tty6}.service\n# systemctl stop getty@tty5.service getty@tty6.service\n```\n\nsystemd no usa el archivo /etc/inittab.\n\n"
+    },
+    {
+      "title": "¿Cómo puedo obtener una salida con información más detallada durante el arranque?",
+      "level": 3,
+      "content": "Si no ve ninguna salida en absoluto en la consola después del mensaje initram, esto significa que tiene el parámetro quiet en la línea del kernel. Lo mejor es quitarlo, al menos la primera vez que arranque con systemd, para ver si todo está bien. A continuación, verá una lista [ OK ] en verde o [ FAILED ] en rojo.\n\nLos mensajes se registrarán en el log del sistema y si quiere indagar sobre del estado del propio sistema ejecute systemctl (no necesita privilegios de root) o busque en el registro boot/system con journalctl.\n\n"
+    },
+    {
+      "title": "¿Cómo evitar que se borre la consola después del arranque?",
+      "level": 3,
+      "content": "Cree un directorio llamado /etc/systemd/system/getty@.service.d y coloque nodisallocate.conf allí para sobrescribir la opción TTYVTDisallocate a no.\n\n```\n/etc/systemd/system/getty@.service.d/nodisallocate.conf\n```\n\n```\n[Service]\nTTYVTDisallocate=no\n```\n\n"
+    },
+    {
+      "title": "¿Qué opciones del kernel son requeridas por systemd?",
+      "level": 3,
+      "content": "Los Kernels anteriores a 3.0 no son compatibles.\n\nSi usa un kernel personalizado, deberá asegurarse de que las opciones de systemd estén seleccionadas.\n\nSi está compilando un nuevo kernel para usar con una versión instalada de systemd, las opciones requeridas y recomendadas se enumeran en el archivo README de systemd /usr/share/doc/systemd/README.\n\nSi se está preparando para instalar una nueva versión de systemd y está ejecutando un kernel personalizado, la versión más reciente del archivo se puede encontrar en the systemd git.\n\n"
+    },
+    {
+      "title": "¿Qué otras unidades dependen de una unidad?",
+      "level": 3,
+      "content": "Por ejemplo, si desea averiguar qué servicios activa un target como multi-user.target, use algo como esto:\n\n```\n$ systemctl show -p \"Wants\" multi-user.target\n```\n\n```\nWants=rc-local.service avahi-daemon.service rpcbind.service NetworkManager.service acpid.service dbus.service atd.service crond.service auditd.service ntpd.service udisks.service bluetooth.service org.cups.cupsd.service wpa_supplicant.service getty.target modem-manager.service portreserve.service abrtd.service yum-updatesd.service upowerd.service test-first.service pcscd.service rsyslog.service haldaemon.service remote-fs.target plymouth-quit.service systemd-update-utmp-runlevel.service sendmail.service lvm2-monitor.service cpuspeed.service udev-post.service mdmonitor.service iscsid.service livesys.service livesys-late.service irqbalance.service iscsi.service\n```\n\nEn lugar de Wants también podría probar WantedBy, Requires, RequiredBy, Conflicts, ConflictedBy, Before, After para conocer los correspondientes tipos de dependencias y viceversa.\n\n"
+    },
+    {
+      "title": "Mi ordenador se apaga, pero el power permanece encendido.",
+      "level": 3,
+      "content": "Utilice systemctl poweroff, en lugar de systemctl halt.\n\n"
+    },
+    {
+      "title": "Después de migrar a systemd, ¿por qué no funciona el montaje de fakeRAID?",
+      "level": 3,
+      "content": "Asegúrese de usar:\n\n```\n# systemctl enable dmraid.service\n```\n\n"
+    },
+    {
+      "title": "¿Cómo puedo hacer un script que se inicie durante el proceso de arranque?",
+      "level": 3,
+      "content": "Cree un nuevo archivo como /etc/systemd/system/myscript.service y añada el siguiente contenido:\n\n```\n/etc/systemd/system/myscript.service\n```\n\n```\n[Unit]\nDescription=My script\n \n[Service]\nExecStart=/usr/bin/my-script\n \n[Install]\nWantedBy=multi-user.target\n```\n\nEste ejemplo asume que quiere que el script arranque cuando el target multi-user sea lanzado. Asegúrese de hacer ejecutable el script.\n\nActive myscript.service para iniciar el servicio en el arranque.\n\nNote: **No** \n\n"
+    },
+    {
+      "title": "El estado de .service dice «active (exited)» en verde (por ejemplo, iptables)",
+      "level": 3,
+      "content": "Esto es perfectamente normal. En el caso de las iptables es porque no hay ningún demonio corriendo, que es controlado en el kernel. Por lo tanto, se cierran después que las reglas han sido cargadas.\n\nPara comprobar si las reglas iptables se han cargado correctamente:\n\n```\n# iptables --list\n```\n\n"
+    },
+    {
+      "title": "Error «Failed to issue method call: File exists»",
+      "level": 3,
+      "content": "Esto sucede cuando se utiliza systemctl enable y el enlace simbólico que trata de crear en /etc/systemd/system/ ya existe. Normalmente esto pasa cuando se cambia de un gestor de pantalla a otro (por ejemplo de GDM a SDDM, que se pueden activar con gdm.service y sddm.service, respectivamente) y el enlace correspondiente /etc/systemd/system/display-manager.service ya existe.\n\nPara resolver este problema, utilice systemctl -f enable para sobreescribir el enlace simbólico existente.\n\n"
+    }
+  ]
+}

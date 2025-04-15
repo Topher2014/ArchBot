@@ -1,0 +1,51 @@
+{
+  "title": "ASUS Transformer Book Trio",
+  "url": "https://wiki.archlinux.org/title/ASUS_Transformer_Book_Trio",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nAsus Trio TX201LA is a good piece of recent (for 2014) hardware, which allows one to combine desktop, laptop and tablet in a single piece. In fact the tablet is a different story - detachable screen runs Android and is out of scope. Nevertheless the base itself (which can serve as desktop) or with attached tablet (forming laptop) can boast Intel Haswell Core i7 or Core i5 CPU, 4G RAM and 500G HDD. And that is what running Linux, almost smoothly.\n\n"
+    },
+    {
+      "title": "Install",
+      "level": 2,
+      "content": "You can follow the standard Installation guide. No problems with UEFI spotted.\n\n"
+    },
+    {
+      "title": "Wi-Fi",
+      "level": 3,
+      "content": "When installing from 2014.12 image running on 3.17 kernel Wi-Fi for some reason does not work. It seems it works for some older versions, and for 3.18+ but with 3.17 you would probably need some USB Wi-Fi. Wi-Fi is detected, wpa_supplicant runs on it however it cannot associate in any band. It seems it is caused by way too restrictive regulation settings, so you may also try to adjust AP settings for safe channels (1-11, 36-44) and sit closer to AP to get it working.\n\nDo not forget to install wireless-regdb among other required wireless packages to apply less restrictive regional regulation domain settings.\n\nThis together with 3.18 or newer kernel make Wi-Fi work somehow. To improve Wi-Fi quality even better adjust power management settings, effectively disabling any kind of power management for Wi-Fi. E.g.\n\n```\necho 'options rtl8821ae ips=N fwlps=N swlps=Y' > /etc/modprobe.d/wifi.conf\n```\n\nto switch to software PM. If even that does not help you may switch off PM now by\n\n```\niwconfig wlp2s0 power off\n```\n\nIt is really about power management, not power supply for the card (which is managed by rfkill). Or to preserve it permanently across reboots\n\n```\necho 'ACTION==\"add\",SUBSYSTEM==\"net\",ENV{ID_NET_DRIVER}==\"rtl8821ae\", RUN+=\"iwconfig $name power off\"' > /etc/udev/rules.d/wifi.rules\n```\n\nIf the above actions do not fix the disconnects add this to /etc/NetworkManager/NetworkManager.conf\n\n```\n[device]\nwifi.scan-rand-mac-address=0\n```\n\n"
+    },
+    {
+      "title": "SATA",
+      "level": 3,
+      "content": "You may notice during installation or on initial reboot ATA errors, such as CRC or READ FPDMA QUEUED - those are result of SATA speed mismatches. The controller is capable of 6Gbps while the internal HDD can only run at 3Gbps. This will add a boot delay until libata finds the correct speed by probing and resetting.\n\nIt is likely better to enforce 3Gbps by adding libata.force=3.0Gbps to the kernel command line. Remove this restriction after migrating to an SSD drive.\n\n"
+    },
+    {
+      "title": "Kernel",
+      "level": 3,
+      "content": "Even though system is capable of running current stable kernel it maybe worth spending some time compiling newer rc+ kernel until it is packaged. With 3.18 kernel you may experience various lock-outs, hang-outs and even kernel panics - due to inadequate memory and resource management. On the other hand 3.19 or 4.0+ is running much more smoothly, although not fully fixed even that. The hardware is heavily dependent on ACPI management which in turn mostly relies on certain driver feedback so be ready to expect various oops and kernel thread hangups until proper hooks are installed by kernel and drivers.\n\nWhen configuring kernel do not forget to enable drivers/options for following device specific components:\n\nTable content:\nComponent | HW Name | Kernel menu item\nWi-Fi | Realtek 8821AE | Device Drivers -> Network Device Support -> Realtek rtlwifi family -> Realtek 8821AE\nTouchpad | Elantech EPS/2 Touchpad | Device Drivers -> Input device support -> Mice -> PS/2 Mouse -> Elantech PS/2 Protocol extension\nTouchscreen | Atmel maXTouch Digitizer | Device Drivers -> HID Support -> Special HID Drivers -> HID Multitouch Pannels\nBluetooth | Realtek USB HCI | Networking Support -> Bluetooth Subsystem Support -> Bluetooth Device Drivers -> HCI USB Driver\nAudio | Intel HD + Conexant | Device Drivers -> Sound card support -> Advanced Linux Sound Architecture -> HD Audio -> Conexant and HDMI\nWebCAM | Chicony HD USB Video | Device Drivers -> Multimedia Support -> Media USB Adapters -> USB Video Class\n\n"
+    },
+    {
+      "title": "Backlight",
+      "level": 3,
+      "content": "Backlight does not work by default in Linux due to missing Ambient Light Sensor (ALS) driver. ACPI handler for backlight is hooked to ALS probe and when driver is absent it generates ACPI Error:\n\n```\nACPI Exception: AE_AML_PACKAGE_LIMIT, Index (0xFFFFFFFFFFFFFFFF) is beyond end of object (length 0x10) (20140926/exoparg2-420)\nACPI Error: Method parse/execution failed [\\_SB_.PCI0.LPCB.EC0_._Q0E] (Node ffff88011a448820), AE_AML_PACKAGE_LIMIT (20140926/psparse-536)\n```\n\nOne way then which seems to be somehow working to deal with backlight is using xrandr, but even that is not really decreasing backlight, rather as command says changes brightness:\n\n```\nxrandr --output eDP1 --brightness 1.0\n```\n\nIt accepts values from 0(off) to 1 and above, but above 1.5 it becomes overexposed. Workable range 0.0 to 1.2, good default would be 0.5 (which you can put into your local xsession rc file.\n\nAlso you can turn backlight on and off and that either by setting brightness to 0 or bl_power to 1 in the sys/class/backlight/* knobs.\n\nTo make the backlight keys work you need to load ALS driver. That could be achieved by booting Windows and rebooting to Linux - but that will work until power-off or suspend.\n\nIf you do not mind compiling kernel module you may try to use off-the-tree driver for ALS by Viktar Vaŭčkievič. With the driver ACPI handler works properly so you do not need any other scripts.\n\nIf the driver still does not work (most of the time it does not - certain hardware initialisation for ALS seems to be still missing) you may try instead this fork which by default disabled ALS allowing manual backlight management via ACPI with fn keys.\n\n"
+    },
+    {
+      "title": "Wireless Switch",
+      "level": 3,
+      "content": "Wireless switch does not work by default on linux. ACPI handler detects Win8 OS and delegates rfkill management to software driver, which is missing. One way to handle this is to remove Windows 2012 OSI string - which may affect other ACPI handlers though. When OSI is below Win8 - asus-nb-wmi's wapf parameter influences how hardware switch is acting. WAPF handling is different from the one documented in asus-nb-wmi.c - the implementation states following:\n\nIf OSI string is required to be preserved - the only way out is using driver for ACPI device (ASHS) which will handle events and do radio management.\n\n"
+    },
+    {
+      "title": "Other Keys",
+      "level": 3,
+      "content": "There are multiple special keys available under the same ACPI event key: Display-Off key (fn+F7), Camera key (fn+V), Screen-profile (fn+C), Auto-backlight (fn+A) and Touchpad-Off (fn+F9). All of them are generating\n\n```\nPNP0C14:00 000000ff 00000000\n```\n\nwhich makes them useless for acpid. Screen profile key though generates in addition another event (eg, two events are emitted)\n\n```\nbutton/prog1 PROG1 00000080 00000000 K\n```\n\nso you can bind toggle script which enables/disables backlight using both knobs (in case you turn it off by one of them while debugging). Something like\n\n```\n!/bin/sh\n\nSYS=/sys/class/backlight\nBLD=intel_backlight\n\nPWR_KNOB=$SYS/$BLD/bl_power\nBRT_KNOB=$SYS/$BLD/brightness\n\nPWR_VAL=$(cat $PWR_KNOB)\nBRT_VAL=$(cat $BRT_KNOB)\n\nif [ \"$BRT_VAL\" -eq 0 ] || [ \"$PWR_VAL\" -eq 1 ]; then\n  echo 0 > $PWR_KNOB\n  echo 99 > $BRT_KNOB\nelse\n  echo 1 > $PWR_KNOB\n  echo 0 > $BRT_KNOB\nfi\n```\n\nwhich could be hooked into system by simple file like /etc/acpi/events/bl\n\n```\nevent=button/prog1.*\naction=/etc/acpi/bl.sh\n```\n\nAdditionally volume keys are sending proper acpi events (MUTE/VOLUP/VOLDOWN) so could be bound to the system or left for app to react since they are also sending proper XF86 scancodes.\n\nOther keys sending proper scancodes are XF86TouchpadToggle (fn+F9), XF86WebCam (fn+V), XF86Launch1 (fn+C), XF86Launch6 (fn+Space) and undefined NoSymbol with keycode 248(fn+A) - AutoBacklight. Even though not labeled on the keyboard - fn+F3 and fn+F4 are generating XF86Mail and XF86WWW correspondingly.\n\nUseless keys then are Wireless/Airplane-Mode(fn+F2), Backlight (fn+F5-F7) and DisplaySwitch (fn+F8) as they are not generating any events.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- ASUS Zenbook Prime UX31A\n\n- ASUS Transformer Book Trio\n\n- NotebookCheck Test\n\n- Linux Laptop Usability Matrix\n\n"
+    }
+  ]
+}

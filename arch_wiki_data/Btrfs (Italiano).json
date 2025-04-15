@@ -1,0 +1,246 @@
+{
+  "title": "Btrfs (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Btrfs_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Articoli correlati\n\n- File systems (Italiano)\n- Snapper\n- Yabsnap\n\nDalla documentazione di Btrfs:\n\n"
+    },
+    {
+      "title": "Preparazione",
+      "level": 2,
+      "content": "Per gli strumenti user space installare il pacchetto btrfs-progs, necessario per le operazioni di base.\n\nNel caso si necessiti di effettuare il boot da un file system Btrfs (ad es. nel caso il kernel e l'immagine initramfs risiedano su una partizione Btrfs), verificare che il proprio boot loader supporti Btrfs.\n\n"
+    },
+    {
+      "title": "Creazione del file system",
+      "level": 2,
+      "content": "Di seguito viene illustrato come creare un nuovo file system Btrfs. Per convertire una partizione Ext3/4 in Btrfs, vedere #Conversione da Ext3/4 a Btrfs. Per utilizzare un setup privo di partizioni vedere #Disco Btrfs privo di partizioni.\n\nVedere mkfs.btrfs(8) per maggiori informazioni.\n\n"
+    },
+    {
+      "title": "File system su un singolo dispositivo",
+      "level": 3,
+      "content": "Per creare un file system Btrfs su una partizione /dev/partizione:\n\n```\n# mkfs.btrfs -L la mia etichetta /dev/partizione\n```\n\nIn Btrfs, la dimensione di default dei nodi dei metadati è di 16 KiB, mentre la dimensione di default dei settori dati è uguale alla dimensione della pagina e viene rilevata in modo automatico. Per utilizzare una dimensione maggiore per i nodi dei metadati (tale dimensione deve essere un multiplo della dimensione dei settori, con un valore massimo consentito di 64 KiB), specificare un valore per il nodesize tramite lo switch -n come illustrato in questo esempio in cui vengono utilizzati blocchi da 32 KiB:\n\n```\n# mkfs.btrfs -L la mia etichetta -n 32k /dev/partizione\n```\n\n"
+    },
+    {
+      "title": "File system su più dispositivi",
+      "level": 3,
+      "content": "È possibile utilizzare dispositivi multipli per creare una configurazione RAID. I livelli RAID supportati includono RAID 0, RAID 1, RAID 10, RAID 5 e RAID 6. A partire dal kernel 5.5 RAID1c3 e RAID1c4 per le copie 3- e 4- del livello RAID 1. I livelli RAID possono essere configurati separatamente per dati e metadati utilizzando rispettivamente le opzioni -d e -m. Come impostazione di default i dati possiedono una copia (single) e i metadati sono in configurazione mirrored (raid1). Si tratta di una situazione simile alla creazione di una configurazione JBOD, in cui i dischi vengono visti come un singolo file system, ma i file non sono duplicati. Vedere questo articolo sull'utilizzo di Btrfs con dispositivi multipli per maggiori informazioni su come creare un volume RAID Btrfs.\n\n```\n# mkfs.btrfs -d single -m raid1 /dev/part1 /dev/part2 ...\n```\n\nÈ necessario includere l'hook udev, l'hook systemd o l'hook btrfs in /etc/mkinitcpio.conf per utilizzare dispositivi Btrfs multipli in un pool. Vedere l'articolo Mkinitcpio#Common hooks per maggiori informazioni.\n\n- È possibile aggiungere dispositivi a un file system con dispositivi multipli anche in un secondo momento. Vedere l'articolo sulla pagina wiki Btrfs per maggiori informazioni.\n- I dispositivi possono essere di dimensioni diverse. Tuttavia se un drive in una configurazione RAID è di dimensioni maggiori rispetto agli altri, questo spazio extra non verrà utilizzato.\n- Alcuni boot loader, come ad esempio Syslinux, non supportano i file system su più dispositivi.\n- Btrfs non effettua automaticamente le operazioni di lettura dal dispositivo più veloce, pertanto l'utilizzo di diversi tipi di dischi produce oscillazioni nelle prestazioni. Vedere [1] per maggiori dettagli.\n\nVedere #RAID per indicazioni sulla manutenzione di specifici file system Btrfs su più dispositivi.\n\n"
+    },
+    {
+      "title": "Copy-on-Write (CoW)",
+      "level": 3,
+      "content": "Come impostazione di default, Btrfs utilizza una strategia copy-on-write per tutti i file e in ogni momento. Le operazioni di scrittura non sovrascrivono i dati presenti. In luogo di questo approccio, una copia modificata del blocco viene scritta in una nuova posizione, e i metadati vengono aggiornati in modo da puntare a questa nuova posizione. Vedere la sezione della guida Btrfs per amministratori di sistema per i dettagli sull'implementazione e per una descrizione dei vantaggi e degli svantaggi.\n\n"
+    },
+    {
+      "title": "Disabilitazione della funzione CoW",
+      "level": 4,
+      "content": "Per disabilitare la funzione copy-on-write per i file di nuova creazione in a un sottovolume montato, utilizzare l'opzione di montaggio nodatacow. Questa modifica avrà effetto sui file di nuova creazione. La funzione copy-on-write rimarrà attiva per i file già esistenti. L'opzione nodatacow disabilita inoltre la compressione. Vedere btrfs(5) per maggiori dettagli.\n\nPer disabilitare la funzione copy-on-write per singoli file/singole directory, eseguire il seguente comando:\n\n```\n$ chattr +C /dir/file\n```\n\nQuesto comando disabiliterà la funzione copy-on-write per le operazioni in cui esiste un solo riferimento al file. Se esiste più di un riferimento, ad es. a causa di cloni del file o di cloni di dimensioni ridotte o di snapshot del file system, la funzione copy-on-write rimane attiva. Si segnala che, a partire dalla versione 9.0 di coreutils, il comando cp tenta di eseguire copie di dimensioni ridotte come impostazione di default — vedere cp(1) per maggiori dettagli.\n\n```\n$ mv /percorso/a/dir /percorso/a/dir_old\n$ mkdir /percorso/a/dir\n$ chattr +C /percorso/a/dir\n$ cp -a --reflink=never /percorso/a/dir_old/. /percorso/a/dir\n$ rm -rf /percorso/a/dir_old\n```\n\nSe per un file viene disabilitata la funzione copy-on-write (NOCOW) e viene eseguito uno snapshot, la prima scrittura su un blocco del file dopo l'effettuazione dello snapshot sarà un'operazione COW perché lo snapshot blocca il vecchio file nella sua posizione. Tuttavia, il file conserverà l'attributo NOCOW e ogni scrittura successiva sul medesimo blocco del file verrà effettuata nella medesima posizione fino allo snapshot successivo.\n\nL'esecuzione di snapshot frequenti può ridurre l'efficacia dell'attributo NOCOW, essendo la funzione COW ancora necessaria per la prima scrittura. Per disabilitare la funzione copy-on-write del tutto per questi file, posizionarli in un sottovolume separato e non effettuare snapshot di quest'ultimo.\n\n"
+    },
+    {
+      "title": "Compressione",
+      "level": 3,
+      "content": "Btrfs supporta la compressione trasparente e automatica. Ciò riduce la dimensione dei file oltre ad aumentare in modo significativo la durata di vita dei dispositivi di archiviazione basati su memoria flash in quanto diminuisce l'amplificazione di scrittura. Vedere Fedora:Changes/BtrfsByDefault#Compression, [2], e [3]. Può inoltre migliorare le prestazioni in alcuni casi (ad es. thread singolo con importante flusso I/O di file) e ovviamente, allo stesso tempo, limitare le prestazioni stesse in altri casi (ad es. operazioni a thread multipli e/o con un utilizzo intenso della CPU con elevati flussi I/O di file). In linea generale si possono ottenere prestazioni migliori utilizzando gli algoritmi di compressione più veloci, zstd e lzo. Alcuni benchmark forniscono un raffronto dettagliato.\n\nLZO possiede un livello di compressione fisso, mentre zlib e zstd sono caratterizzati da un intervallo di livelli che vanno da 1 (bassa compressione) a 9 (zlib) o 15 (zstd); vedere btrfs(5) § COMPRESSION. La modifica dei livelli produrrà effetti diversi a livello di CPU e di capacità di flusso I/O, pertanto è opportuno eseguire delle verifiche / dei benchmark prima e dopo l'applicazione delle modifiche.\n\nL'opzione di montaggio compress=alg[:livello] fa sì che ogni file venga automaticamente preso in considerazione per la compressione. I valori consentiti per alg sono zlib, lzo, zstd, o no (per assenza di compressione). Utilizzando questa opzione, Btrfs verificherà se comprimendo la prima porzione dei dati si ottiene una riduzione delle sue dimensioni. In caso affermativo, l'intera operazione di scrittura su tale file verrà compressa. In caso contrario non verrà effettuata alcuna compressione. Con questa opzione, se la prima porzione della scrittura non vede alcuna riduzione delle dimensioni, non verrà applicata alcuna compressione alla scrittura stessa, anche qualora la parte restante dei dati fosse potenzialmente soggetta a una riduzione significativa delle dimensioni. [4] Questa soluzione ha la finalità di evitare che il disco rimanga in attesa dell'inizio della scrittura fino a quando tutti i dati che devono essere scritti non siano stati passati al file system Btrfs per essere compressi.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nÈ possibile invece utilizzare l'opzione di montaggio compress-force=alg[:livello] per far sì che Btrfs non verifichi se la compressione riduca le dimensioni della prima porzione dei dati, e abilitare il tentativo di compressione automatica per ogni file. Nello scenario peggiore che si possa immaginare, ciò potrebbe tradursi in un utilizzo (leggermente) maggiore della CPU senza alcun vantaggio. Tuttavia, test empirici svolti su diversi sistemi impiegati per un utilizzo misto hanno mostrato un miglioramento significativo del 10% circa di compressione del disco in conseguenza dell'utilizzo di compress-force=zstd anziché di compress=zstd, anch'esso con una compressione del disco del 10%. È tuttavia opportuno considerare che forzare la compressione è una pratica contraria alle linee guida ufficiali Btrfs.\n\nSolo i file creati o modificati dopo l'aggiunta dell'opzione di montaggio verranno compressi.\n\nPer applicare la compressione ai file esistenti, utilizzare il comando btrfs filesystem defragment -calg, dove alg può essere zlib, lzo o zstd. Ad esempio, per ricomprimere l'intero file system con l'algoritmo zstd, eseguire il seguente comando:\n\n```\n# btrfs filesystem defragment -r -v -czstd /\n```\n\nPer abilitare la compressione durante l'installazione di Arch su una partizione Btrfs vuota, utilizzare l'opzione compress al momento di montare il file system: mount -o compress=zstd /dev/sdxY /mnt/. Durante la configurazione, aggiungere compress=zstd alle opzioni di montaggio del file system di root in fstab.\n\n- I sistemi che utilizzano kernel più datati o btrfs-progs senza supporto per zstd potrebbero non essere in grado di leggere o riparare il file system qualora si utilizzi questa opzione.\n- GRUB Ha introdotto in supporto a zstd nella versione 2.04. Assicurarsi di avere effettivamente aggiornato il bootloader installato nel proprio MBR / nella propria partizione ESP da detta versione eseguendo grub-install con le opzioni appropriate per il proprio setup BIOS/UEFI, dal momento che questa operazione non viene svolta automaticamente. Vedere FS#63235.\n\n"
+    },
+    {
+      "title": "Visualizzazione dei tipi e dei rapporti di compressione",
+      "level": 4,
+      "content": "compsize prende un elenco di file (o un intero file system Btrfs) e misura i tipi di compressione utilizzati e i rapporti di compressione effettivi. Le dimensioni non compresse potrebbero non corrispondere a quelle restituite da altri programmi quali du(1) in quanto ogni estensione viene computata una volta, anche se sono stati creati diversi link di riferimento ad essa, e anche se una sua parte non viene più utilizzata in nessun modo ma non è ancora stata eliminata. L'opzione -x limita l'analisi a un singolo file system, risultando una soluzione utile in casi quali compsize -x / al fine di evitare il tentativo di ricerca all'interno di sottocartelle non Btrfs, che risulterebbe in un fallimento dell'intero processo.\n\n"
+    },
+    {
+      "title": "Sottovolumi",
+      "level": 3,
+      "content": "\"Un sottovolume Btrfs non è un dispositivo a blocchi (e non può essere trattato come tale), bensì un sottovolume Btrfs può essere pensato come un namespace file POSIX. È possibile accedere a questo namespace tramite il sottovolume top-level del file system, oppure è possibile montarlo in modo indipendente.\" [5]\n\nOgni file system Btrfs possiede un sottovolume top-level con ID 5. Questo sottovolume non può essere rimosso o sostituito da un altro sottovolume. Il percorso del sottovolume top-level all'interno del file system è / e gli altri sottovolumi sono disposti in configurazione nidificata al di sotto del sottovolume top-level. Tuttavia, i sottovolumi possono essere spostati all'interno del file system è il loro percorso può cambiare, mentre il loro ID no.\n\nCome impostazione di default, il sottovolume top-level viene montato al momento del montaggio del file system. Le opzioni invece consentono di montare uno specifico sottovolume.\n\nUno dei principali casi di utilizzo per i sottovolumi sono gli snapshot.\n\nVedere i seguenti link per maggiori dettagli:\n\n- Documentazione Btrfs\n- Sezione relativa ai sottovolumi della guida per gli amministratori di sistema della wiki Btrfs\n- Pagina relativa ai tree della wiki Btrfs\n\n"
+    },
+    {
+      "title": "Creazione di un sottovolume",
+      "level": 4,
+      "content": "Per creare un sottovolume, è necessario montare il file system Btrfs. Il nome del sottovolume viene definito utilizzando l'ultimo argomento.\n\n```\n# btrfs subvolume create /percorso/al/sottovolume\n```\n\n"
+    },
+    {
+      "title": "Elencare i sottovolumi",
+      "level": 4,
+      "content": "Per visualizzare un elenco dei sottovolumi attualmente presenti e dei rispettivi id nel percorso:\n\n```\n# btrfs subvolume list -p percorso\n```\n\n"
+    },
+    {
+      "title": "Cancellazione di un sottovolume",
+      "level": 4,
+      "content": "Per cancellare un sottovolume:\n\n```\n# btrfs subvolume delete /percorso/al/sottovolume\n```\n\nIn alternativa, è possibile cancellare un sottovolume come si farebbe con una comune directory con i comandi (rm -r, rmdir).\n\n"
+    },
+    {
+      "title": "Montaggio dei sottovolumi",
+      "level": 4,
+      "content": "I sottovolumi possono essere montati come partizioni del file system utilizzando le flag di montaggio subvol=/percorso/al/sottovolume o subvolid=id dell'oggetto. Ad esempio, si potrebbe avere un sottovolume con nome subvol_root e lo si potrebbe montare come /. Si potrebbero riprodurre le tradizionali partizioni del file system creando diversi sottovolumi al di sotto del livello top del file system e montandoli poi nei punti di montaggio rispettivamente appropriati. È preferibile eseguire il montaggio utilizzando subvol=/percorso/al/sottovolume, anziché l'opzione subvolid, in quanto il subvolid potrebbe variare quando si ripristinano gli snapshot, richiedendo di conseguenza una modifica della configurazione di montaggio.\n\nNote: Vedere le FAQ della wiki Btrfs per informazioni su quali opzioni di montaggio possano essere utilizzate per i singoli sottovolumi.\n\nVedere le FAQ della wiki Btrfs per informazioni su quali opzioni di montaggio possano essere utilizzate per i singoli sottovolumi.\n\nVedere Snapper#Suggested filesystem layout, sezione relativa alla gestione degli snapshot della guida per gli amministratori di sistema della wiki Btrfs, e sezione relativa ai layout della medesima guida per gli amministratori di sistema per esempi di layout del file system con utilizzo dei sottovolumi.\n\nVedere btrfs(5) per un elenco completo delle opzioni di montaggio specifiche del file system Btrfs.\n\n"
+    },
+    {
+      "title": "Montaggio di un sottovolume come root",
+      "level": 4,
+      "content": "Per utilizzare un sottovolume come punto di montaggio root è possibile renderlo il sottovolume di default, oppure specificare il sottovolume mediante un parametro del kernel utilizzando rootflags=subvol=/percorso/al/sottovolume. Modificare il punto di montaggio root nel file /etc/fstab e specificare l'opzione di montaggio subvol=. In alternativa, è possibile specificare il sottovolume utilizzando il suo id rootflags=subvolid=id dell'oggetto come parametro del kernel e subvolid=id dell'oggetto come opzione di montaggio in /etc/fstab. È preferibile eseguire il montaggio utilizzando subvol=/percorso/al/sottovolume, anziché l'opzione subvolid, in quanto il subvolid potrebbe variare quando si ripristinano gli snapshot, richiedendo di conseguenza una modifica della configurazione di montaggio, in assenza della quale il sistema non si avvierà.\n\n"
+    },
+    {
+      "title": "Modifica del sottovolume di default",
+      "level": 4,
+      "content": "Se non si specifica alcuna opzione di montaggio subvol= viene montato il sottovolume di default. Per modificare il sottovolume di default eseguire il seguente comando:\n\n```\n# btrfs subvolume set-default id del sottovolume /\n```\n\nè possibile trovare il valore id del sottovolume visualizzando l'elenco dei sottovolumi.\n\nLa modifica del sottovolume di default con btrfs subvolume set-default renderà inaccessibile il livello top del file system, a meno che non venga utilizzata l'opzione di montaggio subvol=/ oppure subvolid=5 [6].\n\n"
+    },
+    {
+      "title": "Quota",
+      "level": 3,
+      "content": "Il supporto della funzione quota in Btrfs è implementato a livello di un sottovolume mediante l'utilizzo di gruppi quota o qgroup: a ogni sottovolume viene assegnato come impostazione di default un gruppo quota sotto forma di 0/id_sottovolume. Tuttavia, se lo si desidera, è possibile creare un gruppo quota utilizzando qualunque numero.\n\nPer utilizzare i qgroup, è necessario dapprima abilitare la funzione quota con il comando\n\n```\n# btrfs quota enable percorso\n```\n\nDa questo momento in poi, i sottovolumi di nuova creazione saranno controllati da questi gruppi. Al fine di abilitarli in modo retrospettivo per i sottovolumi già esistenti, abilitare normalmente la funzione quota, dopodiché creare un qgroup (gruppo quota) per ciascuno di questi sottovolumi utilizzando i rispettivi id_sottovolume ed eseguirne una nuova scansione:\n\n```\n# btrfs subvolume list path | cut -d' ' -f2 | xargs -I{} -n1 btrfs qgroup create 0/{} percorso\n# btrfs quota rescan percorso\n```\n\nI gruppi quota in Btrfs formano una gerarchia ad albero, in cui i qgroup sono collegati ai sottovolumi. I limiti di dimensioni sono impostati a livello del singolo qgroup e si applicano allorché venga raggiunto qualsivoglia limite all'interno dell'albero contenente un dato sottovolume.\n\nI limiti nei gruppi quota possono essere applicati sia sull'utilizzo totale dei dati, sull'utilizzo dei dati non condivisi, sull'utilizzo dei dati compressi o su entrambi. La copia e l'eliminazione dei file possono entrambe influire sui limiti, dal momento che il limite per i dati non condivisi di un altro qgroup può variare se i file del volume originale vengono cancellati e ne rimane solo una copia. Ad esempio, uno snapshot appena eseguito condivide quasi tutti i blocchi con il sottovolume originale, le nuove scritture su ognuno dei sottovolumi si muoveranno in direzione del limite esclusivo, mentre le cancellazioni dei dati in comune in un volume provocherà un movimento in direzione del limite esclusivo nell'altro.\n\nPer applicare un limite a un qgroup, utilizzare il comando btrfs qgroup limit. A seconda del proprio tipo di utilizzo, utilizzare un limite totale, un limite non condiviso (-e) o un limite compresso (-c). Per visualizzare l'utilizzo e i limiti per un dato percorso all'interno del file system, utilizzare il comando\n\n```\n# btrfs qgroup show -reF percorso\n```\n\n"
+    },
+    {
+      "title": "Intervallo di commit",
+      "level": 3,
+      "content": "La frequenza con cui i dati vengono scritti nel file system è determinata da Btrfs e da impostazioni a livello di sistema. Btrfs è impostato di default su un intervallo di checkpoint di 30 secondi nel quali viene eseguito il commit dei nuovi dati nel file system. Questa impostazione può essere modificata aggiungendo l'opzione di montaggio commit in /etc/fstab per la partizione Btrfs.\n\n```\nLABEL=arch64 / btrfs defaults,compress=zstd,commit=120 0 0\n```\n\nInoltre anche le impostazioni a livello di sistema influenzano gli intervalli di commit. Tali impostazioni comprendono i file in /proc/sys/vm/* ed esulano dall'argomento trattato nel presente articolo wiki. La documentazione del kernel relativa a queste impostazioni è disponibile all'indirizzo https://docs.kernel.org/admin-guide/sysctl/vm.html.\n\n"
+    },
+    {
+      "title": "TRIM dei drive SSD",
+      "level": 3,
+      "content": "Un file system Btrfs è in grado di liberare i blocchi inutilizzati da un drive SSD che supporti il comando TRIM. Il supporto del discard asincrono è disponibile utilizzando l'opzione di montaggio discard=async, ed è abilitato di default a partire dalla versione 6.2 del kernel linux. Le estensioni liberate non sono scartate immediatamente, bensì raggruppate insieme per essere sottoposte in un secondo momento all'operazione di trim da parte di un thread separato, andando in questo modo a migliorare la latenza di commit.\n\nLa funzione di discard asincrono può essere utilizzata in sicurezza unitamente alle operazioni di trim periodico [7].\n\nUlteriori informazioni su come abilitare e utilizzare la funzione di TRIM sono disponibili alla pagina Solid State Drives#TRIM.\n\n"
+    },
+    {
+      "title": "Swap file",
+      "level": 3,
+      "content": "Per inizializzare in modo corretto uno swap file, creare dapprima un sottovolume di cui non vengano effettuati snapshot per alloggiare il file, ad es.\n\n```\n# btrfs subvolume create /swap\n```\n\nCreare lo swap file:\n\n```\n# btrfs filesystem mkswapfile --size 4g --uuid clear /swap/swapfile\n```\n\nOmettendo la flag If --size, viene utilizzato il valore di default di 2GiB.\n\nAttivare lo swap file:\n\n```\n# swapon /swap/swapfile\n```\n\nInfine, modificare la configurazione del file fstab aggiungendo una voce per lo swap file:\n\n```\n/etc/fstab\n```\n\n```\n/swap/swapfile none swap defaults 0 0\n```\n\nPer maggiori informazioni vedere fstab (Italiano)#Utilizzo.\n\nLa configurazione dell'ibernazione in uno swap è descritta in Power management/Suspend and hibernate#Acquire swap file offset.\n\n"
+    },
+    {
+      "title": "Visualizzazione dello spazio utilizzato/libero",
+      "level": 3,
+      "content": "Gli strumenti userspace linux di uso generale come ad esempio df(1) forniranno valori errati in relazione allo spazio libero su una partizione Btrfs. Si raccomanda l'utilizzo di btrfs filesystem usage per visualizzare i valori relativi alle partizioni Btrfs. Ad esempio, per ottenere statistiche complete e dettagliate sull'allocazione e l'utilizzo del dispositivo eseguire il seguente comando:\n\n```\n# btrfs filesystem usage /\n```\n\nIn alternativa, btrfs filesystem df permette di effettuare un rapido controllo dell'utilizzo dello spazio allocato senza la necessità di eseguire come root il seguente comando:\n\n```\n$ btrfs filesystem df /\n```\n\nVedere [8] per maggiori informazioni.\n\nLe medesime limitazioni si applicano agli strumenti che analizzano l'utilizzo dello spazio per alcuni subset del file system, come du(1) o ncdu(1), dal momento che questi ultimi non prendono in considerazione i link di riferimento, gli snapshot e la compressione. In luogo di questi strumenti, vedere btduAUR e compsize per delle alternative che tengano in considerazione le specificità di Btrfs.\n\n"
+    },
+    {
+      "title": "Deframmentazione",
+      "level": 3,
+      "content": "Btrfs supporta la deframmentazione online tramite l'opzione di montaggio autodefrag; vedere btrfs(5) § MOUNT OPTIONS. Per eseguire manualmente la deframmentazione della propria partizione root, utilizzare il seguente comando:\n\n```\n# btrfs filesystem defragment -r /\n```\n\nUtilizzando questo comando senza lo switch -r farà sì che soltanto i metadati conservati nel sottovolume contenente la directory vengano deframmentati. Ciò consente di eseguire la deframmentazione di file singoli semplicemente specificandone il percorso.\n\n"
+    },
+    {
+      "title": "RAID",
+      "level": 3,
+      "content": "Btrfs offre a livello nativo una soluzione \"RAID\" per i #File system su più dispositivi. Tra le funzioni degne di nota che differenziano la soluzione RAID Btrfs da quella mdadm ci sono gli array ridondanti a correzione autonoma e il bilanciamento online. Vedere la pagina wiki Btrfs per maggiori informazioni. Inoltre, la pagina Btrfs per gli amministratori di sistema possiede una sezione che fornisce informazioni di natura più tecnica.\n\n"
+    },
+    {
+      "title": "Scrub",
+      "level": 4,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nIl glossario della wiki Btrfs afferma che lo scrub Btrfs è \"uno strumento per la verifica online del file system. Legge tutti i dati e i metadati sul file system e usa i checksum e le copie duplicate dell'archiviazione RAID per identificare e riparare qualunque dato corrotto.\"\n\nPer avviare uno scrub (in background) del file system che contiene / eseguire:\n\n```\n# btrfs scrub start /\n```\n\nPer verificare lo stato di un processo di scrub in esecuzione eseguire:\n\n```\n# btrfs scrub status /\n```\n\nIl pacchetto btrfs-progs fornisce l'unità btrfs-scrub@.timer per l'esecuzione a cadenza mensile dello scrub del punto di montaggio specificato. Abilitare il timer con un percorso su cui si sia eseguita l'operazione di escape, ad es. btrfs-scrub@-.timer per / e btrfs-scrub@home.timer per /home. Per eseguire l'escape del percorso è possibile utilizzare systemd-escape -p /pecorso/del/punto di montaggio; vedere systemd-escape(1) per i dettagli.\n\nÈ inoltre possibile eseguire lo scrub abilitando btrfs-scrub@.service (con il medesimo percorso). Il vantaggio di questa soluzione rispetto all'esecuzione di btrfs scrub (come utente root) è la registrazione dei risultati dello scrub nel log del systemd journal.\n\nNei drive NVMe di grandi dimensioni con insufficiente capacità di raffreddamento (ad es. in un laptop), il processo di scrub può leggere il drive a una velocità e per un tempo sufficiente a portarlo a temperature molto elevate. Nel caso si eseguano gli scrub con systemd, è possibile limitare con facilità la velocità di scrub con l'opzione IOReadBandwidthMax descritta in systemd.resource-control(5) utilizzando un drop-in file.\n\n"
+    },
+    {
+      "title": "Bilanciamento",
+      "level": 4,
+      "content": "\"Un bilanciamento passa nuovamente tutti i dati presenti nel file system attraverso l'allocatore. La sua funzione principale è il ribilanciamento dei dati nel file system su tutti i dispositivi quando un dispositivo viene aggiunto o rimosso. Un bilanciamento provvederà a rigenerare le copie mancanti per i livelli RAID ridondanti, in caso di guasto di un dispositivo.\" [9] Vedere la pagina FAQ upstream.\n\nIn un file system su un dispositivo singolo, un bilanciamento può inoltre essere utile al fine di ridurre (temporaneamente) la quantità di porzioni allocate ma non utilizzate di (meta)dati. Talvolta ciò si rende necessario per risolvere problemi di tipo \"file system pieno\".\n\n```\n# btrfs balance start --bg /\n# btrfs balance status /\n```\n\n"
+    },
+    {
+      "title": "Snapshot",
+      "level": 3,
+      "content": "\"Uno snapshot è semplicemente un sottovolume che condivide i propri dati (e metadati) con alcuni altri sottovolumi, mediante l'utilizzo delle funzioni COW di Btrfs.\" Vedere la relativa ai sottovolumi della guida per gli amministratori di sistema della wiki Btrfs per maggiori dettagli.\n\nPer creare uno snapshot:\n\n```\n# btrfs subvolume snapshot sorgente [destinazione/]nome\n```\n\nPer creare uno snapshot in sola lettura, aggiungere la flag -r. Per creare una versione scrivibile di uno snapshot in sola lettura, è sufficiente creare uno snapshot di quest'ultimo.\n\n- È possibile convertire uno snapshot in loco da sola lettura a scrivibile con il comando btrfs property set -f -ts '/percorso/dello/snapshot' ro false. Tuttavia questa operazione non è consigliata in quanto provoca problemi con ogni operazione di invio/ricezione incrementale futura. Effettuare un nuovo snapshot scrivibile evita questo tipo di problema.\n- Gli snapshot non sono ricorsivi. Ogni sottovolume nidificato sarà una directory vuota all'interno dello snapshot.\n\n"
+    },
+    {
+      "title": "Invio/ricezione",
+      "level": 3,
+      "content": "Un sottovolume può essere inviato all'output stdout o a un file utilizzando il comando send. Questa operazione rivela la propria massima utilità di norma quando abbinata mediante pipe a un comando Btrfs receive. Ad esempio, per inviare uno snapshot con nome /root_backup (che potrebbe essere un backup di uno snapshot di / eseguito in precedenza) a /backup, si dovrebbe eseguire il seguente comando:\n\n```\n# btrfs send /root_backup | btrfs receive /backup\n```\n\nLo snapshot inviato deve essere in sola lettura. Il comando precedente è utile per copiare un sottovolume su un dispositivo esterno (ad es. un disco USB montato in /backup come sopra).\n\nIl sottovolume verrà creato nella posizione indicata in ricezione. Non dovrà essere creato manualmente.\n\nUn altro esempio che crea: /mnt/arch-v2/subvolumes/@var:\n\n```\n# btrfs send --proto 2 --compressed-data '/mnt/arch/snapshots/@var' | btrfs receive '/mnt/arch-v2/subvolumes/'\n```\n\nI parametri --proto 2 e --compressed-data utilizzati nell'esempio possono risultare utili per effettuare l'invio in modo più efficiente (dando per assunta la presenza di dati compressi).\n\nÈ anche possibile inviare esclusivamente la differenza tra due snapshot. Ad esempio, se è già stata inviata una copia di root_backup come sopra ed è stato effettuato un nuovo snapshot in sola lettura del proprio sistema con nome root_backup_new, per inviare solo la differenza incrementale a /backup, eseguire il seguente comando:\n\n```\n# btrfs send -p /root_backup /root_backup_new | btrfs receive /backup\n```\n\nOra un nuovo sottovolume con nome root_backup_new sarà presente in /backup.\n\nVedere pagina relativa ai backup incrementali della wiki Btrfs e #Backup incrementale verso un drive esterno per informazioni su come utilizzare questa funzione per eseguire backup incrementali e sugli strumenti disponibili per automatizzare il processo.\n\n"
+    },
+    {
+      "title": "Deduplicazione",
+      "level": 3,
+      "content": "Grazie alla funzione copy-on-write, Btrfs è in grado di copiare file o interi sottovolumi senza effettivamente copiare i dati. Tuttavia, ogniqualvolta un file viene modificato, viene creata una nuova copia effettiva. La deduplicazione rappresenta un'ulteriore evoluzione in questo senso in quanto identifica attivamente i blocchi di dati che condividono sequenze comuni e li combina in un'estensione con le medesime caratteristiche semantiche copy-on-write.\n\nGli strumenti dedicati alla deduplicazione di una partizione formattata con file system Btrfs includono duperemove e bees. Si potrebbe anche desiderare deduplicare semplicemente i dati a livello di file anziché utilizzare ad es. rmlint-gitAUR, rdfind, jdupesAUR o dduper-gitAUR. Per una panoramica delle caratteristiche disponibili di questi programmi e per informazioni aggiuntive, consultare la relativa voce della wiki upstream.\n\n"
+    },
+    {
+      "title": "Ridimensionamento",
+      "level": 3,
+      "content": "È possibile aumentare le dimensioni di un file system fino al massimo spazio disponibile sul dispositivo, oppure specificarne le dimensioni esatte. Assicurarsi di aumentare le dimensioni del dispositivo o del volume logico prima di tentare di aumentare le dimensioni del file system. Quando si specifica la dimensione esatta del file system su un dispositivo, sia che le dimensioni del file system stesso vengano diminuite o aumentate, assicurarsi che le nuove dimensioni soddisfino le seguenti condizioni:\n\n- Le nuove dimensioni devono essere maggiori di quelle dei dati esistenti; in caso contrario si verificherà una perdita di dati.\n- Le nuove dimensioni devono essere uguali o inferiori alle dimensioni attuali del dispositivo, poiché il file system non può estendersi oltre lo spazio disponibile.\n\nPer estendere le dimensioni del file system al massimo spazio disponibile sul dispositivo:\n\n```\n# btrfs filesystem resize max /\n```\n\nPer estendere il file system a dimensioni specifiche:\n\n```\n# btrfs filesystem resize dimensioni /\n```\n\nSostituire a dimensioni il valore delle dimensioni desiderate. È inoltre possibile specificare le unità in cui il valore è espresso, come ad esempio K (kibibyte), M (mebibyte), o G (gibibyte). In alternativa, è possibile specificare un aumento o una riduzione delle dimensioni attuali inserendo rispettivamente un segno più (+) o o meno (-) davanti al valore:\n\n```\n# btrfs filesystem resize +dimensioni /\n# btrfs filesystem resize -dimensioni /\n```\n\n"
+    },
+    {
+      "title": "Problemi noti",
+      "level": 2,
+      "content": "Prima di utilizzare questo file system è opportuno conoscerne alcune limitazioni.\n\n"
+    },
+    {
+      "title": "Cifratura",
+      "level": 3,
+      "content": "Btrfs non possiede un supporto integrato alla cifratura, ma questa funzionalità potrebbe essere aggiunta in futuro. Gli utenti possono cifrare la partizione prima di eseguire mkfs.btrfs. Vedere dm-crypt/Encrypting an entire system.\n\nI file system Btrfs esistenti possono utilizzare soluzioni quali EncFS o TrueCrypt, che possono però escludere alcune funzionalità di Btrfs.\n\n"
+    },
+    {
+      "title": "Problemi legati a btrfs check",
+      "level": 3,
+      "content": "Lo strumento btrfs check presenta alcune problematiche note e non dovrebbe essere eseguito prima di essersi informati dettagliatamente in merito; vedere la sezione #btrfs check.\n\n"
+    },
+    {
+      "title": "Disco Btrfs privo di partizioni",
+      "level": 3,
+      "content": "Btrfs può occupare un intero dispositivo di archiviazione dati e sostituire gli schemi di partizionamento MBR o GPT mediante l’utilizzo dei sottovolumi per simulare le partizioni. Tuttavia, l’utilizzo di una configurazione priva di partizioni non è richiesto per semplicemente creare un file system Btrfs in una partizione creata utilizzando un altro metodo. Sono presenti alcune limitazioni in relazione alle configurazioni prive di partizioni con un singolo disco:\n\n- Non è possibile creare altri file system su un’altra partizione sul medesimo disco.\n- A causa di quanto specificato nel punto precedente, non è possibile avere una partizione ESP su questo disco. Per eseguire il boot UEFI è necessario un altro dispositivo.\n\nPer sovrascrivere la tabella delle partizioni esistente con Btrfs, eseguire il seguente comando:\n\n```\n# mkfs.btrfs /dev/sdX\n```\n\nAd esempio, utilizzare /dev/sda anziché /dev/sda1. Il secondo comando eseguirebbe la formattazione di una partizione esistente anziché sostituire l’intero schema delle partizioni. Dal momento che la partizione root è in Btrfs, assicurarsi che btrfs sia compilato all’interno del kernel, oppure inserire btrfs in mkinitcpio.conf#MODULES e rigenerare l'initramfs.\n\nInstallare il boot loader come si farebbe per un dispositivo di archiviazione dati con un Master Boot Record. Vedere Syslinux#Manually o GRUB/Tips and tricks#Install to partition or partitionless disk. Se il proprio kernel non effettua il boot restituendo l’errore Failed to mount /sysroot., aggiungere GRUB_PRELOAD_MODULES=\"btrfs\" nel file /etc/default/grub e generare il file di configurazione di grub.\n\n"
+    },
+    {
+      "title": "Conversione da Ext3/4 a Btrfs",
+      "level": 3,
+      "content": "Eseguire il boot da un CD di installazione, dopodiché effettuare la conversione eseguendo:\n\n```\n# btrfs-convert /dev/partizione\n```\n\nMontare la partizione e verificare l'avvenuta conversione controllando i file. Assicurarsi di modificare il file /etc/fstab adattandolo alla modifica eseguita (type diviene btrfs e fs_passno [l'ultimo campo] diviene 0 dal momento che Btrfs non effettua un controllo del file system durante il boot). È inoltre importante notare che lo UUID della partizione risulterà diverso, pertanto è necessario aggiornare fstab di conseguenza qualora si utilizzino gli UUID. Eseguire il chroot nel sistema e rigenerare l'elenco del menu del proprio boot loader (vedere Install Arch Linux from existing Linux (Italiano)). Nel caso si stia convertendo un file system di root, mentre si è ancora nell'ambiente di chroot, eseguire mkinitcpio -p linux per rigenerare l'initramfs o il sistema non potrà eseguire il boot.\n\nUna volta confermata l'assenza di problemi, completare la conversione cancellando il sottovolume di backup ext2_saved. Attenzione: in assenza di questo sottovolume non è possibile ritornare a ext3/4.\n\n```\n# btrfs subvolume delete /ext2_saved\n```\n\nInfine, eseguire il bilanciamento del file system per liberare lo spazio.\n\nRicordarsi che alcune applicazioni precedentemente installate devono essere adattate a Btrfs.\n\n"
+    },
+    {
+      "title": "Riparazione delle corruzioni",
+      "level": 3,
+      "content": "btrfs-check non può essere utilizzato su un file system montato. Per poter utilizzare btrfs-check senza effettuare il boot da una live USB, aggiungerlo all'initramfs:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nBINARIES=(btrfs)\n```\n\nRigenerare l'initramfs.\n\nDopodiché se dovesse verificarsi un problema durante il boot, lo strumento sarà disponibile per eseguire l'opportuna riparazione.\n\nVedere btrfs-check(8) per maggiori informazioni.\n\n"
+    },
+    {
+      "title": "Eseguire il boot all'interno di snapshot",
+      "level": 3,
+      "content": "Per eseguire il boot all'interno di uno snapshot, si applica la medesima procedura prevista per montare un sottovolume come propria partizione di root, come descritta nella sezione relativa al montaggio di un sottovolume come propria partizione di root, in quanto gli snapshot possono essere montati come sottovolumi.\n\n- Se si utilizza GRUB, è possibile popolare automaticamente il proprio menu di boot con gli snapshot Btrfs al momento della rigenerazione del file di configurazione utilizzando il pacchetto grub-btrfs o grub-btrfs-gitAUR.\n- Se si utilizza rEFInd, è possibile popolare automaticamente il proprio menu di boot con gli snapshot Btrfs utilizzando il pacchetto refind-btrfsAUR, dopo aver abilitato refind-btrfs.service.\n\n"
+    },
+    {
+      "title": "Utilizzo dei sottovolumi Btrfs con systemd-nspawn",
+      "level": 3,
+      "content": "Vedere gli articoli Systemd-nspawn#Use Btrfs subvolume as container root e Systemd-nspawn#Use temporary Btrfs snapshot of container.\n\n"
+    },
+    {
+      "title": "Riduzione degli aggiornamenti dei metadati sull'ora di accesso",
+      "level": 3,
+      "content": "In ragione della natura copy-on-write di Btrfs, il semplice accesso ai file può azionare il processo di copia e scrittura dei metadati. Ridurre la frequenza degli aggiornamenti dell'ora di accesso potrebbe eliminare questo utilizzo inatteso del disco, con un conseguente miglioramento delle prestazioni. Vedere fstab (Italiano)#Opzioni atime per le opzioni disponibili.\n\n"
+    },
+    {
+      "title": "Backup incrementale verso un drive esterno",
+      "level": 3,
+      "content": "I seguenti pacchetti usano btrfs send e btrfs receive per inviare con un approccio incrementale i backup a un drive esterno. Fare riferimento alla rispettiva documentazione informazioni sulle differenze in termini di implementazione, caratteristiche e requisiti.\n\n- btrbk — Strumento per la creazione di snapshot e di backup remoti di sottovolumi Btrfs.\n\n- snap-sync — Utilizza snapshot di snapper per effettuare un backup verso un drive esterno o una macchina remota.\n\n- snapsync — Uno strumento di sincronizzazione per snapper.\n\nIl seguente pacchetto consente di effettuare un backup di snapshot di snapper verso file system non Btrfs.\n\n- snapborg — Strumento simile a borgmatic che integra gli snapshot di snapper con i backup borg.\n\n"
+    },
+    {
+      "title": "Snapshot automatici",
+      "level": 3,
+      "content": "Per la gestione e la creazione in automatico di snapshot Btrfs, è possibile utilizzare uno snapshot manager come Snapper, Timeshift o Yabsnap.\n\n"
+    },
+    {
+      "title": "Risoluzione di problemi",
+      "level": 2,
+      "content": "Vedere le pagine Btrfs dedicate alla risoluzione di problemi e le FAQ Btrfs relative ai problemi per la risoluzione di problemi generici.\n\n"
+    },
+    {
+      "title": "Offset della partition",
+      "level": 4,
+      "content": "Il problema legato all'offset si può presentare quando si tenta di integrare core.img in un disco partizionato. Ciò significa che è OK integrare il file core.img di GRUB direttamente in un pool Btrfs su un disco privo di partizioni (ad es. /dev/sdX).\n\nGRUB può effettuare il boot di partizioni Btrfs, tuttavia il relativo modulo potrebbe essere di dimensioni maggiori rispetto a quelli di altri file system. Pertanto il file core.img creato da grub-install potrebbe risultare di dimensioni eccessive per i primi 63 settori (31.5KiB) del drive che si trovano tra il MBR e la prima partizione. Gli strumenti di partizionamento più aggiornati quali fdisk e gdisk evitano questo problema prevedendo un offset della prima partizione di circa 1MiB o 2MiB.\n\n"
+    },
+    {
+      "title": "Root mancante",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nGli utenti che sperimentano il seguente errore: error no such device: root nell'eseguire il boot da una configurazione in stile RAID dovranno modificare il file /usr/share/grub/grub-mkconfig_lib cancellando entrambe le virgolette dalla linea echo \" search --no-floppy --fs-uuid --set=root ${hints} ${fs_uuid}\". Dopodiché rigenerare il file di configurazione di grub e il sistema dovrebbe eseguire il boot senza errori.\n\n"
+    },
+    {
+      "title": "Time out del montaggio",
+      "level": 3,
+      "content": "Talvolta, in particolare in array RAID1 di grandi dimensioni, si potrebbe verificare il time out dell'operazione di montaggio con un messaggio del journal come:\n\n```\nJan 25 18:05:12 host systemd[1]: storage.mount: Mounting timed out. Terminating.\nJan 25 18:05:46 host systemd[1]: storage.mount: Mount process exited, code=killed, status=15/TERM\nJan 25 18:05:46 host systemd[1]: storage.mount: Failed with result 'timeout'.\nJan 25 18:05:46 host systemd[1]: Failed to mount /storage.\nJan 25 18:05:46 host systemd[1]: Startup finished in 32.943s (firmware) + 3.097s (loader) + 7.247s (kernel)>\nJan 25 18:05:46 host kernel: BTRFS error (device sda): open_ctree failed\n```\n\nQuesto problema può essere facilmente aggirato indicando un tempo di timeout maggiore tramite la specifica opzione di mount di systemd x-systemd.mount-timeout in fstab. Ad esempio:\n\n```\n/dev/sda                /storage    btrfs       rw,relatime,x-systemd.mount-timeout=5min  0 0\n```\n\n"
+    },
+    {
+      "title": "BTRFS: open_ctree failed",
+      "level": 3,
+      "content": "Da novembre 2014 sembra essere presente un bug in systemd o mkinitcpio che provoca il seguente errore nei sistemi con un file system Btrfs su più dispositivi che utilizzano l'hook btrfs in mkinitcpio.conf:\n\n```\nBTRFS: open_ctree failed\nmount: wrong fs type, bad option, bad superblock on /dev/sdb2, missing codepage or helper program, or other error\n\nIn some cases, useful info is found in syslog - try dmesg|tail or so.\n\nYou are now being dropped into an emergency shell.\n```\n\nUn modo per aggirare questo problema è rimuovere btrfs dall'array HOOKS in /etc/mkinitcpio.conf aggiungendo invece btrfs all'array MODULES. Dopodiché rigenerare l'initramfs ed eseguire il reboot.\n\nSi verificherà il medesimo errore se si tenta di montare un array raid senza uno dei dispositivi. In questo caso, è necessario aggiungere l'opzione di montaggio degraded in /etc/fstab. Se la propria partizione di root risiede nell'array, è inoltre necessario aggiungere rootflags=degraded ai propri parametri del kernel.\n\nDa agosto 2016, un possibile modo di aggirare questo bug è montare l'array con un solo drive indicato in /etc/fstab, consentendo così a Btrfs di rilevare e aggiungere in modo automatico gli altri drive. Gli identificatori basati su gruppo quali UUID e LABEL sembrano contribuire a questo errore. Ad esempio, un array RAID1 costituito da due dispositivi 'disk1' e disk2' possiederà uno UUID allocato. Tuttavia, anziché utilizzare lo UUID, utilizzare solo /dev/mapper/disk1 in /etc/fstab. Per una spiegazione maggiormente dettagliata, vedere il seguente post sul blog.\n\nUn'ulteriore possibile soluzione è rimuovere l'hook udev in mkinitcpio.conf e sostituirlo con l'hook systemd. In questo caso, btrfs non dovrebbe essere nell'array HOOKS o MODULES.\n\nVedere il thread originale del forum e FS#42884 per ulteriori informazioni e discussione.\n\n"
+    },
+    {
+      "title": "btrfs check",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIl comando btrfs-check(8) può essere utilizzato per verificare o riparare un file system Btrfs non montato. Tuttavia, questo strumento di riparazione è ancora immaturo e non è in grado di riparare determinati errori del file system, anche quelli che non rendono in file system stesso impossibile da montare.\n\n"
+    },
+    {
+      "title": "Attività costante del drive",
+      "level": 3,
+      "content": "A partire dalla versione 6.2 del kernel, l'opzione di montaggio discard=async mount(8) è impostata di default. Ciò è stato riportato come causa di un'attività costante in alcuni drive, anche quando in stato di idle, in quanto la coda di discard si riempie più velocemente della relativa velocità di elaborazione. Ciò può risultare in un consumo maggiore, in particolare nei drive NVMe.\n\nA partire dalla versione 6.3 del kernel, l'opzione discard di default iops_limit è stata modificata da 100 a 1000 per risolvere questo problema. È possibile impostare manualmente il valore desiderato per una versione datata del kernel, ad es.\n\n```\n# echo 1000 > /sys/fs/btrfs/uuid/discard/iops_limit\n```\n\nDove uuid è lo UUID del file system Btrfs. Il limite di 1000 dovrà essere perfezionato sperimentando.\n\nPer impostare il parametro al boot, è possibile utilizzare systemd-tmpfiles, ad es. creando il seguente file:\n\n```\n/etc/tmpfiles.d/btrfs-discard.conf\n```\n\n```\nw /sys/fs/btrfs/uuid/discard/iops_limit - - - - 1000\n```\n\nIn alternativa, è possibile disattivare del tutto la funzione di discard asincrono utilizzando l'opzione di montaggio nodiscard in fstab, abbinandola a quanto specificato in Periodic TRIM.\n\n"
+    },
+    {
+      "title": "Vedere anche",
+      "level": 2,
+      "content": "- Sito ufficiale Documentazione Btrfs Wiki Btrfs archiviata\n- Risorse relative alle prestazioni Btrfs su dischi raw? Leafsize e nodesize variabili in Btrfs Supporto Btrfs per un funzionamento efficiente dei dischi SSD (allineamento dei blocchi dati) Btrfs è ottimizzato per i dischi SSD? Lzo vs. zLib\n- Varie Funtoo:BTRFS Fun Avi Miller presenta Btrfs presso SCALE 10x, gennaio 2012. Riassunto del discorso di Chris Mason presso LFCS 2012 Btrfs: interruzione della fornitura di una modalità operativa bmap per evitare corruzioni dello swapfile 2009-01-21 Eseguire backup incrementali rapidi con Btrfs Send and Receive\n\n- Documentazione Btrfs\n- Wiki Btrfs archiviata\n\n- Btrfs su dischi raw?\n- Leafsize e nodesize variabili in Btrfs\n- Supporto Btrfs per un funzionamento efficiente dei dischi SSD (allineamento dei blocchi dati)\n- Btrfs è ottimizzato per i dischi SSD?\n- Lzo vs. zLib\n\n- Funtoo:BTRFS Fun\n- Avi Miller presenta Btrfs presso SCALE 10x, gennaio 2012.\n- Riassunto del discorso di Chris Mason presso LFCS 2012\n- Btrfs: interruzione della fornitura di una modalità operativa bmap per evitare corruzioni dello swapfile 2009-01-21\n- Eseguire backup incrementali rapidi con Btrfs Send and Receive\n\n"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "title": "Mullvad (Nederlands)",
+  "url": "https://wiki.archlinux.org/title/Mullvad_(Nederlands)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Mullvad is een VPN service uit Zweden die OpenVPN en WireGuard gebruikt.\n\n"
+    },
+    {
+      "title": "Installatie",
+      "level": 2,
+      "content": "De nieuwe officiele GUI is beschikbaar als mullvad-vpnAUR.\n\nNa installatie zal je mullvad-daemon.service moeten start/enable.\n\nAs alternatief kan je OpenVPN of WireGuard met een configuratie file gebruiken zoals verteld in #Handmatig configuratie.\n\n"
+    },
+    {
+      "title": "Handmatig configuratie",
+      "level": 2,
+      "content": "Als je de Mullvad app niet wilt gebruiken kan je het ook gebruiken met standaard Linux software. Mullvad ondersteund het OpenVPN en WireGuard protocols. Mullvad zelf adviseerd het gebruik van Wireguard. Maar in sommige situtaties zou OpenVPN worden gekozen omdat bijv. GNOME GUI OpenVPN servers in een graphics interface support. Wat het makelijker maakt om te kijken welke VPN wordt gebruikt, or tussen VPN's schakelen.\n\n"
+    },
+    {
+      "title": "OpenVPN Gebruiken",
+      "level": 3,
+      "content": "Als eerste, weet zeker dat je openvpn en openresolv geinstaleerd zijn. Download hierna Mullvad's OpenVPN configuratie file pak van hun website[dead link 2023-05-06 ⓘ]. unzip de downloaded file naar /etc/openvpn/client van hier kan je of NetworkManager front-ends gebruiken met NetworkManager. Of je kan systemd gebruiken om het automatisch op boot te starten.\n\n"
+    },
+    {
+      "title": "Using NetworkManager front-ends",
+      "level": 4,
+      "content": "Zie OpenVPN#NetworkManager-native VPN configuration.\n\n"
+    },
+    {
+      "title": "Systemd Gebruiken",
+      "level": 4,
+      "content": "Verander de naam van mullvad_linux.conf voor een kortere naam om later voor de systemd service te gebruiken:\n\n```\n# mv /etc/openvpn/client/mullvad_linux.conf /etc/openvpn/client/mullvad.conf\n```\n\nOm de nameservers van Mullvad te gebruiken word update-resolv-conf script gebruikt om resolv.conf te veranderen met de correcte IP adressen waneer de connectie gestart en gestopt wordt. Dit script zit ook in de Mullvad configuratie zip, maar moet worden verplaatst naar /etc/openvpn/ om het pad dat gespecifeerd is te voldoen:\n\n```\n# mv /etc/openvpn/client/update-resolv-conf /etc/openvpn/\n```\n\nMaak zeker dat het script executable is.\n\nDit script kan updated blijven door het gebruik van openvpn-update-resolv-conf. Die ook een fix voor DNS leaks heeft.\n\nNa configuratie kan de VPN connectie managed worden met openvpn-client@mullvad.service. Als de service faalt om te starten met een error als Cannot open TUN/TAP dev /dev/net/tun: No such device (errno=19). Moet je waarschijnlijk het systeem rebooten zodat OpenVPN de correcte netwerk devices kan maken.\n\n"
+    },
+    {
+      "title": "Kill Switch aanzetten",
+      "level": 4,
+      "content": "Om Kill Switch te gebruiken om leakages te voorkomen als de VPN connectie neer gaat, kan je iptables gebruiken zoals uitgelegd op de Mullvad OpenVPN on Linux pagina. Onder \"Enabling a Kill Switch\"\n\n"
+    },
+    {
+      "title": "Met NetworkManager",
+      "level": 4,
+      "content": "Install de wireguard-tools package. Log in op de Mullvad pagina met je account, en ga naar de Wireguard-config pagina. Kies Linux as platform, en click op \"Generate Key\" om een public key te genereren. In een terminal, gebruik de volgende command om een private key te maken:\n\n```\n# wg genkey\n```\n\nClick op \"Manage keys\" in de Mullvad WireGuard-config pagina, en plaats de private key die je net hebt gemaakt in de field die \"Enter Private key\" heeft, en click op \"import key\". Vul stap 3 op de website in en download de file die je krijgt. Unzip deze file die je hebt gedownload om één of meerdere files te krijgen, wat ligt aan je selectie bij stap 3. Met deze kan je de terminal interface van NetworkManager gebruiken, nmcli.\n\nOm een wireguard connectie van een config file toetevoegen, execute het volgende command in een terminal:\n\n```\n# nmcli connection import type wireguard file configuratie_file\n```\n\nAls de file naam WG1.conf was, zou een connectie genaamd WG1 toegevoegd moeten zijn.\n\nAls je op enige punt de connectie wilt verwijderen, execute het volgende command:\n\n```\n# nmcli connection delete connectie_naam\n```\n\nOm de Wireguard VPN tunnel te starten issue het volgende command:\n\n```\n# nmcli connection up connectie_naam\n```\n\nCheck of de connectie er staat met het command:\n\n```\n# nmcli\n```\n\nJe wilt misschien checken of de Private en Public key overeen komen met wat je van je de website hebt gekregen:\n\n```\n# WG_HIDE_KEYS=never wg\n```\n\nMullvad heeft een shell script om deze stappen te automatiseren, met een waarschuwing. Deze automatisch aangemaakte configuratie files hebben geen kill switch, deze zult u zelf aan moeten maken als u dit wilt.\n\n"
+    },
+    {
+      "title": "Met systemd-networkd",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/99-wg0.netdev\n```\n\n```\n[NetDev]\nName=wg0\nKind=wireguard\nDescription=WireGuard VPN\n\n[WireGuard]\nFirewallMark=0x8888\nListenPort=51820\nRouteTable=off\nPrivateKey=<private key>                               \n\n[WireGuardPeer]\nPublicKey=<public key>                                \nAllowedIPs=0.0.0.0/0  \nAllowedIPs=::0/0\nEndpoint=<ip>:<port>\n```\n\n```\n/etc/systemd/network/99-wg0.network\n```\n\n```\n[Match]\nName=wg0\n\n[Network]\nAddress=<ipv4 addr>/32\nAddress=<ipv6 addr>/128\nDNS=193.138.218.74\nDNSDefaultRoute=yes\nDomains=~.\n\n[RoutingPolicyRule]\nFamily=both\nSuppressPrefixLength=0\nPriority=999\nTable=main\n\n[RoutingPolicyRule]\nFamily=both\nFirewallMark=0x8888\nInvertRule=true\nTable=1000\nPriority=1000\n\n[Route]\nGateway=0.0.0.0\nTable=1000\n\n[Route]\nGateway=::\nTable=1000\n```\n\nVoor basis kill-switch functionaliteit kan je iptables gebruiken om alle uitgaande connectie te blockeren die niet voor fwmark 0x8888 zijn:\n\n```\niptables incomplete example\n```\n\n```\n-A OUTPUT -m mark --mark 0x8888 -j ACCEPT\n-A OUTPUT -j DROP\n```\n\n"
+    },
+    {
+      "title": "DNS leaks",
+      "level": 2,
+      "content": "In de standaard settings zal de Mullvad OpenVPN configuratie DNS leaks toestaan, wat in een normale situtatie voor een VPN niet ideaal is. Mullvad's nieuwe GUI client stopt automatisch DNS leaks door elke DNS server IP van de system configuratie te vervangen met een IP die verwijst naar Mullvad's eigen niet-behoudend DNS server tijdens de VPN connectie. Deze fix kan ook handmatig worden gedaan door resolv.conf te vertellen om alleen de Mullvad DNS server IP die op hun website staat te gebruiken.\n\nDe resolv.conf update script versie in openvpn-update-resolv-conf implementeerd een andere fix voor dit probleem die gebruiken maakt van een exclusief interface switch -x waneer resolvconf geexecuteerd word. Maar dit kan een ander probleem vormen omdat elk lokaal netwerk adress door Mullvad's DNS server zal draaien. Zoals genoteerd in de [https://github.com/masterkorp/openvpn-update-resolv-conf/issues/18 script's GitHub issue pagina\n\n"
+    },
+    {
+      "title": "Automatisch configuratie",
+      "level": 2,
+      "content": "vopono support automatisch genereren van configuratie files voor mullvad, hierdoor kan je meteen applicaties via een Mullvad connectie draaien in een tijdelijk netwerk namespace.\n\nOpenVPN en Wireguard connecties zijn ondersteud. Shadowsocks is nu ondersteund voor OpenVPN connecties, en port forwarding is ondersteund voor Wireguard connecties.\n\n"
+    },
+    {
+      "title": "Zie ook",
+      "level": 2,
+      "content": "- Mullvad client source code\n- Mullvad FAQ\n- vopono\n\n"
+    }
+  ]
+}

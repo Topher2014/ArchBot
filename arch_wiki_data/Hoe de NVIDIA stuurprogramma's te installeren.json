@@ -1,0 +1,156 @@
+{
+  "title": "Hoe de NVIDIA stuurprogramma's te installeren",
+  "url": "https://wiki.archlinux.org/title/Hoe_de_NVIDIA_stuurprogramma%27s_te_installeren",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- NVIDIA/Tips and tricks\n- NVIDIA/Troubleshooting\n- Nouveau\n- NVIDIA Optimus\n- PRIME\n- Bumblebee\n- nvidia-xrun\n- Xorg\n- Vulkan\n\nThis article covers the official NVIDIA graphics card drivers. For the community open-source driver, see Nouveau. If you have a laptop with hybrid graphics, see also NVIDIA Optimus.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "First, find the family of your card (e.g. NV110, NVC0, etc.) on nouveau wiki's code names page corresponding to its model/official name obtained with:\n\n```\n$ lspci -k -d ::03xx\n```\n\nThen, install the appropriate driver for your card:\n\nTable content:\nGPU family | Driver | Status\nTuring (NV160/TUXXX) and newer | nvidia-open for linux nvidia-open-lts for linux-lts nvidia-open-dkms for any kernel(s) | Recommended by upstream Current, supported1\nMaxwell (NV110/GMXXX) through Ada Lovelace (NV190/ADXXX) | nvidia for linux nvidia-lts for linux-lts nvidia-dkms for any kernel(s) | Current, supported1\nKepler (NVE0/GKXXX) | nvidia-470xx-dkmsAUR | Legacy, unsupported2,3\nFermi (NVC0/GF1XX) | nvidia-390xx-dkmsAUR\nTesla (NV50/G80-90-GT2XX) | nvidia-340xx-dkmsAUR\nCurie (NV40/G70) and older | No longer packaged\n\n1. If these packages do not work, usually due to new hardware releases, nvidia-open-betaAUR may have a newer driver version that offers support.\n1. May not function correctly on Linux 5.18 (or later) on systems with Intel CPUs 11th Gen and newer due an incompatibility with Indirect Branch Tracking. You can disable it by setting the ibt=off kernel parameter from the boot loader. Be aware, this security feature is responsible for mitigating a class of exploit techniques.\n1. NVIDIA no longer actively supports these cards and their drivers may not officially support the current Xorg version. It might be easier to use the nouveau driver; however, NVIDIA's legacy drivers are still available and might provide better 3D performance/stability.\n\n- When installing dkms, read Dynamic Kernel Module Support#Installation.\n- The DKMS variants are not tied to a specific kernel, as they recompile the NVIDIA kernel module for each kernel for which header files are installed.\n\nFor 32-bit application support, also install the corresponding lib32 package from the multilib repository (e.g. lib32-nvidia-utils).\n\nRemove kms from the HOOKS array in /etc/mkinitcpio.conf and regenerate the initramfs. This will prevent the initramfs from containing the nouveau module making sure the kernel cannot load it during early boot. The nvidia-utils package contains a file which blacklists the nouveau module once you reboot.\n\nOnce the driver has been installed, continue to #Xorg configuration or #Wayland configuration.\n\n"
+    },
+    {
+      "title": "Custom kernel",
+      "level": 3,
+      "content": "Ensure your kernel has CONFIG_DRM_SIMPLEDRM=y, and if using CONFIG_DEBUG_INFO_BTF then this is needed in the PKGBUILD (since kernel 5.16):\n\n```\ninstall -Dt \"$builddir/tools/bpf/resolve_btfids\" tools/bpf/resolve_btfids/resolve_btfids\n```\n\n"
+    },
+    {
+      "title": "DRM kernel mode setting",
+      "level": 3,
+      "content": "Since NVIDIA does not support automatic KMS late loading, enabling DRM (Direct Rendering Manager) kernel mode setting is required to make Wayland compositors function properly, or to allow for Xorg#Rootless Xorg.\n\nStarting from nvidia-utils 560.35.03-5, DRM defaults to enabled.[1] For older drivers, set the modeset=1 kernel module parameter for the nvidia_drm module.\n\nTo verify that DRM is actually enabled, execute the following:\n\n```\n# cat /sys/module/nvidia_drm/parameters/modeset\n```\n\nWhich should now return Y, and not N.\n\n"
+    },
+    {
+      "title": "Early loading",
+      "level": 4,
+      "content": "For basic functionality, just adding the kernel parameter should suffice. If you want to ensure it is loaded as early as possible, or you are noticing startup issues (such as the nvidia kernel module being loaded after the display manager), you can add nvidia, nvidia_modeset, nvidia_uvm and nvidia_drm to the initramfs. See Kernel module#Early module loading to learn how to configure your initramfs generator. mkinitcpio users may also need to regenerate the initramfs image every time there is a nvidia driver update. See #pacman hook to automate these steps.\n\nTo avoid the possibility of forgetting to update initramfs after an NVIDIA driver upgrade, you may want to use a pacman hook:\n\n```\n/etc/pacman.d/hooks/nvidia.hook\n```\n\n```\n[Trigger]\nOperation=Install\nOperation=Upgrade\nOperation=Remove\nType=Package\n# You can remove package(s) that don't apply to your config, e.g. if you only use nvidia-open you can remove nvidia-lts as a Target\nTarget=nvidia\nTarget=nvidia-open\nTarget=nvidia-lts\n# If running a different kernel, modify below to match\nTarget=linux\n\n[Action]\nDescription=Updating NVIDIA module in initcpio\nDepends=mkinitcpio\nWhen=PostTransaction\nNeedsTargets\nExec=/bin/sh -c 'while read -r trg; do case $trg in linux*) exit 0; esac; done; /usr/bin/mkinitcpio -P'\n```\n\n"
+    },
+    {
+      "title": "Hardware accelerated video decoding",
+      "level": 3,
+      "content": "Accelerated video decoding with VDPAU is supported on GeForce 8 series cards and newer. Accelerated video decoding with NVDEC is supported on Fermi (~400 series) cards and newer. See Hardware video acceleration for details.\n\n"
+    },
+    {
+      "title": "Hardware accelerated video encoding with NVENC",
+      "level": 3,
+      "content": "NVENC requires the nvidia_uvm module and the creation of related device nodes under /dev.\n\nThe latest driver package provides a udev rule which creates device nodes automatically, so no further action is required.\n\nIf you are using an old driver (e.g. nvidia-340xx-dkmsAUR), you need to create device nodes. Invoking the nvidia-modprobe utility automatically creates them. You can create /etc/udev/rules.d/70-nvidia.rules to run it automatically:\n\n```\n/etc/udev/rules.d/70-nvidia.rules\n```\n\n```\nACTION==\"add\", DEVPATH==\"/bus/pci/drivers/nvidia\", RUN+=\"/usr/bin/nvidia-modprobe -c 0 -u\"\n```\n\n"
+    },
+    {
+      "title": "Wayland configuration",
+      "level": 2,
+      "content": "Regarding Xwayland take a look at Wayland#Xwayland.\n\nFor further configuration options, take a look at the wiki pages or documentation of the respective compositor.\n\n"
+    },
+    {
+      "title": "Basic support",
+      "level": 3,
+      "content": "There are two kernel parameters for the nvidia_drm module to be considered: modeset and fbdev. Both are enabled by default when using the nvidia-utils package. NVIDIA also plans to enable them by default in a future release.\n\n"
+    },
+    {
+      "title": "modeset",
+      "level": 4,
+      "content": "Enabling modeset is necessary for all Wayland configurations.\n\nFor unsupported drivers, where modeset needs to be enabled manually, see #DRM kernel mode setting, and Wayland#Requirements for more information.\n\n"
+    },
+    {
+      "title": "fbdev",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nEnabling fbdev is necessary for some Wayland configurations.\n\nIt is specifically a hard requirement on Linux 6.11 and later, but it is currently unclear whether this is intended behavior or a bug, see [2] for more details.\n\nIt can be set the same way as the modesetting parameter, with the difference that executing:\n\n```\n# cat /sys/module/nvidia_drm/parameters/fbdev\n```\n\nWill return a missing file error if it is not set at all, instead of N.\n\n"
+    },
+    {
+      "title": "Suspend support",
+      "level": 3,
+      "content": "Wayland suspend can suffer from the defaults more than X does, see /Tips and tricks#Preserve video memory after suspend for details.\n\nIf you use GDM, also see GDM#Wayland and the proprietary NVIDIA driver.\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 2,
+      "content": "The proprietary NVIDIA graphics card driver does not need any Xorg server configuration file. You can start X to see if the Xorg server will function correctly without a configuration file. However, it may be required to create a configuration file (prefer /etc/X11/xorg.conf.d/20-nvidia.conf over /etc/X11/xorg.conf) in order to adjust various settings. This configuration can be generated by the NVIDIA Xorg configuration tool, or it can be created manually. If created manually, it can be a minimal configuration (in the sense that it will only pass the basic options to the Xorg server), or it can include a number of settings that can bypass Xorg's auto-discovered or pre-configured options.\n\n"
+    },
+    {
+      "title": "Automatic configuration",
+      "level": 3,
+      "content": "The NVIDIA package includes an automatic configuration tool to create an Xorg server configuration file (xorg.conf) and can be run by:\n\n```\n# nvidia-xconfig\n```\n\nThis command will auto-detect and create (or edit, if already present) the /etc/X11/xorg.conf configuration according to present hardware.\n\nIf there are instances of DRI, ensure they are commented out:\n\n```\n#    Load        \"dri\"\n```\n\nDouble-check your /etc/X11/xorg.conf to make sure your default depth, horizontal sync, vertical refresh, and resolutions are acceptable.\n\n"
+    },
+    {
+      "title": "nvidia-settings",
+      "level": 3,
+      "content": "The nvidia-settings tool lets you configure many options using either CLI or GUI. Running nvidia-settings without any options launches the GUI, for CLI options see nvidia-settings(1).\n\nYou can run the CLI/GUI as a non-root user and save the settings to ~/.nvidia-settings-rc by using the option Save Current Configuration under nvidia-settings Configuration tab.\n\nTo load the ~/.nvidia-settings-rc for the current user:\n\n```\n$ nvidia-settings --load-config-only\n```\n\nSee Autostarting to start this command on every boot.\n\n- Xorg may not start or crash on startup after saving nvidia-settings changes. Adjusting or deleting the generated ~/.nvidia-settings-rc and/or Xorg file(s) should recover normal startup.\n- Cinnamon desktop can override changes made through nvidia-settings. You can adjust the Cinnamon startup behavior to prevent that.\n\n"
+    },
+    {
+      "title": "Manual configuration",
+      "level": 3,
+      "content": "Several tweaks (which cannot be enabled automatically or with nvidia-settings) can be performed by editing your configuration file. The Xorg server will need to be restarted before any changes are applied.\n\nSee NVIDIA Accelerated Linux Graphics Driver README and Installation Guide for additional details and options.\n\n"
+    },
+    {
+      "title": "Minimal configuration",
+      "level": 4,
+      "content": "A basic configuration block in 20-nvidia.conf (or deprecated in xorg.conf) would look like this:\n\n```\n/etc/X11/xorg.conf.d/20-nvidia.conf\n```\n\n```\nSection \"Device\"\n        Identifier \"NVIDIA Card\"\n        Driver \"nvidia\"\n        VendorName \"NVIDIA Corporation\"\n        BoardName \"GeForce GTX 1050 Ti\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Disabling the logo on startup",
+      "level": 4,
+      "content": "If you are using an old driver (nvidia-340xx-dkmsAUR), you may want to disable the NVIDIA logo splash screen that is displayed at X startup. Add the \"NoLogo\" option under section Device:\n\n```\nOption \"NoLogo\" \"1\"\n```\n\n"
+    },
+    {
+      "title": "Overriding monitor detection",
+      "level": 4,
+      "content": "The \"ConnectedMonitor\" option under section Device allows overriding monitor detection when X server starts, which may save a significant amount of time at start up. The available options are: \"CRT\" for analog connections, \"DFP\" for digital monitors and \"TV\" for televisions.\n\nThe following statement forces the NVIDIA driver to bypass startup checks and recognize the monitor as DFP:\n\n```\nOption \"ConnectedMonitor\" \"DFP\"\n```\n\n"
+    },
+    {
+      "title": "Enabling brightness control",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nAdd to kernel parameters:\n\n```\nnvidia.NVreg_RegistryDwords=EnableBrightnessControl=1\n```\n\nAlternatively, add the following under section Device:\n\n```\nOption \"RegistryDwords\" \"EnableBrightnessControl=1\"\n```\n\nIf brightness control still does not work with this option, try installing nvidia-bl-dkmsAUR.\n\n"
+    },
+    {
+      "title": "Enabling SLI",
+      "level": 4,
+      "content": "Taken from the NVIDIA driver's README Appendix B: This option controls the configuration of SLI rendering in supported configurations. A \"supported configuration\" is a computer equipped with an SLI-Certified Motherboard and 2 or 3 SLI-Certified GeForce GPUs.\n\nFind the first GPU's PCI Bus ID using lspci:\n\n```\n# lspci -d ::03xx\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation Xeon E3-1200 v2/3rd Gen Core processor Graphics Controller (rev 09)\n03:00.0 VGA compatible controller: NVIDIA Corporation GK107 [GeForce GTX 650] (rev a1)\n04:00.0 VGA compatible controller: NVIDIA Corporation GK107 [GeForce GTX 650] (rev a1)\n08:00.0 3D controller: NVIDIA Corporation GM108GLM [Quadro K620M / Quadro M500M] (rev a2)\n```\n\nAdd the BusID (3 in the previous example) under section Device:\n\n```\nBusID \"PCI:3:0:0\"\n```\n\nAdd the desired SLI rendering mode value under section Screen:\n\n```\nOption \"SLI\" \"AA\"\n```\n\nThe following table presents the available rendering modes.\n\nTable content:\nValue | Behavior\n0, no, off, false, Single | Use only a single GPU when rendering.\n1, yes, on, true, Auto | Enable SLI and allow the driver to automatically select the appropriate rendering mode.\nAFR | Enable SLI and use the alternate frame rendering mode.\nSFR | Enable SLI and use the split frame rendering mode.\nAA | Enable SLI and use SLI antialiasing. Use this in conjunction with full scene antialiasing to improve visual quality.\n\nAlternatively, you can use the nvidia-xconfig utility to insert these changes into xorg.conf with a single command:\n\n```\n# nvidia-xconfig --busid=PCI:3:0:0 --sli=AA\n```\n\nTo verify that SLI mode is enabled from a shell:\n\n```\n$ nvidia-settings -q all | grep SLIMode\n```\n\n```\nAttribute 'SLIMode' (arch:0.0): AA\n    'SLIMode' is a string attribute.\n    'SLIMode' is a read-only attribute.\n    'SLIMode' can use the following target types: X Screen.\n```\n\nIf this configuration does not work, you may need to use the PCI Bus ID provided by nvidia-settings,\n\n```\n$ nvidia-settings -q all | grep -i pcibus\n```\n\n```\nAttribute 'PCIBus' (host:0[gpu:0]): 101.\n  'PCIBus' is an integer attribute.\n  'PCIBus' is a read-only attribute.\n  'PCIBus' can use the following target types: GPU, SDI Input Device.\nAttribute 'PCIBus' (host:0[gpu:1]): 23.\n  'PCIBus' is an integer attribute.\n  'PCIBus' is a read-only attribute.\n  'PCIBus' can use the following target types: GPU, SDI Input Device.\n```\n\nand comment out the PrimaryGPU option in your xorg.d configuration,\n\n```\n/usr/share/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf\n```\n\n```\n...\n\nSection \"OutputClass\"\n...\n    # Option \"PrimaryGPU\" \"yes\"\n...\n```\n\nUsing this configuration may also solve any graphical boot issues.\n\n"
+    },
+    {
+      "title": "Multiple monitors",
+      "level": 3,
+      "content": "See Multihead for more general information.\n\n"
+    },
+    {
+      "title": "Using nvidia-settings",
+      "level": 4,
+      "content": "The nvidia-settings tool can configure multiple monitors.\n\nFor CLI configuration, first get the CurrentMetaMode by running:\n\n```\n$ nvidia-settings -q CurrentMetaMode\n```\n\n```\nAttribute 'CurrentMetaMode' (hostnmae:0.0): id=50, switchable=no, source=nv-control :: DPY-1: 2880x1620 @2880x1620 +0+0 {ViewPortIn=2880x1620, ViewPortOut=2880x1620+0+0}\n```\n\nSave everything after the :: to the end of the attribute (in this case: DPY-1: 2880x1620 @2880x1620 +0+0 {ViewPortIn=2880x1620, ViewPortOut=2880x1620+0+0}) and use to reconfigure your displays with nvidia-settings --assign \"CurrentMetaMode=your_meta_mode\".\n\n"
+    },
+    {
+      "title": "ConnectedMonitor",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf the driver does not properly detect a second monitor, you can force it to do so with ConnectedMonitor.\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"Monitor\"\n    Identifier     \"Monitor1\"\n    VendorName     \"Panasonic\"\n    ModelName      \"Panasonic MICRON 2100Ex\"\n    HorizSync       30.0 - 121.0 # this monitor has incorrect EDID, hence Option \"UseEDIDFreqs\" \"false\"\n    VertRefresh     50.0 - 160.0\n    Option         \"DPMS\"\nEndSection\n\nSection \"Monitor\"\n    Identifier     \"Monitor2\"\n    VendorName     \"Gateway\"\n    ModelName      \"GatewayVX1120\"\n    HorizSync       30.0 - 121.0\n    VertRefresh     50.0 - 160.0\n    Option         \"DPMS\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"Device1\"\n    Driver         \"nvidia\"\n    Option         \"NoLogo\"\n    Option         \"UseEDIDFreqs\" \"false\"\n    Option         \"ConnectedMonitor\" \"CRT,CRT\"\n    VendorName     \"NVIDIA Corporation\"\n    BoardName      \"GeForce 6200 LE\"\n    BusID          \"PCI:3:0:0\"\n    Screen          0\nEndSection\n\nSection \"Device\"\n    Identifier     \"Device2\"\n    Driver         \"nvidia\"\n    Option         \"NoLogo\"\n    Option         \"UseEDIDFreqs\" \"false\"\n    Option         \"ConnectedMonitor\" \"CRT,CRT\"\n    VendorName     \"NVIDIA Corporation\"\n    BoardName      \"GeForce 6200 LE\"\n    BusID          \"PCI:3:0:0\"\n    Screen          1\nEndSection\n```\n\nThe duplicated device with Screen is how you get X to use two monitors on one card without TwinView. Note that nvidia-settings will strip out any ConnectedMonitor options you have added.\n\n"
+    },
+    {
+      "title": "TwinView",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nYou want only one big screen instead of two. Set the TwinView argument to 1. This option should be used if you desire compositing. TwinView only works on a per-card basis, when all participating monitors are connected to the same card.\n\n```\nOption \"TwinView\" \"1\"\n```\n\nExample configuration:\n\n```\n/etc/X11/xorg.conf.d/10-monitor.conf\n```\n\n```\nSection \"ServerLayout\"\n    Identifier     \"TwinLayout\"\n    Screen         0 \"metaScreen\" 0 0\nEndSection\n\nSection \"Monitor\"\n    Identifier     \"Monitor0\"\n    Option         \"Enable\" \"true\"\nEndSection\n\nSection \"Monitor\"\n    Identifier     \"Monitor1\"\n    Option         \"Enable\" \"true\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"Card0\"\n    Driver         \"nvidia\"\n    VendorName     \"NVIDIA Corporation\"\n\n    #refer to the link below for more information on each of the following options.\n    Option         \"HorizSync\"          \"DFP-0: 28-33; DFP-1: 28-33\"\n    Option         \"VertRefresh\"        \"DFP-0: 43-73; DFP-1: 43-73\"\n    Option         \"MetaModes\"          \"1920x1080, 1920x1080\"\n    Option         \"ConnectedMonitor\"   \"DFP-0, DFP-1\"\n    Option         \"MetaModeOrientation\" \"DFP-1 LeftOf DFP-0\"\nEndSection\n\nSection \"Screen\"\n    Identifier     \"metaScreen\"\n    Device         \"Card0\"\n    Monitor        \"Monitor0\"\n    DefaultDepth    24\n    Option         \"TwinView\" \"True\"\n    SubSection \"Display\"\n        Modes          \"1920x1080\"\n    EndSubSection\nEndSection\n```\n\nDevice option information.\n\nIf you have multiple cards that are SLI capable, it is possible to run more than one monitor attached to separate cards (for example: two cards in SLI with one monitor attached to each). The \"MetaModes\" option in conjunction with SLI Mosaic mode enables this. Below is a configuration which works for the aforementioned example and runs GNOME flawlessly.\n\n```\n/etc/X11/xorg.conf.d/10-monitor.conf\n```\n\n```\nSection \"Device\"\n        Identifier      \"Card A\"\n        Driver          \"nvidia\"\n        BusID           \"PCI:1:00:0\"\nEndSection\n\nSection \"Device\"\n        Identifier      \"Card B\"\n        Driver          \"nvidia\"\n        BusID           \"PCI:2:00:0\"\nEndSection\n\nSection \"Monitor\"\n        Identifier      \"Right Monitor\"\nEndSection\n\nSection \"Monitor\"\n        Identifier      \"Left Monitor\"\nEndSection\n\nSection \"Screen\"\n        Identifier      \"Right Screen\"\n        Device          \"Card A\"\n        Monitor         \"Right Monitor\"\n        DefaultDepth    24\n        Option          \"SLI\" \"Mosaic\"\n        Option          \"Stereo\" \"0\"\n        Option          \"BaseMosaic\" \"True\"\n        Option          \"MetaModes\" \"GPU-0.DFP-0: 1920x1200+4480+0, GPU-1.DFP-0:1920x1200+0+0\"\n        SubSection      \"Display\"\n                        Depth           24\n        EndSubSection\nEndSection\n\nSection \"Screen\"\n        Identifier      \"Left Screen\"\n        Device          \"Card B\"\n        Monitor         \"Left Monitor\"\n        DefaultDepth    24\n        Option          \"SLI\" \"Mosaic\"\n        Option          \"Stereo\" \"0\"\n        Option          \"BaseMosaic\" \"True\"\n        Option          \"MetaModes\" \"GPU-0.DFP-0: 1920x1200+4480+0, GPU-1.DFP-0:1920x1200+0+0\"\n        SubSection      \"Display\"\n                        Depth           24\n        EndSubSection\nEndSection\n\nSection \"ServerLayout\"\n        Identifier      \"Default\"\n        Screen 0        \"Right Screen\" 0 0\n        Option          \"Xinerama\" \"0\"\nEndSection\n```\n\nIf you are using TwinView and vertical sync (the \"Sync to VBlank\" option in nvidia-settings), you will notice that only one screen is being properly synced, unless you have two identical monitors. Although nvidia-settings does offer an option to change which screen is being synced (the \"Sync to this display device\" option), this does not always work. A solution is to add the following environment variables at startup, for example append in /etc/profile:\n\n```\nexport __GL_SYNC_TO_VBLANK=1\nexport __GL_SYNC_DISPLAY_DEVICE=DFP-0\nexport VDPAU_NVIDIA_SYNC_DISPLAY_DEVICE=DFP-0\n```\n\nYou can change DFP-0 with your preferred screen (DFP-0 is the DVI port and CRT-0 is the VGA port). You can find the identifier for your display from nvidia-settings in the \"X Server XVideoSettings\" section.\n\nIn case you want to play full-screen games when using TwinView, you will notice that games recognize the two screens as being one big screen. While this is technically correct (the virtual X screen really is the size of your screens combined), you probably do not want to play on both screens at the same time.\n\nTo correct this behavior for SDL, try:\n\n```\nexport SDL_VIDEO_FULLSCREEN_HEAD=1\n```\n\nFor OpenGL, add the appropriate Metamodes to your xorg.conf in section Device and restart X:\n\n```\nOption \"Metamodes\" \"1680x1050,1680x1050; 1280x1024,1280x1024; 1680x1050,NULL; 1280x1024,NULL;\"\n```\n\nAnother method that may either work alone or in conjunction with those mentioned above is starting games in a separate X server.\n\n"
+    },
+    {
+      "title": "Mosaic mode",
+      "level": 4,
+      "content": "Mosaic mode is the only way to use more than 2 monitors across multiple graphics cards with compositing. Your window manager may or may not recognize the distinction between each monitor. Mosaic mode requires a valid SLI configuration. Even if using Base mode without SLI, the GPUs must still be SLI capable/compatible.\n\nBase Mosaic mode works on any set of Geforce 8000 series or higher GPUs. It cannot be enabled from within the nvidia-setting GUI. You must either use the nvidia-xconfig command line program or edit xorg.conf by hand. Metamodes must be specified. The following is an example for four DFPs in a 2x2 configuration, each running at 1920x1024, with two DFPs connected to two cards:\n\n```\n$ nvidia-xconfig --base-mosaic --metamodes=\"GPU-0.DFP-0: 1920x1024+0+0, GPU-0.DFP-1: 1920x1024+1920+0, GPU-1.DFP-0: 1920x1024+0+1024, GPU-1.DFP-1: 1920x1024+1920+1024\"\n```\n\nIf you have an SLI configuration and each GPU is a Quadro FX 5800, Quadro Fermi or newer, then you can use SLI Mosaic mode. It can be enabled from within the nvidia-settings GUI or from the command line with:\n\n```\n$ nvidia-xconfig --sli=Mosaic --metamodes=\"GPU-0.DFP-0: 1920x1024+0+0, GPU-0.DFP-1: 1920x1024+1920+0, GPU-1.DFP-0: 1920x1024+0+1024, GPU-1.DFP-1: 1920x1024+1920+1024\"\n```\n\n"
+    },
+    {
+      "title": "NVswitch",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nFor systems with NVswitch, like H100x8 on AWS, the following is need.\n\n- install nvidia-fabricmanager\n- install matching kernel module needed by the fabric manager\n\nWith the fabricmanager, pytorch would report no GPU is found.\n\nTo install the fabric manager:\n\n1. download the tarball from nvidia. here\n1. version 555.42.02 works well\n1. modify the install script in sbin/fm_run_package_installer.sh to fix the installed file path\n\nTo get the matching kernel driver:\n\n1. git clone the AUR for nvidia-beta-dkms and nvidia-utils-beta\n1. change the PKGBUILD to use version 555.42.02\n1. build and install them\n1. reboot\n\nfinally, systemctl enable nvidia-fabricmanager and systemctl start nvidia-fabricmanager, then pytorch should work.\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "See NVIDIA/Tips and tricks.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "See NVIDIA/Troubleshooting.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Current graphics driver releases in official NVIDIA Forum\n- NVIDIA Developers Forum - Linux Subforum\n\n"
+    }
+  ]
+}

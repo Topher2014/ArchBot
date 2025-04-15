@@ -1,0 +1,161 @@
+{
+  "title": "Vncserver (Русский)",
+  "url": "https://wiki.archlinux.org/title/Vncserver_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- x11vnc\n- TurboVNC\n\nTigerVNC is an implementation of the Virtual Network Computing (VNC) protocol. This article focuses on the server functionality.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the tigervnc package.\n\n"
+    },
+    {
+      "title": "Initial setup",
+      "level": 3,
+      "content": "For a quick start, see the steps below. Users are encouraged to read vncserver(8) for the complete list of configuration options.\n\n1. Create a password using vncpasswd which will store the hashed password in $XDG_CONFIG_HOME/tigervnc/passwd. Ensure the file's permission is set to 0600. If creating vncserver access for another user, you must be logged in as that user before running vncpasswd.\n1. Edit /etc/tigervnc/vncserver.users to define user mappings. Each user defined in this file will have a corresponding port on which its session will run. The number in the file corresponds to a TCP port. By default, :1 is TCP port 5901 (5900+1). If another parallel server is needed, a second instance can then run on the next highest, free port, i.e 5902 (5900+2).\n1. Create $XDG_CONFIG_HOME/tigervnc/config and at a minimum, define the type of session desired with a line like session=foo where foo corresponds to whichever desktop environment is to run. One can see which desktop environments are available on the system by seeing their corresponding .desktop files within /usr/share/xsessions/. For example:\n\n```\n$XDG_CONFIG_HOME/tigervnc/config\n```\n\n```\nsession=lxqt\ngeometry=1920x1080\nlocalhost\nalwaysshared\n```\n\n"
+    },
+    {
+      "title": "Starting and stopping tigervnc",
+      "level": 3,
+      "content": "Start an instance of the vncserver@.service template and optionally enable it to run at boot time/shutdown. Note that the instance identifier in this case is the display number (e.g. instance vncserver@:1.service for display number :1).\n\n- Direct calls to /usr/bin/vncserver are not supported as they will not establish a proper session scope. The systemd service is the only supported method of using TigerVNC. See: Issue #1096.\n- Remove drop-in service files created for earlier versions of TigerVNC before starting vncserver. Prior versions required drop-in service files for each display, e.g. for display :1 /etc/systemd/system/vncserver@:1.service. vncserver will fail to start if the old drop-in file is present when started with the new templated service file.\n\n"
+    },
+    {
+      "title": "Expose the local display directly",
+      "level": 2,
+      "content": "TigerVNC includes libvnc.so, which can be seamlessly loaded during X initialization for enhanced performance. To utilize this feature, create the following file and then restart X:\n\n```\n/etc/X11/xorg.conf.d/10-vnc.conf\n```\n\n```\nSection \"Module\"\nLoad \"vnc\"\nEndSection\n\nSection \"Screen\"\nIdentifier \"Screen0\"\nOption \"UserPasswdVerifier\" \"VncAuth\"\nOption \"PasswordFile\" \"/root/.vnc/passwd\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Running x0vncserver to directly control the local display",
+      "level": 2,
+      "content": "tigervnc also provides x0vncserver(1) which allows direct control over a physical X session. After defining a session password using the vncpasswd tool, invoke the server like so:\n\n```\n$ x0vncserver -rfbauth $XDG_CONFIG_HOME/tigervnc/passwd\n```\n\n- x11vnc is an alternative VNC server which can also provide direct control of the current X session.\n- x0vncserver does not currently support clipboard sharing between the client and the server (even with the help of autocutsel). See: Issue #529.\n\n"
+    },
+    {
+      "title": "With xprofile",
+      "level": 3,
+      "content": "A simple way to start x0vncserver is adding a line in one of the xprofile files such as:\n\n```\n~/.xprofile\n```\n\n```\n...\nx0vncserver -rfbauth $XDG_CONFIG_HOME/tigervnc/passwd &\n```\n\n"
+    },
+    {
+      "title": "With a system service",
+      "level": 4,
+      "content": "This option will allow the users to access the current display, including the login screen provided by the display manager.\n\nThe service will be relaunched automatically every time an user logs off of their session.\n\nLightDM is used for the example below, but it should be possible to adapt it to other display managers by modifying the XAUTHORITY variable.\n\n```\n/etc/systemd/system/x0vncserver.service\n```\n\n```\n[Unit]\nDescription=Remote desktop service (VNC) for :0 display\nRequires=display-manager.service\nAfter=network-online.target\nAfter=display-manager.service\n\n[Service]\nType=simple\nEnvironment=HOME=/root\nEnvironment=XAUTHORITY=/var/run/lightdm/root/:0\nExecStart=x0vncserver -display :0 -rfbauth $XDG_CONFIG_HOME/tigervnc/passwd\nRestart=on-failure\nRestartSec=500ms\n\n[Install]\nWantedBy=multi-user.target\n```\n\nAs this is a system unit, -rfbauth $XDG_CONFIG_HOME/tigervnc/passwd refers to /root/.vnc/passwd\n\nStart/enable x0vncserver.service.\n\n"
+    },
+    {
+      "title": "With a user service",
+      "level": 4,
+      "content": "In order to have a VNC Server running x0vncserver, which is the easiest way for most users to quickly have remote access to the current desktop, create a systemd unit as follows replacing the user and the options with the desired ones:\n\n```\n~/.config/systemd/user/x0vncserver.service\n```\n\n```\n[Unit]\nDescription=Remote desktop service (VNC)\n\n[Service]\nType=simple\nExecStartPre=/bin/sh -c 'while ! pgrep -U \"$USER\" Xorg; do sleep 2; done'\nExecStart=/usr/bin/x0vncserver -rfbauth %h/.vnc/passwd\n\n[Install]\nWantedBy=default.target\n```\n\nThe ExecStartPre line waits for Xorg to be started by ${USER}.\n\nTo login with a specific username and password, replace ExecStart by /usr/bin/x0vncserver -PAMService=login -PlainUsers=${USER} -SecurityTypes=TLSPlain.\n\nStart/enable the x0vncserver.service user unit.\n\n"
+    },
+    {
+      "title": "Running Xvnc with XDMCP for on demand sessions",
+      "level": 2,
+      "content": "One can use systemd socket activation in combination with XDMCP to automatically spawn VNC servers for each user who attempts to login, so there is no need to set up one server/port per user. This setup uses the display manager to authenticate users and login, so there is no need for VNC passwords. The downside is that users cannot leave a session running on the server and reconnect to it later.\n\nTo get this running, first set up XDMCP and make sure the display manager is running. Then create:\n\n```\n/etc/systemd/system/xvnc.socket\n```\n\n```\n[Unit]\nDescription=XVNC Server\n\n[Socket]\nListenStream=5900\nAccept=yes\n\n[Install]\nWantedBy=sockets.target\n```\n\n```\n/etc/systemd/system/xvnc@.service\n```\n\n```\n[Unit]\nDescription=XVNC Per-Connection Daemon\n\n[Service]\nExecStart=-/usr/bin/Xvnc -inetd -query localhost -geometry 1920x1080 -once -SecurityTypes=None\nUser=nobody\nStandardInput=socket\nStandardError=syslog\n```\n\nStart/enable xvnc.socket. Now, any number of users can get unique desktops by connecting to port 5900.\n\nIf the VNC server is exposed to the internet, add the -localhost option to Xvnc in xvnc@.service (note that -query localhost and -localhost are different switches) and follow #Accessing vncserver via SSH tunnels. Since we only select a user after connecting, the VNC server runs as user nobody and uses Xvnc directly instead of the vncserver script, so any options in $XDG_CONFIG_HOME/tigervnc are ignored. Optionally, autostart vncconfig so that the clipboard works (vncconfig exits immediately in non-VNC sessions). One way is to create:\n\n```\n/etc/X11/xinit/xinitrc.d/99-vncconfig.sh\n```\n\n```\n#!/bin/sh\nvncconfig -nowin &\n```\n\n"
+    },
+    {
+      "title": "Connecting to vncserver",
+      "level": 2,
+      "content": "Any number of clients can connect to a vncserver. A simple example is given below where vncserver is running on 10.1.10.2 port 5901, or :1 in shorthand notation:\n\n```\n$ vncviewer 10.1.10.2:1\n```\n\n"
+    },
+    {
+      "title": "Passwordless authentication",
+      "level": 3,
+      "content": "The -passwd switch enables one to specify the location of the server's $XDG_CONFIG_HOME/tigervnc/passwd file. This file is expected to be accessible to the user through SSH or physical access to the server. In either case, place the file on the client's file system in a safe location, i.e. one in which only the intended user has read access.\n\n```\n$ vncviewer -passwd /path/to/server-passwd-file\n```\n\nThe password can also be provided directly.\n\n```\n$ vncviewer -passwd <(echo MYPASSWORD | vncpasswd -f)\n```\n\n"
+    },
+    {
+      "title": "Example GUI-based clients",
+      "level": 3,
+      "content": "- gtk-vnc\n- krdc\n- vinagre\n- remmina\n- virt-viewer\n\nTigerVNC's vncviewer also has a simple GUI when run without any parameters:\n\n```\n$ vncviewer\n```\n\n"
+    },
+    {
+      "title": "Accessing vncserver via SSH tunnels",
+      "level": 2,
+      "content": "For servers offering SSH connection, an advantage of this method is that it is not necessary to open any other port than the already opened SSH port to the outside, since the VNC traffic is tunneled through the SSH port.\n\n"
+    },
+    {
+      "title": "On the server",
+      "level": 3,
+      "content": "On the server side, vncserver or x0vncserver must be run.\n\nWhen running either one of these, it is recommended to use the localhost option in $XDG_CONFIG_HOME/tigervnc/config or the -localhost switch (for x0vncserver) since it allows connections from the localhost only and by analogy, only from users ssh'ed and authenticated on the box. For example:\n\n```\n$XDG_CONFIG_HOME/tigervnc/config\n```\n\n```\nsession=lxqt\ngeometry=1920x1080\nlocalhost\nalwaysshared\n```\n\nMake sure to Start or Restart the vncserver@.service, for example (see also #Initial setup):\n\n```\n# systemctl start vncserver@:1\n```\n\nor for x0vncserver:\n\n```\n$ x0vncserver -localhost -SecurityTypes none\n```\n\n"
+    },
+    {
+      "title": "On the client",
+      "level": 3,
+      "content": "The VNC server has been setup on the remote machine to only accept local connections. Now, the client must open a secure shell with the remote machine (10.1.10.2 in this example) and create a tunnel from the client port, for instance 9901, to the remote server 5901 port. For more details on this feature, see OpenSSH#Forwarding other ports and ssh(1).\n\n```\n$ ssh 10.1.10.2 -L 9901:localhost:5901\n```\n\nOnce connected via SSH, leave this shell window open since it is acting as the secured tunnel with the server. Alternatively, directly run SSH in the background using the -f option. On the client side, to connect via this encrypted tunnel, point the vncviewer to the forwarded client port on the localhost.\n\n```\n$ vncviewer localhost:9901\n```\n\nWhat happens in practice is that the vncviewer connects locally to port 9901 which is tunneled to the server's localhost port 5901. The connection is established to the right port within the secure shell.\n\nNote: What it does is that the -f switch will make ssh go in the background; it will still be alive executing sleep 10. vncviewer is then executed and ssh remains open in the background as long as vncviewer makes use of the tunnel. ssh will close once the tunnel is dropped which is the wanted behavior.\n\n```\n$ ssh -fL 9901:localhost:5901 10.1.10.2 sleep 10; vncviewer localhost:9901\n```\n\nWhat it does is that the -f switch will make ssh go in the background; it will still be alive executing sleep 10. vncviewer is then executed and ssh remains open in the background as long as vncviewer makes use of the tunnel. ssh will close once the tunnel is dropped which is the wanted behavior.\n\nAlternatively, vncviewer's -via switch provides a shortcut for the above command:\n\n```\n$ vncviewer -via 10.1.10.2 localhost::5901\n```\n\n(Notice the double colon – vncviewer's syntax is [host]:[display#] or [host]::[port].)\n\n"
+    },
+    {
+      "title": "Connecting to a vncserver from Android devices over SSH",
+      "level": 3,
+      "content": "To connect to a VNC server over SSH using an Android device as a client, consider having the following setup:\n\n1. SSH running on the server\n1. vncserver running on server (with -localhost flag for security)\n1. SSH client on the Android device: ConnectBot is a popular choice and will be used in this guide as an example\n1. VNC client on the Android device: androidVNC used here\n\nIn ConnectBot, connect to the desired machine. Tap the options key, select Port Forwards and add a port:\n\n```\nType: Local\nSource port: 5901\nDestination: 127.0.0.1:5901\n```\n\nIn androidVNC, connect to the VNC port; this is the local address following the SSH connection:\n\n```\nPassword: the vncserver password\nAddress: 127.0.0.1\nPort: 5901\n```\n\n"
+    },
+    {
+      "title": "Connecting to a macOS system",
+      "level": 3,
+      "content": "See https://help.ubuntu.com/community/AppleRemoteDesktop. Tested with Remmina.\n\n"
+    },
+    {
+      "title": "Recommended security settings",
+      "level": 3,
+      "content": "If not #Accessing vncserver via SSH tunnels where the identification and the encryption are handled via SSH, it is recommended to use X509Vnc, as TLSVnc lacks identity verification.\n\n```\n$ vncserver -x509key /path/to/key.pem -x509cert /path/to/cert.pem -SecurityTypes X509Vnc :1\n```\n\nIssuing x509 certificates is beyond the scope of this guide. However, Let's Encrypt provides an easy way to do so. Alternatively, one can issue certificates using OpenSSL, share the public key with the client and specify it with the -X509CA parameter. An example is given below the server is running on 10.1.10.2:\n\n```\n$ vncviewer 10.1.10.2 -X509CA /path/to/cert.pem\n```\n\n"
+    },
+    {
+      "title": "Toggling fullscreen",
+      "level": 3,
+      "content": "This can be done through vnc client's menu. By default, vnc client's mkey is F8.\n\n"
+    },
+    {
+      "title": "Workaround for mouse back and forward buttons not working",
+      "level": 3,
+      "content": "The VNC protocol currently only uses 7 mouse buttons (left, middle, right, scroll up, scroll down, scroll left, scroll right) which means if the mouse has a back and a forward button, these are not usable and input will be ignored.\n\nevrouter can be used to work around this limitation by sending keyboard key presses when clicking the mouse back/forward buttons. Optionally, xte found in xautomation and xbindkeys can be used on the server to map the keyboard key presses back to mouse button clicks if needed.\n\n"
+    },
+    {
+      "title": "Substituting mouse back/forward buttons with keyboard keys XF86Back/XF86Forward",
+      "level": 4,
+      "content": "This method is simple and suitable if you only need a way to navigate backward/forward while using web browsers or file browsers for example.\n\nInstall evrouterAUR and xautomation on the client. Configure evrouter, see Mouse buttons#evrouter and evrouter man pages for instructions and tips on how to find the correct device name, window name, button names etc. Example config:\n\n```\n~/.evrouterrc\n```\n\n```\nWindow \"OtherComputer:0 - TigerVNC\": # Window title used as filter\n\n# Using Shell to avoid repeating key presses (see evrouter manual)\n\"USB mouse\" \"/dev/input/by-id/usb-Mouse-name-event-mouse\" none key/275 \"Shell/xte 'key XF86Back'\"\n\"USB mouse\" \"/dev/input/by-id/usb-Mouse-name-event-mouse\" none key/276 \"Shell/xte 'key XF86Forward'\"\n\n# Use XKey below instead if repeating keys is desired (see evrouter manual)\n#\"Logitech Gaming Mouse G400\" \"/dev/input/by-id/usb-Logitech_Gaming_Mouse_G400-event-mouse\" none key/275 \"XKey/XF86Back\"\n#\"Logitech Gaming Mouse G400\" \"/dev/input/by-id/usb-Logitech_Gaming_Mouse_G400-event-mouse\" none key/276 \"XKey/XF86Forward\"\n```\n\nStart evrouter on the client. With above configuration keyboard key XF86Back is sent to the VNC server when clicking the back button on the mouse, and XF86Forward is sent when clicking the forward button.\n\n"
+    },
+    {
+      "title": "Mapping the keyboard key presses back to mouse button clicks on the server",
+      "level": 4,
+      "content": "If needed, it is possible to map the keyboard keys back to mouse button clicks on the server. In this case, it might be a good idea to use keyboard keys which are never on the client or server. In the example below, keyboard keys XF86Launch8/XF86Launch9 are used as mouse buttons 8/9.\n\nEvrouter configuration on the client:\n\n```\n~/.evrouterrc\n```\n\n```\nWindow \"OtherComputer:0 - TigerVNC\": # Window title\n\n# Using Shell to avoid repeating key presses (see evrouter manual)\n\"USB mouse\" \"/dev/input/by-id/usb-Mouse-name-event-mouse\" none key/275 \"Shell/xte 'key XF86Launch8'\"\n\"USB mouse\" \"/dev/input/by-id/usb-Mouse-name-event-mouse\" none key/276 \"Shell/xte 'key XF86Launch9'\"\n```\n\nInstall xautomation and xbindkeys on the server. Configure xbindkeys to map keyboard keys XF86Launch8/XF86Launch9 to mouse buttons 8/9 with xte.\n\n```\n~/.xbindkeysrc\n```\n\n```\n\"xte 'mouseclick 8'\"\n     XF86Launch8\n\n\"xte 'mouseclick 9'\"\n     XF86Launch9\n```\n\nStart xbindkeys (xbindkeys -f ~/.xbindkeysrc). The server will now map XF86Launch8/XF86Launch9 to mouse buttons 8/9.\n\n"
+    },
+    {
+      "title": "Black rectangle instead of window",
+      "level": 3,
+      "content": "Most probably, this is due to the application strictly requiring the composite Xorg extension. For example webkit based app: midori, psi-plus, etc.\n\nRestart vncserver in this case using something like following:\n\n```\n$ vncserver -geometry ... -depth 24 :1 +extension Composite\n```\n\nIt looks like Composite extension in VNC will work only with 24bit depth.\n\n"
+    },
+    {
+      "title": "Empty black window with mouse cursor or xinit: connection to X server lost",
+      "level": 3,
+      "content": "Verify that the user is not logged into a physical X session, unless this option was configured with x0vncserver. Multiple X sessions for a single user are not supported, see 684#issuecomment-494385395 and #1634.\n\nConversely, trying to log into a local X session while a VNC server service is running for that user will likely not work, and may get stuck on a splash screen when using a desktop environment.\n\n"
+    },
+    {
+      "title": "No mouse cursor",
+      "level": 3,
+      "content": "If no mouse cursor is visible when using x0vncserver, start vncviewer as follows:\n\n```\n$ vncviewer DotWhenNoCursor=1 server\n```\n\nAlternatively, put DotWhenNoCursor=1 in the TigerVNC configuration file, which is at $XDG_CONFIG_HOME/tigervnc/default.tigervnc by default.\n\n"
+    },
+    {
+      "title": "Copying clipboard content from the remote machine",
+      "level": 3,
+      "content": "If copying from the remote machine to the local machine does not work, run autocutsel on the server, as mentioned in [1]:\n\n```\n$ autocutsel -fork\n```\n\nNow, press F8 to display the VNC menu popup, and select Clipboard: local -> remote option.\n\n"
+    },
+    {
+      "title": "No window decoration / borders / titlebars / cannot move windows around",
+      "level": 3,
+      "content": "Start a window manager to fix an empty xterm frame. For example, on Xfce, run xfwm4 &.\n\n"
+    },
+    {
+      "title": "Desktop environment is displaying only boxes for font",
+      "level": 3,
+      "content": "Some desktop environments might be missing necessary font to display ASCII characters. Install ttf-dejavu.\n\n"
+    },
+    {
+      "title": "VNC server terminates immediately while using xfce4 session",
+      "level": 3,
+      "content": "Create a new .desktop file under /usr/share/xsessions. For example:\n\n```\n/usr/share/xsessions/xfce4vnc.desktop\n```\n\n```\n[Desktop Entry]\nVersion=1.0\nName=Xfce4vnc Session\nExec=dbus-launch startxfce4\nIcon=\nType=Application\nDesktopNames=XFCE4VNC\n```\n\nMake sure the Exec key is using dbus-launch to start xfce4 within new session bus instance context. Remember to change session value in $XDG_CONFIG_HOME/tigervnc/config to xfce4vnc.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://github.com/TigerVNC/tigervnc\n\n"
+    }
+  ]
+}

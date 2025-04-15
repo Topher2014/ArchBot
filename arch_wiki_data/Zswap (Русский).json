@@ -1,0 +1,56 @@
+{
+  "title": "Zswap (Русский)",
+  "url": "https://wiki.archlinux.org/title/Zswap_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Параметры ядра\n- mkinitcpio (Русский)\n\nzswap — это функция ядра, предоставляющая сжатый кэш в оперативной памяти для страниц подкачки. Она перехватывает страницы памяти, выгружаемые в подкачку, и вместо выгрузки они сжимаются и сохраняются в пуле в ОЗУ. Когда пул заполняется или свободная память заканчивается, давно не использовавшиеся страницы (LRU) разжимаются и выгружаются в подкачку на диске, а затем их сжатые версии удаляются из пула.\n\nОтличие от zram в том, что zswap работает в связке с обычной подкачкой, в то время как zram с созданным на нём swap — это самостоятельное устройство подкачки, которое расположено в ОЗУ и не требует использования обычной подкачки на диске.\n\n"
+    },
+    {
+      "title": "Включение и выключение zswap",
+      "level": 2,
+      "content": "В ядре linux zswap по умолчанию отключен. Для его переключения во время работы системы запишите 1 для включения или 0 для отключения в файл /sys/module/zswap/parameters/enabled. Изменения будут действовать до перезагрузки. Пример команды для отключения:\n\n```\n# echo 0 > /sys/module/zswap/parameters/enabled\n```\n\nЧтобы включить zswap навсегда, добавьте zswap.enabled=1 в параметры ядра. Чтобы выключить zswap на ядрах, в которых он включен по умолчанию, добавьте zswap.enabled=0.\n\n"
+    },
+    {
+      "title": "Текущие параметры",
+      "level": 3,
+      "content": "zswap имеет несколько настраиваемых параметров. Посмотреть их текущие значения можно так:\n\n```\n$ grep -r . /sys/module/zswap/parameters/\n```\n\n```\n/sys/module/zswap/parameters/same_filled_pages_enabled:Y\n/sys/module/zswap/parameters/enabled:Y\n/sys/module/zswap/parameters/max_pool_percent:20\n/sys/module/zswap/parameters/compressor:zstd\n/sys/module/zswap/parameters/non_same_filled_pages_enabled:Y\n/sys/module/zswap/parameters/zpool:zsmalloc\n/sys/module/zswap/parameters/exclusive_loads:N\n/sys/module/zswap/parameters/accept_threshold_percent:90\n```\n\nОписание параметров доступно в документации zswap.\n\nПодробности о exclusive_loads параметре, которого на текущий момент нет в документации, написаны в комментарии к исходному коду ядра.\n\nПосмотреть сообщение со статусом zswap, отображающееся при загрузке системы, можно так:\n\n```\n# dmesg | grep zswap:\n```\n\n```\n[    0.317569] zswap: loaded using pool zstd/zsmalloc\n```\n\n"
+    },
+    {
+      "title": "С помощью sysfs",
+      "level": 4,
+      "content": "Каждый параметр можно изменить до следующей перезагрузки через интерфейс sysfs. Например, для изменения параметра compressor:\n\n```\n# echo lz4 > /sys/module/zswap/parameters/compressor\n```\n\n"
+    },
+    {
+      "title": "С помощью параметров ядра",
+      "level": 4,
+      "content": "Чтобы сделать изменения постоянными, нужно указать соответствующие настройки в параметры ядра, например zswap.compressor=lz4. Таким образом, для постоянной установки всех вышеперечисленных параметров необходимо добавить следующие параметры ядра:\n\n```\nzswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=20 zswap.zpool=z3fold\n```\n\nПри изменении алгоритма сжатия через параметр загрузки необходимо обеспечить раннюю загрузку соответствующего модуля сжатия во время загрузки (смотрите раздел #Алгоритм сжатия).\n\n"
+    },
+    {
+      "title": "Максимальный размер пула",
+      "level": 3,
+      "content": "Память для пула не выделяется заранее, он может расти до определённого предела в процентах от общего объёма доступной памяти, по умолчанию до 20%. При достижении этого порога страницы вытесняются из пула в устройство подкачки. Максимальный размер сжатого пула контролируется параметром max_pool_percent.\n\n"
+    },
+    {
+      "title": "Распределитель пула сжатой памяти",
+      "level": 3,
+      "content": "Параметр zpool регулирует управление пулом сжатой памяти.\n\nРаспределитель zbud хранит 2 сжатых объекта в 1 странице памяти, что ограничивает коэффициент сжатия значением 2 или меньше.\n\nРаспределитель z3fold позволяет хранить до 3 сжатых объектов в одной странице. Коэффициент сжатия при использовании z3fold обычно составляет в среднем 2,7, в то время как для zbud он равен 1,7.\n\nНачиная с версии ядра 6.3, доступен новый распределитель zsmalloc. Он хорошо работает в условиях малого количества доступной RAM и не тратит лишний раз память.\n\nПо умолчанию создаётся zpool типа zsmalloc. С помощью параметра ядра zswap.zpool можно выбрать другой распределитель во время загрузки. Распределитель данных также можно изменить позднее через интерфейс sysfs.\n\n"
+    },
+    {
+      "title": "Алгоритм сжатия",
+      "level": 3,
+      "content": "Для сжатия страниц zswap использует модули, предоставляемые криптографическим API ядра. В официальных ядрах по умолчанию используется алгоритм сжатия zstd, но можно выбрать другой алгоритм с помощью параметра ядра zswap.compressor=. Доступны варианты deflate, lzo, 842, lz4 и lz4hc.\n\nМожно переключить алгоритм в работающей системе через sysfs, но в этом случае zswap изначально запускается с zstd, а позже переключается на указанный алгоритм. Чтобы сразу запустить zswap с другим алгоритмом, нужно использовать параметр ядра, а соответствующий модуль ядра должен быть заранее загружен. Этого можно достичь, выполнив следующие шаги:\n\n1. Добавьте модули, необходимые для выбранного алгоритма сжатия, в массив mkinitcpio (Русский)#MODULES.\n1. Пересоберите образ initramfs.\n1. Укажите выбранный алгоритм, изменив zswap.compressor= в параметрах ядра.\n\nПри следующей загрузке посмотрите #Текущие параметры, чтобы проверить, использует ли zswap нужный алгоритм сжатия.\n\n"
+    },
+    {
+      "title": "Статистика использования zswap",
+      "level": 2,
+      "content": "Чтобы посмотреть статистику zswap, используйте следующую команду:\n\n```\n# grep -r . /sys/kernel/debug/zswap\n```\n\n```\n/sys/kernel/debug/zswap/same_filled_pages:26274\n/sys/kernel/debug/zswap/stored_pages:159898\n/sys/kernel/debug/zswap/pool_total_size:171565056\n/sys/kernel/debug/zswap/written_back_pages:787323\n/sys/kernel/debug/zswap/reject_compress_poor:0\n/sys/kernel/debug/zswap/reject_compress_fail:15860\n/sys/kernel/debug/zswap/reject_kmemcache_fail:0\n/sys/kernel/debug/zswap/reject_alloc_fail:0\n/sys/kernel/debug/zswap/reject_reclaim_fail:31\n/sys/kernel/debug/zswap/pool_limit_hit:0\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- zswap: How to determine whether it is compressing swap pages?.\n- IBM Support Article \"New Linux zswap compression functionality\" (benchmarks images do not load).\n- Ask Ubuntu: zram vs. zswap vs. zcache.\n- Arch Linux forum thread.\n- LWN.net technical article by the main developer of zswap.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "title": "FluidSynth (日本語)",
+  "url": "https://wiki.archlinux.org/title/FluidSynth_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "FluidSynth は SoundFont 2 の仕様に基づいたリアルタイムソフトウェアシンセサイザーです。gst-plugins-bad の依存パッケージになっているため、gnome グループをインストールしたときに一緒にインストールされます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 使い方 2.1 スタンドアロンモード 2.2 ALSA デーモンモード 2.3 SDL_Mixer\n- 3 MIDI を OGG に変換する方法\n- 4 トラブルシューティング 4.1 PulseAudio との競合\n\n- 2.1 スタンドアロンモード\n- 2.2 ALSA デーモンモード\n- 2.3 SDL_Mixer\n\n- 4.1 PulseAudio との競合\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "まずは公式リポジトリから fluidsynth をインストールしてください。\n\n音を出すためには、サウンドフォント をインストールする必要があります。サウンドフォントのリストは次の通りです:\n\n- freepats-general-midi\n- soundfont-fluid\n\n"
+    },
+    {
+      "title": "使い方",
+      "level": 2,
+      "content": "FluidSynth を使う方法は2つあります。MIDI プレイヤーとして使うか、ALSA に MIDI サポートを追加するデーモンとして使うかです。\n\n"
+    },
+    {
+      "title": "スタンドアロンモード",
+      "level": 3,
+      "content": "簡単に fluidsynth を使って MIDI ファイルを再生することができます:\n\n```\n$ fluidsynth -a alsa -m alsa_seq -l -i /usr/share/soundfonts/FluidR3_GM2-2.sf2 example.midi\n```\n\nここでは公式リポジトリから soundfont-fluid をインストールしていると仮定しています。\n\nfluidsynth には他にもたくさんのオプションが存在しています。man ページを見たり -h を使ってヘルプを表示してください。\n\n-a オプションを指定することで alsa の代わりに pulseaudio を使うこともできます。\n\n"
+    },
+    {
+      "title": "ALSA デーモンモード",
+      "level": 3,
+      "content": "fluidsynth を ALSA デーモンとして動作させたい場合、/etc/conf.d/fluidsynth を編集して、使いたいサウンドフォントを追加してください。例えば fluidr3 の場合:\n\n```\nSOUND_FONT=/usr/share/soundfonts/FluidR3_GM.sf2\nOTHER_OPTS='-a alsa -m alsa_seq -r 48000'\n```\n\nその後、fluidsynth サービスを起動させてセッションを実行できます:\n\n```\nsystemctl --user start fluidsynth\n```\n\n以下の設定で (システムのハードウェア MIDI ポートに加えて) ソフトウェア MIDI 出力ポートができます:\n\n```\n$ aconnect -o\n```\n\n```\nclient 128: 'FLUID Synth (5117)' [type=user]\n   0 'Synth input port (5117:0)'\n```\n\naplaymidi などでこのポートを使うことができます:\n\n```\n$ aplaymidi -p128:0 example.midi\n```\n\n"
+    },
+    {
+      "title": "SDL_Mixer",
+      "level": 3,
+      "content": "SDL_Mixer を使用するプログラムで fluidsynth を使用するには、サウンドフォントを次のように指定する必要があります:\n\n```\n$ SDL_SOUNDFONTS=/usr/share/soundfonts/FluidR3_GM.sf2 ./program\n```\n\n"
+    },
+    {
+      "title": "MIDI を OGG に変換する方法",
+      "level": 2,
+      "content": "midi を ogg に変換するシンプルなコマンドライン:\n\n```\n$ fluidsynth -nli -r 48000 -o synth.cpu-cores=2 -T oga -F example.ogg /usr/share/soundfonts/fluidr3/FluidR3GM.SF2 example.MID\n```\n\n以下は同時に複数の midi ファイルを ogg に変換する小さなスクリプトです:\n\n```\n#!/bin/bash\nmaxjobs=$(grep processor /proc/cpuinfo | wc -l)\nmidi2ogg() {\n\tname=$(echo $@ | sed -r s/[.][mM][iI][dD][iI]?$//g | sed s/^[.][/]//g)\n\tfor arg; do \n\tfluidsynth -nli -r 48000 -o synth.cpu-cores=$maxjobs -F \"/dev/shm/$name.raw\" /usr/share/soundfonts/fluidr3/FluidR3GM.SF2 \"$@\"\n\toggenc -r -B 16 -C 2 -R 48000 \"/dev/shm/$name.raw\" -o \"$name.ogg\"\n\trm \"/dev/shm/$name.raw\"\n\t## Uncomment for replaygain tagging\n\t#vorbisgain -f \"$name.ogg\" \n\tdone\n}\nexport -f midi2ogg\nfind . -regex '.*[.][mM][iI][dD][iI]?$' -print0 | xargs -0 -n 1 -P $maxjobs bash -c 'midi2ogg \"$@\"' --\n```\n\n"
+    },
+    {
+      "title": "PulseAudio との競合",
+      "level": 3,
+      "content": "fluidsynth アプリケーションがドライバとして alsa を使用するように設定されていると、サウンドカードに直接アクセスしてしまい、pulseaudio や pulseaudio を使用するアプリケーションが正常に動作しなくなります。設定ファイル /etc/conf.d/fluidsynth を修正し、ドライバを PulseAudio に変更してから、fluidsynth と PulseAudio を再起動してください:\n\n```\n/etc/conf.d/fluidsynth\n```\n\n```\nOTHER_OPTS='-a pulseaudio -m alsa_seq -r 48000'\n```\n\n"
+    }
+  ]
+}

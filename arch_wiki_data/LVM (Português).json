@@ -1,0 +1,236 @@
+{
+  "title": "LVM (Português)",
+  "url": "https://wiki.archlinux.org/title/LVM_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Software RAID and LVM\n- LUKS dentro do LVM\n- Instalar Arch Linux em LVM\n- Resizing LVM-on-LUKS\n- Create root filesystem snapshots with LVM\n\nDe Wikipédia: Gerenciador de Volume Lógico (Linux):\n\n"
+    },
+    {
+      "title": "Blocos de construção do LVM",
+      "level": 3,
+      "content": "O gerenciador de volumes lógicos (LVM) utiliza um recurso do kernel chamado de mapeador de dispositivo (do inglês device mapper) para fornecer um sistema de partições independente do layout subjacente do disco. Com o LVM você abstrai seu dispositivo de armazenamento e passa a ter \"partições virtuais\", tornando a tarefa de estender/diminuir volumes mais fácil (embora isto esteja sujeito a potenciais limitações do sistema de arquivos).\n\nPartições virtuais permitem adição e remoção sem a preocupação de haver ou não espaço contíguo suficiente em um disco em particular. Evita aquelas situações de tentar manipular partições pelo fdisk com um disco em uso (e ficar com apreensão imaginando se o kernel está usando a tabela de partições nova ou velha), ou ainda, precisar mover outras partições para outras regiões ao longo do disco.\n\nConstrução básica dos blocos pelo LVM:\n\nExemplo:\n\n```\nDiscos físicos\n\n  Disco1 (/dev/sda):\n    ┌──────────────────────────────────────┬─────────────────────────────────────┐\n    │ Partição1  50 GiB (Volume físico)    │ Partição2 80 GiB (Volume físico)    │\n    │ /dev/sda1                            │ /dev/sda2                           │\n    └──────────────────────────────────────┴─────────────────────────────────────┘\n\n  Disco2 (/dev/sdb):\n    ┌──────────────────────────────────────┐\n    │ Partição1 120 GiB (Volume físico)    │\n    │ /dev/sdb1                            │\n    └──────────────────────────────────────┘\n```\n\n```\nVolumes lógicos do LVM\n\n  Grupo de volume1 (/dev/MeuGrupoVol/ = /dev/sda1 + /dev/sda2 + /dev/sdb1):\n    ┌─────────────────────────┬─────────────────────────┬──────────────────────────┐\n    │ Volume lógico1 15 GiB   │ Volume lógico2 35 GiB   │ Volume lógico3 200 GiB   │\n    │ /dev/MeuGrupoVol/rootvol│ /dev/MeuGrupoVol/homevol│ /dev/MeuGrupoVol/mediavol│\n    └─────────────────────────┴─────────────────────────┴──────────────────────────┘\n```\n\n"
+    },
+    {
+      "title": "Vantagens",
+      "level": 3,
+      "content": "O LVM proporciona mais flexibilidade do que usar partições normais no disco rígido, pois permite:\n\n- Usar qualquer quantidade de discos como se fosse um único grande disco;\n- Ter volumes lógicos estendidos sobre vários discos (Como em RAID, que os volumes podem espelhar ou distribuir dados entre os discos. Tais opções podem oferecer vantagens como resiliência adicional e desempenho [1]);\n- Criar pequenos volumes lógicos e estendê-los \"dinamicamente\" à medida em que eles forem ficando cheios;\n- Redimensionar volumes lógicos independentemente da ordem que estão dispostos fisicamente no disco. Isto não depende da posição do LV dentro do VG, não havendo nem mesmo necessidade de liberar espaço disponível ao redor destes;\n- Redimensionar/criar/excluir volumes lógicos e físicos online. Os sistemas de arquivos neles ainda precisam ser redimensionados, mas alguns (como Ext4 e Btrfs) suportam redimensionamento online;\n- Migração de um LV (ou segmentos) em uso online/em tempo real por serviços para diferentes discos sem necessidade de reinicializar os serviços;\n- Criação de snapshots que permitem o backup de uma cópia congelada de um sistema de arquivos, ao mesmo tempo que minimiza o tempo de indisponibilidade dos serviços e o snapshot pode ser facilmente mesclado/fundido ao volume original mais tarde;\n- Suporte ao desbloqueio de volumes criptografados separados, sem necessidade de informar uma chave múltiplas vezes durante o boot ao criar um LVM dentro do LUKS.\n- Suporte integrado de criação de cache dos dados usados frequentemente (lvmcache(7)).\n\n"
+    },
+    {
+      "title": "Desvantagens",
+      "level": 3,
+      "content": "- Etapas adicionais em configurar o sistema (provavelmente requerendo ajustes na configuração de mkinitcpio) tornam o processo mais complicado. Precisa executar constantemente (múltiplos) daemons.\n\n- Em dual boot, note que o Windows não suporta LVM; é impossibilitado o acesso de quaisquer partições LVM à partir do Windows. Softwares de terceiros talvez permitam a montagem de certos tipos de sistemas configurados com LVM. [2]\n\n- Se seus volumes físicos não estão em uma RAID-1, RAID-5 ou RAID-6 um dos discos pode perder um ou mais volumes lógicos se você espalhar (ou expandir) seus volumes lógicos entre múltiplos discos não redundantes.\n\n- Não é sempre fácil encolher o espaço usado pelo gerenciador de volumes lógicos, no caso os volumes físicos usados para os volumes lógicos. Se as extensões físicas são dispersas pelo volume físico até o final, você pode precisar inspecionar os segmentos e movê-los (potencialmente para outro dispositivo físico), ou mover o mesmo dispositivo com a alocação personalizada (por exemplo, --alloc anywhere). Se você quiser configurar dual boot com outros sistemas operacionais (em exemplo o Microsoft Windows), o único espaço restante no dispositivo com Microsoft Windows será o espaço não usado pelo LVM, ou o que não foi usado como um volume físico.\n\n- Potencial piora de desempenho em comparação às partições simples. [3]\n\n- Pode não funcionar bem com todos os sistema de arquivos, especialmente aqueles projetados para gestão de vários dispositivos. Por exemplo, Btrfs oferece algumas das mesmas funcionalidades (suporte a múltiplos dispositivos , (sub)volumes, snapshots e RAID), e com isso pode existir conflito (leia com mais profundidade sobre os problemas com snapshots em LVM com Btrfs).\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Certifique-se que o pacote lvm2 está instalado.\n\nSe você tem volumes LVM não ativados via initramfs, ative o lvm2-monitor.service, do qual é fornecido pelo pacote lvm2.\n\n"
+    },
+    {
+      "title": "Criação",
+      "level": 4,
+      "content": "Ao criar o PV em /dev/sda1, execute:\n\n```\n# pvcreate /dev/sda1\n```\n\nVocê pode verificar se o PV foi criado ao usar o seguinte comando:\n\n```\n# pvs\n```\n\n"
+    },
+    {
+      "title": "Expansão",
+      "level": 4,
+      "content": "Ao estender, ou antes de reduzir, o tamanho de um dispositivo que possui um volume físico sobre ele, você precisará expandir ou encolher o PV usando pvresize(8).\n\nPara expandir o PV em /dev/sda1, logo após de aumentar a partição, execute:\n\n```\n# pvresize /dev/sda1\n```\n\nCom isso será automaticamente detectado o novo tamanho do dispositivo, e por fim o PV irá estender ao seu máximo.\n\n"
+    },
+    {
+      "title": "Encolhimento",
+      "level": 4,
+      "content": "Para encolher um volume físico antes de reduzir seu dispositivo subjacente, adicione os parâmetros --setphysicalvolumesize tamanho_aqui no comando. Em exemplo:\n\n```\n# pvresize --setphysicalvolumesize 40G /dev/sda1\n```\n\nO comando acima talvez mostre-lhe o seguinte erro:\n\n```\n/dev/sda1: cannot resize to 25599 extents as later ones are allocated.\n0 physical volume(s) resized / 1 physical volume(s) not resized\n```\n\nOu de forma traduzida:\n\n```\n/dev/sda1: não foi possível redimensionar para 25599 extensões, pois há extensões posteriormente já alocadas.\n0 volume(s) físico(s) redimensionados / 1 volume(s) físico(s) não redimensionado(s).\n```\n\nRealmente, pvresize se negará a encolher um PV se o mesmo estiver com as extensões alocadas após o local que as novas últimas alocações do volume deveriam estar. É necessário executar pvmove de antemão para realocá-las em outro lugar no grupo de volume, e para tal deve haver espaço livre disponível.\n\nAntes de liberar as extensões físicas que estão no final do volume, deve-se executar pvdisplay -v -m para vê-las. Uma alternativa seria ver os segmentos de forma tabular com pvs --segments -v.\n\nNo exemplo abaixo, há um volume físico em /dev/sdd1, um grupo de volume como vg1 e um volume lógico chamado backup.\n\n```\n# pvdisplay -v -m\n```\n\n```\nFinding all volume groups.\n    Using physical volume(s) on command line.\n  --- Physical volume ---\n  PV Name               /dev/sdd1\n  VG Name               vg1\n  PV Size               1.52 TiB / not usable 1.97 MiB\n  Allocatable           yes \n  PE Size               4.00 MiB\n  Total PE              399669\n  Free PE               153600\n  Allocated PE          246069\n  PV UUID               MR9J0X-zQB4-wi3k-EnaV-5ksf-hN1P-Jkm5mW\n   \n  --- Physical Segments ---\n  Physical extent 0 to 153600:\n    FREE\n  Physical extent 153601 to 307199:\n    Logical volume\t/dev/vg1/backup\n    Logical extents\t1 to 153599\n  Physical extent 307200 to 307200:\n    FREE\n  Physical extent 307201 to 399668:\n    Logical volume\t/dev/vg1/backup\n    Logical extents\t153601 to 246068\n```\n\nObserve que o espaço sinalizado como FREE foi distribuído para outro local ao longo do volume. Nós devemos primeiramente mover todos os segmentos usados para o começo do volume.\n\nAqui o primeiro segmento livre é de 0 a 153600, desta forma são 153601 extensões livres. Nós agora podemos mover esse número de segmentos da última extensão física para a primeira extensão. O comando portanto será:\n\n```\n# pvmove --alloc anywhere /dev/sdd1:307201-399668 /dev/sdd1:0-92467\n```\n\n```\n/dev/sdd1: Moved: 0.1 %\n/dev/sdd1: Moved: 0.2 %\n...\n/dev/sdd1: Moved: 99.9 %\n/dev/sdd1: Moved: 100.0 %\n```\n\nNote: **do** \n\n- Este comando move 399668 - 307201 + 1 = 92468 PEs do último segmento até o primeiro segmento. Isto é possível porque o primeiro segmento contém 153600 PEs livres, do qual pode alocar os PEs movidos, ou seja, 92467 - 0 + 1 = 92468.\n- A opção --alloc anywhere é usada enquanto movemos os PEs para dentro da mesma partição. Em caso de diferentes partições, o comando pode parecer-se com: # pvmove /dev/sdb1:1000-1999 /dev/sdc1:0-999\n- A execução deste comando pode demorar (entre uma a duas horas) em caso de volumes extensos. É provável que seja uma boa ideia executar o comando em um tmux ou em uma sessão de GNU Screen. Qualquer parada indesejada do processo é capaz de ser fatal.\n- Quando a operação for concluída, execute fsck para averiguar se o seu sistema de arquivos é válido.\n\n```\n# pvmove /dev/sdb1:1000-1999 /dev/sdc1:0-999\n```\n\nUma vez que todos os segmentos físicos livres estejam nas últimas extensões físicas, execute vgdisplay com privilégios de root e veja sua PE livre.\n\nVocê pode agora executar novamente o comando:\n\n```\n# pvresize --setphysicalvolumesize tamanho VolumeFísico\n```\n\nVeja o resultado:\n\n```\n# pvs\n```\n\n```\nPV         VG   Fmt  Attr PSize    PFree \n  /dev/sdd1  vg1  lvm2 a--     1t     500g\n```\n\nPor fim, você deve diminuir a partição com sua ferramenta de particionamento favorita.\n\n"
+    },
+    {
+      "title": "Criando um grupo de volume",
+      "level": 4,
+      "content": "Para criar uma VG MeuGrupoVol com um PV associado ao /dev/sdb1, execute:\n\n```\n# vgcreate MeuGrupoVol /dev/sdb1\n```\n\nVocê pode verificar se foi criado o VG MeuGrupoVol usando o seguinte comando:\n\n```\n# vgs\n```\n\nVocê pode vincular múltiplos PVs ao criar um VG como este:\n\n```\n# vgcreate MeuGrupoVol /dev/sdb1 /dev/sdb2\n```\n\n"
+    },
+    {
+      "title": "Ativando um grupo de volume",
+      "level": 4,
+      "content": "```\n# vgchange -a y MeuGrupoVol\n```\n\nPor padrão, quando aplicável, isto vai reativar o grupo de volume. Por exemplo, quando houve uma falha de um drive espelho e você fez a substituição da unidade e executou os passos: (1) pvcreate, (2) vgextend e (3) vgreduce --removemissing --force.\n\n"
+    },
+    {
+      "title": "Reparando um grupo de volume",
+      "level": 4,
+      "content": "Para começar o processo de reconstrução do arranjo (array) deteriorado de um espelhamento neste exemplo, você deve executar:\n\n```\n# lvconvert --repair /dev/MeuGrupoVol/mirror\n```\n\nVocê pode monitorar o processo de reconstrução (Cpy%Sync Column output) com:\n\n```\n# lvs -a -o +devices\n```\n\n"
+    },
+    {
+      "title": "Desativando um grupo de volume",
+      "level": 4,
+      "content": "Apenas invoque:\n\n```\n# vgchange -a n MeuGrupoVol\n```\n\nIsto irá desativar o grupo de volume e permitir-lhe a desmontagem do contêiner que está armazenando-o.\n\n"
+    },
+    {
+      "title": "Renomeando um grupo de volume",
+      "level": 4,
+      "content": "Use o comando vgrename(8) para renomear um grupo de volume existente.\n\nAmbos os comandos a seguir renomeiam o grupo de volume existente de MeuGrupoVol para meu_grupo_volume:\n\n```\n# vgrename /dev/MeuGrupoVol /dev/meu_grupo_volume\n```\n\n```\n# vgrename MeuGrupoVol meu_grupo_volume\n```\n\nGaranta a atualização de todos os arquivos de configuração (por exemplo /etc/fstab ou /etc/crypttab) que referenciam o grupo de volume renomeado.\n\n"
+    },
+    {
+      "title": "Adicionando um volume físico em um grupo de volume",
+      "level": 4,
+      "content": "Primeiro, crie um novo volume físico no bloco do dispositivo que você deseja usar, então estenda o grupo de volume do mesmo:\n\n```\n# pvcreate /dev/sdb1\n# vgextend MeuGrupoVol /dev/sdb1\n```\n\nIsto, é claro, irá aumentar o número total de extensões físicas no seu grupo de volume, e que podem ser alocadas por volumes lógicos da forma que você achar melhor.\n\n"
+    },
+    {
+      "title": "Removendo uma partição de um grupo de volume",
+      "level": 4,
+      "content": "Se você criou um volume lógico na partição, antes de tudo a remova\n\nTodos os dados daquela partição precisam ser movidos para outra partição. Felizmente, LVM torna isto fácil:\n\n```\n# pvmove /dev/sdb1\n```\n\nSe você quiser mover os dados para um volume físico em específico, determine o armazenamento de destino como o segundo argumento em pvmove:\n\n```\n# pvmove /dev/sdb1 /dev/sdf1\n```\n\nE então o volume físico precisa ser removido do grupo de volume:\n\n```\n# vgreduce MeuGrupoVol /dev/sdb1\n```\n\nOu remova todos os volumes físicos vazios:\n\n```\n# vgreduce --all MeuGrupoVol\n```\n\nPor exemplo: Se você tiver um disco ruim em um grupo que não pode ser encontrado porque ele foi removido ou apresenta falha:\n\n```\n# vgreduce --removemissing --force MeuGrupoVol\n```\n\nE finalmente, se você quiser usar a partição para outra coisa, e quer evitar que o LVM pense que a partição é um volume físico:\n\n```\n# pvremove /dev/sdb1\n```\n\n"
+    },
+    {
+      "title": "Criando um volume lógico",
+      "level": 4,
+      "content": "Para criar um LV homevol em um VG MeuGrupoVol com 300 GiB de capacidade, execute:\n\n```\n# lvcreate -L 300G MeuGrupoVol -n homevol\n```\n\nOu para criar um LV homevol em um VG MeuGrupoVol com o restante da capacidade, execute:\n\n```\n# lvcreate -l 100%FREE MeuGrupoVol -n homevol\n```\n\nPara criar o LV enquanto o restringe para PVs específicos em um determinado VG, acrescente os volumes físicos ao comando:\n\n```\n# lvcreate -L 300G MeuGrupoVol -n homevol /dev/sda1\n```\n\nO novo LV irá aparecer como /dev/MeuGrupoVol/homevol. Agora você pode formatar o LV com um sistema de arquivos apropriado.\n\nVocê pode verificar o LV criado usando o seguinte comando:\n\n```\n# lvs\n```\n\n"
+    },
+    {
+      "title": "Renomeando um volume lógico",
+      "level": 4,
+      "content": "Para renomear um volume lógico existente, use o comando lvrename(8).\n\nAmbos os comandos a seguir renomeiam o volume lógico vol_velho no grupo de volume MeuGrupoVol para vol_novo.\n\n```\n# lvrename /dev/MeuGrupoVol/vol_velho /dev/MeuGrupoVol/vol_novo\n```\n\n```\n# lvrename MeuGrupoVol vol_velho vol_novo\n```\n\nGaranta a atualização de todos os arquivos de configuração (por exemplo /etc/fstab ou /etc/crypttab) que referenciam o volume lógico renomeado.\n\n"
+    },
+    {
+      "title": "Redimensionando um volume lógico e um sistema de arquivos de uma só vez",
+      "level": 4,
+      "content": "Estenda o volume lógico mediavol em MeuGrupoVol para 10 GiB e redimensione o sistema de arquivos de uma só vez:\n\n```\n# lvresize -L +10G --resizefs MeuGrupoVol/mediavol\n```\n\nDefina o tamanho do volume lógico mediavol em MeuGrupoVol para 15 GiB e redimensione o sistema de arquivos de uma só vez:\n\n```\n# lvresize -L 15G --resizefs MeuGrupoVol/mediavol\n```\n\nSe você quiser encher todo o espaço livre disponível no grupo de volume, use o seguinte comando:\n\n```\n# lvresize -l +100%FREE --resizefs MeuGrupoVol/mediavol\n```\n\nVeja lvresize(8) para mais opções detalhadas.\n\n"
+    },
+    {
+      "title": "Redimensionando o volume lógico e o sistema de arquivos separadamente",
+      "level": 4,
+      "content": "Para sistemas de arquivos não suportados por fsadm(8), será necessário usar utilitários apropriados para redimensionar o sistema de arquivos antes de encolher o volume lógico ou depois de expandi-lo.\n\nPara estender um volume lógico mediavol por dentro de um grupo de volume MeuGrupoVol para 2 GiB sem encostar no sistema de arquivos:\n\n```\n# lvresize -L +2G MeuGrupoVol/mediavol\n```\n\nAgora expanda o sistema de arquivos (Ext4 neste exemplo) para o tamanho máximo do volume lógico subjacente:\n\n```\n# resize2fs /dev/MeuGrupoVol/mediavol\n```\n\nPara Btrfs, o btrfs-filesystem(8) espera o ponto de montagem ao invés do dispositivo. O equivalente seria:\n\n```\n# btrfs filesystem resize max /mnt/meu-ponto-de-montagem\n```\n\nPara reduzir o tamanho do volume lógico mediavol em MeuGrupoVol para 500 MiB, primeiramente calcule o tamanho resultante do sistema de arquivos, em seguida encolha o sistema de arquivos (Ext4 neste exemplo) para o novo tamanho:\n\n```\n# resize2fs /dev/MeuGrupoVol/mediavol NovoTamanho\n```\n\nAo contrário do Ext4, Btrfs oferece suporte ao encolhimento online (novamente, o ponto de montagem deverá ser especificado). Por exemplo:\n\n```\n# btrfs filesystem resize -500M /mnt/meu-ponto-de-montagem\n```\n\nQuando o sistema de arquivos for encolhido, reduza o tamanho do volume lógico:\n\n```\n# lvresize -L -500M MeuGrupoVol/mediavol\n```\n\nPara calcular o exato tamanho do volume lógico para os sistemas de arquivos ext2, ext3, ext4, use uma formula simples:\n\nLVM_EXTENTS = FS_BLOCKS × FS_BLOCKSIZE ÷ LVM_EXTENTSIZE.\n\nOu de forma traduzida:\n\nLVM_EXTENSÕES = SA_BLOCOS × SA_TAMANHO-DO-BLOCO ÷ LVM_TAMANHO-DA-EXTENSÃO.\n\n```\n# tune2fs -l /dev/MeuGrupoVol/mediavol | grep Block\n```\n\n```\nBlock count:              102400000\nBlock size:               4096\nBlocks per group:         32768\n```\n\n```\n# vgdisplay MeuGrupoVol | grep \"PE Size\"\n```\n\n```\nPE Size               4.00 MiB\n```\n\n```\n102400000 blocos × 4096 bytes/blocos ÷ 4 MiB/extensões = 100000 extensões\n```\n\nAo passar --resizefs será confirmado com a correção.\n\n```\n# lvreduce -l 100000 --resizefs /dev/MyVolGroup/mediavol\n```\n\n```\n...\nThe filesystem is already 102400000 (4k) blocks long.  Nothing to do!\n...\nLogical volume sysvg/root successfully resized.\n```\n\nOu de forma traduzida:\n\n```\n# lvreduce -l 100000 --resizefs /dev/MeuGrupoVol/mediavol\n```\n\n```\n...\nO sistema de arquivos já está alongado para 102400000 (4k) blocos. Não há nada para fazer!\n...\nVolume lógico sysvg/root foi redimensionado com sucesso.\n```\n\nVeja lvresize(8) para mais opções detalhadas.\n\n"
+    },
+    {
+      "title": "Removendo um volume lógico",
+      "level": 4,
+      "content": "Primeiro, encontre o nome do volume lógico que você quer remover. Você pode pegar uma lista de todos os volumes lógicos presentes com:\n\n```\n# lvs\n```\n\nDepois, procure o ponto de montagem do volume lógico escolhido:\n\n```\n$ lsblk\n```\n\nEntão, desmonte o sistema de arquivos do volume lógico:\n\n```\n# umount /ponto-de-montagem\n```\n\nPor fim, remova o volume lógico:\n\n```\n# lvremove grupo_volume/volume_logico\n```\n\nPor exemplo:\n\n```\n# lvremove MeuGrupoVol/homevol\n```\n\nConfirme a operação digitando y.\n\nGaranta a atualização de todos os arquivos de configuração (por exemplo /etc/fstab ou /etc/crypttab) que referenciam o volume lógico removido.\n\nVocê pode verificar a remoção do volume lógico ao digitar lvs como root novamente (veja o primeiro passo desta seção).\n\n"
+    },
+    {
+      "title": "Snapshots",
+      "level": 2,
+      "content": "LVM permite suporte aos CoW snapshots (Cópia em Gravação, do inglês Copy-on-Write). Um CoW snapshot inicialmente cria um apontamento para os dados originais; quando os blocos de dados são sobrescritos a cópia original permanece intacta, enquanto que os novos blocos são gravados em outro lugar no disco. Isto possui diversas propriedades cobiçáveis:\n\n- Criar um snapshot é rápido, pois não há cópia de dados (apenas cria uma lista bem curta de ponteiros, dos quais apontam para outras localizações no disco).\n- Snapshots requerem apenas o espaço livre suficiente para armazenar os novos blocos de dados (mais uma quantidade de armazenamento, entretanto negligenciável, para o apontamento de novos blocos). Por exemplo, para um snapshot de 35 GiB se utiliza apenas 2 GiB (incluso os dados do ponto de origem e do snapshot), portanto requer apenas 2 GiB de espaço livre.\n\nOs snapshots do LVM estão a nível de bloco; eles criam um novo dispositivo de bloco sem aparente relação com o original, exceto ao lidar com as ferramentas do LVM, logo, ao deletar arquivos na cópia original não será liberado espaço nos snapshots. Se você precisa de snapshots a nível de sistema de arquivos, é necessário que use btrfs, ZFS ou bcachefs.\n\nNote: **não é um backup** \n\n- Um CoW snapshot não é um backup porque o mesmo não faz uma segunda cópia dos dados originários. Como exemplo, um setor danificado do disco que afete os dados originais também afetará os snapshots. Com isto dito, um snapshot pode ser útil enquanto outra ferramenta gerencia um backup, como destacado logo abaixo.\n- Btrfs espera que diferentes sistemas de arquivos tenham diferentes UUIDs. Se você tirar um snapshot de um volume LVM que contem um sistema de arquivos btrfs, lembre-se de alterar o UUID do sistema de arquivos original ou da cópia antes de ambos serem montados (ou faça ser visível para o kernel; em exemplo, em caso de um daemon sem relação engatilhar um escaneamento do dispositivo btrfs). Para detalhes veja sobre btrfs na wiki Gotcha's.\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 3,
+      "content": "É criado um snapshot de volumes lógicos da mesma forma que cria-se volumes lógicos normais.\n\n```\n# lvcreate --size 100M --snapshot --name snap01vol /dev/MeuGrupoVol/lvol\n```\n\nCom este volume você pode modificar menos que 100 MiB de dados, antes que o volume de snapshot encha por completo.\n\nA reversão do volume lógico lvol modificado para o estado que o snapshot snap01vol foi criado pode ser feita com:\n\n```\n# lvconvert --merge /dev/MyVolGroup/snap01vol\n```\n\nEm caso do volume lógico original estar ativo, haverá uma mesclagem no próximo reboot (esta fusão pode ser feita a partir de um LiveCD).\n\nAlém disso, múltiplos snapshots podem ser tirados e cada um pode ser mesclado com o volume lógico original à vontade.\n\n"
+    },
+    {
+      "title": "Backups",
+      "level": 3,
+      "content": "Um snapshot fornece uma cópia congelada de um sistema de arquivos para a criação de backups. Por exemplo, um backup que leve duas horas fornece uma maior consistência de imagem do sistema de arquivos, isto em comparação a um backup feito diretamente na partição.\n\nO snapshot pode ser montado e feito o backup com dd ou tar. O tamanho do arquivo de backup feito pelo dd será igual ao tamanho dos arquivos que residem no volume de snapshot.\n\nPara restauração é preciso apenas criar um snapshot, montá-lo, gravar ou extrair o backup nele, e por fim mesclar/fundir com a origem.\n\nVeja a página em inglês sobre Criação de snapshots do sistema de arquivos root com LVM para automatizar a criação e limpeza de snapshots do root, além de criar durante o processo de inicialização do sistema os backups ou os rollbacks (reversões).\n\n"
+    },
+    {
+      "title": "Criptografia",
+      "level": 2,
+      "content": "Veja os tópicos LVM dentro do LUKS e LUKS dentro do LVM para conhecer os possíveis esquemas ao combinar LUKS com LVM.\n\n"
+    },
+    {
+      "title": "Cache",
+      "level": 2,
+      "content": "De lvmcache(7):\n\n"
+    },
+    {
+      "title": "Criar cache",
+      "level": 3,
+      "content": "Converta seu disco rápido (/dev/disco-rápido) para um PV e adicione-o ao seu VG (MeuGrupoVol) existente:\n\n```\n# vgextend MeuGrupoVol /dev/disco-rápido\n```\n\nCrie uma área de cache com metadado automático em dev/disco-rápido e converta o LV existente MeuGrupoVol/rootvol para um volume de cache. Tudo isso é feito em um único passo:\n\n```\n# lvcreate --type cache --cachemode writethrough -l 100%FREE -n root_cachepool MeuGrupoVol/rootvol /dev/disco-rápido\n```\n\nO modo de cache (do inglês Cachemode) possui duas possibilidades de opções:\n\n- writethrough garante que, quaisquer que sejam os dados escritos, tudo seja armazenado no LV de cache e no LV de origem. A perda do dispositivo associado ao LV de cache, neste caso, não significará a perda dos dados.\n- writeback garante melhor desempenho, ao custo de maior risco de perda de dados em caso do dispositivo usado para cache falhar.\n\nSe não for indicado um --cachemode específico, o sistema irá assumir a opção writethrough por padrão.\n\n"
+    },
+    {
+      "title": "Remover cache",
+      "level": 3,
+      "content": "Se por algum motivo você precisar desfazer a operação de criação acima:\n\n```\n# lvconvert --uncache MeuGrupoVol/rootvol\n```\n\nIsto sujeita qualquer escrita ainda pendente no cache de volta para o LV de origem, e então o deleta. Outras opções disponíveis são descritas em lvmcache(7).\n\n"
+    },
+    {
+      "title": "RAID",
+      "level": 2,
+      "content": "LVM pode ser usado para criar um RAID em software. É uma boa escolha se o usuário não tiver RAID em hardware e já estava planejando usar LVM de qualquer forma. De lvmraid(7):\n\nLVM RAID tem suporte para RAID 0, RAID 1, RAID 4, RAID 5, RAID 6 e RAID 10. Veja em Wikipedia:Standard RAID levels para conhecer os detalhes de cada nível.\n\n"
+    },
+    {
+      "title": "Configurando RAID",
+      "level": 3,
+      "content": "Crie os volumes físicos:\n\n```\n# pvcreate /dev/sda2 /dev/sdb2\n```\n\nCrie um grupo de volume nos volumes físicos:\n\n```\n# vgcreate MeuGrupoVol /dev/sda2 /dev/sdb2\n```\n\n"
+    },
+    {
+      "title": "Novos volumes",
+      "level": 4,
+      "content": "Crie os volumes lógicos com lvcreate --type raidnível. Veja lvmraid(7) e lvcreate(8) para mais opções.\n\n```\n# lvcreate --type RaidNível [OPTIONS] -n Nome -L Tamanho VG [PVs]\n```\n\nPor exemplo:\n\n```\n# lvcreate -n meuraid1vol -i 2 -I 64 -L 70G GrupoVol00 /dev/nvme1n1p1 /dev/nvme0n1p1\n```\n\nO comando acima irá criar e separar 70 GiB (raid0) do volume lógico nomeado como \"meuraid1vol\" em GrupoVol00. A disjunção dos dados será distribuída entre /dev/nvme1n1p1 e /dev/nvme0n1p1. O tamanho de cada parte dividida está definido para ser 64K.\n\nPor exemplo:\n\n```\n# lvcreate --type raid1 --mirrors 1 -L 20G -n meuraid1vol MeuGrupoVol /dev/sda2 /dev/sdb2\n```\n\nO comando acima irá criar um volume lógico espelhado, nomeado como \"meuraid1vol\" em GrupoVol00, com 20 GiB de dados em /dev/sda2 e /dev/sdb2.\n\nPor exemplo:\n\n```\n# lvcreate -n meuraid1vol -L 100G --type raid10 -m 1 -i 2 MeuGrupoVol /dev/sdd1 /dev/sdc1 /dev/sdb1 /dev/sda5\n```\n\nO comando acima irá criar um volume lógico RAID10 de 100 GiB, nomeado como \"meuraid1vol\" em GrupoVol00, entre /dev/sdd1, /dev/sdc1, /dev/sdb1 e /dev/sda5.\n\n"
+    },
+    {
+      "title": "Volumes existentes",
+      "level": 4,
+      "content": "Você pode converter facilmente um volume \"não RAID\" (por exemplo, linear) para basicamente qualquer configuração raid, contanto que você tenha dispositivos físicos suficientes para satisfazer os critérios de criação de RAID. Alguns irão requisitar seguir passos intermediários, do qual o comando lvconvert informará a você na linha de comando para aceitar. O raid10 abaixo pode ser substituído por raid0, raid1, raid5, etc.\n\n```\n# lvconvert --type raid10 /dev/vg01/lv01\n```\n\nPara usar PVs específicos:\n\n```\n# lvconvert --type raid10 /dev/vg01/lv01 /dev/sda1 /dev/sdb2 /dev/nvme0n1p1 ...\n```\n\nVocê pode rastrear o processo de conversão com:\n\n```\n# watch lvs -o name,vg_name,copy_percent\n```\n\n"
+    },
+    {
+      "title": "Provisionamento fino",
+      "level": 2,
+      "content": "De lvmthin(7):\n\n"
+    },
+    {
+      "title": "Exemplo: implementando servidores privados virtuais",
+      "level": 3,
+      "content": "Aqui vai um caso clássico de uso. Suponha que você queira começar seu próprio serviço de VPS, inicialmente hospedando cerca de 100 VPSes em um único computador com disco rígido de 930 GiB. Dificilmente qualquer um dos VPSes irá realmente usar todo o armazenamento que eles foram alocados, então ao invés de alocar 9 GiB para cada VPS, você poderia permitir que cada VPS tenha um tamanho máximo de 30 GiB e que usem provisionamento fino para somente alocar o espaço que cada VPS estará de fato usando no disco rígido. Presuma que o disco rígido de 930 GiB é /dev/sdb. Esta seria a configuração:\n\nPrepare o grupo de volume, MeuGrupoVol.\n\n```\n# vgcreate MeuGrupoVol /dev/sdb\n```\n\nCrie a área fina (ou, do inglês pool) do LV, MeuPoolFino. Este LV irá providenciar os blocos para armazenamento.\n\n```\n# lvcreate --type thin-pool -n MeuPoolFino -l 95%FREE MeuGrupoVol\n```\n\nA pool é composta de dois sub-volumes, o LV de dado e o LV de metadado; este comando cria ambos automaticamente, porém o espaço fino para de funcionar se ambos encherem completamente, e atualmente LVM não possui suporte para encolhimento de nenhum destes volumes. É por isso que o comando acima permite 5% de espaço extra, em caso de você precisar eventualmente expandir os sub-volumes de dado ou de metadado da área fina.\n\nPara cada VPS, crie um LV fino. Este é o dispositivo de bloco exposto ao usuário para a partição root.\n\n```\n# lvcreate -n AlgunsClientesRoot -V 30G --thinpool MeuPoolFino MeuGrupoVol\n```\n\nO dispositivo de bloco /dev/MeuGrupoVol/AlgunsClientesRoot pode então ser usado por uma instância de VirtualBox como partição root.\n\n"
+    },
+    {
+      "title": "Usando snapshots finos para salvar mais espaço",
+      "level": 4,
+      "content": "Snapshots finos são muito mais poderosos do que snapshots convencionais, por conta de serem propriamente LVs finos. Veja o guia da Red Hat [4] para uma lista completa de vantagens que estes snapshots possuem.\n\nAo invés de instalar um Linux do zero toda vez que um VPS é criado, é mais eficiente em espaço começar com apenas um LV fino contendo uma instalação básica do Linux:\n\n```\n# lvcreate -n RootGenérico -V 30G --thinpool MeuPoolFino MeuGrupoVol\n*** instalado um Linux em /dev/MeuGrupoVol/RootGenérico ***\n```\n\nEntão crie snapshots disso para cada VPS:\n\n```\n# lvcreate -s MeuGrupoVol/RootGenérico -n AlgunsClientesRoot\n```\n\nDesta forma, na área fina há apenas uma cópia de dado comum para todos os VPSes, pelo menos inicialmente. Como uma adição bônus, a criação de um novo VPS é instantânea.\n\nEm razão destes snapshots serem finos, uma operação de escrita em RootGenérico faz apenas uma operação CoW no total, em vez de uma operação CoW por snapshot. Isto permite-lhe atualizar o RootGenérico de maneira mais eficiente do que se cada VPS fosse um snapshot regular.\n\n"
+    },
+    {
+      "title": "Exemplo: atualização de armazenamento com zero tempo de inatividade (zero-downtime)",
+      "level": 3,
+      "content": "Existem aplicações de provisionamento fino por fora de uma hospedagem VPS, e existe um jeito de como você pode usá-las para crescer efetivamente a capacidade de um sistema de arquivos previamente montado, sem precisar desmontá-lo. Suponha, de novo, que o servidor possui somente um disco rígido de 930 GiB. A configuração é a mesma feita para a hospedagem de VPS, exceto que há somente um LV fino e o tamanho do LV é muito maior do que o tamanho da área fina.\n\n```\n# lvcreate -n MeuLVFino -V 16T --thinpool MeuPoolFino MeuGrupoVol\n```\n\nEste espaço virtual extra pode ser preenchido com um armazenamento real mais tarde, ao estender a pool fina.\n\nPresuma agora que, depois de um certo tempo, uma atualização de armazenamento é necessária, e o novo disco rígido, /dev/sdc, está conectado ao servidor. Para atualizar a capacidade da área fina, adicione o novo disco rígido ao VG:\n\n```\n# vgextend MeuGrupoVol /dev/sdc\n```\n\nAgora, estenda a pool fina:\n\n```\n# lvextend -l +95%FREE MeuGrupoVol/MeuPoolFino\n```\n\nEm razão do tamanho do LV fino ser de 16 TiB, você poderia adicionar outro disco rígido com espaço de 15.09 TiB antes de finalmente precisar desmontar e redimensionar o sistema de arquivos.\n\n"
+    },
+    {
+      "title": "Customização",
+      "level": 2,
+      "content": "Algumas customizações estão disponíveis ao editar /etc/lvm/lvm.conf. Você talvez ache útil customizar a saída de lvs e pvs, que por padrão não incluem a sincronização em % (vantajoso para ver o progresso de conversão entre, por exemplo, um volume linear para um tipo raid) e o tipo de volume lógico.\n\n```\n/etc/lvm/lvm.conf\n```\n\n```\nreport {\n \tlvs_cols = \"lv_name,lv_attr,lv_active,vg_name,lv_size,lv_layout,lv_allocation_policy,copy_percent,chunk_size\"\n\tpvs_cols = \"pv_name,vg_name,pv_size,pv_free,pv_used,dev_size\"\n}\n```\n\n"
+    },
+    {
+      "title": "Comandos de LVM não funcionam",
+      "level": 3,
+      "content": "- Carregue o módulo adequado:\n\n```\n# modprobe dm_mod\n```\n\nO módulo dm_mod deveria ser automaticamente carregado. No caso de não acontecer, carregue o módulo durante o boot.\n\n- Tente antecipar comandos com lvm desta forma:\n\n```\n# lvm pvdisplay\n```\n\n"
+    },
+    {
+      "title": "Volumes lógicos não aparecem",
+      "level": 3,
+      "content": "Se você está tentando montar volumes lógicos existentes, porém não aparecem em lvscan, você pode usar os comandos a seguir para ativá-los:\n\n```\n# vgscan\n# aay\n```\n\n"
+    },
+    {
+      "title": "LVM em mídia removível",
+      "level": 3,
+      "content": "Sintomas:\n\n```\n# vgscan\n```\n\n```\nReading all physical volumes.  This may take a while...\n  /dev/backupdrive1/backup: read failed after 0 of 4096 at 319836585984: Input/output error\n  /dev/backupdrive1/backup: read failed after 0 of 4096 at 319836643328: Input/output error\n  /dev/backupdrive1/backup: read failed after 0 of 4096 at 0: Input/output error\n  /dev/backupdrive1/backup: read failed after 0 of 4096 at 4096: Input/output error\n  Found volume group \"backupdrive1\" using metadata type lvm2\n  Found volume group \"networkdrive\" using metadata type lvm2\n```\n\nOu de forma traduzida:\n\n```\n# vgscan\n```\n\n```\nLendo todos os volumes físicos.  Isto pode levar um tempo...\n  /dev/backupdrive1/backup: leitura falhou logo após 0 de 4096 em 319836585984: erro de Entrada/Saída\n  /dev/backupdrive1/backup: leitura falhou logo após 0 de 4096 em 319836643328: erro de Entrada/Saída\n  /dev/backupdrive1/backup: leitura falhou logo após 0 de 4096 em 0: erro de Entrada/Saída\n  /dev/backupdrive1/backup: leitura falhou logo após 0 de 4096 em 4096: erro de Entrada/Saída\n  Encontrado grupo de volume \"backupdrive1\" usando metadata tipo lvm2\n  Encontrado grupo de volume \"networkdrive\" usando metadata tipo lvm2\n```\n\nCausa: remover um drive LVM externo sem desativar o(s) grupo(s) de volume antes. Antes de desconectar, se assegure de fazer:\n\n```\n# vgchange -an nome_grupo_volume\n```\n\nCorreção: supondo que você já tentou ativar o grupo de volume com vgchange -ay vg, e está recebendo erros de Entrada/Saída:\n\n```\n# vgchange -an nome_grupo_volume\n```\n\nDesconecte o dispositivo externo e espere alguns minutos:\n\n```\n# vgscan\n# vgchange -ay nome_grupo_volume\n```\n\n"
+    },
+    {
+      "title": "Suspensão/retorno com LVM e mídia removível",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nPara que o LVM funcione adequadamente com mídias removíveis - como em uma unidade USB externa - o grupo de volume da unidade externa precisa ser desativado antes de suspender. Se isso não for feito, você pode acabar com erros de Entrada/Saída no buffer do dispositivo mapeado (após o retorno). Por esta razão, não é recomendado misturar drives externos com internos no mesmo grupo de volume.\n\nPara automaticamente desativar os grupos de volume com unidades USB externas, marque cada um dos grupos de volume com a tag sleep_umount, sendo desta forma:\n\n```\n# vgchange --addtag sleep_umount vg_externo\n```\n\nUma vez que a marcação é definida, use o seguinte arquivo unit do systemd para desativar apropriadamente os volumes antes da suspensão. Ao retornar o sistema, os drives serão automaticamente ativados pelo LVM.\n\n```\n/etc/systemd/system/ext_usb_vg_desativar.service\n```\n\n```\n[Unit]\nDescription=Desativar grupos de volume de USB externo ao suspender\nBefore=sleep.target\n\n[Service]\nType=oneshot\nExecStart=-/etc/systemd/system/desativar_sleep_vgs.sh\n\n[Install]\nWantedBy=sleep.target\n```\n\nEste é o script:\n\n```\n/etc/systemd/system/deactivate_sleep_vgs.sh\n```\n\n```\n#!/bin/sh\n\nTAG=@sleep_umount\nvgs=$(vgs --noheadings -o vg_name $TAG)\n\necho \"Desativando grupos de volume com a tag $TAG: $vgs\"\n\n# Desmonte volumes lógicos que pertencem ao grupos de volumes com a tag $TAG\nfor vg in $vgs; do\n    for lv_dev_path in $(lvs --noheadings  -o lv_path -S lv_active=active,vg_name=$vg); do\n        echo \"Desmontando volume lógico $lv_dev_path\"\n        umount $lv_dev_path\n    done\ndone\n\n# Desative grupos de volumes marcados com sleep_umount\nfor vg in $vgs; do\n    echo \"Desativando grupo de volume $vg\"\n    vgchange -an $vg\ndone\n```\n\nPor fim, ative a unit.\n\n"
+    },
+    {
+      "title": "Redimensionando um volume lógico contíguo que falha",
+      "level": 3,
+      "content": "Se estiver tentando estender um volume lógico e houver erros com:\n\n```\n\" Insufficient suitable contiguous allocatable extents for logical volume \"\n```\n\nOu de forma traduzida:\n\n```\n\" Extensões alocáveis contíguas e adequadas insuficientes para o volume lógico \"\n```\n\nA razão é que o volume lógico foi criado com uma restrição explícita (ou, do inglês policy) de alocação contígua (definido por opções como -C y ou --alloc contiguous), e nenhuma extensão contígua adjacente está disponível. [5]\n\nPara corrigir, principalmente para estender o volume lógico, modifique a restrição de alocação com lvchange --alloc inherit volume_lógico. Se você precisar manter a restrição de alocação contígua, uma alternativa seria mover o volume para uma área do disco com extensões livres suficientes. Veja [6].\n\n"
+    },
+    {
+      "title": "Comando \"grub-mkconfig\" reporta erros de \"unknown filesystem\"",
+      "level": 3,
+      "content": "Lembre-se de remover volumes snapshot antes de gerar o grub.cfg, pois GRUB não conseguirá reconhecer estes volumes como um sistema de arquivos.\n\n"
+    },
+    {
+      "title": "Tempo de volume root com dispositivo de provisão fina expira (time out)",
+      "level": 3,
+      "content": "Com um grande número de snapshots, thin_check executará por um tempo longo o suficiente para que o tempo de espera pelo dispositivo root expire. Para compensar isso, adicione o parâmetro de inicialização do kernel rootdelay=60 nas configurações do seu bootloader. Ou faça com que thin_check pule a verificação de mapeamento de blocos (veja [7]) e gere novamente o initramfs:\n\n```\n/etc/lvm/lvm.conf\n```\n\n```\nthin_check_options = [ \"-q\", \"--clear-needs-check-flag\", \"--skip-mappings\" ]\n```\n\n"
+    },
+    {
+      "title": "Lentidão ao desligar",
+      "level": 3,
+      "content": "Se você usa RAID, snapshots ou provisionamento fino e estiver experienciando uma lentidão ao desligar, garanta que lvm2-monitor.service esteja iniciado. Veja FS#50420.\n\n"
+    },
+    {
+      "title": "Hibernação em um volume swap de provisionamento fino",
+      "level": 3,
+      "content": "Veja em Gestão de energia#hibernação em volume LVM de provisionamento fino.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- LVM2 Resource Page em SourceWare.org\n- Gentoo:LVM\n- Red Hat Enterprise 9: Configuração e gerenciamento de volumes lógicos\n- Guia do Ubuntu sobre LVM Parte 1detalhes sobre snapshots Parte 2\n\n"
+    }
+  ]
+}

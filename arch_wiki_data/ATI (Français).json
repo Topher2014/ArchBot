@@ -1,0 +1,191 @@
+{
+  "title": "ATI (Français)",
+  "url": "https://wiki.archlinux.org/title/ATI_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- AMDGPU\n- Xorg\n\nThis article covers the radeon open source driver which supports older AMD (previously ATI) GPUs.\n\n"
+    },
+    {
+      "title": "Selecting the right driver",
+      "level": 2,
+      "content": "Depending on the card you have, find the right driver in Xorg#AMD. This page has instructions for ATI.\n\nIf unsure, try the AMDGPU driver first, it will suit most needs for cards released since 2015. See the feature matrix to know what is supported by this driver and the decoding table to translate marketing names (e.g. Radeon HD4330) to chip names (e.g. R700).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mesa package, which provides both the DRI driver for 3D acceleration and VA-API/VDPAU drivers for accelerated video decoding. Or mesa-amber for very old GPUs (R200 and prior).\n\n- For 32-bit application support, also install the lib32-mesa (lib32-mesa-amber) package from the multilib repository.\n- For the DDX driver (which provides 2D acceleration in Xorg), you can install the xf86-video-ati package. However, it is not required since default modesetting driver exists.\n\n"
+    },
+    {
+      "title": "Loading",
+      "level": 2,
+      "content": "The radeon kernel module should load fine automatically on system boot.\n\nIf it does not happen, then:\n\n- Make sure you do not have nomodeset or vga= as a kernel parameter, since radeon requires KMS.\n- Also, check that you have not disabled radeon by using any kernel module blacklisting.\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 2,
+      "content": "Xorg will automatically load the driver and it will use your monitor's EDID to set the native resolution. Configuration is only required for tuning the driver.\n\nIf you want manual configuration, create /etc/X11/xorg.conf.d/20-radeon.conf, and add the following:\n\n```\nSection \"OutputClass\"\n    Identifier \"Radeon\"\n    MatchDriver \"radeon\"\n    Driver \"radeon\"\nEndSection\n```\n\nUsing this section, you can enable features and tweak the driver settings.\n\n"
+    },
+    {
+      "title": "Enabling video acceleration",
+      "level": 3,
+      "content": "See Hardware video acceleration#AMD/ATI.\n\n"
+    },
+    {
+      "title": "Graphical tools",
+      "level": 3,
+      "content": "- radeon-profile — Qt application for displaying info about a Radeon card.\n\n- CoreCtrl — Popular general purpose GPU/CPU controller. See their Setup page for advanced usage.\n\n"
+    },
+    {
+      "title": "Driver options",
+      "level": 3,
+      "content": "The following options apply to /etc/X11/xorg.conf.d/20-radeon.conf.\n\nPlease read radeon(4) and RadeonFeature first before applying driver options.\n\nAcceleration architecture; Glamor is available as a 2D acceleration method implemented through OpenGL, and it is the default for R600 (Radeon HD2000 series) and newer graphic cards. Older cards use EXA.\n\n```\nOption \"AccelMethod\" \"glamor\"\n```\n\nDRI3 is enabled by default since xf86-video-ati 7.8.0.\n\nTearFree is a tearing prevention option which prevents tearing by using the hardware page flipping mechanism:\n\n```\nOption \"TearFree\" \"on\"\n```\n\nColorTiling and ColorTiling2D are supposed to be enabled by default. Tiled mode can provide significant performance benefits with 3D applications. It is disabled if the DRM module is too old or if the current display configuration does not support it. KMS ColorTiling2D is only supported on R600 (Radeon HD2000 series) and newer chips:\n\n```\nOption \"ColorTiling\" \"on\"\nOption \"ColorTiling2D\" \"on\"\n```\n\nWhen using Glamor as acceleration architecture, it is possible to enable the ShadowPrimary option, which enables a so-called \"shadow primary\" buffer for fast CPU access to pixel data, and separate scanout buffers for each display controller (CRTC). This may improve performance for some 2D workloads, potentially at the expense of other (e.g. 3D, video) workloads. Note that enabling this option currently disables Option \"EnablePageFlip\":\n\n```\nOption \"ShadowPrimary\" \"on\"\n```\n\nEXAVSync is only available when using EXA and can be enabled to avoid tearing by stalling the engine until the display controller has passed the destination region. It reduces tearing at the cost of performance and has been known to cause instability on some chips:\n\n```\nOption \"EXAVSync\" \"yes\"\n```\n\nBelow is a sample configuration file of /etc/X11/xorg.conf.d/20-radeon.conf:\n\n```\nSection \"OutputClass\"\n  Identifier \"Radeon\"\n  MatchDriver \"radeon\"\n  Driver \"radeon\"\n  Option \"AccelMethod\" \"glamor\"\n  Option \"DRI\" \"3\"\n  Option \"TearFree\" \"on\"\n  Option \"ColorTiling\" \"on\"\n  Option \"ColorTiling2D\" \"on\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Kernel parameters",
+      "level": 3,
+      "content": "Defining the gartsize, if not autodetected, can be done by adding radeon.gartsize=32 as a kernel parameter.\n\n```\n[drm] Detected VRAM RAM=2048M, BAR=256M\n[drm] radeon: 2048M of VRAM memory ready\n[drm] radeon: 2048M of GTT memory ready.\n```\n\nThe changes take effect at the next reboot.\n\n"
+    },
+    {
+      "title": "Deactivating PCIe 2.0",
+      "level": 4,
+      "content": "Since kernel 3.6, PCI Express 2.0 in radeon is turned on by default.\n\nIt may be unstable with some motherboards. It can be deactivated by adding radeon.pcie_gen2=0 as a kernel parameter.\n\nSee Phoronix article for more information.\n\n"
+    },
+    {
+      "title": "Gallium Heads-Up Display",
+      "level": 3,
+      "content": "The radeon driver supports the activation of a heads-up display (HUD) which can draw transparent graphs and text on top of applications that are rendering, such as games. These can show values such as the current frame rate or the CPU load for each CPU core or an average of all of them. The HUD is controlled by the GALLIUM_HUD environment variable, and can be passed the following list of parameters among others:\n\n- \"fps\" - displays current frames per second\n- \"cpu\" - displays the average CPU load\n- \"cpu0\" - displays the CPU load for the first CPU core\n- \"cpu0+cpu1\" - displays the CPU load for the first two CPU cores\n- \"draw-calls\" - displays how many times each material in an object is drawn to the screen\n- \"requested-VRAM\" - displays how much VRAM is being used on the GPU\n- \"samples-passed\" - displays how many pixels are being displayed\n\nTo see a full list of parameters, as well as some notes on operating GALLIUM_HUD, you can also pass the \"help\" parameter to a simple application such as glxgears and see the corresponding terminal output:\n\n```\n# GALLIUM_HUD=\"help\" glxgears\n```\n\nMore information can be found from this mailing list post or this blog post.\n\n"
+    },
+    {
+      "title": "Hybrid graphics/AMD Dynamic Switchable Graphics",
+      "level": 2,
+      "content": "It is the technology used on recent laptops equiped with two GPUs, one power-efficent (generally Intel integrated card) and one more powerful and more power-hungry (generally Radeon or Nvidia). There are two ways to get it work:\n\n- If it is not required to run 'GPU-hungry' applications, it is possible to disable the discrete card (see Ubuntu wiki): # echo OFF > /sys/kernel/debug/vgaswitcheroo/switch\n- PRIME: Is a proper way to use hybrid graphics on Linux, but still requires a bit of manual intervention from the user.\n\n```\n# echo OFF > /sys/kernel/debug/vgaswitcheroo/switch\n```\n\n"
+    },
+    {
+      "title": "Powersaving",
+      "level": 2,
+      "content": "You can choose between three different methods:\n\n1. dpm (enabled by default since kernel 3.13)\n1. dynpm\n1. profile\n\nSee https://www.x.org/wiki/RadeonFeature/#index3h2 for more details.\n\n"
+    },
+    {
+      "title": "Dynamic power management",
+      "level": 3,
+      "content": "Since kernel 3.13, DPM is enabled by default for lots of AMD Radeon hardware. If you want to disable it and use another method instead, add the parameter radeon.dpm=0 to the kernel parameters.\n\nUnlike dynpm, the \"dpm\" method uses hardware on the GPU to dynamically change the clocks and voltage based on GPU load. It also enables clock and power gating.\n\nThere are 3 operation modes to choose from:\n\n- battery lowest power consumption\n- balanced sane default\n- performance highest performance\n\nThey can be changed via sysfs:\n\n```\n# echo battery > /sys/class/drm/card0/device/power_dpm_state\n```\n\nFor testing or debugging purposes, you can force the card to run in a set performance mode:\n\n- auto default; uses all levels in the power state\n- low enforces the lowest performance level\n- high enforces the highest performance level\n\n```\n# echo low > /sys/class/drm/card0/device/power_dpm_force_performance_level\n```\n\n"
+    },
+    {
+      "title": "Command-line tools",
+      "level": 4,
+      "content": "- radcard - A script to get and set DPM power states and levels\n\n"
+    },
+    {
+      "title": "Dynamic frequency switching",
+      "level": 4,
+      "content": "This method dynamically changes the frequency depending on GPU load, so performance is ramped up when running GPU intensive applications, and ramped down when the GPU is idle. The re-clocking is attempted during vertical blanking periods, but due to the timing of the re-clocking functions, does not always complete in the blanking period, which can lead to flicker in the display. Due to this, dynamic power management only works when a single head is active.\n\nIt can be activated by simply running the following command:\n\n```\n# echo dynpm > /sys/class/drm/card0/device/power_method\n```\n\n"
+    },
+    {
+      "title": "Profile-based frequency switching",
+      "level": 4,
+      "content": "This method will allow you to select one of the five profiles (described below). Different profiles, for the most part, end up changing the frequency/voltage of the GPU. This method is not as aggressive, but is more stable and flicker free and works with multiple heads active.\n\nTo activate the method, run the following command:\n\n```\n# echo profile > /sys/class/drm/card0/device/power_method\n```\n\nSelect one of the available profiles:\n\n- default uses the default clocks and does not change the power state. This is the default behaviour.\n- auto selects between mid and high power states based on the whether the system is on battery power or not.\n- low forces the gpu to be in the low power state all the time. Note that low can cause display problems on some laptops, which is why auto only uses low when monitors are off. Selected on other profiles when the monitors are in the DPMS-off state.\n- mid forces the gpu to be in the mid power state all the time.\n- high forces the gpu to be in the high power state all the time.\n\nAs an example, we will activate the low profile (replace low with any of the aforementioned profiles as necessary):\n\n```\n# echo low > /sys/class/drm/card0/device/power_profile\n```\n\n"
+    },
+    {
+      "title": "Persistent configuration",
+      "level": 3,
+      "content": "The methods described above are not persistent. To make them persistent, you may create a udev rule (example for #Profile-based frequency switching):\n\n```\n/etc/udev/rules.d/30-radeon-pm.rules\n```\n\n```\nKERNEL==\"card0\", SUBSYSTEM==\"drm\", DRIVERS==\"radeon\", ATTR{device/power_method}=\"profile\", ATTR{device/power_profile}=\"low\"\n```\n\nAs another example, dynamic power management can be permanently forced to a certain performance level:\n\n```\n/etc/udev/rules.d/30-radeon-pm.rules\n```\n\n```\nKERNEL==\"card0\", SUBSYSTEM==\"drm\", DRIVERS==\"radeon\", ATTR{device/power_dpm_force_performance_level}=\"high\"\n```\n\n"
+    },
+    {
+      "title": "Other notes",
+      "level": 3,
+      "content": "To view the speed that the GPU is running at, perform the following command and you will get something like this output:\n\n```\n# cat /sys/kernel/debug/dri/0/radeon_pm_info\n```\n\n```\nstate: PM_STATE_ENABLED\ndefault engine clock: 300000 kHz\ncurrent engine clock: 300720 kHz\ndefault memory clock: 200000 kHz\n```\n\nIt depends on which GPU line yours is, however. Along with the radeon driver versions, kernel versions, etc. So it may not have much/any voltage regulation at all.\n\nThermal sensors are implemented via external i2c chips or via the internal thermal sensor (rv6xx-evergreen only). To get the temperature on asics that use i2c chips, you need to load the appropriate hwmon driver for the sensor used on your board (lm63, lm64, etc.). The drm will attempt to load the appropriate hwmon driver. On boards that use the internal thermal sensor, the drm will set up the hwmon interface automatically. When the appropriate driver is loaded, the temperatures can be accessed via lm_sensors tools or via sysfs in /sys/class/hwmon.\n\n"
+    },
+    {
+      "title": "Fan speed",
+      "level": 2,
+      "content": "While the power saving features above should handle fan speeds quite well, some cards may still be too noisy in their idle state. In this case, and when your card supports it, you can change the fan speed manually.\n\n- Keep in mind that the following method sets the fan speed to a fixed value, hence it will not adjust with the stress of the GPU, which can lead to overheating under heavy load.\n- Check GPU temperature when applying lower than standard values.\n\nTo control the GPU fan, see Fan speed control#AMDGPU sysfs fan control (amdgpu and radeon share the same controls for this).\n\nFor persistence, see the example in #Persistent configuration.\n\nIf a fixed value is not desired, there are possibilities to define a custom fan curve manually by, for example, writing a script in which fan speeds are set depending on the current temperature (current value in /sys/class/drm/card0/device/hwmon/hwmon0/temp1_input).\n\nA GUI solution is available by installing radeon-profile-gitAUR.\n\n"
+    },
+    {
+      "title": "TV out",
+      "level": 2,
+      "content": "First, check that you have an S-video output: xrandr should give you something like\n\n```\nScreen 0: minimum 320x200, current 1024x768, maximum 1280x1200\n...\nS-video disconnected (normal left inverted right x axis y axis)\n```\n\nNow we should tell Xorg that it is actually connected (it is, right?)\n\n```\nxrandr --output S-video --set \"load detection\" 1\n```\n\nSetting TV standard to use:\n\n```\nxrandr --output S-video --set \"tv standard\" ntsc\n```\n\nAdding a mode for it (currently supports only 800x600):\n\n```\nxrandr --addmode S-video 800x600\n```\n\nClone mode:\n\n```\nxrandr --output S-video --same-as VGA-0\n```\n\nNow let us try to see what we have:\n\n```\nxrandr --output S-video --mode 800x600\n```\n\nAt this point, you should see a 800x600 version of your desktop on your TV.\n\nTo disable the output, do\n\n```\nxrandr --output S-video --off\n```\n\n"
+    },
+    {
+      "title": "Force TV-out in KMS",
+      "level": 3,
+      "content": "The kernel can recognize video= parameter in following form (see KMS for more details):\n\n```\nvideo=<conn>:<xres>x<yres>[M][R][-<bpp>][@<refresh>][i][m][eDd]\n```\n\nFor example:\n\n```\nvideo=DVI-I-1:1280x1024-24@60e\n```\n\nParameters with whitespaces must be quoted:\n\n```\n\"video=9-pin DIN-1:1024x768-24@60e\"\n```\n\nYou can get list of your video outputs with following command:\n\n```\n$ ls -1 /sys/class/drm/ | grep -E '^card[[:digit:]]+-' | cut -d- -f2-\n```\n\n"
+    },
+    {
+      "title": "HDMI audio",
+      "level": 2,
+      "content": "HDMI audio is supported in the xf86-video-ati video driver. To disable HDMI audio add radeon.audio=0 to your kernel parameters.\n\nIf there is no video after boot up, the driver option has to be disabled.\n\n- If HDMI audio does not work after installing the driver, test your setup with the procedure at Advanced Linux Sound Architecture/Troubleshooting#HDMI output does not work.\n- If the sound is distorted in PulseAudio, try setting tsched=0 as described in PulseAudio/Troubleshooting#Troubleshooting buffer underruns (glitches, skips, crackling) and make sure rtkit daemon is running.\n- Your sound card might use the same module, since HDA compliant hardware is pretty common. Advanced Linux Sound Architecture#Set the default sound card using one of the suggested methods, which include using the defaults node in alsa configuration.\n\n"
+    },
+    {
+      "title": "Using the RandR extension",
+      "level": 3,
+      "content": "See Multihead#RandR how to setup multiple monitors by using RandR.\n\n"
+    },
+    {
+      "title": "Independent X screens",
+      "level": 3,
+      "content": "Independent dual-headed setups can be configured the usual way. However you might want to know that the radeon driver has a \"ZaphodHeads\" option which allows you to bind a specific device section to an output of your choice:\n\n```\n/etc/X11/xorg.conf.d/20-radeon.conf\n```\n\n```\nSection \"Device\"\n  Identifier \"Device0\"\n  Driver \"radeon\"\n  Option \"ZaphodHeads\" \"VGA-0\"\n  VendorName \"ATI\"\n  BusID \"PCI:1:0:0\"\n  Screen 0\nEndSection\n```\n\nThis can be a life-saver, when using videocards that have more than two outputs. For instance one HDMI out, one DVI, one VGA, will only select and use HDMI+DVI outputs for the dual-head setup, unless you explicitly specify \"ZaphodHeads\" \"VGA-0\".\n\n"
+    },
+    {
+      "title": "Turn vsync off",
+      "level": 2,
+      "content": "The radeon driver will probably enable vsync by default, which is perfectly fine except for benchmarking. To turn it off, try the vblank_mode=0 environment variable or create ~/.drirc (edit it if it already exists) and add the following:\n\n```\n~/.drirc\n```\n\n```\n<driconf>\n    <device screen=\"0\" driver=\"dri2\">\n        <application name=\"Default\">\n            <option name=\"vblank_mode\" value=\"0\" />\n        </application>\n    </device>\n    ...\n</driconf>\n```\n\nNote: **dri2** \n\nIf vsync is still enabled, you can disable it by editing /etc/X11/xorg.conf.d/20-radeon.conf. See #Driver options.\n\n"
+    },
+    {
+      "title": "Performance and/or artifacts issues when using EXA",
+      "level": 3,
+      "content": "If having 2D performance issues, like slow scrolling in a terminal or webbrowser, adding Option \"MigrationHeuristic\" \"greedy\" as device option may solve the issue.\n\nIn addition disabling EXAPixmaps may solve artifacts issues, although this is generally not recommended and may cause other issues.\n\n```\n/etc/X11/xorg.conf.d/20-radeon.conf\n```\n\n```\nSection \"OutputClass\"\n    Identifier \"Radeon\"\n    MatchDriver \"radeon\"\n    Option \"AccelMethod\" \"exa\"\n    Option \"MigrationHeuristic\" \"greedy\"\n    #Option \"EXAPixmaps\" \"off\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Adding undetected/unsupported resolutions",
+      "level": 3,
+      "content": "See Xrandr#Adding undetected resolutions.\n\n"
+    },
+    {
+      "title": "TV showing a black border around the screen",
+      "level": 3,
+      "content": "When connecting a TV using the HDMI port, the TV may show a blurry picture with a 2-3cm border around it. This protects against overscanning (see Wikipedia:Overscan), but can be turned off using xrandr:\n\n```\nxrandr --output HDMI-0 --set underscan off\n```\n\n"
+    },
+    {
+      "title": "Black screen and no console, but X works in KMS",
+      "level": 3,
+      "content": "This is a solution to the no-console problem that might come up, when using two or more ATI cards on the same PC. Fujitsu Siemens Amilo PA 3553 laptop for example has this problem. This is due to fbcon console driver mapping itself to the wrong framebuffer device that exists on the wrong card. This can be fixed by using the following kernel parameter:\n\n```\nfbcon=map:1\n```\n\nThis will tell the fbcon to map itself to the /dev/fb1 framebuffer and not the /dev/fb0, that in our case exists on the wrong graphics card. If that does not fix your problem, try booting with\n\n```\nfbcon=map:0\n```\n\ninstead.\n\n"
+    },
+    {
+      "title": "ATI X1600 (RV530 series) 3D application show black windows",
+      "level": 3,
+      "content": "There are three possible solutions:\n\n- Try adding pci=nomsi to your boot loader Kernel parameters.\n- If this does not work, you can try adding noapic instead of pci=nomsi.\n- If none of the above work, then you can try running vblank_mode=0 glxgears or vblank_mode=1 glxgears to see which one works for you, then set the option permanently.\n\n"
+    },
+    {
+      "title": "Cursor corruption after coming out of sleep",
+      "level": 3,
+      "content": "If the cursor becomes corrupted (e.g. repeating itself vertically after the monitor(s) comes out of sleep) set \"SWCursor\" \"True\" in the \"OutputClass\" section of the /etc/X11/xorg.conf.d/20-radeon.conf configuration file.\n\n"
+    },
+    {
+      "title": "DisplayPort stays black on multimonitor mode",
+      "level": 3,
+      "content": "Try booting with the kernel parameter radeon.audio=0.\n\n"
+    },
+    {
+      "title": "R9-390 Poor Performance and/or Instability",
+      "level": 3,
+      "content": "Firmware issues with R9-390 series cards include poor performance and crashes (frequently caused by gaming or using Google Maps) possibly related DPM. There has been a comment on a bug report with instructions for a fix.\n\n"
+    },
+    {
+      "title": "QHD / UHD / 4k support over HDMI for older Radeon cards",
+      "level": 3,
+      "content": "Older cards have their pixel clock limited to 165MHz for HDMI. Hence, they do not support QHD or 4k only via dual-link DVI but not over HDMI.\n\nOne possibility to work around this is to use custom modes with lower refresh rate, e.g. 30Hz.\n\nAnother one is a kernel patch removing the pixel clock limit, but this may damage the card!\n\nOfficial kernel bug ticket with patch for 4.8: https://bugzilla.kernel.org/show_bug.cgi?id=172421\n\nThe patch introduces a new kernel parameter radeon.hdmimhz which alters the pixel clock limit.\n\nBe sure to use a high speed HDMI cable for this.\n\n"
+    },
+    {
+      "title": "Horizontal flickering occasionally when using 4k DP output on 390X",
+      "level": 3,
+      "content": "If you use 390X (or perhaps similar models) and the 4k output from DP, you may experiencing occasional horizontal artifacts / flickering (i.e. every half an hour or so, a horizontal strip of pixels with a height of ~100 pixels across the whole screen's width shaking up and down for a few seconds). This might be a bug of the radeon driver. Changing to AMDGPU seems to fix it.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "Benchmark showing the open source driver is on par performance-wise with the proprietary driver for many cards.\n\n"
+    }
+  ]
+}

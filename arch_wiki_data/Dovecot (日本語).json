@@ -1,0 +1,76 @@
+{
+  "title": "Dovecot (日本語)",
+  "url": "https://wiki.archlinux.org/title/Dovecot_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Postfix\n- Courier MTA\n- OpenSMTPD\n- Fail2ban\n- SOGo\n- 仮想ユーザーメールシステム\n\nこの記事では個人やスモールオフィスでの利用に適したメールサーバーの設定方法について記述しています。\n\nDovecot は Linux/Unix ライクなシステム向けのオープンソースの IMAP と POP3 サーバーで、セキュリティを主眼に置いて書かれています。Dovecot は Timo Sirainen によって開発され、2002年7月に初めてリリースされました。Dovecot は第一に軽量で高速、設定しやすいオープンソースのメールサーバーを目指しています。詳しい情報は、公式の Dovecot Wiki を見て下さい。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 前提 2.2 SSL 証明書の作成 2.3 DH パラメータの生成 2.4 PAM 認証 2.5 PAM 認証と LDAP 2.6 Dovecot の設定 2.7 Sieve 2.7.1 Sieve Interpreter Plugin 2.7.1.1 SpamAssassin - スパムを \"Junk\" フォルダに移動 2.7.2 ManageSieve Server\n- 3 サーバーを起動する\n- 4 ヒントとテクニック\n\n- 2.1 前提\n- 2.2 SSL 証明書の作成\n- 2.3 DH パラメータの生成\n- 2.4 PAM 認証\n- 2.5 PAM 認証と LDAP\n- 2.6 Dovecot の設定\n- 2.7 Sieve 2.7.1 Sieve Interpreter Plugin 2.7.1.1 SpamAssassin - スパムを \"Junk\" フォルダに移動 2.7.2 ManageSieve Server\n\n- 2.7.1 Sieve Interpreter Plugin 2.7.1.1 SpamAssassin - スパムを \"Junk\" フォルダに移動\n- 2.7.2 ManageSieve Server\n\n- 2.7.1.1 SpamAssassin - スパムを \"Junk\" フォルダに移動\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "dovecot と pam パッケージをインストールしてください。\n\n"
+    },
+    {
+      "title": "前提",
+      "level": 3,
+      "content": "- Dovecot によるメールアカウントはそれぞれ、サーバーに定義するローカルのユーザーアカウントを持ちます。\n- サーバーはローカルのユーザーデータベース (/etc/passwd) ではなく PAM を使ってユーザーを認証します。\n- 認証パスワードの暗号化には SSL が使われます。\n- 一般的な Maildir フォーマットを使ってユーザーのホームディレクトリにメールを保存します。\n- MDA はあらかじめローカルユーザーにメールを配達するように設定されています。\n\n"
+    },
+    {
+      "title": "SSL 証明書の作成",
+      "level": 3,
+      "content": "dovecot パッケージにはサーバーの SSL 証明書を生成するためのスクリプトが含まれています。\n\n- サンプルファイルから設定ファイルをコピーしてください: # cp /usr/share/doc/dovecot/dovecot-openssl.cnf /etc/ssl/dovecot-openssl.cnf。\n- /etc/ssl/dovecot-openssl.cnf を編集して証明書を設定してください。\n\n- # /usr/lib/dovecot/mkcert.sh を実行すれば証明書が生成されます。\n\n証明書・キーのペアは /etc/ssl/certs/dovecot.pem と /etc/ssl/private/dovecot.pem として作成されます。\n\n証明書を変更した時は cp /etc/ssl/certs/dovecot.pem /etc/ca-certificates/trust-source/anchors/dovecot.crt と # trust extract-compat を実行してください。\n\n```\nssl_protocols = !SSLv3\nssl_cipher_list = ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA\nssl_prefer_server_ciphers = yes\n```\n\n"
+    },
+    {
+      "title": "DH パラメータの生成",
+      "level": 3,
+      "content": "新しい DH パラメータファイルを生成するには (長い時間がかかります):\n\n```\n# openssl dhparam -out /etc/dovecot/dh.pem 4096\n```\n\n/etc/dovecot/dovecot.conf にファイルを追加してください:\n\n```\nssl_dh = </etc/ssl/dh.pem\n```\n\n"
+    },
+    {
+      "title": "PAM 認証",
+      "level": 3,
+      "content": "- dovecot の PAM を設定するには、以下の内容で /etc/pam.d/dovecot を作成してください:\n\n```\n/etc/pam.d/dovecot\n```\n\n```\nauth    required        pam_unix.so nullok\naccount required        pam_unix.so\n```\n\n"
+    },
+    {
+      "title": "PAM 認証と LDAP",
+      "level": 3,
+      "content": "- OpenLDAP サーバーを使って認証している場合、LDAP 認証に書かれているように先に LDAP ユーザーでログインできることを確認してください。それから、/etc/pam.d/dovecot に以下を記述します。エントリの順番には意味があるので注意してください:\n\n```\n/etc/pam.d/dovecot\n```\n\n```\nauth    sufficient      pam_ldap.so\nauth    required        pam_unix.so     nullok\naccount sufficient      pam_ldap.so\naccount required        pam_unix.so\nsession required        pam_mkhomedir.so skel=/etc/skel umask=0022\nsession sufficient      pam_ldap.so\n```\n\n上記の設定の場合 LDAP とシステムユーザーの両方がメールボックスを持つことになります。\n\n- /etc/dovecot/conf.d/auth-system.conf を編集して passdb ディレクティブを以下のように変更:\n\n```\npassdb {\n  driver = pam\n  args = session=yes dovecot\n}\n```\n\npam_mkhomedir.so モジュールを使用して passdb ディレクティブに session を追加することで、LDAP ユーザーが最初にログインしたときにホームディレクトリを自動的に作成します。\n\n"
+    },
+    {
+      "title": "Dovecot の設定",
+      "level": 3,
+      "content": "- /usr/share/doc/dovecot/example-config から /etc/dovecot に dovecot.conf と conf.d/* 設定ファイルをコピーしてください:\n\n```\n# cp /usr/share/doc/dovecot/example-config/dovecot.conf /etc/dovecot\n# cp -r /usr/share/doc/dovecot/example-config/conf.d /etc/dovecot\n```\n\nほとんどのシステムではデフォルト設定で問題ありませんが、設定ファイルを読んで利用できるオプションを確認してください。詳しい説明は クイック設定ガイド や dovecot configuration を見て下さい。\n\nデフォルトで dovecot はシステムで使われているメールストレージシステムを検出しようとします。Maildir フォーマットを使うには /etc/dovecot/conf.d/10-mail.conf を編集して mail_location = maildir:~/Maildir を設定してください。\n\n"
+    },
+    {
+      "title": "Sieve",
+      "level": 3,
+      "content": "Sieve はメールサーバーのメールのフィルターを作成するのに使うことができるプログラミング言語です。\n\n"
+    },
+    {
+      "title": "Sieve Interpreter Plugin",
+      "level": 4,
+      "content": "- pigeonhole をインストールしてください。\n- sieve を mail_plugins に追加してください: /etc/dovecot/conf.d/15-lda.confprotocol lda { mail_plugins = $mail_plugins sieve } /etc/dovecot/conf.d/20-lmtp.confprotocol lmtp { mail_plugins = $mail_plugins sieve }\n\n- /etc/dovecot/conf.d/15-lda.confprotocol lda { mail_plugins = $mail_plugins sieve }\n- /etc/dovecot/conf.d/20-lmtp.confprotocol lmtp { mail_plugins = $mail_plugins sieve }\n\n```\nprotocol lda {\n  mail_plugins = $mail_plugins sieve\n}\n```\n\n```\nprotocol lmtp {\n  mail_plugins = $mail_plugins sieve\n}\n```\n\n- 任意で plugin セクションに設定を追加してください。設定オプションとデフォルト値については Sieve Interpreter Documentation を見てください。例: plugin { sieve = file:~/sieve;active=~/.dovecot.sieve }\n\n```\nplugin {\n  sieve = file:~/sieve;active=~/.dovecot.sieve \n}\n```\n\n- スパムテスト設定を追加:\n\n```\n/etc/dovecot/conf.d/90-sieve.conf\n```\n\n```\nplugin {\n  sieve_extensions = +spamtest +spamtestplus\n\n  sieve_spamtest_status_type = score\n  sieve_spamtest_status_header = \\ \n    X-Spam_score: (-?[[:digit:]]+\\.[[:digit:]]).* \n  sieve_spamtest_max_value = 5.0 \n\n  sieve_before = /var/lib/dovecot/sieve/global_sieves/move_to_spam_folder.sieve\n}\n```\n\n- sieve スクリプトを作成:\n\n```\n/var/lib/dovecot/sieve/global_sieves/move_to_spam_folder.sieve\n```\n\n```\nrequire \"spamtestplus\";\nrequire \"fileinto\";\nrequire \"relational\";\nrequire \"comparator-i;ascii-numeric\";\n\nif spamtest :value \"ge\" :comparator \"i;ascii-numeric\" \"5\" {\n  fileinto \"Junk\";\n}\n```\n\n- sieve をコンパイル: sievec /var/lib/dovecot/sieve/global_sieves move_to_spam_folder.sieve と move_to_spam_folder.svbin ファイルが誰からでも読み込めるように権限が設定されているか確認してください。\n\n```\nsievec /var/lib/dovecot/sieve/global_sieves\n```\n\n"
+    },
+    {
+      "title": "ManageSieve Server",
+      "level": 4,
+      "content": "サーバー上の Sieve スクリプトをリモートで管理できる ManageSieve プロトコルが実装されています。\n\n- 上記の Sieve Interpreter Plugin の手順に従ってください。\n- dovecot.conf の protocols に sieve を追加: protocols = imap pop3 sieve\n- /etc/dovecot/conf.d/20-managesieve.conf を追加: service managesieve-login { } service managesieve { } protocol sieve { }\n- dovecot を再起動してください。managesieve デーモンはデフォルトではポート 4190 を使用します。\n\n```\nprotocols = imap pop3 sieve\n```\n\n```\nservice managesieve-login {\n}\n\nservice managesieve {\n}\n\nprotocol sieve {\n}\n```\n\n"
+    },
+    {
+      "title": "サーバーを起動する",
+      "level": 2,
+      "content": "標準の systemd を使って dovecot.service デーモンを操作してください。\n\n```\n# systemctl start dovecot.service\n```\n\nブート時に起動させるには\n\n```\n# systemctl enable dovecot.service\n```\n\n"
+    },
+    {
+      "title": "ヒントとテクニック",
+      "level": 2,
+      "content": "デフォルトではないハッシュ関数を使ってハッシュを生成する:\n\n```\ndoveadm pw -s SHA512-CRYPT -p \"superpassword\"\n```\n\nデータベースのカラムが十分大きいことを確認してください (警告は表示されません)。\n\ndovecot-sql.conf ファイルにパスワードの形式を設定します:\n\n```\ndefault_pass_scheme = SHA512-CRYPT\n```\n\n"
+    }
+  ]
+}

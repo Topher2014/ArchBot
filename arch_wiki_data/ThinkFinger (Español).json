@@ -1,0 +1,71 @@
+{
+  "title": "ThinkFinger (Español)",
+  "url": "https://wiki.archlinux.org/title/ThinkFinger_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-11-23** \n\nArtículos relacionados\n\n- Fingerprint-gui\n- Fprint\n\nThinkFinger es un controlador para el lector de huellas digitales SGS Thomson Microelectronics encontrado en IBM/Lenovo ThinkPads antiguas.\n\nThinkWiki tiene una lista de varios lectores de huellas encontrados en ThinkPads. Modelos nuevos que usen diferentes lectores pueden no funcionar con ThinkFinger.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete thinkfingerAUR.\n\n"
+    },
+    {
+      "title": "TF-Tool",
+      "level": 3,
+      "content": "Utilice tf-tool para probar ThinkFinger. Tendrá que ejecutar esto como root debido a que se necesita acceso directo a los dispositivos usb. Ejecute tf-tool --acquire para generar un archivo en //etc/pam_thinkfinger/test.bir y use tf-tool --verify para ver si le identifica correctamente. tf-tool --add-user <nombreusuario> adquiere y almacena su huella digital en /etc/pam_thinkfinger/<nombreusuario>.bir, la cual es necesaria para una identificación con pam.\n\n"
+    },
+    {
+      "title": "Pam",
+      "level": 2,
+      "content": "PAM es el módulo insertable de autentificación, inventado por Sun.\n\n"
+    },
+    {
+      "title": "/etc/pam.d/login",
+      "level": 3,
+      "content": "Cambie el archivo /etc/pam.d/login para que se parezca a lo siguiente si quiere utilizar su huella digital para autentificarse a si mismo al ingresar al sistema:\n\n```\n/etc/pam.d/login\n```\n\n```\n#%PAM-1.0\nauth           sufficient      pam_thinkfinger.so\nauth           required        pam_unix.so use_first_pass nullok_secure\naccount        required        pam_unix.so\npassword       required        pam_unix.so\nsession        required        pam_unix.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/su",
+      "level": 3,
+      "content": "Cambie este archivo para confirmar la orden su con una pasada de dedo:\n\n```\n/etc/pam.d/su\n```\n\n```\n#%PAM-1.0\nauth           sufficient      pam_rootok.so\nauth           sufficient      pam_thinkfinger.so\nauth           required        pam_unix.so nullok_secure try_first_pass\naccount        required        pam_unix.so\nsession        required        pam_unix.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/sudo",
+      "level": 3,
+      "content": "Cambie este archivo para confirmar la orden sudo con una pasada de dedo:\n\n```\n/etc/pam.d/su\n```\n\n```\n#%PAM-1.0\nauth           sufficient      pam_thinkfinger.so\nauth           required        pam_unix.so nullok_secure try_first_pass\nauth           required        pam_nologin.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/xscreensaver",
+      "level": 3,
+      "content": "XScreensaver es un poco complejo. Primero, configure PAM con un archivo /etc/pam.d/xscreensaver que contenga:\n\n```\n/etc/pam.d/xscreensaver\n```\n\n```\nauth            sufficient      pam_thinkfinger.so\n auth            required        pam_unix_auth.so try_first_pass\n```\n\nEsto no funciona aún porque Xscreensaver no puede leer/escribir desde /dev/misc/uinput y /dev/bus/usb*. Una regla udev debe ser escrita para autorizar a un nuevo grupo acceso de lectura/escritura.\n\nPrimero, cree un nuevo grupo, digamos huella:\n\n```\n# groupadd huella\n```\n\nAñada al usuario que quiera que pueda desbloquear Xscreensaver con el lector de huellas al grupo:\n\n```\n# gpasswd -a <user> huella\n```\n\nCierre e inicie sesión otra vez para que los cambios tengan efecto.\n\nDespués, busque uinput y bus/usb en su directorio de reglas udev:\n\n```\n$ grep -in uinput /etc/udev/rules.d/*\n\n/etc/udev/rules.d/udev.rules:222:KERNEL==\"uinput\",  NAME=\"misc/%k\", SYMLINK+=\"%k\"\n/etc/udev/rules.d/udev.rules:263:KERNEL==\"uinput\", NAME=\"input/%k\"\n```\n\n```\n$ grep -in \"bus/usb\" /etc/udev/rules.d/*\n\n/etc/udev/rules.d/udev.rules:318:SUBSYSTEM==\"usb_device\", ACTION==\"add\", PROGRAM=\"/bin/sh -c 'K=%k; K=$${K#usbdev};printf bus/usb/%%03i/%%03i $${K%%%%.*} $${K#*.}'\", NAME=\"%c\", MODE=\"0664\"\n/etc/udev/rules.d/udev.rules:320:SUBSYSTEM==\"usb\", ACTION==\"add\", ENV{DEVTYPE}==\"usb_device\", NAME=\"bus/usb/$env{BUSNUM}/$env{DEVNUM}\", MODE=\"0664\"\n```\n\nCopie las lineas que encontró con grep en el paso previo a un nuevo archivo de reglas udev:\n\n```\n/etc/udev/rules.d/99fingerprint.rules\n```\n\n```\nKERNEL==\"uinput\",  NAME=\"misc/%k\", SYMLINK+=\"%k\", MODE=\"0660\", GROUP=\"huella\"\nSUBSYSTEM==\"usb_device\", ACTION==\"add\", PROGRAM=\"/bin/sh -c 'K=%k; K=$${K#usbdev};printf bus/usb/%%03i/%%03i $${K%%%%.*} $${K#*.}'\", NAME=\"%c\", MODE=\"0664\", GROUP=\"huella\"\nSUBSYSTEM==\"usb\", ACTION==\"add\", ENV{DEVTYPE}==\"usb_device\", NAME=\"bus/usb/$env{BUSNUM}/$env{DEVNUM}\", MODE=\"0664\", GROUP=\"huella\"\n```\n\nLa diferencia entre las reglas en /etc/udev/rules.d/99fingreprint.rules y en las de /etc/udev/rules.d/udev.rules solo debe ser la adición de MODE=\"0664\", GROUP=\"huella\" o MODE=\"0660\", GROUP=\"huella\" al final de las lineas.\n\nDespués de añadir las reglas personalizadas de udev, debe darle a su usuario permisos para acceder su propio archivo de huella:\n\n```\n$ chown $USERNAME:root /etc/pam_thinkfinger/$USERNAME.bir\n$ chmod 400 /etc/pam_thinkfinger/$USERNAME.bir\n$ chmod o+x /etc/pam_thinkfinger\n```\n\nComo ultimo paso, tiene que remover el root setuid de /usr/bin/xscreensaver, o si no, Xscreensaver no será capaz de desbloquear con el lector de huellas:\n\n```\n# chmod -s /usr/bin/xscreensaver\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/gdm",
+      "level": 3,
+      "content": "Edite /etc/pam.d/gdm la linea siguiente al principio:\n\n```\n/etc/pam.d/gdm\n```\n\n```\nauth\t\tsufficient \tpam_thinkfinger.so\n```\n\nY modifique auth required pam_unix.so para que se parezca a esto:\n\n```\n/etc/pam.d/gdm\n```\n\n```\nauth\t\trequired\tpam_unix.so use_first_pass nullok_secure\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/xdm",
+      "level": 3,
+      "content": "Edite /etc/pam.d/xdm para que se parezca a esto:\n\n```\n/etc/pam.d/xdm\n```\n\n```\n#%PAM-1.0\nauth            sufficient      pam_thinkfinger.so\nauth            required        pam_unix.so use_first_pass nullok_secure\nauth            required        pam_nologin.so\nauth            required        pam_env.so\naccount         required        pam_unix.so\npassword        required        pam_unix.so\nsession         required        pam_unix.so\nsession         required        pam_limits.so\n```\n\n"
+    },
+    {
+      "title": "SLiM",
+      "level": 2,
+      "content": "Para que thinkfinger pueda trabajar con el gestor de ingreso SLiM tendrá que activar la capacidad PAM.\n\nConsiga el código fuente del paquete de slim desde ABS, y edite el PKGBUILD) para que el comando make construya SLiM con soporte PAM:\n\n```\nSLiM PKGBUILD\n```\n\n```\nmake USE_PAM=1\n```\n\nReconstruya el paquete e instalelo.\n\nY cree /etc/pam.d/slim:\n\n```\n/etc/pam.d/slim\n```\n\n```\n#%PAM-1.0\nauth            sufficient      pam_thinkfinger.so\nauth            requisite       pam_nologin.so\nauth            required        pam_env.so\nauth            required        pam_unix.so\naccount         required        pam_unix.so\nsession         required        pam_limits.so\nsession         required        pam_unix.so\npassword        required        pam_unix.so\n```\n\nAhora reinicie SLiM y podrá ocupar el lector de huellas para iniciar sesión.\n\n"
+    },
+    {
+      "title": "Software alternativo para lector de huellas",
+      "level": 2,
+      "content": "Fprint es un software alternativo de lector de huellas que funciona con algunos de los lectores ThinkPad nuevos.\n\n"
+    },
+    {
+      "title": "Más información",
+      "level": 2,
+      "content": "- https://www.thinkwiki.org/wiki/Talk:How_to_enable_the_fingerprint_reader\n- https://thinkfinger.sourceforge.net/\n- https://bbs.archlinux.org/viewtopic.php?id=36134\n- https://www.thinkwiki.org/wiki/How_to_enable_the_fingerprint_reader_with_ThinkFinger\n- https://www.thinkwiki.org/index.php?title=Installing_Ubuntu_6.06_on_a_ThinkPad_T43#Fingerprint_Reader\n\n"
+    }
+  ]
+}

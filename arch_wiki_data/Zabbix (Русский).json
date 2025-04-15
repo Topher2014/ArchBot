@@ -1,0 +1,96 @@
+{
+  "title": "Zabbix (Русский)",
+  "url": "https://wiki.archlinux.org/title/Zabbix_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Zabbix is a full-featured monitoring solution for larger networks. It can discover all kind of networking devices using different methods, check machine states and applications, sending pre-defined alarm messages and visualize complex data correlations.\n\n"
+    },
+    {
+      "title": "Server Installation",
+      "level": 4,
+      "content": "Install the zabbix-server package. This includes the necessary scripts for use with MariaDB or PostgreSQL.\n\n"
+    },
+    {
+      "title": "Database Installation",
+      "level": 4,
+      "content": "Install either the mariadb package or the postgresql package.\n\n"
+    },
+    {
+      "title": "Frontend Installation",
+      "level": 4,
+      "content": "Install the zabbix-frontend-php package. You should choose a web server with PHP support, e.g.:\n\n- Apache HTTP Server\n- Lighttpd\n- nginx\n\nYou can also choose one of the servers found in Category:Web server.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "Symlink the Zabbix web application directory to your http document root, e.g.:\n\n```\n$ ln -s /usr/share/webapps/zabbix /srv/http/zabbix\n```\n\nTo get Apache working out-of-the-box, you need to enable PHP integration:\n\n- see Using php-fpm and mod_proxy_fcgi\n\nAdjust following variables in /etc/php/php.ini:\n\n```\nextension=bcmath\nextension=gd\nextension=sockets\nextension=mysqli\nextension=gettext\npost_max_size = 16M\nmax_execution_time = 300\nmax_input_time = 300\ndate.timezone = \"UTC\"\n```\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 4,
+      "content": "In this example, we create on localhost a MariaDB database called zabbix for the user zabbix identified by the password test and then import the database templates. This connection will be later used by the Zabbix server and web application.\n\nIf your MariaDB installation uses a root account with a password, use the following:\n\n```\n$ mariadb -u root -p -e \"create database zabbix character set utf8 collate utf8_bin\"\n$ mariadb -u root -p -e \"grant all on zabbix.* to zabbix@localhost identified by 'test'\"\n```\n\nIf your MariaDB installation uses a root account without a password, use the following:\n\n```\n# mariadb -e \"create database zabbix character set utf8 collate utf8_bin\"\n# mariadb -e \"grant all on zabbix.* to zabbix@localhost identified by 'test'\"\n```\n\nUse the following to import the database templates:\n\n```\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/schema.sql\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/images.sql\n$ mariadb -u zabbix -p -D zabbix < /usr/share/zabbix-server/mysql/data.sql\n```\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "For PostgreSQL, these commands will create a database zabbix for user zabbix, which are the default settings in zabbix_server.conf, then import the schema and initial data:\n\n```\n$ createuser zabbix\n$ createdb zabbix -O zabbix\n$ cat /usr/share/zabbix-server/postgresql/{schema,images,data}.sql | psql -U zabbix -d zabbix\n```\n\n"
+    },
+    {
+      "title": "Database Configuration",
+      "level": 3,
+      "content": "Now edit /etc/zabbix/zabbix_server.conf with the database settings:\n\n```\n/etc/zabbix/zabbix_server.conf\n```\n\n```\nDBName=zabbix\nDBUser=zabbix\nDBPassword=test\nLogType=system\n```\n\n"
+    },
+    {
+      "title": "ICMP/ping discovery",
+      "level": 3,
+      "content": "To use ICMP discovery (e.g. ping) in Zabbix, install the fping package.\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 3,
+      "content": "If you are using MariaDB, enable and start the zabbix-server-mysql.service unit, or if you are using PostgreSQL, the zabbix-server-pgsql.service unit.\n\nAccess Zabbix via your local web server, e.g.: http://localhost/zabbix/, and start the installation wizard.\n\nThe default username is Admin and password zabbix.\n\nSee appendix for a link to the official documentation, which explains all further steps in using it.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 3,
+      "content": "Install zabbix-agent for each monitoring target, including your monitoring server where zabbix-server is installed. zabbix-server no longer includes zabbix-agent.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "Simply edit the zabbix_agentd.conf and replace the server variable with the IP of your monitoring server. Only servers from this/these IP will be allowed to access the agent.\n\n```\n/etc/zabbix/zabbix_agentd.conf\n```\n\n```\nServer=<IP of Zabbix server>\n ServerActive=<IP of Zabbix server>\n```\n\nFurther make sure the port 10050 on your device being monitored is not blocked and is properly forwarded.\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 3,
+      "content": "Enable and start the zabbix-agent.service unit.\n\n"
+    },
+    {
+      "title": "Debugging a Zabbix agent",
+      "level": 3,
+      "content": "On the client site, you can check the state of an item like this:\n\n```\n$ zabbix_agentd -t hdd.smart[sda,Temperature_Celsius]\n```\n\nOn the server/monitoring site, try this:\n\n```\n$ zabbix_get -s host -k hdd.smart[sda,Temperature_Celsius]\n```\n\n"
+    },
+    {
+      "title": "Monitor Arch Linux system updates",
+      "level": 3,
+      "content": "Here is an approach on how to monitor your Arch Linux clients for available system update using a custom UserParameter:\n\n```\n/etc/zabbix/zabbix_agentd.conf\n```\n\n```\nInclude=/etc/zabbix/zabbix_agentd.conf.d/*.conf\n```\n\n```\n/etc/zabbix/zabbix_agentd.conf.d/archlinuxupdates.conf\n```\n\n```\nUserParameter=archlinuxupdates,checkupdates | wc -l\n```\n\nYou have to restart zabbix-agentd to apply the new configuration. The keyword for the item you later use in the web frontend is archlinuxupdates. It returns an integer representing the count of available updates.\n\n"
+    },
+    {
+      "title": "Error \"Specified key was too long; max key length is 767 bytes\"",
+      "level": 3,
+      "content": "While importing the databases, you might get this error message. In order to solve this, you will have to change the code page configuration for your MariaDB database: MariaDB#Using UTF8MB4.\n\n"
+    },
+    {
+      "title": "Unable to start Zabbix server due to unsupported MariaDB database version",
+      "level": 3,
+      "content": "Database version can easily exceeds the maximum alloved version. To bypass this add the following to the configuration file:\n\n```\n/etc/zabbix/zabbix_server.conf\n```\n\n```\nAllowUnsupportedDBVersions=1\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official manual\n- Zabbix Share – Zabbix templates, modules & more\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "Ansible",
+  "url": "https://wiki.archlinux.org/title/Ansible",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "From www.ansible.com:\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "On the control machine (master), install the ansible-core package. Additionally, you can install the ansible package, which provides a range of community curated collections.\n\nOn the managed machines (nodes), where you want to automate deployment or configuration tasks, python is required and it may be necessary to indicate the specific #Python binary location in some circumstances. A way to communicate with the node is also necessary, this is usually SSH. Note that a functioning SSH key setup eases the use of Ansible but is not required.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "Ansible parameters are set in the configuration file which can either be ansible.cfg in the current directory, .ansible.cfg in the home directory or /etc/ansible/ansible.cfg, whichever it finds first.\n\nA base config can be generated with:\n\n```\n$ ansible-config init --disabled > ansible.cfg\n```\n\n"
+    },
+    {
+      "title": "Inventory",
+      "level": 3,
+      "content": "The infrastructure is listed in the Ansible inventory file, which defaults to being saved in the location /etc/ansible/hosts or one can specify a different inventory file using the -i command line switch. For instance, the following inventory defines a cluster with 7 nodes organized into two groups:\n\n```\n/etc/ansible/hosts\n```\n\n```\n[control]\n192.168.12.1\nfoo-[a:c].example.org\nlocalhost ansible_connection=local\n\n[managed]\n192.168.12.2\n192.168.12.3\n```\n\nOne can assign specific attributes to every node in the infrastructure file at the corresponding line or in the ansible.cfg configuration file. By default Ansible executes playbooks over SSH, the ansible_connection parameter extends the connection to:\n\n- local to deploy the playbook to the control machine itself\n- docker deploys the playbook directly into Docker containers\n\nCheck Ansible - intro inventory for details.\n\n"
+    },
+    {
+      "title": "Ping",
+      "level": 3,
+      "content": "You may check if all the nodes listed in the inventory are alive by\n\n```\n$ ansible all -m ping\n```\n\n"
+    },
+    {
+      "title": "Playbook",
+      "level": 3,
+      "content": "Playbooks are the main organizational unit to configure and deploy the whole infrastructure. Check the official document for more details. Here is an extremely simple demonstration, where the administrator of the above inventory wants to perform a full system upgrade on a set of Arch Linux hosts. First, create a playbook file, with YAML formatting (always 2 spaces indentation):\n\n```\nsyu.yml\n```\n\n```\n---\n- name: All hosts up-to-date\n  hosts: control managed\n  become: true\n\n  tasks:\n    - name: Full system upgrade\n      community.general.pacman:\n        update_cache: true\n        upgrade: true\n```\n\nThen, run the playbook script:\n\n```\n$ ansible-playbook --ask-become-pass syu.yml\n```\n\n"
+    },
+    {
+      "title": "Vault",
+      "level": 3,
+      "content": "A vault can be used to keep sensitive data in an encrypted form in playbooks or roles, rather than in plaintext. The vault password can be stored in plaintext in a file, for example vault_pass.txt containing myvaultpassword, to be used later on as a command parameter:\n\n```\n$ ansible-playbook site.yml --vault-id vault_pass.txt\n```\n\nIn order to encrypt the content the var content of a variable named varname using the password stored in vault_pass.txt, the following command should be used:\n\n```\n$ ansible-vault encrypt_string --vault-id vault_pass.txt 'the var content' --name varname\n```\n\nMore securely, to avoid inputting the variable content in the command line and be prompted for it instead, one can use:\n\n```\n$ ansible-vault encrypt_string --vault-id vault_pass.txt --stdin-name varname\n```\n\n```\nReading plaintext input from stdin. (ctrl-d to end input)\n```\n\nThe command returns directly the protected variable that can be inserted into a playbook. Encrypted and non-encrypted variables can coexist in a YAML file as illustrated below:\n\n```\nnotsecret: myvalue\n\nmysecret: !vault |\n          $ANSIBLE_VAULT;1.1;AES256\n          66386439653236336462626566653063336164663966303231363934653561363964363833313662\n          6431626536303530376336343832656537303632313433360a626438346336353331386135323734\n          62656361653630373231613662633962316233633936396165386439616533353965373339616234\n          3430613539666330390a313736323265656432366236633330313963326365653937323833366536\n          3462\n\nother_not_secret: othervalue\n```\n\n"
+    },
+    {
+      "title": "Official repositories",
+      "level": 4,
+      "content": "Ansible has a pacman module (provided by the ansible package) to handle installation, removal and system upgrades with pacman.\n\n"
+    },
+    {
+      "title": "AUR",
+      "level": 4,
+      "content": "For the Arch User Repository (AUR), it is required to use the external module ansible-aur. See the README for use and installation instructions.\n\nWhile Ansible expects to ssh as root, AUR helpers do not allow executing operations as root, they all fail with \"you cannot perform this operation as root\". For Ansible automation, it is therefore recommended to create a user, for example named aur_builder, that has no need for password with pacman in sudoers. This can be done in Ansible with the following actions:\n\n```\ntask.yml\n```\n\n```\n- user: name=aur_builder\n\n- lineinfile:\n     path: /etc/sudoers.d/aur_builder-allow-to-sudo-pacman\n     state: present\n     line: \"aur_builder ALL=(ALL) NOPASSWD: /usr/bin/pacman\"\n     validate: /usr/sbin/visudo -cf %s\n     create: yes\n```\n\nThen, AUR helpers or makepkg can be used associated with the Ansible parameters become: yes and become_user: aur_builder\n\n"
+    },
+    {
+      "title": "User account creation",
+      "level": 3,
+      "content": "Ansible can manage user accounts and in particular it is able to create new ones. This is achieved in playbooks with the user module which takes an optional password argument to set the user's password. It is the hashed value of the password that needs to be provided to the module.\n\nThe hashing can simply be performed on the fly within Ansible using one of its internal hash-filters:\n\n```\n- user:\n  name: user_name\n  password: \"{{ 'user_password' | password_hash('sha512', 'mypermsalt') }}\"\n  shell: /usr/bin/nologin\n```\n\nWith this approach it is recommended to vault-encrypt user_password so that it does not appear in plain text, see #Vault. However, an encrypted variable cannot be piped directly and will first need to be assigned to another one that will be piped.\n\nAlternatively, the hashing can be performed outside Ansible. The following commands return respectively the MD5 and the SHA512 hashed values of user_password:\n\n```\n$ openssl passwd -1 user_password\n```\n\n```\n$ python -c 'import crypt; print(crypt.crypt(\"user_password\", crypt.mksalt(crypt.METHOD_SHA512)))'\n```\n\n"
+    },
+    {
+      "title": "Python binary location",
+      "level": 3,
+      "content": "Ansible requires Python on the target machine. By default Ansible assumes it can find a /usr/bin/python on the remote system that is a 2.X or 3.X version, specifically 2.6 or higher.\n\nIf some of your modules specifically require Python2, you need to inform Ansible about its location by setting the ansible_python_interpreter variable in the inventory file. This can be done by using host groups in the inventory:\n\n```\n/etc/ansible/hosts\n```\n\n```\n[archlinux]\nserver1\nserver2\n\n[debian]\nserver3\n\n[archlinux:vars]\nansible_python_interpreter=/usr/bin/python2\n```\n\nMore information about Python version support in Ansible is available in [1], [2] and [3].\n\n"
+    },
+    {
+      "title": "Unarchive",
+      "level": 3,
+      "content": "The unarchive module unpacks an archive. However tar files are not well supported and several outstanding issues are reported in GitHub - unarchive. In particular when the parameter keep_newer is set to yes, idempotence is not observed. In case you face an issue with the module, you can use instead the zip format which is better integrated in Ansible.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://www.ansible.com/resources/videos/quick-start-video - Ansible concept in 12 minutes\n- https://docs.ansible.com/ansible/latest/collections/community/general/pacman_module.html - Official documentation of the pacman module\n\n"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "title": "Go package guidelines (Português)",
+  "url": "https://wiki.archlinux.org/title/Go_package_guidelines_(Portugu%C3%AAs)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **Este artigo ou esta seção precisa de tradução.** Este artigo ou esta seção precisa de tradução.\n\nEste artigo ou esta seção precisa de tradução.\n\n32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nEsse documento cobra padrões e diretrizes sobre a escrita de PKGBUILDs para Go.\n\n"
+    },
+    {
+      "title": "Nomenclatura de pacote",
+      "level": 3,
+      "content": "Para módulos de biblioteca Go, use golang-nomemódulo. Use também o prefixo se o pacote fornecer um programa fortemente acoplado ao ecossistema Go. Para outras aplicações, use apenas o nome do programa.\n\n"
+    },
+    {
+      "title": "Instruções para gerenciadores de dependência alternativos",
+      "level": 3,
+      "content": "Isso não é necessário para o Go 1.11 e posterior, a menos que um gerenciador de dependências alternativo seja exigido pelo projeto Go que você está empacotando.\n\nAo preparar as fontes antes de construir, pode ser necessário o seguinte:\n\n- Crie um diretório $srcdir/gopath para $GOPATH[link quebrado: seção inválida] e copie o código-fonte para esse diretório.\n- Deve-se notar que esta etapa pode não ser necessária se o projeto fornecer um Makefile para o projeto que o configura.\n\n```\nprepare(){\n  mkdir -p gopath/src/github.com/pkgbuild-example\n  ln -rTsf $pkgname-$pkgver gopath/src/github.com/pkgbuild-example/$pkgname\n  export GOPATH=\"$srcdir\"/gopath\n\n  # as dependências podem ser obtidas aqui, se necessário\n  cd gopath/src/github.com/pkgbuild-example/$pkgname\n  dep ensure\n}\n```\n\n"
+    },
+    {
+      "title": "Compilação",
+      "level": 2,
+      "content": "Existem nos repositórios dois pacotes go com os quais que você pode compilar; go e go-pie[link quebrado: replaced by go]. Todos os pacotes devem ser compilados preferencialmente com o go-pie[link quebrado: replaced by go], pois isso nos permite entregar binários seguros. No entanto, como upstream pode ter bugs, compilar com o go deve ser o último recurso.\n\n"
+    },
+    {
+      "title": "Sinalizadores e opções de compilação",
+      "level": 3,
+      "content": "A maioria dos Makefiles escritos para aplicativos go não respeitam o LDFLAGS fornecido pelos sistemas de compilação, isso faz com que os binários do Go não sejam compilados com o RELRO. Isso precisa ser corrigido no Makefile, ou o Makefile deve ser omitido. Se houver um Makefile envolvido, você tem 3 opções para suportar o RELRO:\n\n- Aplicar um patch no Makefile\n- Ignorar o Makefile completamente e usar go build\n- Exportar GOFLAGS - Isso é menos desejável, pois estaremos descartando sinalizadores do LDFLAGS.\n\nPara reproducible builds, é importante que os binários sejam removidos do caminho de compilação usando os sinalizadores -trimpath.\n\n```\nexport CGO_LDFLAGS=\"${LDFLAGS}\"\nexport GOFLAGS=\"-trimpath\"\n\n# ou, alternativamente, use LDFLAGS definido no go build.\ngo build \\\n    -trimpath \\\n    -ldflags \"-extldflags ${LDFLAGS}\" \\\n    .\n```\n\n"
+    },
+    {
+      "title": "Projetos Go modernos (para Go >=1.11)",
+      "level": 3,
+      "content": "Go 1.11 introduz go modules. Isso omite a necessidade de configuração GOPATH e nós podemos compilar diretamente no diretório.\n\nProjetos como esses têm um arquivo go.mod e um go.sum.\n\n```\nbuild(){\n  cd $pkgname-$pkgver\n  go build .\n}\n```\n\n"
+    },
+    {
+      "title": "Projetos Go antigos (para Go <1.11)",
+      "level": 3,
+      "content": "Ao compilarmos pacotes com $GOPATH[link quebrado: seção inválida], existem alguns problemas que você pode encontrar. Normalmente o projeto entrega um Makefile que pode ser usado e deve ser usado. Existem casos em que você ainda precisa configurar um $GOPATH no PKGBUILD. O trecho a seguir configura um GOPATH dentro de $srcdir/gopath que pode ser usado para compilar pacotes. Um novo diretório é usado, já que alguns gerenciador de dependências fazem coisas estranhas se descobrirem o projeto na raiz do $GOPATH.\n\n```\nprepare(){\n  mkdir -p gopath/src/github.com/pkgbuild-example\n  ln -rTsf $pkgname-$pkgver gopath/src/github.com/pkgbuild-example/$pkgname\n\n  # as dependências podem ser obtidas aqui se necessário\n  cd gopath/src/github.com/pkgbuild-example/$pkgname\n  dep ensure\n}\n\nbuild(){\n  export GOPATH=\"$srcdir\"/gopath\n  cd gopath/src/github.com/pkgbuild-example/$pkgname\n  go install -v .\n}\n```\n\nNote install e build, e que podem ser feitas compilações recursivas se você tiver um subdiretório cmd/ com múltiplos binários: go install -v github.com/pkgbuild-example/cmd/...\n\n"
+    },
+    {
+      "title": "Notas sobre dependências e gerenciadores de dependências",
+      "level": 3,
+      "content": "Os pacotes Go atualmente usam a pasta vendor/ para lidar com dependências em projetos. Geralmente, eles são gerenciados por um dos vários projetos do gerenciador de dependências. Se um for usado para o pacote, este passo deve ser executado na função prepare() do PKGBUILD.\n\nDependências são normalmente gerenciadas pelo comando go mod, que vem com o Go 1.11 ou posterior.\n\nExistem também gerenciadores de dependência alternativos:\n\n- depAUR\n- godep[link quebrado: package not found]\n- glide\n\n"
+    },
+    {
+      "title": "PKGBUILD básico",
+      "level": 3,
+      "content": "```\npkgname=foo\npkgver=0.0.1\npkgrel=1\npkgdesc='Go PKGBUILD Example'\narch=('x86_64')\nurl='https://example.org/$pkgname'\nlicense=('GPL')\nmakedepends=('go-pie')\nsource=(\"$url/$pkgname-$pkgver.tar.gz\")\nsha256sums=('1337deadbeef')\n\nbuild() {\n  cd $pkgname-$pkgver\n  go build \\\n    -mod=vendor \\\n    -trimpath \\\n    -ldflags \"-extldflags $LDFLAGS\" \\\n    -o $pkgname .\n}\n\ncheck() {\n  cd $pkgname-$pkgver\n  go test -mod=vendor ./...    \n}\n\npackage() {\n  cd $pkgname-$pkgver\n  install -Dm755 $pkgname \"$pkgdir\"/usr/bin/$pkgname\n}\n```\n\n"
+    },
+    {
+      "title": "PKGBUILD com GOPATH e dep",
+      "level": 3,
+      "content": "```\npkgname=foo\npkgver=0.0.1\npkgrel=1\npkgdesc='Go PKGBUILD Example'\narch=('x86_64')\nurl='https://example.org/$pkgname'\nlicense=('GPL')\nmakedepends=('go-pie' 'dep')\nsource=(\"$url/$pkgname-$pkgver.tar.gz\")\nsha256sums=('1337deadbeef')\n\nprepare(){\n  mkdir -p gopath/src/example.org/foo\n  ln -rTsf $pkgname-$pkgver gopath/src/example.org/foo\n  cd gopath/src/example.org/foo\n  dep ensure\n}\n\nbuild() {\n  export GOPATH=\"$srcdir\"/gopath\n  cd gopath/src/example.org/foo\n  go install \\\n    -trimpath \\\n    -ldflags \"-extldflags $LDFLAGS\" \\\n    -v ./...\n}\n\ncheck() {\n  export GOPATH=\"$srcdir\"/gopath\n  cd gopath/src/example.org/foo\n  go test ./...\n}\n\npackage() {\n  install -Dm755 gopath/bin/$pkgname \"$pkgdir\"/usr/bin/$pkgname\n}\n```\n\n"
+    },
+    {
+      "title": "Exemplos de pacotes",
+      "level": 2,
+      "content": "- depAUR\n- gopass\n- delve\n- gitea\n- git-lfs\n\n"
+    }
+  ]
+}

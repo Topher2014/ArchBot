@@ -1,0 +1,66 @@
+{
+  "title": "Dell XPS 13 (9310)",
+  "url": "https://wiki.archlinux.org/title/Dell_XPS_13_(9310)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nDevice | CPI/USB ID | Working?\nGPU |  | Yes\nWi-Fi (AX500) |  | Yes\nBluetooth (AX500) |  | Partial\nWi-Fi (AX201) |  | Yes\nBluetooth (AX201) |  | Yes\nAudio |  | Yes\nTouchpad |  | Yes\nWebcam |  | Yes\nInfrared Webcam |  | Yes\nFingerprint sensor | 27c6:533c | Partial\nAmbient light sensor |  | Yes\n\nDell XPS late 2020 edition.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "In some units, the NVMe drive is configured to operate in RAID mode by default. This may cause the boot loader to not find your boot disk. In order to fix this, press F2 to enter the Dell UEFI. Go to Storage > NVMe Operation and make sure that Select AHCI/NVMe mode is selected. All other operating systems installed before changing this setting must be reinstalled after changing this setting.\n\nTo successfully boot the installation medium you will need to disable Secure Boot.\n\n"
+    },
+    {
+      "title": "Audio",
+      "level": 2,
+      "content": "This laptop requires Sound Open Firmware in order for the soundcard to work.\n\n"
+    },
+    {
+      "title": "Wi-Fi",
+      "level": 2,
+      "content": "There are two possible devices the laptop may ship with, AX201 or AX500. Both are supported in the mainline kernel.\n\n"
+    },
+    {
+      "title": "AX500",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Network configuration/Wireless#Atheros.** This article or section is a candidate for merging with Network configuration/Wireless#Atheros.\n\nThis article or section is a candidate for merging with Network configuration/Wireless#Atheros.\n\nSince Kernel version 5.10.9, users have reported some success with the Arch stock Kernel (a recent Dell firmware is also required: at least version 1.2.5), however there are persistent problems, including firmware crashes and problems when resuming from hibernate/suspend. If your Wi-Fi is not working, first try to add the following kernel parameter:\n\n```\nmemmap=12M$20M\n```\n\nDetails about this fix can be found in the Linux kernel mailing list: https://lore.kernel.org/lkml/3e30ac52-6ad4-fa7b-8817-bca35a80d268@gmail.com/. After adding this parameter there still may be problems with Wi-Fi functionality on resuming from suspend. Enabling VT for Direct I/O in the BIOS may help with recovering Wi-Fi functionality after a suspend. Please note that the ath11k driver is still experimental. While it is reported to working fine with a 2.4 GHz WPA Personal Wi-Fi network, there might be problems after disconnecting the Wi-Fi or with different setups (WPA3, 5 GHz Wi-Fi). Your mileage may vary. However, recovery from suspend and hibernate appears to be broken, though it can usually be manually fixed by reloading the ath11k_pci module. For example:\n\n```\n# rmmod ath11k_pci\n```\n\nwait a couple minutes (yes really) for the operation to complete\n\n```\n# modprobe ath11k_pci\n```\n\nThis can be automated via sleep hooks - if the module is unloaded before hibernating or suspending it unloads immediately with no delay, and the resume kernel bug does not happen:\n\n```\n/etc/systemd/system/ath11k-suspend.service\n```\n\n```\n[Unit]\nDescription=Suspend: rmmod ath11k_pci\nBefore=sleep.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/rmmod ath11k_pci\n\n[Install]\nWantedBy=sleep.target\n```\n\n```\n/etc/systemd/system/ath11k-resume.service\n```\n\n```\n[Unit]\nDescription=Resume: modprobe ath11k_pci\nAfter=suspend.target suspend-then-hibernate.target hibernate.target hybrid-sleep.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/modprobe ath11k_pci\n\n[Install]\nWantedBy=suspend.target suspend-then-hibernate.target hibernate.target hybrid-sleep.target\n```\n\nYou need to enable ath11k-suspend.service and ath11k-resume.service.\n\nThere is also work in progress in the form of qca6390 (the SoC of Killer AX500) driver development in the kernel.org kvalo/ath repository[dead link 2024-10-12 ⓘ]. Patches based on the ath11k-qca6390-bringup branch[dead link 2024-10-12 ⓘ] have been working (with an \"experimental\" caveat) for a while.\n\n"
+    },
+    {
+      "title": "AX500",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nIn kernel version 6.10 the Bluetooth support is better where there does not seem to be hard lockups anymore. Bluetooth seems to work from a cold restart. Occasionally the follow error occurs on boot and Bluetooth does not work:\n\n```\n# [    7.233715] Bluetooth: hci0: command 0xfc00 tx timeout\n# [    7.233731] Bluetooth: hci0: Reading QCA version information failed (-110)\n```\n\nAs of 5.16.16, bluetooth is partially working, but must be activated manually after boot is complete. You must blacklist hci_uart by adding blacklist hci_uart to /etc/modprobe.d/blacklist.conf, then modprobe hci_uart after boot and start the bluetooth service with systemd. Functionality still appears broken after resuming from suspend. Note that when hci_uart is loaded during boot, or after suspending, the laptop may hard lock with errors similar to watchdog: BUG: soft lockup - CPU#2 stuck for 23s! [swapper/2:0]. See the talk page for additional details.\n\n"
+    },
+    {
+      "title": "Fingerprint sensor",
+      "level": 2,
+      "content": "The fingerprint sensor can be used by installing the proprietary Ubuntu driver released by Dell and Goodix. This requires a different fork of libfprint, libfprint-tod-gitAUR. This is a newer version intended for use only with touch-based sensors such as the one on the XPS.\n\nThe proprietary driver is available as libfprint-2-tod1-xps9300-binAUR. Alternatively, it can also be manually installed from the Dell repository by extracting the Debian file and copying its contents.\n\n- This driver is proprietary, closed source and only distributed in binary form.\n- Since fprintd was updated to version 1.92.0-1, libfprint-tod-git and libfprint-2-tod1-xps9300-bin no longer work as expected. This can prevent GDM from listing users during login. Downgrading fprintd to version 1.90.6-1 partially solves this problem.\n\nThe rest of the process is identical to that described on fprint—just make sure not to install the version of libfprint in the official repositories as it conflicts with libfprint-tod-git.\n\n"
+    },
+    {
+      "title": "Infrared camera",
+      "level": 2,
+      "content": "When the IR camera (/dev/video2) is on, it will not automatically turn on the IR emitter. You can follow the instructions from linux-enable-ir-emitter to enable the IR emitter. This is the IrConfig.yaml file as detected by the quick command so you do not need to go through all the manual configuration steps:\n\n```\n/usr/lib/linux-enable-ir-emitter/IrConfig.yaml\n```\n\n```\n!!python/object:IrConfiguration.IrConfiguration\n_data:\n- '0x1'\n- '0x3'\n- '0x2'\n- '0x0'\n- '0x0'\n- '0x0'\n- '0x0'\n- '0x0'\n- '0x0'\n_selector: '0x6'\n_unit: '0x4'\n_videoPath: /dev/video2\n```\n\nThe infrared camera can be used as an authentication method with howdyAUR.\n\nThe configuration file is located at /lib/security/howdy/config.ini. The device should be configured like this: device_path = /dev/video2.\n\n"
+    },
+    {
+      "title": "Ambient light sensor",
+      "level": 2,
+      "content": "Install iio-sensor-proxy to enable automatic brightness in Gnome.\n\n"
+    },
+    {
+      "title": "Virtualization",
+      "level": 2,
+      "content": "Virtualbox EFI guests VM are currently not working on this hardware. See https://www.virtualbox.org/ticket/20090 and https://forums.virtualbox.org/viewtopic.php?f=7&t=100940.\n\n"
+    },
+    {
+      "title": "Sleep/Modern Standby battery drain",
+      "level": 2,
+      "content": "Since 11th gen Intel CPUs do not support deep sleep (S3) anymore and modern standby drains battery life very quickly, the solution is to switch the Storage in the BIOS from RAID to AHCI and battery life will dramatically improve in (modern standby) sleep mode. This requires bcedit'ing windows in case of dualboot or windows will not boot anymore - does not affect the Linux partition though.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Me and My Dell (reference guide)\n- Service manual\n- Setup and specifications\n- https://ubuntu.com/certified/202007-28040\n\n"
+    }
+  ]
+}

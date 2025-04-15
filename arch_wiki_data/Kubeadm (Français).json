@@ -1,0 +1,86 @@
+{
+  "title": "Kubeadm (Français)",
+  "url": "https://wiki.archlinux.org/title/Kubeadm_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nRelated articles\n\n- Kubernetes\n\nKubeadm est un outil pour installer et configurer un nœud Kubernetes en utilisant la distribution officielle.\n\nIl permet de configurer kubelet — interface entre la machine hôte et l’amas Kubernetes — et d’installer kube-apiserver, kube-controller-manager, kube-scheduler et etcd statiquement sur le nœud maître.\n\n"
+    },
+    {
+      "title": "Requis",
+      "level": 2,
+      "content": "Le service kubelet doit être installé et démarré sur chaque ordinateur participant à la grappe Kubernetes. Il permet le démarrage des composants de contrôle à partir des définitions entreposées dans le dossier /etc/kubernetes/manifests. Il est le contrôleur local et communique avec l’API pour recevoir les instructions de création et destruction de Pod.\n\nLe programme kubeadm doit être installé sur chaque ordinateur pour l’installation, la mise à jour des composants ou un changement de la configuration. La configuration est sauvegardée directement dans Kubernetes et kubeadm permet de la récupérer et de l’installer sur chaque machine.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "La configuration des composants utilise un fichier de déclaration lu par kubeadm pour générer des fichiers de configuration et les arguments de lancement des services (kubelet). Tous les « documents » YAML peuvent être réunis dans un même fichier, séparés par « --- », pour simplifier les commandes à un seul paramètres --config=options.yaml.\n\n"
+    },
+    {
+      "title": "ClusterConfiguration",
+      "level": 3,
+      "content": "Il faut choisir deux plages d’adresses IP que les composants Kubernetes pourront utiliser pour communiquer entre eux. Ces plages d’adresses ne doivent pas se superposer à d’autres plages d’adresses utilisées sur le réseau. Les Pods recevront une adresse parmi celles fournies par controllerManager.extraArgs.cluster-cidr qui définit un sous-ensemble de podSubnet.\n\n```\ncluster.yaml\n```\n\n```\nclusterName: \"Kube\"\nnetworking:\n  serviceSubnet: \"10.84.0.0/16\"\n  podSubnet: \"10.85.0.0/16\"\n  dnsDomain: \"cluster.local\"\ncontrollerManager:\n  extraArgs:\n    allocate-node-cidrs: true\n    cluster-cidr: \"10.85.0.0/16\"\n    node-cidr-mask-size-ipv4: \"24\"\n```\n\nPour un réseau privilégiant IPv6, les subnet doivent contenir en premier une plage IPv6 et tous les services utiliser bind-address: '::'. Une configuration complète est disponible ici.\n\n"
+    },
+    {
+      "title": "KubeletConfiguration",
+      "level": 3,
+      "content": "Ce fichier contient les options commune à tous les kubelet de la grappe. Elle est publiée sur etcd pour être accessible de chaque nœud. En cas de modification, il faut manuellement (kubeadm) installer la nouvelle configuration sur chaque machine.\n\nLes options importantes sont\n\n```\nkubelet.yaml\n```\n\n```\napiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\nsystemReserved:\n  cpu: \"1\"\n  memory: \"1G\"\nkubeReserved:\n  cpu: \"500m\"\n  memory: \"500M\"\n```\n\nPour un réseau privilégiant IPv6, les options suivantes doivent contenir une adresse IPv6 :\n\n- address: \"::\"\n- clusterDNS: [...] est une liste d’adresses appartenant à l’intervalle définie par cluster-cidr.\n- healthzBindAddress: \"::1\" sert d’entrée dans un Pod pour les tests de réponse du service.\n\n"
+    },
+    {
+      "title": "Nœud Maître",
+      "level": 3,
+      "content": "Le premier nœud installe les composants du control-plane (apiserver, etcd, controler-manager, scheduler), génère des certificats x509 pour les communication et démarre les premiers modules dans Kubernetes (coredns, kube-proxy). Suivre ce tutoriel pour utiliser ses propres certificats.\n\nLa commande kubeadm init ne s’utilise que sur le premier nœud et se divise en plusieurs phases. Par défaut toutes les phases sont réalisées dans l’ordre et sans modifier les fichiers déjà présents sur la machine. Il est possible de demander une phase en particulier mais elle échouera si ses dépendances ne sont pas complètes.\n\n"
+    },
+    {
+      "title": "InitConfiguration",
+      "level": 4,
+      "content": "Le groupe nodeRegistration contient les options faisant le lien entre un nœud, son matériel et le monde extérieur.\n\n"
+    },
+    {
+      "title": "Autres Nœuds",
+      "level": 3,
+      "content": "Pour ajouter des nœuds à la grappe, ils doivent mettre en place une relation de confiance à double sens avec le control-plane. La méthode du jeton utilise un jeton temporaire créé par le maître que le nouvel arrivant doit présenter pour prouver que l’administrateur a bien accès à l’API Kubernetes. Pour vérifier que la première connexion n’a pas été détournée, kubeadm join utilise le hash de la clé publique utilisée par le maître.\n\nLa commande kubeadm token create, utilisée depuis une session avec accès à l’API, génère un jeton. La commande kubeadm join --discovery-token=<token> --discovery-token-ca-cert-hash=\"<hash-type>:<hex-encoded-value>\" <master-IP>:6443 génère les certificats du nœud, configure kubelet et le démarre puis l’enregistre dans la grappe.\n\n"
+    },
+    {
+      "title": "Personnalisation du control-plane",
+      "level": 3,
+      "content": "Kubeadm installe les définitions pour kube-apiserver, kube-controller-manager et kube-scheduler dans le dossier /etc/kubernetes/manifests du nœud principal. Ces fichiers peuvent être modifiés pour mettre à jour les pods correspondants. À la moindre modification, le service kubelet éteint et redémarre les Pods correspondants pour appliquer les modifications.\n\nLa méthode conseillée pour appliquer des modifications est d’utiliser Kubeadm avec des correctifs. Ces correctifs peuvent être appliqués à l’initialisation d’un nœud ou pendant sa mise à jour: kubeadm upgrade apply --patches PATCHES. PATCHES est un dossier contenant des fichiers de correctifs nommés selon le schéma target[suffix][+patchtype]. Sans nécessités particulières, ces fichiers peuvent être nommés directement avec le nom du composant à modifier.\n\n```\nkube-apiserver.yaml\n```\n\n```\napiVersion: v1\nkind: Pod\nmetadata:\n  name: kube-apiserver\nspec:\n  containers:\n    - name: kube-apiserver\n      env:\n        - name: GOMAXPROCS\n          valueFrom:\n            resourceFieldRef:\n              resource: limits.cpu\n        - name: GOMEMLIMIT\n          valueFrom:\n            resourceFieldRef:\n              resource: requests.memory\n      resources:\n        requests:\n          cpu: \"100m\"\n          memory: \"600Mi\"\n        limits:\n          cpu: \"4\"\n          memory: \"700Mi\"\n      readinessProbe:\n        periodSeconds: 15\n```\n\nCet exemple diminue la fréquence du test readiness, réserve et limite la mémoire et informe le programme Go de ces nouvelles limitations. GOMEMLIMIT est une limite douce.\n\n"
+    },
+    {
+      "title": "Dépannage",
+      "level": 2,
+      "content": "Les erreurs réseau qui ne concernent pas api-server et les autres composants du control-plane sont causées par un dysfonctionnement du réseau entre les machines ou du plugin CNI utilisé. Kubeadm ne peut rien faire.\n\n"
+    },
+    {
+      "title": "Control Plane",
+      "level": 3,
+      "content": "Les pods du control-plane ne sont pas enregistrés dans etcd et ne sont pas contrôlés par le controller-manager. Si les fichiers de définition sont absents ou invalides, ils peuvent être régénérés par kubeadm sur le nœud maître avec la commande kubeadm init phase control-plane ou kubeadm upgrade node control-plane.\n\n"
+    },
+    {
+      "title": "Kubelet",
+      "level": 3,
+      "content": "- La configuration /var/lib/kubelet/config.yaml est invalide\n- kubelet ne communique pas avec cri-o/containerd\n\nSa configuration peut être mise à jour depuis la définition commune stockée dans la ConfigMap kube-system/kubelet-config. La commande kubeadm upgrade node phase kubelet-config récupère la configuration et l’installe sur la machine. Il n’est pas nécessaire que le nœud soit fonctionnel pour effectuer cette action.\n\nPour changer de Container Runtime Interface, le nœud doit être détruit puis créé à nouveau.\n\n"
+    },
+    {
+      "title": "Renouvellement des certificats",
+      "level": 3,
+      "content": "- Kubectl ne peut pas se connecter à l’API\n- Les pods ne sont pas détruits et les nouveaux ne sont pas créés. Les deployments ne démarrent pas.\n\nLe controller-manager ne parvient pas à communiquer avec l’API.\n\nLes certificats auto-signés utilisés pour les communications internes sont générés par kubeadm avec une période de validité de 365 jours par défaut. Ils sont automatiquement renouvelés si besoin par kubeadm upgrade.\n\nLes certificats de connexion sont également à renouveler. Le fichier /etc/kubernetes/admin.conf est mis à jour avec les autres certificats.\n\nPour forcer le redémarrage des pods du control-plane, il faut déplacer les fichiers hors du dossier /etc/kubernetes/manifests, attendre que kubelet détruise les pods correspondants, puis remettre les fichiers à leurs places.\n\n"
+    },
+    {
+      "title": "Outils supplémentaires",
+      "level": 2,
+      "content": "Les composants de base Kubernetes ne gèrent que l’orchestration et le démarrage des Pods. Il faut ensuite installer un certain nombre de composants supplémentaires dans Kubernetes pour un fonctionnement complet.\n\n"
+    },
+    {
+      "title": "Réseau",
+      "level": 3,
+      "content": "La communication réseau entre Pods et entre Nodes nécessite des programmes et configurations supplémentaires sur chaque machine. Tout cela est géré par le Container Runtime Interface' comme Cilium, Calico ou Flannel.\n\nKubernetes propose une configuration unifiée pour les Ingress (obsolète) et les Gateway. Il existe de nombreux programme pour réaliser ces tâches, dont traefik, ingress, Cilium, envoy.\n\n"
+    },
+    {
+      "title": "GPUs",
+      "level": 3,
+      "content": "L’utilisation des GPUs comme ressource matérielle au même titre que les CPUs et la RAM n’est pas supportée par le Kubernetes Scheduler basique. Cette ressource est contrôlée par un device-plugin (voir cette documentation).\n\n"
+    }
+  ]
+}

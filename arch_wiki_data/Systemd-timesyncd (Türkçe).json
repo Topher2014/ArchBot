@@ -1,0 +1,46 @@
+{
+  "title": "Systemd-timesyncd (Türkçe)",
+  "url": "https://wiki.archlinux.org/title/Systemd-timesyncd_(T%C3%BCrk%C3%A7e)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "İlgili makaleler\n\n- systemd-networkd\n- systemd\n- System time\n\nsystemd e-posta listesinden:\n\n"
+    },
+    {
+      "title": "Yapılandırma",
+      "level": 2,
+      "content": "systemd-timesyncd başlatılırken /etc/systemd/timesyncd.conf dizinindeki yapılandırma dosyasını okuyacaktır. Bu dosya şöyle gözükmektedir:\n\n```\n/etc/systemd/timesyncd.conf\n```\n\n```\n[Time]\n#NTP=\n#FallbackNTP=0.arch.pool.ntp.org 1.arch.pool.ntp.org 2.arch.pool.ntp.org 3.arch.pool.ntp.org\n#...\n```\n\nYeni zaman sunucuları eklemek veya elde bulunanları değiştirmek için ilgili yerleri yorum satırından çıkarın, ardından sunucu adreslerini veya IP adreslerini boşluklar bırakarak ekleyin. Ayrıca bir yapılandırma parçası da (configuration snippet) /etc/systemd/timesyncd.conf.d/*.conf kullanabilirsiniz, daha fazla bilgi için timesyncd.conf(5) sayfasına bakın.\n\nÖrneğin, NTP havuzu tarafından sağlanan herhangi bir sunucuyu kullanabilir veya varsayılan Arch havuzunu (yine NTP havuz projesi tarafından sağlanmıştır) kullanabilirsiniz:\n\n```\n/etc/systemd/timesyncd.conf veya /etc/systemd/timesyncd.conf.d/local.conf\n```\n\n```\n[Time]\nNTP=0.arch.pool.ntp.org 1.arch.pool.ntp.org 2.arch.pool.ntp.org 3.arch.pool.ntp.org\nFallbackNTP=0.pool.ntp.org 1.pool.ntp.org 0.fr.pool.ntp.org\n```\n\nYapılandırmanızı doğrulamak için\n\n```\n$ timedatectl show-timesync --all\n```\n\n```\nLinkNTPServers=\nSystemNTPServers=\nRuntimeNTPServers=\nFallbackNTPServers=0.arch.pool.ntp.org 1.arch.pool.ntp.org 2.arch.pool.ntp.org 3.arch.pool.ntp.org\nServerName=2.arch.pool.ntp.org\nServerAddress=45.136.155.37\nRootDistanceMaxUSec=5s\nPollIntervalMinUSec=32s\nPollIntervalMaxUSec=34min 8s\nPollIntervalUSec=34min 8s\nNTPMessage={ Leap=0, Version=4, Mode=4, Stratum=3, Precision=-24, RootDelay=217.346ms, RootDispersion=52.047ms, Reference=27912C56, OriginateTimestamp=Fri 2024-01-19 16:39:56 +03, ReceiveTimestamp=Fri 2024-01-19 16:39:56 +03, TransmitTimestamp=Fri 2024-01-19 16:39:56 +03, DestinationTimestamp=Fri 2024-01-19 16:39:56 +03, Ignored=no, PacketCount=12, Jitter=535.760ms }\nFrequency=-210741\n```\n\nServis yapılandırmasına ek olarak, NTP sunucuları NTP= ile systemd-networkd yapılandırma dosyası üzerinden veya dinamik bir şekilde bir DHCP sunucusu aracılığıyla da sağlanabilir (.network dosyasının içerisinde [DHCPv4] veya [DHCPv6] bölümünde UseNTP seçeneği aktif hale getirilirse).\n\nKullanılacak NTP sunucusu aşağıdaki kurallar kullanılarak belirlenir:\n\n- systemd-networkd.service(8) yapılandırmasından veya DHCP aracılığıyla elde edilen arayüz başı NTP sunucularına öncelik verilir.\n- /etc/systemd/timesyncd.conf içinde tanımlanan NTP sunucuları çalıştırılırken arayüz başına listeye eklenecek ve servis yanıt veren bir tane bulana kadar sırayla sunucularla iletişime geçecektir.\n- Bu adımlar tamamlandıktan sonra herhangi bir NTP sunucu bilgisi edinilmezse, FallbackNTP= içinde tanımlanmış NTP sunucusu ana makine adları veya IP adresleri kullanılır.\n\n- Hizmet her senkronizasyonda /var/lib/systemd/timesync/clock dosyasını günceller. Bu dosya konumu sabittir ve değiştirilemez.\n- Bu yazma işlemi salt okunur kök bölümü çalıştırırken veya SD kartta yazmaları en aza indirmeye çalışırken soruna sebep olabilir.\n- Yazma işlemi yapılandırma dosyasına eklenecek PollIntervalMinSec=1d ve SaveIntervalSec=infinity ayarları ile azaltılabilir.\n\n"
+    },
+    {
+      "title": "Etkinleştirme ve başlatma",
+      "level": 3,
+      "content": "Servisi etkinleştirip çalıştırmak için aşağıdaki komutu girin:\n\n```\n# timedatectl set-ntp true\n```\n\nAlternatif olarak (örneğin chroot içerisindeyken) systemd-timesyncd.service servisini başlatın/etkinleştirin.\n\n"
+    },
+    {
+      "title": "Servis kontrolü",
+      "level": 3,
+      "content": "Senkronizasyon süreci belirgin ölçüde yavaş olabilir. Bu herhangi bir sorun olduğu anlamına gelmez, bir sorun olduğundan emin olmadan önce belli bir süre beklemek gerekir. Hizmetin ne durumda olduğunu kontrol etmek için aşağıdaki komutu kullanın:\n\n```\n$ timedatectl status\n```\n\n```\nLocal time: Fri 2024-01-19 17:36:59 +03\n           Universal time: Fri 2024-01-19 14:36:59 UTC\n                 RTC time: Fri 2024-01-19 14:36:59\n                Time zone: Europe/Istanbul (+03, +0300)\nSystem clock synchronized: yes\n              NTP service: active\n          RTC in local TZ: no\n```\n\n"
+    },
+    {
+      "title": "Ayrıntılı bilgi edinme",
+      "level": 3,
+      "content": "Servise dair ayrıntılı bilgi edinmek için aşağıdaki komutu kullanın:\n\n```\n$ timedatectl timesync-status\n```\n\n```\nServer: 45.136.155.37 (2.arch.pool.ntp.org)\nPoll interval: 34min 8s (min: 32s; max 34min 8s)\n         Leap: normal\n      Version: 4\n      Stratum: 3\n    Reference: 27912C56\n    Precision: 1us (-24)\nRoot distance: 165.137ms (max: 5s)\n       Offset: -4.870ms\n        Delay: 17.750ms\n       Jitter: 535.761ms\n Packet count: 13\n    Frequency: -4.405ppm\n```\n\n"
+    },
+    {
+      "title": "Varsayılan olmayan yapılandırma ayarlarını görüntüleme",
+      "level": 3,
+      "content": "Varsayılan olmayan yapılandırma ayarlarını ve bu ayarların hangi dosyalar ile ayarlandığını görmek için aşağıdaki komutu kullanın:\n\n```\n$ systemd-analyze cat-config systemd/timesyncd.conf --tldr\n```\n\n```\n# /etc/systemd/timesyncd.conf\n[Time]\n# /etc/systemd/timesyncd.conf.d/local.conf\n[Time]\nNTP=0.nl.pool.ntp.org 1.nl.pool.ntp.org 2.nl.pool.ntp.org 3.nl.pool.ntp.org\nRootDistanceMaxSec=0.1\nPollIntervalMinSec=1d\nPollIntervalMaxSec=4w\nSaveIntervalSec=infinity\n```\n\n"
+    },
+    {
+      "title": "Günlüğü görüntüleme",
+      "level": 3,
+      "content": "Servise dair, son 24 saat içinde günlüğe kaydedilmiş olayları listelemek için aşağıdaki komutu kullanın:\n\n```\n# journalctl -u systemd-timesyncd --no-hostname --since \"1 day ago\"\n```\n\n```\nJan 19 15:14:20 systemd[1]: Stopping Network Time Synchronization...\nJan 19 15:14:20 systemd[1]: systemd-timesyncd.service: Deactivated successfully.\nJan 19 15:14:20 systemd[1]: Stopped Network Time Synchronization.\nJan 19 15:14:20 systemd[1]: Starting Network Time Synchronization...\nJan 19 15:14:20 systemd[1]: Started Network Time Synchronization.\nJan 19 15:14:20 systemd-timesyncd[1023]: Contacted time server 178.215.228.24:123 (0.nl.pool.ntp.org).\nJan 19 15:14:20 systemd-timesyncd[1023]: Initial clock synchronization to Fri 2024-01-19 15:14:20.393865 CET.\n```\n\n"
+    },
+    {
+      "title": "Ayrıca bakınız",
+      "level": 2,
+      "content": "- Forum: systemd-timesyncd is not syncing time\n- Forum: Using systemd-timesync instead of NTP\n- timesyncd kaynak kodu\n- systemd-timesyncd(8)\n- timesyncd.conf(5)\n\n"
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "title": "Postfix (Español)",
+  "url": "https://wiki.archlinux.org/title/Postfix_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-06** \n\nArtículos relacionados\n\n- Postfix with SASL\n- Virtual user mail system\n- OpenDMARC\n- OpenDKIM\n\nPostfix es un agente de transferencia de correo que de acuerdo con su sitio web:\n\nEste artículo se basa en Servidor de correo. El objetivo de este artículo es configurar Postfix y explicar qué hacen los archivos de configuración básicos. Hay instrucciones para configurar la entrega solo para usuarios locales del sistema y un enlace a una guía para la entrega a usuarios virtuales.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete postfix.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "Véase Configuración básica de Postfix. Los archivos de configuración están en /etc/postfix por defecto. Los dos archivos más importantes son:\n\n- master.cf, define qué servicios de Postfix están habilitados y cómo se conectan los clientes con ellos, véase master(5)\n- main.cf, el archivo de configuración principal, véase postconf(5)\n\nLos cambios de configuración necesitan un reinicio de postfix.service para tener efecto.\n\n"
+    },
+    {
+      "title": "Alias",
+      "level": 3,
+      "content": "Véase aliases(5).\n\nPuede especificar los alias (también conocidos como reenviadores) en /etc/postfix/aliases.\n\nDebe asignar todo el correo dirigido a root a otra cuenta, ya que no es una buena idea leer el correo como superusuario.\n\nDescomente la siguiente línea, y cambie tú a una cuenta real.\n\n```\nroot: tú\n```\n\nUna vez que haya terminado de editar /etc/postfix/aliases debe ejecutar la orden postalias:\n\n```\npostalias /etc/postfix/aliases\n```\n\nPara cambios posteriores puedes utilizar:\n\n```\nnewaliases\n```\n\n```\n/root/.forward\n```\n\n```\nusuario@localhost\n```\n\n"
+    },
+    {
+      "title": "Correo local",
+      "level": 3,
+      "content": "Para enviar correo solo a los usuarios locales del sistema (que están en /etc/passwd) actualice /etc/postfix/main.cf para reflejar la siguiente configuración. Descomente, cambie o añada las siguientes líneas:\n\n```\nmyhostname = localhost\nmydomain = localdomain\nmydestination = $myhostname, localhost.$mydomain, localhost\ninet_interfaces = $myhostname, localhost\nmynetworks_style = host\ndefault_transport = error: outside mail is not deliverable\n```\n\nTodos los demás ajustes pueden permanecer sin cambios. Después de configurar el archivo de configuración anterior, es posible que desee configurar algunos #Alias y luego #Iniciar Postfix.\n\n"
+    },
+    {
+      "title": "Correo virtual",
+      "level": 3,
+      "content": "El correo virtual es un correo que no se asigna a una cuenta de usuario (/etc/passwd).\n\nVéase Virtual user mail system with Postfix, Dovecot and Roundcube para una guía completa de cómo configurarlo.\n\n"
+    },
+    {
+      "title": "Comprobar configuración",
+      "level": 3,
+      "content": "Ejecute la orden postfix check. Debería mostrar cualquier cosa que pueda haber hecho mal en un archivo de configuración.\n\nPara ver todas sus configuraciones, escriba postconf. Para ver en qué se diferencian de los valores por defecto, pruebe postconf -n.\n\n"
+    },
+    {
+      "title": "Iniciar Postfix",
+      "level": 2,
+      "content": "Inicie/active postfix.service.\n\n"
+    },
+    {
+      "title": "TLS",
+      "level": 2,
+      "content": "Para más información, véase Soporte TLS en Postfix.\n\n"
+    },
+    {
+      "title": "SMTP seguro (enviando)",
+      "level": 3,
+      "content": "Por defecto, Postfix/sendmailno enviará correo electrónico cifrado a otros servidores SMTP. Para utilizar TLS cuando esté disponible, añada la siguiente línea a main.cf:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtp_tls_security_level = may\n```\n\nPara forzar TLS (y fallar cuando el servidor remoto no lo soporte), cambie may a encrypt. Note, sin embargo, que esto viola el RFC:2487 si el servidor SMTP es referenciado públicamente.\n\n"
+    },
+    {
+      "title": "SMTP seguro (recibiendo)",
+      "level": 3,
+      "content": "Por defecto, Postfix no aceptará el correo seguro.\n\nNecesita obtener un certificado. Apunte Postfix a sus certificados TLS añadiendo las líneas siguientes a main.cf:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_tls_security_level = may\nsmtpd_use_tls = yes\nsmtpd_tls_cert_file = /ruta/al/cert.pem\nsmtpd_tls_key_file = /ruta/al/key.pem\n```\n\nHay dos formas de aceptar el correo seguro. STARTTLS sobre SMTP (puerto 587) y SMTPS (puerto 465). Este último fue previamente desaprobado pero fue reintegrado por el RFC:8314.\n\nPara activar STARTTLS sobre SMTP (puerto 587), descomente las siguientes líneas en master.cf:\n\n```\n/etc/postfix/master.cf\n```\n\n```\nsubmission inet n       -       n       -       -       smtpd\n  -o syslog_name=postfix/submission\n  -o smtpd_tls_security_level=encrypt\n  -o smtpd_sasl_auth_enable=yes\n  -o smtpd_tls_auth_only=yes\n  -o smtpd_reject_unlisted_recipient=no\n#  -o smtpd_client_restrictions=$mua_client_restrictions\n#  -o smtpd_helo_restrictions=$mua_helo_restrictions\n#  -o smtpd_sender_restrictions=$mua_sender_restrictions\n  -o smtpd_recipient_restrictions=\n  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject\n  -o milter_macro_daemon_name=ORIGINATING\n```\n\nLas opciones smtpd_*_restrictions permanecen comentadas porque $mua_*_restrictions no están definidas en main.cf por defecto. Si defide configurar alguna $mua_*_restrictions, descomente esas líneas también.\n\nPara activar SMTPS (puerto 465), descomente las líneas siguientes en master.cf:\n\n```\n/etc/postfix/master.cf\n```\n\n```\nsmtps     inet  n       -       n       -       -       smtpd\n  -o syslog_name=postfix/smtps\n  -o smtpd_tls_wrappermode=yes\n  -o smtpd_sasl_auth_enable=yes\n  -o smtpd_reject_unlisted_recipient=no\n#  -o smtpd_client_restrictions=$mua_client_restrictions\n#  -o smtpd_helo_restrictions=$mua_helo_restrictions\n#  -o smtpd_sender_restrictions=$mua_sender_restrictions\n  -o smtpd_recipient_restrictions=\n  -o smtpd_relay_restrictions=permit_sasl_authenticated,reject\n  -o milter_macro_daemon_name=ORIGINATING\n```\n\nY en primera línea, reemplace smtps con submissions. (este es el nombre oficial del servicio según IANA; Postfix todavía hace referencia al nombre antiguo)\n\nEl razonamiento que rodea a las líneas $smtpd_*_restrictions es el mismo que arriba.\n\nNote: También asegúrese de que /etc/services está actualizado e incluye la siguiente línea:\n\n```\nsubmissions inet n       -       n       -       -       smtpd\n```\n\nTambién asegúrese de que /etc/services está actualizado e incluye la siguiente línea:\n\n```\nsubmissions 465/tcp\n```\n\n"
+    },
+    {
+      "title": "Lista negra de correos electrónicos entrantes",
+      "level": 3,
+      "content": "La lista negra de correos electrónicos entrantes por dirección del remitente se puede hacer fácilmente con Postfix.\n\nCree y abra el fichero /etc/postfix/blacklist_incoming y añada la dirección de correo electrónico del remitente:\n\n```\nusuario@ejemplo.com REJECT\n```\n\nLuego use la orden postmap para crear una base de datos:\n\n```\n# postmap hash:blacklist_incoming\n```\n\nAñada el siguiente código antes de la primera regla permisiva en main.cf:\n\n```\nsmtpd_recipient_restrictions = check_sender_access hash:/etc/postfix/blacklist_incoming\n```\n\nFinalmente reinicie postfix.service.\n\n"
+    },
+    {
+      "title": "Ocultar la IP y el agente de usuario del remitente en el encabezado Received",
+      "level": 3,
+      "content": "Este es un problema de privacidad principalmente, si utiliza Thunderbird y envía un correo electrónico. El encabezado Received contendrá su IP LAN y WAN e información sobre el cliente de correo electrónico que utilizó. (Fuente original: AskUbuntu) Lo que queremos hacer es eliminar el encabezado Received de los correos electrónicos salientes.\n\nPara hacer esto, primero añada la siguiente línea a main.cf:\n\n```\nsmtp_header_checks = regexp:/etc/postfix/smtp_header_checks\n```\n\nCree /etc/postfix/smtp_header_checks con este contenido:\n\n```\n/^Received: .*/     IGNORE\n/^User-Agent: .*/   IGNORE\n```\n\nFinalmente, reinicie postfix.service.\n\n"
+    },
+    {
+      "title": "Postfix en una jaula chroot",
+      "level": 3,
+      "content": "Postfix no se pone en una jaula chroot por defecto. La documentación de Postfix [1] proporciona detalles sobre cómo llevar a cabo tal enjaulado. Los pasos se describen a continuación y se basan en el script de configuración de chroot que se proporciona en el código fuente de Postfix.\n\nPrimero, entre en el archivo master.cf en el directorio /etc/postfix y cambie todas las entradas chroot a 'yes' (y) excepto para los servicios qmgr, proxymap, proxywrite, local, y virtual\n\nSegundo, cree dos funciones que nos ayudarán más adelante con la copia de archivos en la jaula chroot (véase el último paso)\n\n```\nCP=\"cp -p\"\n```\n\n```\ncond_copy() {\n  # find files as per pattern in $1\n  # if any, copy to directory $2\n  dir=`dirname \"$1\"`\n  pat=`basename \"$1\"`\n  lr=`find \"$dir\" -maxdepth 1 -name \"$pat\"`\n  if test ! -d \"$2\" ; then exit 1 ; fi\n  if test \"x$lr\" != \"x\" ; then $CP $1 \"$2\" ; fi\n}\n```\n\nA continuación, haga los nuevos directorios para la jaula:\n\n```\nset -e\numask 022\n```\n\n```\nPOSTFIX_DIR=${POSTFIX_DIR-/var/spool/postfix}\ncd ${POSTFIX_DIR}\n```\n\n```\nmkdir -p etc lib usr/lib/zoneinfo\ntest -d /lib64 && mkdir -p lib64\n```\n\nEncuentra el archivo localtime:\n\n```\nlt=/etc/localtime\nif test ! -f $lt ; then lt=/usr/lib/zoneinfo/localtime ; fi\nif test ! -f $lt ; then lt=/usr/share/zoneinfo/localtime ; fi\nif test ! -f $lt ; then echo \"cannot find localtime\" ; exit 1 ; fi\nrm -f etc/localtime\n```\n\nCopie localtime y algunos archivos de sistema en el directorio etc del chroot:\n\n```\n$CP -f $lt /etc/services /etc/resolv.conf /etc/nsswitch.conf etc\n$CP -f /etc/host.conf /etc/hosts /etc/passwd etc\nln -s -f /etc/localtime usr/lib/zoneinfo\n```\n\nCopie las bibliotecas requeridas en el chroot utilizando la función creada previamente cond_copy\n\n```\ncond_copy '/usr/lib/libnss_*.so*' lib\ncond_copy '/usr/lib/libresolv.so*' lib\ncond_copy '/usr/lib/libdb.so*' lib\n```\n\nY no olvide recargar Postfix.\n\n"
+    },
+    {
+      "title": "Registro de recursos",
+      "level": 4,
+      "content": "DANE admite varios tipos de registros, sin embargo, no todos ellos son adecuados en Postfix.\n\nEl uso del certificado 0 no es compatible, el 1 se asigna al 3 y 2 es opcional, por lo tanto es recomendable publicar un registro \"3\". Más en Registros de recursos.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 4,
+      "content": "DANE oportunista (opportunistic) se configura de esta manera:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_use_tls = yes\nsmtp_dns_support_level = dnssec\nsmtp_tls_security_level = dane\n```\n\n```\n/etc/postfix/master.cf\n```\n\n```\ndane       unix  -       -       n       -       -       smtp\n  -o smtp_dns_support_level=dnssec\n  -o smtp_tls_security_level=dane\n```\n\nPara utilizar políticas por dominio, por ejemplo DANE oportunista para ejemplo.org y DANE obligatorio (mandatory) para ejemplo.com, utilice algo como esto:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nindexed = ${default_database_type}:${config_directory}/\n\n# Per-destination TLS policy\n#\nsmtp_tls_policy_maps = ${indexed}tls_policy\n\n# default_transport = smtp, but some destinations are special:\n#\ntransport_maps = ${indexed}transport\n```\n\n```\ntransport\n```\n\n```\nejemplo.com dane\nejemplo.org dane\n```\n\n```\ntls_policy\n```\n\n```\nejemplo.com dane-only\n```\n\nLa documentación completa se encuentra aquí.\n\n"
+    },
+    {
+      "title": "Extras",
+      "level": 2,
+      "content": "- PostfixAdmin — Una interfaz administrativa basada en web para Postfix.\n\n"
+    },
+    {
+      "title": "Postgrey",
+      "level": 3,
+      "content": "Postgrey se puede utilizar para activar listas grises en un servidor de correo Postfix.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 4,
+      "content": "Instale el paquete postgrey. Para tenerlo funcionando rápidamente, edite el archivo de configuración de Postfix y añada estas líneas:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_recipient_restrictions =\n  check_policy_service inet:127.0.0.1:10030\n```\n\nLuego inicie/active el servicio postgrey. Después, recargue el servicio postfix. Ahora la lista gris debería estar activada.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 4,
+      "content": "La configuración se realiza mediante la edición del archivo postgrey.service. Primero cópielo para editarlo.\n\n```\n# cp /usr/lib/systemd/system/postgrey.service /etc/systemd/system/\n```\n\n"
+    },
+    {
+      "title": "Lista blanca",
+      "level": 4,
+      "content": "Para añadir listas blancas automáticas (los envíos exitosos entran en la lista blanca y no tienen que esperar nunca más), puede añadir la opción --auto-whitelist-clients=N y reemplazar N por un número adecuadamente pequeño (o dejarlo en su valor por defecto de 5).\n\n...en realidad, el método preferido debería ser la anulación (override):\n\n```\ncat /etc/systemd/system/postgrey.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/postgrey --inet=127.0.0.1:10030 \\\n       --pidfile=/run/postgrey/postgrey.pid \\\n       --group=postgrey --user=postgrey \\\n       --daemonize \\\n       --greylist-text=\"Greylisted for %%s seconds\" \\\n       --auto-whitelist-clients\n```\n\nPara añadir su propia lista de clientes en la lista blanca además de los predeterminados, cree el archivo /etc/postfix/whitelist_clients.local e introduzca un dominio por línea, luego reinicie postgrey.service para que los cambios surtan efecto.\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 4,
+      "content": "Si especifica --unix=/path/to/socket y el archivo de socket no se crea, asegúrese de haber eliminado el valor predeterminado --inet=127.0.0.1:10030 del archivo de servicio.\n\nPara una documentación completa de las posibles opciones véase perldoc postgrey.\n\n"
+    },
+    {
+      "title": "SpamAssassin",
+      "level": 3,
+      "content": "Esta sección describe cómo integrar SpamAssassin.\n\n"
+    },
+    {
+      "title": "Configuración genérica independiente de SpamAssassin",
+      "level": 4,
+      "content": "Edite /etc/postfix/master.cf y añada el filtro de contenido bajo smtp.\n\n```\nsmtp      inet  n       -       n       -       -       smtpd\n  -o content_filter=spamassassin\n```\n\nTambién añada la siguiente entrada de servicio para SpamAssassin.\n\n```\nspamassassin unix -     n       n       -       -       pipe\n  flags=R user=spamd argv=/usr/bin/vendor_perl/spamc -e /usr/bin/sendmail -oi -f ${sender} ${recipient}\n```\n\nAhora puede iniciar y activar spamassassin.service.\n\n"
+    },
+    {
+      "title": "SpamAssassin combinado con Dovecot LDA / Sieve (Filtrado de correo)",
+      "level": 4,
+      "content": "Configure LDA y Sieve-Plugin como se describe en Dovecot#Sieve. Pero ignore la última línea mailbox_command... .\n\nEn su lugar, añada una tubería (pipe) en /etc/postfix/master.cf:\n\n```\ndovecot   unix  -       n       n       -       -       pipe\n       flags=DRhu user=vmail:vmail argv=/usr/bin/vendor_perl/spamc -u spamd -e /usr/lib/dovecot/dovecot-lda -f ${sender} -d ${recipient}\n```\n\nY actívelo en /etc/postfix/main.cf:\n\n```\nvirtual_transport = dovecot\n```\n\n"
+    },
+    {
+      "title": "SpamAssassin combinado con Dovecot LMTP / Sieve",
+      "level": 4,
+      "content": "Configure LMTP y Sieve como se describe en Dovecot#Sieve.\n\nEdite /etc/dovecot/conf.d/90-plugins.conf y añada:\n\n```\nsieve_before = /etc/dovecot/sieve.before.d/\n sieve_extensions = +vnd.dovecot.filter\n sieve_plugins = sieve_extprograms\n sieve_filter_bin_dir = /etc/dovecot/sieve-filter\n sieve_filter_exec_timeout = 120s #this is often needed for the long running spamassassin scans, default is otherwise 10s\n```\n\nCree el directorio y coloque spamassassin como un binario que pueda ser ejecutado por dovecot:\n\n```\n# mkdir /etc/dovecot/sieve-filter\n # ln -s /usr/bin/vendor_perl/spamc /etc/dovecot/sieve-filter/spamc\n```\n\nCree un nuevo archivo, /etc/dovecot/sieve.before.d/spamassassin.sieve que contenga:\n\n```\nrequire [ \"vnd.dovecot.filter\" ];\n filter \"spamc\" [ \"-d\", \"127.0.0.1\", \"--no-safe-fallback\" ];\n```\n\nCompile las reglas sieve spamassassin.svbin:\n\n```\n# cd /etc/dovecot/sieve.before.d\n # sievec spamassassin.sieve\n```\n\nFinalmente, reinicie dovecot.service.\n\n"
+    },
+    {
+      "title": "Procesamiento de correo basado en reglas",
+      "level": 3,
+      "content": "Con los servicios de políticas se puede ajustar fácilmente el comportamiento de Postfix en la entrega de correos. postfwd y policyd (policyd-mysqlAUR[enlace roto: package not found], policyd-pgsqlAUR[enlace roto: package not found] o policyd-sqliteAUR[enlace roto: package not found]) proporcionan servicios para hacerlo. Esto le permite, por ejemplo, implementar listas grises y negras de remitentes y receptores, así como el control de políticas SPF.\n\nLos servicios de políticas son servicios independientes y están conectados a Postfix tal que así:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_recipient_restrictions =\n  ...\n  check_policy_service unix:/run/policyd.sock\n  check_policy_service inet:127.0.0.1:10040\n```\n\nLa colocación de los servicios de políticas al final de la cola reduce la carga, ya que solo se procesan los correos legítimos. Asegúrese de colocarlo antes de la primera declaración permisiva para capturar todos los mensajes entrantes.\n\n"
+    },
+    {
+      "title": "Marco de políticas del remitente",
+      "level": 3,
+      "content": "Para utilizar el marco de políticas del remitente con Postfix, puede instale python-spf-engineAUR, python-postfix-policyd-spfAUR o postfix-policyd-spf-perlAUR.\n\n"
+    },
+    {
+      "title": "Con spf-engine o python-postfix-policyd-spf",
+      "level": 4,
+      "content": "Edite /etc/python-policyd-spf/policyd-spf.conf a sus necesidades. Una versión ampliamente comentada se puede encontrar en /etc/python-policyd-spf/policyd-spf.conf.commented. Preste especial atención a la política de verificación HELO, ya que la configuración estándar rechaza estrictamente los fallos HELO.\n\nEn el archivo main.cf, añada un tiempo de espera para policyd:\n\n```\n/etc/postfix/main.cf\n```\n\n```\npolicy-spf_time_limit = 3600s\n```\n\nA continuación, añada un transporte:\n\n```\n/etc/postfix/master.cf\n```\n\n```\npolicy-spf  unix  -       n       n       -       0       spawn\n     user=nobody argv=/usr/bin/policyd-spf\n```\n\nPor último, debe añadir policyd a smtpd_recipient_restrictions. Para minimizar la carga, sitúela al final de las restricciones pero por encima de cualquier línea reject_rbl_client DNSBL:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_recipient_restrictions=\n     ...\n     permit_sasl_authenticated\n     permit_mynetworks\n     reject_unauth_destination\n     check_policy_service unix:private/policy-spf\n```\n\nAhora recargue el servicio postfix.\n\nPuede comprobar su configuración con lo siguiente:\n\n```\n/etc/python-policyd-spf/policyd-spf.conf\n```\n\n```\ndefaultSeedOnly = 0\n```\n\n"
+    },
+    {
+      "title": "Con postfix-policyd-spf-perl",
+      "level": 4,
+      "content": "Realice el mismo proceso con postfix como con python-postfix-policyd-spf, pero con las siguientes diferencias:\n\nTiempo de espera para policyd en el archivo main.cf:\n\n```\n/etc/postfix/main.cf\n```\n\n```\npolicy_time_limit = 3600\n```\n\nTransporte:\n\n```\n/etc/postfix/master.cf\n```\n\n```\npolicy  unix  -       n       n       -       0       spawn\n     user=nobody argv=/usr/lib/postfix/postfix-policyd-spf-perl\n```\n\nAñada el policyd a smtpd_recipient_restrictions:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsmtpd_recipient_restrictions=\n     ...\n     reject_unauth_destination\n     check_policy_service unix:private/policy\n     ...\n```\n\n"
+    },
+    {
+      "title": "Esquema de reescritura del remitente",
+      "level": 3,
+      "content": "Para utilizar el esquema de reescritura del remitente con Postfix, instale postsrsdAUR y ajuste la configuración:\n\n```\n/etc/postsrsd/postsrsd\n```\n\n```\nSRS_DOMAIN=yourdomain.tld\nSRS_EXCLUDE_DOMAINS=yourotherdomain.tld,yet.anotherdomain.tld\nSRS_SEPARATOR==\nSRS_SECRET=/etc/postsrsd/postsrsd.secret\nSRS_FORWARD_PORT=10001\nSRS_REVERSE_PORT=10002\nRUN_AS=postsrsd\nCHROOT=/usr/lib/postsrsd\n```\n\nActive e inicie el demonio, asegurándose de que se ejecute también después de reiniciar. A continuación, configure Postfix en consecuencia ajustando las siguientes líneas:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nsender_canonical_maps = tcp:localhost:10001\nsender_canonical_classes = envelope_sender\nrecipient_canonical_maps = tcp:localhost:10002\nrecipient_canonical_classes= envelope_recipient,header_recipient\n```\n\nReinicie Postfix y comience a reenviar correo.\n\n"
+    },
+    {
+      "title": "Warning: \"database /etc/postfix/*.db is older than source file ..\"",
+      "level": 3,
+      "content": "Si recibe alguna o ambas advertencias con journalctl:\n\n```\nwarning: database /etc/postfix/virtual.db is older than source file /etc/postfix/virtual\nwarning: database /etc/postfix/transport.db is older than source file /etc/postfix/transport\n```\n\nEntonces puede solucionarlo utilizando estas órdenes dependiendo de los mensajes que reciba:\n\n```\npostmap /etc/postfix/transport\npostmap /etc/postfix/virtual\n```\n\nY reiniciar postfix.service.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Documentación oficial\n- Documentación de Ubuntu sobre Postfix\n\n"
+    }
+  ]
+}

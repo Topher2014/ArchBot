@@ -1,0 +1,196 @@
+{
+  "title": "Unified Extensible Firmware Interface (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- EFI system partition\n- GUID Partition Table\n- Secure Boot\n- Unified kernel image\n\nThe Unified Extensible Firmware Interface (UEFI) is an interface between operating systems and firmware. It provides a standard environment for booting an operating system and running pre-boot applications.\n\nIt is distinct from the MBR boot code method that was used by legacy BIOS systems. See Arch boot process for their differences and the boot process using UEFI. To set up UEFI boot loaders, see Arch boot process#Boot loader.\n\n- Early vendor UEFI implementations may carry more bugs than their BIOS counterparts. Consider using legacy BIOS booting for such systems if you encounter unsolvable issues.\n- Apple UEFI implementation does not conform to the standard. Unless stated explicitly, these instructions are general and some of them may not work or may be different for Macs.\n\n"
+    },
+    {
+      "title": "UEFI firmware bitness",
+      "level": 2,
+      "content": "Under UEFI, every program whether it is an operating system loader or a utility (e.g. a memory testing or recovery tool), should be an EFI application corresponding to the UEFI firmware bitness/architecture.\n\nThe vast majority of x86_64 systems, including recent Apple Macs, use x64 (64-bit) UEFI firmware. The only known devices that use IA32 (32-bit) UEFI are older (pre 2008) Apple Macs, Intel Atom System-on-Chip systems (as on 2 November 2013)[1] and some older Intel server boards that are known to operate on Intel EFI 1.10 firmware.\n\nAn x64 UEFI firmware does not include support for launching 32-bit EFI applications (unlike x86_64 Linux and Windows versions which include such support). Therefore the EFI application must be compiled for that specific firmware processor bitness/architecture.\n\n"
+    },
+    {
+      "title": "Checking the firmware bitness",
+      "level": 3,
+      "content": "The firmware bitness can be checked from a booted operating system.\n\n"
+    },
+    {
+      "title": "From Linux",
+      "level": 4,
+      "content": "On distributions running Linux kernel 4.0 or newer, the UEFI firmware bitness can be found via the sysfs interface. Run:\n\n```\n$ cat /sys/firmware/efi/fw_platform_size\n```\n\nIt will return 64 for a 64-bit (x64) UEFI or 32 for a 32-bit (IA32) UEFI. If the file does not exist, then you have not booted in UEFI mode.\n\n"
+    },
+    {
+      "title": "From macOS",
+      "level": 4,
+      "content": "Pre-2008 Macs mostly have IA32 EFI firmware while >=2008 Macs have mostly x64 EFI. All Macs capable of running Mac OS X Snow Leopard 64-bit Kernel have x64 EFI 1.x firmware.\n\nTo find out the arch of the EFI firmware in a Mac, type the following into the Mac OS X terminal:\n\n```\n$ ioreg -l -p IODeviceTree | grep firmware-abi\n```\n\nIf the command returns EFI32 then it is IA32 (32-bit) EFI firmware. If it returns EFI64 then it is x64 EFI firmware. Most of the Macs do not have UEFI 2.x firmware as Apple's EFI implementation is not fully compliant with UEFI 2.x specification.\n\n"
+    },
+    {
+      "title": "From Microsoft Windows",
+      "level": 4,
+      "content": "64-bit versions of Windows do not support booting on a 32-bit UEFI. So, if you have a 32-bit version of Windows booted in UEFI mode, you have a 32-bit UEFI.\n\nTo check the bitness run msinfo32.exe. In the System Summary section look at the values of \"System Type\" and \"BIOS mode\".\n\nFor a 64-bit Windows on a 64-bit UEFI it will be System Type: x64-based PC and BIOS mode: UEFI, for a 32-bit Windows on a 32-bit UEFI - System Type: x86-based PC and BIOS mode: UEFI. If the \"BIOS mode\" is not UEFI, then Windows is not booted in UEFI mode.\n\n"
+    },
+    {
+      "title": "UEFI variables",
+      "level": 2,
+      "content": "UEFI defines variables through which an operating system can interact with the firmware. UEFI boot variables are used by the boot loader and used by the operating system only for early system start-up. UEFI runtime variables allow an operating system to manage certain settings of the firmware like the UEFI boot manager or managing the keys for UEFI Secure Boot protocol etc. You can get the list using:\n\n```\n$ efivar --list\n```\n\n"
+    },
+    {
+      "title": "UEFI variables support in Linux kernel",
+      "level": 3,
+      "content": "Linux kernel exposes UEFI variables data to userspace via efivarfs (EFI VARiable FileSystem) interface (CONFIG_EFIVAR_FS) - mounted using efivarfs kernel module at /sys/firmware/efi/efivars - it has no maximum per-variable size limitation and supports UEFI Secure Boot variables. Introduced in kernel 3.8.\n\n"
+    },
+    {
+      "title": "Requirements for UEFI variable support",
+      "level": 3,
+      "content": "1. Kernel should be booted in UEFI mode via the EFI boot stub (optionally using a boot manager) or by a UEFI boot loader, not via BIOS or CSM, or Apple's Boot Camp which is also a CSM.\n1. EFI Runtime Services support should be present in the kernel (CONFIG_EFI=y, check if present with zgrep CONFIG_EFI /proc/config.gz).\n1. EFI Runtime Services in the kernel SHOULD NOT be disabled via the kernel command line, i.e. noefi kernel parameter SHOULD NOT be used.\n1. efivarfs filesystem should be mounted at /sys/firmware/efi/efivars, otherwise follow #Mount efivarfs section below.\n1. efivar should list (option -l/--list) the UEFI variables without any error.\n\nIf UEFI Variables support does not work even after the above conditions are satisfied, try the below workarounds:\n\n1. If listing of the UEFI variables (efivar -l) leads to efivar: error listing variables: Function not implemented and the system is booted into a realtime kernel, add efi=runtime to the kernel parameters and reboot (efivarfs functionality is disabled by default on those kernels).\n1. See #Userspace tools are unable to modify UEFI variable data for more troubleshooting steps\n\n"
+    },
+    {
+      "title": "Mount efivarfs",
+      "level": 4,
+      "content": "If efivarfs is not automatically mounted at /sys/firmware/efi/efivars by systemd during boot, then you need to manually mount it to expose UEFI variables to userspace tools like efibootmgr:\n\n```\n# mount -t efivarfs efivarfs /sys/firmware/efi/efivars\n```\n\nNote: **both outside** \n\nSee efivarfs.html for kernel documentation.\n\n"
+    },
+    {
+      "title": "Userspace tools",
+      "level": 3,
+      "content": "There are few tools that can access/modify the UEFI variables, namely\n\n- efivar — Library and Tool to manipulate UEFI variables (used by efibootmgr)\n\n- efibootmgr — Tool to manipulate UEFI Firmware Boot Manager Settings\n\n- uefivars — Dumps list of UEFI variables with some additional PCI related info (uses efibootmgr code internally)\n\n- efitools — Tools for manipulating UEFI secure boot platforms\n\n- Ubuntu's Firmware Test Suite — Test suite that performs sanity checks on Intel/AMD PC firmware\n\n"
+    },
+    {
+      "title": "efibootmgr",
+      "level": 4,
+      "content": "You will have to install the efibootmgr package.\n\n- If efibootmgr does not work on your system, you can reboot into #UEFI Shell and use bcfg to create a boot entry for the bootloader.\n- If you are unable to use efibootmgr, some UEFI firmwares allow users to directly manage UEFI boot entries from within its boot-time interface. For example, some firmwares have an \"Add New Boot Option\" choice which enables you to select a local EFI system partition and manually enter the EFI application location e.g. \\EFI\\refind\\refind_x64.efi.\n- The below commands use rEFInd boot manager as example.\n\nTo add a new boot option using efibootmgr, you need to know three things:\n\n1. The disk containing the EFI system partition (ESP). E.g.: /dev/sda, /dev/nvme0n1.\n1. The partition number of the ESP on that disk. The Y in /dev/sdaY or /dev/nvme0n1pY.\n1. The path to the EFI application (relative to the root of the ESP)\n\nFor example, if you want to add a boot option for /efi/EFI/refind/refind_x64.efi where /efi is the mount point of the ESP, run\n\n```\n$ findmnt /efi\n```\n\n```\nTARGET SOURCE    FSTYPE OPTIONS\n/efi   /dev/sda1 vfat   rw,flush,tz=UTC\n```\n\nIn this example, findmnt(8) indicates that the ESP is on disk /dev/sda and has partition number 1. The path to the EFI application relative to the root of the ESP is /EFI/refind/refind_x64.efi. So you would create the boot entry as follows:\n\n```\n# efibootmgr --create --disk /dev/sda --part 1 --loader '\\EFI\\refind\\refind_x64.efi' --label 'rEFInd Boot Manager' --unicode\n```\n\nGet an overview of all boot entries and the boot order:\n\n```\n# efibootmgr --unicode\n```\n\nTo set the boot order:\n\n```\n# efibootmgr --bootorder XXXX,XXXX --unicode\n```\n\nWhere XXXX is the number that appears in the previous output of efibootmgr command.\n\nDelete an unwanted entry:\n\n```\n# efibootmgr --delete-bootnum --bootnum XXXX --unicode\n```\n\nSee efibootmgr(8) or efibootmgr README for more info.\n\n"
+    },
+    {
+      "title": "Disable UEFI variable access",
+      "level": 3,
+      "content": "Access to the UEFI can potentially cause harm beyond the running operating system level. There are dangerous UEFI exploits like LogoFAIL which allows a malicious actor to take full control over the machine. Even hardware-level bricking is possible in some cases of poor UEFI implementation [2].\n\nSo, as the UEFI variables access is not required for daily system usage, you may want to disable it, to avoid potential security breaches or accidental harm.\n\nPossible solutions are:\n\n- Mount efivars in read-only mode using fstab. For example: efivarfs /sys/firmware/efi/efivars efivarfs ro,nosuid,nodev,noexec 0 0\n- Use the noefi kernel parameter to completely disable OS access to UEFI.\n\n```\nefivarfs /sys/firmware/efi/efivars efivarfs ro,nosuid,nodev,noexec 0 0\n```\n\n"
+    },
+    {
+      "title": "UEFI Shell",
+      "level": 2,
+      "content": "The UEFI Shell is a shell/terminal for the firmware which allows launching EFI applications which include UEFI bootloaders. Apart from that, the shell can also be used to obtain various other information about the system or the firmware like memory map (memmap), modifying boot manager variables (bcfg), running partitioning programs (diskpart), loading UEFI drivers, editing text files (edit), hexedit etc.\n\n"
+    },
+    {
+      "title": "Obtaining UEFI Shell",
+      "level": 3,
+      "content": "You can obtain a BSD licensed UEFI Shell from the TianoCore EDK2 project:\n\n- Shell v2: On the Arch install medium: /shellx64.efi. A copy of /usr/share/edk2-shell/x64/Shell_Full.efi from the time the ISO was built. edk2-shell provides x64 Shell for x64 (64-bit) UEFI and IA32 Shell for IA32 (32-bit) UEFI - compiled directly from latest TianoCore EDK2 release. uefi-shell-gitAUR provides x64 Shell for x64 (64-bit) UEFI and IA32 Shell for IA32 (32-bit) UEFI - compiled directly from latest TianoCore EDK2 source.\n- Shell v1: Precompiled UEFI Shell v1 binaries from TianoCore (not updated anymore upstream as of Jan 10, 2014).\n- Patched shells: Precompiled UEFI Shell v2 binary with bcfg modified to work with UEFI pre-2.3 firmware[dead link 2023-07-30 ⓘ] - from Clover EFI bootloader. Precompiled UEFI Shell v2 binary for compatibility with a broad range of firmwares - from the OpenCore bootloader. In the release archive: EFI/OC/Tools/OpenShell.efi.\n\n- On the Arch install medium: /shellx64.efi. A copy of /usr/share/edk2-shell/x64/Shell_Full.efi from the time the ISO was built.\n- edk2-shell provides x64 Shell for x64 (64-bit) UEFI and IA32 Shell for IA32 (32-bit) UEFI - compiled directly from latest TianoCore EDK2 release.\n- uefi-shell-gitAUR provides x64 Shell for x64 (64-bit) UEFI and IA32 Shell for IA32 (32-bit) UEFI - compiled directly from latest TianoCore EDK2 source.\n\n- Precompiled UEFI Shell v1 binaries from TianoCore (not updated anymore upstream as of Jan 10, 2014).\n\n- Precompiled UEFI Shell v2 binary with bcfg modified to work with UEFI pre-2.3 firmware[dead link 2023-07-30 ⓘ] - from Clover EFI bootloader.\n- Precompiled UEFI Shell v2 binary for compatibility with a broad range of firmwares - from the OpenCore bootloader. In the release archive: EFI/OC/Tools/OpenShell.efi.\n\nShell v2 works best in UEFI 2.3+ systems and is recommended over Shell v1 in those systems. Shell v1 should work in all UEFI systems irrespective of the spec. version the firmware follows. More information at ShellPkg and the EDK2 mailing list thread—Inclusion of UEFI shell in Linux distro iso.\n\n"
+    },
+    {
+      "title": "Launching UEFI Shell",
+      "level": 3,
+      "content": "Few Asus and other AMI Aptio x64 UEFI firmware based motherboards (from Sandy Bridge onwards) provide an option called Launch EFI Shell from filesystem device. For those motherboards, copy the x64 UEFI Shell to the root of your EFI system partition, named as shellx64.efi.\n\n- The Arch Linux installation medium has shellx64.efi at the root of the volume.\n- rEFInd and systemd-boot will automatically add a boot menu entry for the UEFI shell if shellx64.efi is in the root of the EFI system partition.\n\nSystems with Phoenix SecureCore Tiano UEFI firmware is known to have embedded UEFI Shell which can be launched using either F6, F11 or F12 key.\n\n"
+    },
+    {
+      "title": "Important UEFI Shell commands",
+      "level": 3,
+      "content": "UEFI Shell commands usually support -b option which makes output pause after each page. Run help -b to list available internal commands. Available commands are either built into the shell or discrete EFI applications.\n\nFor more info see Intel Scripting Guide 2008[dead link 2023-07-30 ⓘ] and Intel \"Course\" 2011[dead link 2023-07-30 ⓘ].\n\n"
+    },
+    {
+      "title": "bcfg",
+      "level": 4,
+      "content": "bcfg modifies the UEFI NVRAM entries which allows the user to change the boot entries or driver options. This command is described in detail in page 96 (Section 5.3) of the UEFI Shell Specification 2.2 document.\n\n- Try bcfg only if efibootmgr fails to create working boot entries on your system.\n- UEFI Shell v1 official binary does not support bcfg command. See #Obtaining UEFI Shell for a modified UEFI Shell v2 binary which may work in UEFI pre-2.3 firmwares.\n\nTo dump a list of current boot entries:\n\n```\nShell> bcfg boot dump -v\n```\n\nTo add a boot menu entry for rEFInd (for example) as 4th (numbering starts from zero) option in the boot menu:\n\n```\nShell> bcfg boot add 3 FS0:\\EFI\\refind\\refind_x64.efi \"rEFInd Boot Manager\"\n```\n\nwhere FS0: is the mapping corresponding to the EFI system partition and FS0:\\EFI\\refind\\refind_x64.efi is the file to be launched.\n\nTo add an entry to boot directly into your system without a boot loader, see EFI boot stub#bcfg.\n\nTo remove the 4th boot option:\n\n```\nShell> bcfg boot rm 3\n```\n\nTo move the boot option #3 to #0 (i.e. 1st or the default entry in the UEFI Boot menu):\n\n```\nShell> bcfg boot mv 3 0\n```\n\nFor bcfg help text:\n\n```\nShell> help bcfg -v -b\n```\n\nor:\n\n```\nShell> bcfg -? -v -b\n```\n\n"
+    },
+    {
+      "title": "map",
+      "level": 4,
+      "content": "map displays a list of device mappings i.e. the names of available file systems (FS0) and storage devices (blk0).\n\nBefore running file system commands such as cd or ls, you need to change the shell to the appropriate file system by typing its name:\n\n```\nShell> FS0:\nFS0:\\> cd EFI/\n```\n\n"
+    },
+    {
+      "title": "edit",
+      "level": 4,
+      "content": "edit provides a basic text editor with an interface similar to nano, but slightly less functional. It handles UTF-8 encoding and takes care or LF vs CRLF line endings.\n\nFor example, to edit rEFInd's refind.conf in the EFI system partition (FS0: in the firmware),\n\n```\nShell> edit FS0:\\EFI\\refind\\refind.conf\n```\n\nPress Ctrl+e for help.\n\n"
+    },
+    {
+      "title": "UEFI drivers",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nUEFI drivers are pieces of software that support some functionality. For example, access to NTFS formatted partitions is usually not possible from a UEFI shell. The efifs package has drivers that support reading many more file systems from within an EFI shell. A usage example is to copy such driver to a partition that can be accessed from an UEFI shell. Then, from the UEFI shell, issuing commands such as:\n\n```\nShell> load ntfs_x64.efi\nShell> map -r\n```\n\nAfter the map command has been executed, the user should be able to access NTFS formatted partitions from within a UEFI shell.\n\n- systemd-boot automatically loads UEFI drivers from esp/EFI/systemd/drivers/.\n- rEFInd automatically loads UEFI drivers from the drivers and drivers_x64 subdirectories of its own installation directory on the ESP. E.g. esp/EFI/refind/drivers_x64/. It can be configured to scan additional directories.\n\n"
+    },
+    {
+      "title": "Remove UEFI boot support from optical media",
+      "level": 3,
+      "content": "Note: **CD/DVD only** \n\n- This section mentions removing UEFI boot support from a CD/DVD only (Optical Media booting via EL Torito), not from a USB flash drive.\n- In order to hide the UEFI equipment on USB stick, use a partition editor after having copied the ISO to the flash drive. Remove the partition of type EF. Do not accept offers to convert to GPT.\n\nMost of the 32-bit EFI Macs and some 64-bit EFI Macs refuse to boot from a UEFI(X64)+BIOS bootable CD/DVD. If one wishes to proceed with the installation using optical media, it might be necessary to remove UEFI support first.\n\nExtract the ISO skipping the UEFI-specific directories:\n\n```\n$ mkdir extracted_iso\n$ bsdtar -x --exclude=EFI/ --exclude=loader/ -f archlinux-version-x86_64.iso -C extracted_iso\n```\n\nThen rebuild the ISO, excluding the UEFI optical media booting support, using xorriso(1) from libisoburn. Be sure to set the correct volume label, e.g. ARCH_202103; it can be acquired using file(1) on the original ISO.\n\n```\n$ xorriso -as mkisofs \\\n    -iso-level 3 \\\n    -full-iso9660-filenames \\\n    -joliet \\\n    -joliet-long \\\n    -rational-rock \\\n    -volid \"ARCH_YYYYMM\" \\\n    -appid \"Arch Linux Live/Rescue CD\" \\\n    -publisher \"Arch Linux <https://archlinux.org>\" \\\n    -preparer \"prepared by $USER\" \\\n    -eltorito-boot syslinux/isolinux.bin \\\n    -eltorito-catalog syslinux/boot.cat \\\n    -no-emul-boot -boot-load-size 4 -boot-info-table \\\n    -isohybrid-mbr \"extracted_iso/syslinux/isohdpfx.bin\" \\\n    -output archlinux-version-x86_64-noUEFI.iso extracted_iso/\n```\n\nBurn archlinux-version-x86_64-noUEFI.iso to optical media and proceed with installation normally.\n\n"
+    },
+    {
+      "title": "OVMF for virtual machines",
+      "level": 3,
+      "content": "OVMF is a TianoCore project to enable UEFI support for Virtual Machines. OVMF contains a sample UEFI firmware and a separate non-volatile variable store for QEMU.\n\nYou can install edk2-ovmf from the extra repository.\n\nIt is advised to make a local copy of the non-volatile variable store for your virtual machine:\n\n```\n$ cp /usr/share/edk2/x64/OVMF_VARS.4m.fd my_OVMF_VARS.4m.fd\n```\n\nTo use the OVMF firmware and this variable store, add following to your QEMU command:\n\n```\n-drive if=pflash,format=raw,readonly,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \\\n-drive if=pflash,format=raw,file=my_OVMF_VARS.4m.fd\n```\n\nFor example:\n\n```\n$ qemu-system-x86_64 -enable-kvm -m 1G -drive if=pflash,format=raw,readonly,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd -drive if=pflash,format=raw,file=my_OVMF_VARS.4m.fd …\n```\n\n"
+    },
+    {
+      "title": "DUET for BIOS only systems",
+      "level": 3,
+      "content": "DUET was a TianoCore project that enabled chainloading a full UEFI environment from a BIOS system, in a way similar to BIOS operating system booting. This method is being discussed extensively. Pre-build DUET images can be downloaded from one of the repos[dead link 2023-04-07 ⓘ]. Read specific instructions[dead link 2023-04-07 ⓘ] for setting up DUET. However, as of November 2018, the DUET code has been removed from TianoCore git repository.\n\nYou can also try Clover which provides modified DUET images that may contain some system specific fixes and is more frequently updated compared to the gitlab repos.\n\n"
+    },
+    {
+      "title": "Boot back to Arch Linux when stuck with Windows",
+      "level": 3,
+      "content": "To boot back into Arch Linux when you are stuck with Windows, reach Advanced startup in Windows by the Windows PowerShell command shutdown /r /o, or via Settings > Update & Security > Recovery > Advanced startup and select Restart now. When you have reached the Advanced startup menu, choose Use a device, which actually contains your UEFI boot options (not limited to USB or CD, but can also boot operating system in hard drive), and choose \"Arch Linux\".\n\n"
+    },
+    {
+      "title": "Enter firmware setup without function keys",
+      "level": 3,
+      "content": "On some laptops, like Lenovo XiaoXin 15are 2020, using keys like F2 or F12 does not do anything. This can possibly be fixed by returning laptops to OEM to repair mainboard information, but sometimes this is not possible or not desired. There are however other means to enter firmware setup:\n\n- With systemctl: $ systemctl reboot --firmware-setup This will reboot your computer to firmware setup.\n- With GRUB: Press c for command line and in GRUB command line use fwsetup to enter firmware setup.\n- In Windows: Enter Advanced Startup, see #Boot back to Arch Linux when stuck with Windows.\n\n```\n$ systemctl reboot --firmware-setup\n```\n\n"
+    },
+    {
+      "title": "Userspace tools are unable to modify UEFI variable data",
+      "level": 3,
+      "content": "If any userspace tool is unable to modify UEFI variable data, check for existence of /sys/firmware/efi/efivars/dump-* files. If they exist, delete them, reboot and retry again. If the above step does not fix the issue, try booting with efi_no_storage_paranoia kernel parameter to disable kernel UEFI variable storage space check that may prevent writing/modification of UEFI variables.\n\n"
+    },
+    {
+      "title": "Cannot create a new boot entry with efibootmgr",
+      "level": 3,
+      "content": "Some kernel and efibootmgr version combinations might refuse to create new boot entries. This could be due to lack of free space in the NVRAM. You can try the solution at #Userspace tools are unable to modify UEFI variable data.\n\nYou can also try to downgrade your efibootmgr install to version 0.11.0. This version works with Linux version 4.0.6. See the bug discussion FS#34641, in particular the closing comment, for more information.\n\n"
+    },
+    {
+      "title": "Windows changes boot order",
+      "level": 3,
+      "content": "If you dual boot with Windows and your motherboard just boots Windows immediately instead of your chosen EFI application, there are several possible causes and workarounds.\n\n- Ensure Fast Startup is disabled in your Windows power options\n- Ensure Secure Boot is disabled in your firmware (if you are not using a signed boot loader)\n- Ensure your UEFI boot order does not have Windows Boot Manager set first e.g. using efibootmgr and what you see in the configuration tool of the UEFI. Some motherboards override by default any settings set with efibootmgr by Windows if it detects it. This is confirmed in a Packard Bell laptop.\n- If your motherboard is booting the default boot path (\\EFI\\BOOT\\BOOTx64.EFI), this file may have been overwritten with the Windows boot loader. Try setting the correct boot path e.g. using efibootmgr.\n- If the previous steps do not work, you can tell the Windows boot loader to run a different EFI application. From a Windows administrator command prompt bcdedit /set \"{bootmgr}\" path \"\\EFI\\path\\to\\app.efi\"\n- Alternatively, deactivate the Windows Boot Manager by running efibootmgr -A -b bootnumber as root. Replace bootnumber with the actual Windows Boot Manager boot number; you can see it by running efibootmgr with no options.\n- Alternatively, you can set a startup script in Windows that ensures that the boot order is set correctly every time you boot Windows. Open a command prompt with administrator privileges. Run bcdedit /enum firmware and find your desired boot entry. Copy the identifier, including the brackets, e.g. {31d0d5f4-22ad-11e5-b30b-806e6f6e6963} Create a batch file with the command bcdedit /set \"{fwbootmgr}\" DEFAULT \"{copied-boot-identifier}\" Open gpedit.msc and under Local Computer Policy > Computer Configuration > Windows Settings > Scripts (Startup/Shutdown), choose Startup Under the Scripts tab, choose the Add button, and select your batch file\n\n1. Open a command prompt with administrator privileges. Run bcdedit /enum firmware and find your desired boot entry.\n1. Copy the identifier, including the brackets, e.g. {31d0d5f4-22ad-11e5-b30b-806e6f6e6963}\n1. Create a batch file with the command bcdedit /set \"{fwbootmgr}\" DEFAULT \"{copied-boot-identifier}\"\n1. Open gpedit.msc and under Local Computer Policy > Computer Configuration > Windows Settings > Scripts (Startup/Shutdown), choose Startup\n1. Under the Scripts tab, choose the Add button, and select your batch file\n\n- Alternatively, Task Scheduler can be used to run a startup script in Windows: Follow steps 1-3 above to create the batch file. Run taskschd.msc, then choose Create Task... from the Action menu. On the General tab: Enter any suitable Name and Description. Ensure the user account selected is an \"Administrator\", not a \"Standard User\". Select \"Run whether user is logged in or not\". Select \"Run with highest privileges\". On the Triggers tab, choose \"At startup\" from the menu, then click OK. On the Actions tab, click New..., then Browse..., and locate the batch file from step 1. On the Conditions tab, untick the Power options so the script runs when on battery power (for laptops). Click OK, and enter the password of the user account selected in step 4 when prompted.\n\n1. Follow steps 1-3 above to create the batch file.\n1. Run taskschd.msc, then choose Create Task... from the Action menu.\n1. On the General tab: Enter any suitable Name and Description. Ensure the user account selected is an \"Administrator\", not a \"Standard User\". Select \"Run whether user is logged in or not\". Select \"Run with highest privileges\".\n1. On the Triggers tab, choose \"At startup\" from the menu, then click OK.\n1. On the Actions tab, click New..., then Browse..., and locate the batch file from step 1.\n1. On the Conditions tab, untick the Power options so the script runs when on battery power (for laptops).\n1. Click OK, and enter the password of the user account selected in step 4 when prompted.\n\n"
+    },
+    {
+      "title": "USB media gets struck with black screen",
+      "level": 3,
+      "content": "This issue can occur due to KMS issue. Try disabling KMS while booting the USB.\n\n"
+    },
+    {
+      "title": "UEFI boot loader does not show up in firmware menu",
+      "level": 3,
+      "content": "Some firmware do not support custom boot entries. They will instead only boot from hardcoded boot entries.\n\nA typical workaround is to not rely on boot entries in the NVRAM and install the boot loader to one of the common fallback paths on the EFI system partition.\n\nThe following sections describe the fallback paths.\n\n"
+    },
+    {
+      "title": "Default boot path for removable drives",
+      "level": 4,
+      "content": "The UEFI specification defines default file paths for EFI binaries for booting from removable media. The relevant ones are:\n\n- esp/EFI/BOOT/BOOTx64.EFI for x64 UEFI\n- esp/EFI/BOOT/BOOTIA32.EFI for IA32 UEFI.\n\nWhile the specification defines these for removable drives only, most firmware support booting these from any drive.\n\nSee the appropriate boot loader article on how to install or migrate the boot loader to the default/fallback boot path.\n\n"
+    },
+    {
+      "title": "Microsoft Windows boot loader location",
+      "level": 4,
+      "content": "On certain UEFI motherboards like some boards with an Intel Z77 chipset, adding entries with efibootmgr or bcfg from the UEFI Shell will not work because they do not show up on the boot menu list after being added to NVRAM.\n\nThis issue is caused because the motherboards can only load Microsoft Windows. To solve this you have to place the .efi file in the location that Windows uses.\n\nCopy the BOOTx64.EFI file from the Arch Linux installation medium (FSO:) to the Microsoft directory your ESP partition on your hard drive (FS1:). Do this by booting into EFI shell and typing:\n\n```\nShell> mkdir FS1:\\EFI\\Microsoft\nShell> mkdir FS1:\\EFI\\Microsoft\\Boot\nShell> cp FS0:\\EFI\\BOOT\\BOOTx64.EFI FS1:\\EFI\\Microsoft\\Boot\\bootmgfw.efi\n```\n\nAfter reboot, any entries added to NVRAM should show up in the boot menu.\n\n"
+    },
+    {
+      "title": "UEFI/BIOS is stuck on loading screen",
+      "level": 3,
+      "content": "This is a recurring problem with Acer laptops, which occurs if .efi files have not been manually authorized. See Laptop/Acer#Firmware Setup became inaccessible after Linux installation.\n\n"
+    },
+    {
+      "title": "Boot entries created with efibootmgr fail to show up in UEFI",
+      "level": 3,
+      "content": "efibootmgr can fail to detect EDD 3.0 and as a result create unusable boot entries in NVRAM. See efibootmgr issue 86 for the details.\n\nTo work around this, when creating boot entries manually, add the -e 3 option to the efibootmgr command. E.g.\n\n```\n# efibootmgr --create --disk /dev/sda --part 1 --loader '\\EFI\\refind\\refind_x64.efi' --label 'rEFInd Boot Manager' --unicode -e 3\n```\n\nTo fix boot loader installers, like grub-install and refind-install, create a wrapper script /usr/local/bin/efibootmgr and make it executable:\n\n```\n/usr/local/bin/efibootmgr\n```\n\n```\n#!/bin/sh\n\nexec /usr/bin/efibootmgr -e 3 \"$@\"\n```\n\n"
+    },
+    {
+      "title": "UEFI boot entry disappears after removing its referenced drive",
+      "level": 3,
+      "content": "Some firmware will remove boot entries referencing drives that are not present during boot. This could be an issue when frequently detaching/attaching drives or when booting from a removable drive.\n\nThe solution is to install the boot loader to the default/fallback boot path.\n\n"
+    },
+    {
+      "title": "Boot entries are randomly removed",
+      "level": 3,
+      "content": "Some motherboards may remove boot entries due to lack of free space in the NVRAM instead of giving an error at creation. To prevent this from occurring, reduce the amount of boot entries being added by minimizing your entry creation process, as well as reducing the amount of automatic drive boot entries by the Compatibility Support Module (CSM) by disabling it from your UEFI settings. See BBS#1608838.\n\nAnother reason why boot entries might have been removed is the fact that UEFI specification allows OEMs to do \"NVRAM maintenance\" during boot process. Those manufacturers do it simply: they just look up for EFI applications in predefined, hardcoded paths on the device. If they fail to find any, they conclude there is no operating system on the device and wipe all boot entries from NVRAM associated with it, because they assume the NVRAM contains some corrupted or outdated data. If you do not plan to install Windows and still want to load the Linux kernel directly from the firmware, one possible workaround is to create an empty file esp/EFI/BOOT/BOOTx64.EFI:\n\n```\n# mkdir -p esp/EFI/BOOT \n# touch esp/EFI/BOOT/BOOTx64.EFI\n```\n\nAnd restore the deleted boot entry. Now after reboot the motherboard will see the \"Fake OS\" and should not wipe other boot entries from NVRAM. You can change the fake operating system loader with an actual EFI application if you want, of course, as long as you keep the standard fallback name.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- UEFI Forum - contains the official UEFI Specifications - GUID Partition Table is part of UEFI Specification\n- UEFI boot: how does that actually work, then? - A blog post by AdamW\n- Linux Kernel UEFI documentation for x86_64 platforms\n- Intel's page on EFI\n- Intel Architecture Firmware Resource Center[dead link 2023-07-30 ⓘ]\n- Matt Fleming - The Linux EFI Boot Stub\n- Matt Fleming - Accessing UEFI Variables from Linux\n- Rod Smith - Linux on UEFI: A Quick Installation Guide\n- UEFI Boot problems on some newer machines (LKML)\n- LPC 2012 Plumbing UEFI into Linux[dead link 2021-05-17 ⓘ]\n- LPC 2012 UEFI Tutorial : part 1[dead link 2021-05-17 ⓘ]\n- LPC 2012 UEFI Tutorial : part 2[dead link 2021-05-17 ⓘ]\n- Intel's TianoCore Project for Open-Source UEFI firmware which includes DuetPkg for direct BIOS based booting and OvmfPkg used in QEMU and Oracle VirtualBox\n- FGA: The EFI boot process\n- Microsoft's Windows and GPT FAQ\n- Convert Windows x64 from BIOS-MBR mode to UEFI-GPT mode without Reinstall\n- Create a Linux BIOS+UEFI and Windows x64 BIOS+UEFI bootable USB drive\n- Rod Smith - A BIOS to UEFI Transformation\n- EFI Shells and Scripting - Intel Documentation\n- UEFI Shell - Intel Documentation\n- UEFI Shell - bcfg command info\n- The bootstrap process on EFI systems\n\n"
+    }
+  ]
+}

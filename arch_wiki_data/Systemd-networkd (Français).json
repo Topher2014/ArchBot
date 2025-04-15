@@ -1,0 +1,196 @@
+{
+  "title": "Systemd-networkd (Français)",
+  "url": "https://wiki.archlinux.org/title/Systemd-networkd_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- systemd (Français)\n- systemd-resolved (Français)\n- systemd-nspawn\n- Network bridge\n- Network configuration (Français)\n- Network configuration (Français)/Wireless (Français)\n- Category:Network configuration (Français)\n\nsystemd-networkd est un daemon système qui gère les configurations réseau. Il détecte et configure les périphériques réseau à mesure qu'ils apparaissent ; il peut également créer des périphériques réseau virtuels. Ce service peut être particulièrement utile pour mettre en place des configurations réseau complexes pour un conteneur géré par systemd-nspawn ou pour des machines virtuelles. Il fonctionne également très bien sur des connexions simples.\n\n"
+    },
+    {
+      "title": "Utilisation de base",
+      "level": 2,
+      "content": "Le paquet systemd fait partie de l'installation par défaut d'Arch et contient tous les fichiers nécessaires au fonctionnement d'un réseau filaire. Les adaptateurs sans fil, traités plus loin dans cet article, peuvent être configurés par des services, tels que wpa_supplicant ou iwd.\n\n"
+    },
+    {
+      "title": "Services requis et configuration",
+      "level": 3,
+      "content": "Pour utiliser systemd-networkd, démarrez et activez systemd-networkd.service.\n\nLa configuration de systemd-resolved, qui est un service de résolution de noms de réseau pour les applications locales, est facultative, compte tenu des points suivants :\n\n- Il est important de comprendre comment resolv.conf et systemd-resolved interagissent pour configurer correctement le DNS qui sera utilisé, quelques explications sont fournies dans systemd-resolved.\n- systemd-resolved est nécessaire si les entrées DNS sont spécifiées dans les fichiers .network.\n- systemd-resolved est également nécessaire si vous souhaitez obtenir des adresses DNS à partir de serveurs DHCP ou d'annonces de routeurs IPv6.(en définissant (DHCP= et/ou IPv6AcceptRA= dans la section [Network], et UseDNS=yes (the default) in the corresponding section(s) [DHCPv4], [DHCPv6], [IPv6AcceptRA], see systemd.network(5)).\n- Notez que systemd-resolved peut également être utilisé sans systemd-networkd.\n\n"
+    },
+    {
+      "title": "systemd-networkd-wait-online",
+      "level": 3,
+      "content": "Activer systemd-networkd.service permet également d'activer systemd-networkd-wait-online.service, qui est un service système à action unique qui attend que le réseau soit configuré. Ce dernier a WantedBy=network-online.target, il ne sera donc démarré que lorsque network-online.target lui-même est activé ou tiré par une autre unité. Consultez également Systemd (Français)#Exécution des services après le démarrage du réseau.\n\nPar défaut, systemd-networkd-wait-online.service attend que tous les liens dont il a connaissance et qui sont gérés par systemd-networkd soient entièrement configurés ou défaillants, et qu'au moins un lien soit en ligne.\n\nSi votre système possède plusieurs interfaces réseau, mais que certaines ne sont pas censées être connectées en permanence (par exemple, si vous avez une carte Ethernet à double port, mais qu'un seul câble est branché), le démarrage de systemd-networkd-wait-online.service échouera après le délai par défaut de 2 minutes. Cela peut entraîner un retard indésirable dans le processus de démarrage. Pour modifier le comportement et attendre que \"n'importe quelle\" interface soit en ligne plutôt que \"toutes\" les interfaces, éditez le service et ajoutez le paramètre --any à la ligne ExecStart :\n\n```\n/etc/systemd/system/systemd-networkd-wait-online.service.d/wait-for-only-one-interface.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/lib/systemd/systemd-networkd-wait-online --any\n```\n\nD'autres comportements, tels que les interfaces spécifiques à attendre ou l'état opérationnel, peuvent également être configurés. Consultez systemd-networkd-wait-online(8) pour connaître les paramètres disponibles.\n\n"
+    },
+    {
+      "title": "Exemples de configuration",
+      "level": 3,
+      "content": "Toutes les configurations de cette section sont stockées sous le nom foo.network dans /etc/systemd/network/. Pour une liste complète des options et l'ordre de traitement, consultez #Fichiers de configuration et systemd.network(5).\n\nsystemd/udev attribue automatiquement des noms d'interface réseau prévisibles et stables pour toutes les interfaces locales Ethernet, WLAN et WWAN. Utilisez networkctl list pour répertorier les périphériques du système.\n\nAprès avoir apporté des modifications à un fichier de configuration, redémarrez systemd-networkd.service.\n\n- Les options spécifiées dans les fichiers de configuration sont sensibles à la casse.\n- Dans les exemples ci-dessous, enp1s0 est l'adaptateur filaire et wlp2s0 est l'adaptateur sans fil. Ces noms peuvent être différents sur différents systèmes. Consultez Network configuration#Network interfaces pour vérifier les noms de vos adaptateurs.\n- Il est également possible d'utiliser un caractère générique, par exemple Nom=fr* ou Nom=wl*.\n- Les périphériques peuvent également être mis en correspondance par leur type. Par exemple, Type=ether pour Ethernet, Type=wlan pour Wi-Fi et Type=wwan pour WWAN. Notez que Type=ether correspondra également aux interfaces Ethernet virtuelles (veth*), ce qui peut être indésirable.\n- Si vous souhaitez désactiver IPv6, consultez IPv6#systemd-networkd.\n\n"
+    },
+    {
+      "title": "Adaptateur filaire utilisant DHCP",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/20-wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nDHCP=yes\n```\n\n"
+    },
+    {
+      "title": "Adaptateur filaire utilisant une IP statique",
+      "level": 4,
+      "content": "```\n/etc/systemd/network/20-wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nAddress=10.1.10.9/24\nGateway=10.1.10.1\nDNS=10.1.10.1\n```\n\nAddress= peut être utilisé plusieurs fois pour configurer plusieurs adresses IPv4 ou IPv6. Consultez #Fichiers network ou systemd.network(5) pour plus d'options.\n\n"
+    },
+    {
+      "title": "Adaptateur sans fil",
+      "level": 4,
+      "content": "Afin de se connecter à un réseau sans fil avec systemd-networkd, un adaptateur sans fil configuré avec une autre application telle que wpa_supplicant ou iwd est nécessaire.\n\n```\n/etc/systemd/network/25-wireless.network\n```\n\n```\n[Match]\nName=wlp2s0\n\n[Network]\nDHCP=yes\nIgnoreCarrierLoss=3s\n```\n\nSi l'adaptateur sans fil a une adresse IP statique, la configuration est la même (sauf pour le nom de l'interface) que pour un adaptateur filaire.\n\nPour s'authentifier sur le réseau sans fil, utilisez par exemple wpa_supplicant ou iwd.\n\n"
+    },
+    {
+      "title": "Adaptateurs avec et sans fil sur la même machine",
+      "level": 4,
+      "content": "Cette configuration activera une IP DHCP pour une connexion filaire et sans fil en utilisant la directive metric pour permettre au noyau de décider à la volée laquelle utiliser. De cette façon, aucune interruption de connexion n'est observée lorsque la connexion filaire est débranchée.\n\nLa métrique de route du noyau (la même que celle configurée avec ip) décide de la route à utiliser pour les paquets sortants, dans les cas où plusieurs correspondent. C'est le cas lorsque les périphériques filaires et sans fil du système ont tous deux des connexions actives. Pour les départager, le noyau utilise la métrique. Si l'une des connexions est interrompue, l'autre l'emporte automatiquement sans qu'il n'y ait de vide où rien ne soit configuré (les transferts en cours peuvent encore ne pas gérer cela de manière agréable, mais cela se situe à une couche OSI différente).\n\n```\n/etc/systemd/network/20-wired.network\n```\n\n```\n[Match]\nName=enp1s0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=10\n```\n\n```\n/etc/systemd/network/25-wireless.network\n```\n\n```\n[Match]\nName=wlp2s0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=20\n```\n\nSi vous utilisez IPv6, vous devrez définir séparément la métrique pour les routes IPv6 également, comme par exemple :\n\n```\n/etc/systemd/network/20-wired.network\n```\n\n```\n...\n\n[IPv6AcceptRA]\nRouteMetric=10\n```\n\n```\n/etc/systemd/network/25-wireless.network\n```\n\n```\n...\n\n[IPv6AcceptRA]\nRouteMetric=20\n```\n\n"
+    },
+    {
+      "title": "Renommer une interface",
+      "level": 4,
+      "content": "Au lieu de modifier les règles d'udev, un fichier .link peut être utilisé pour renommer une interface. Un exemple utile est de définir un nom d'interface prévisible pour un adaptateur USB vers Ethernet en se basant sur son adresse MAC, car ces adaptateurs reçoivent généralement des noms différents en fonction du port USB sur lequel ils sont branchés.\n\n```\n/etc/systemd/network/10-ethusb0.link\n```\n\n```\n[Match]\nMACAddress=12:34:56:78:90:ab\n\n[Link]\nDescription=USB to Ethernet Adapter\nName=ethusb0\n```\n\n"
+    },
+    {
+      "title": "Fichiers de configuration",
+      "level": 2,
+      "content": "Les fichiers de configuration sont situés dans /usr/lib/systemd/network/, le répertoire réseau d'exécution volatile /run/systemd/network/ et le répertoire réseau d'administration locale /etc/systemd/network/. Les fichiers se trouvant dans /etc/systemd/network/ ont la plus haute priorité.\n\nIl existe trois types de fichiers de configuration. Ils utilisent tous un format similaire à celui de fichiers d'unités de systemd.\n\n- Les fichiers .network. Ils vont appliquer une configuration réseau pour un périphérique correspondant.\n- Les fichiers .netdev. Ils vont créer un périphérique réseau virtuel pour un environnement correspondant.\n- Les fichiers .link. Lorsqu'un périphérique réseau apparaît, udev cherchera le premier fichier .link correspondant.\n\nIls suivent tous les mêmes règles :\n\n- Si toutes les conditions de la section [Match] sont remplies, le profil sera activé.\n- Une section [Match] vide signifie que le profil s'appliquera dans tous les cas (peut être comparé au caractère générique *).\n- tous les fichiers de configuration sont triés collectivement et traités dans l'ordre lexical, quel que soit le répertoire dans lequel ils se trouvent\n- les fichiers ayant un nom identique se remplacent les uns les autres\n\n- Les fichiers dans /etc/systemd/network/ remplacent le fichier correspondant fourni par le système dans /usr/lib/systemd/network/. Vous pouvez également créer un lien symbolique vers /dev/null pour \"masquer\" un fichier système.\n- systemd accepte les valeurs 1, true, yes, on pour un booléen vrai, et les valeurs 0, false, no, off pour un booléen faux. Consultez systemd.syntax(7).\n\n"
+    },
+    {
+      "title": "Fichiers network",
+      "level": 3,
+      "content": "Ces fichiers sont destinés à définir les variables de configuration du réseau, notamment pour les serveurs et les conteneurs.\n\nLes fichiers .network ont les sections suivantes : [Match], [Link], [Network], [Address], [Route], et [DHCPv4]. Vous trouverez ci-dessous les clés communément configurées pour chaque section. Consultez systemd.network(5) pour plus d'informations et d'exemples.\n\n"
+    },
+    {
+      "title": "[Match]",
+      "level": 4,
+      "content": "Table content:\nParamètre | Description | Valeurs acceptées | Valeur par défaut\nName= | Correspond aux noms de périphériques, par exemple en*. En préfixant avec !, la liste peut être inversée. | noms de périphériques séparés par des espaces blancs, avec des globales, la négation logique (!) | \nMACAddress= | Correspondance des adresses MAC, par exemple MACAddress=01:23:45:67:89:ab 00-11-22-33-44-55 AABB.CCDD.EEFF | Les adresses MAC sont séparées par des espaces dans un format hexadécimal délimité par deux points, un trait d'union ou un point. | \nHost= | Correspond au nom d'hôte ou à l'ID de la machine de l'hôte. | La chaîne de noms d'hôtes avec des expressions globales, machine-id(5) | \nVirtualization= | Vérifie si le système est exécuté dans un environnement virtualisé. Virtualization=false correspondra uniquement à votre machine hôte, tandis que Virtualization=true correspondra à tout conteneur ou VM. Il est possible de vérifier un type ou une implémentation de virtualisation spécifique, ou un espace de noms d'utilisateur (avec private-users). | Les paramètres suivants peuvent être utilisés : booléen, négation logique (!), type (vm, container), implémentation (consultez systemd-detect-virt(1)), private-users. | \n\n"
+    },
+    {
+      "title": "[Link]",
+      "level": 4,
+      "content": "Table content:\nParamètre | Description | Valeurs acceptées | Valeur par défaut\nMACAddress= | Attribue une adresse matérielle au périphérique. Utile pour MAC address spoofing. | Les adresses MAC hexadécimales délimitées par deux points, un trait d'union ou un point. | \nMTUBytes= | Unité de transmission maximale en octets à définir pour le périphérique. Notez que si IPv6 est activé sur l'interface, et que le MTU est choisi en dessous de 1280 (le MTU minimum pour IPv6), il sera automatiquement augmenté à cette valeur. La définition d'une valeur MTU plus grande (par exemple, lors de l'utilisation de jumbo frames) peut accélérer de manière significative vos transferts sur le réseau | integer (les suffixes habituels K, M, G, sont pris en charge et sont compris dans la base de 1024) | \nMulticast= | permet l'utilisation de multicast | booléen | ? non documenté ?\n\n"
+    },
+    {
+      "title": "[Network]",
+      "level": 4,
+      "content": "Table content:\nParamètre | Description | Valeurs acceptées | Valeur par défaut\nDHCP= | Contrôle la prise en charge des clients DHCPv4 et/ou DHCPv6. | boolean, ipv4, ipv6 | false\nDHCPServer= | Si cette option est activée, un serveur DHCPv4 sera lancé. | boolean | false\nMulticastDNS= | Active la prise en charge du multicast DNS. Lorsqu'il a pour valeur resolve, seule la résolution est activée, mais pas l'enregistrement et l'annonce des hôtes ou des services. | booléen, resolve | false\nDNSSEC= | Contrôle la prise en charge de la validation DNSSEC du DNS sur le lien. Lorsqu'il est défini sur allow-downgrade, la compatibilité avec les réseaux non compatibles DNSSEC est améliorée, en désactivant automatiquement le DNSSEC dans ce cas. | booléen, allow-downgrade | false\nDNS= | Configurer des adresses DNS statiques. Peut être spécifié plus d'une fois. | inet_pton(3) | \nDomains= | Une liste de domaines qui doivent être résolus en utilisant les serveurs DNS de ce lien. systemd.network(5) § [NETWORK] SECTION OPTIONS | Nom de domaine, éventuellement préfixé d'un tilde (~) | \nIPForward= | Si elle est activée, les paquets entrants sur n'importe quelle interface réseau seront transférés vers n'importe quelle autre interface en fonction de la table de routage. Consultez Internet sharing#Enable packet forwarding pour plus de détails. | boolean, ipv4, ipv6 | false\nIPMasquerade= | Si elle est activée, les paquets transférés depuis l'interface réseau apparaîtront comme provenant de l'hôte local. Selon la valeur, implique IPForward=ipv4, IPForward=ipv6 ou IPForward=yes | ipv4, ipv6, both, no | no\nIPv6PrivacyExtensions= | Configure l'utilisation d'adresses temporaires sans état qui changent avec le temps (consultez RFC 4941). Lorsque prefer-public, active les extensions de confidentialité, mais préfère les adresses publiques aux adresses temporaires. Lorsque kernel, le paramètre par défaut du noyau est laissé en place. | boolean, prefer-public, kernel | false\n\n"
+    },
+    {
+      "title": "[Adress]",
+      "level": 4,
+      "content": "Table content:\nParamètre | Description | Valeurs acceptées | Valeur par défaut\nAddress= | Spécifiez cette clé plusieurs fois pour configurer plusieurs adresses. Obligatoire sauf si DHCP est utilisé. Si l'adresse spécifiée est 0.0.0.0 (pour IPv4) ou ::} (pour IPv6), une nouvelle plage d'adresses de la taille demandée est automatiquement allouée à partir d'un pool de plages inutilisées à l'échelle du système. | adresse IPv4 ou IPv6 statique et sa longueur de préfixe (consultez inet_pton(3)) | \n\n"
+    },
+    {
+      "title": "[Route]",
+      "level": 4,
+      "content": "- Gateway= cette option est obligatoire sauf si DHCP est utilisé.\n- Destination= le préfixe de destination de la route, éventuellement suivi d'une barre oblique et de la longueur du préfixe.\n\nSi Destination n'est pas présent dans la section [Route], cette section est traitée comme une route par défaut.\n\n"
+    },
+    {
+      "title": "[DHCPv4]",
+      "level": 4,
+      "content": "Table content:\nParamètre | Description | Valeurs acceptées | Valeur par défaut\nUseDNS= | contrôle si les serveurs DNS annoncés par le serveur DHCP sont utilisés | booléen | true\nAnonymize= | Lorsque cette option est vraie, les options envoyées au serveur DHCP suivent la RFC:7844. (Profils d'anonymat pour les clients DHCP) pour minimiser la divulgation d'informations d'identification | booléen | false\nUseDomains= | contrôle si le nom de domaine reçu du serveur DHCP sera utilisé comme domaine de recherche DNS. S'il a pour valeur route, le nom de domaine reçu du serveur DHCP sera utilisé pour le routage des requêtes DNS uniquement, mais pas pour la recherche. Cette option peut parfois corriger la résolution de noms locaux lors de l'utilisation de systemd-resolved. | booléen, route | false\n\n"
+    },
+    {
+      "title": "[DHCPServer]",
+      "level": 4,
+      "content": "Voici un exemple de configuration de serveur DHCP qui fonctionne bien avec hostapd pour créer un hotspot sans fil. IPMasquerade ajoute les règles de pare-feu pour NAT et implique IPForward=ipv4 pour activer packet forwarding.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n```\n/etc/systemd/network/wlan0.network\n```\n\n```\n[Match]\nName=wlan0\n\n[Network]\nAddress=10.1.1.1/24\nDHCPServer=true\nIPMasquerade=ipv4\n\n[DHCPServer]\nPoolOffset=100\nPoolSize=20\nEmitDNS=yes\nDNS=9.9.9.9\n```\n\n"
+    },
+    {
+      "title": "Fichiers netdev",
+      "level": 3,
+      "content": "Ces fichiers permettent de créer des périphériques réseau virtuels. Ils comportent deux sections : [Match] et [NetDev]. Vous trouverez ci-dessous les clés communément configurées pour chaque section. Consultez systemd.netdev(5) pour plus d'informations et d'exemples.\n\n"
+    },
+    {
+      "title": "Section [Match]",
+      "level": 4,
+      "content": "- Host= le nom d'hôte\n- Virtualization= vérifie si le système fonctionne dans un environnement virtualisé.\n\n"
+    },
+    {
+      "title": "Section [NetDev]",
+      "level": 4,
+      "content": "Les clés les plus courantes sont :\n\n- Name= le nom de l'interface. obligatoire\n- Kind= par exemple bridge, bond, vlan, veth, sit, etc. obligatoire\n\n"
+    },
+    {
+      "title": "Fichiers link",
+      "level": 3,
+      "content": "Ces fichiers sont une alternative aux règles udev personnalisées et seront appliqués par udev lorsque le périphérique apparaîtra. Ils ont deux sections : [Match] et [Link]. Vous trouverez ci-dessous les clés communément configurées pour chaque section. Consultez systemd.link(5) pour plus d'informations et d'exemples.\n\n"
+    },
+    {
+      "title": "Section [Match]",
+      "level": 4,
+      "content": "- MACAddress= l'adresse MAC\n- Host= le nom de l'hôte\n- Virtualization= vérifie si le système fonctionne dans un environnement virtualisé\n- Type= le type de périphérique, par exemple vlan\n\n"
+    },
+    {
+      "title": "Section [Link]",
+      "level": 4,
+      "content": "- MACAddressPolicy= adresses persistantes ou aléatoires, ou\n- MACAddress= une adresse spécifique\n- NamePolicy= liste des politiques par lesquelles le nom de l'interface doit être défini, par exemple, noyau, garder\n\n"
+    },
+    {
+      "title": "Utilisation avec les conteneurs",
+      "level": 2,
+      "content": "systemd-networkd peut fournir une configuration entièrement automatique du réseau pour les conteneurs systemd-nspawn lorsqu'il est utilisé sur le système hôte ainsi qu'à l'intérieur du conteneur. Consultez systemd-nspawn#Networking pour une présentation complète.\n\nPour les exemples ci-dessous ,\n\n- nous limiterons la sortie de la commande ip a aux interfaces concernées.\n- Nous supposons que l'hôte est le système d'exploitation principal sur lequel vous démarrez et que le conteneur est votre machine virtuelle invitée.\n- tous les noms d'interfaces et les adresses IP ne sont que des exemples.\n\n"
+    },
+    {
+      "title": "Interface pont",
+      "level": 4,
+      "content": "Tout d'abord, créez une interface virtuelle bridge avec un fichier d'unité netdev. Nous demandons à systemd de créer un périphérique nommé br0 qui fonctionne comme un pont Ethernet.\n\n```\n/etc/systemd/network/mybridge.netdev\n```\n\n```\n[NetDev]\nName=br0\nKind=bridge\n```\n\nRedémarrez systemd-networkd.service pour que systemd crée le pont.\n\nPour consulter le pont nouvellement créé sur l'hôte et sur le conteneur, tapez :\n\n```\n$ ip a\n```\n\n```\n3 : br0 : <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default \n    link/ether ae:bd:35:ea:0c:c9 brd ff:ff:ff:ff:ff:ff:ff\n```\n\nNotez que l'interface br0 est listée mais est toujours DOWN à ce stade.\n\n"
+    },
+    {
+      "title": "Lier Ethernet au pont",
+      "level": 4,
+      "content": "L'étape suivante consiste à ajouter une interface réseau au pont nouvellement créé. Son fichier de configuration doit être chargé avant ceux des interfaces liées, donc son fichier de configuration doit être alphanumériquement antérieur à ceux-ci. Dans l'exemple ci-dessous, nous ajoutons toute interface qui correspond au nom en* au pont br0.\n\n```\n/etc/systemd/network/10_bind.network\n```\n\n```\n[Match]\nName=en*\n\n[Network]\nBridge=br0\n```\n\nL'interface Ethernet ne doit pas avoir de DHCP ou d'adresse IP associée car le pont a besoin d'une interface à laquelle se lier sans IP : modifiez le /etc/systemd/network/MyEth.network correspondant en conséquence pour supprimer l'adressage.\n\n"
+    },
+    {
+      "title": "Réseau du pont",
+      "level": 4,
+      "content": "Maintenant que le pont a été créé et qu'il a été lié à une interface réseau existante, la configuration IP de l'interface du pont doit être spécifiée. Ceci est défini dans un troisième fichier .network, l'exemple ci-dessous utilise DHCP.\n\n```\n/etc/systemd/network/mybridge.network\n```\n\n```\n[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n```\n\n"
+    },
+    {
+      "title": "Configurer le conteneur",
+      "level": 4,
+      "content": "Utilisez l'option --network-bridge=br0 lors du démarrage du conteneur. Consultez Systemd-nspawn#Use a network bridge pour plus de détails.\n\n"
+    },
+    {
+      "title": "Résultat",
+      "level": 4,
+      "content": "- sur l'hôte\n\n```\n$ ip a\n```\n\n```\n3 : br0 : <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default \n    link/ether 14:da:e9:b5:7a:88 brd ff:ff:ff:ff:ff:ff:ff\n    inet 192.168.1.87/24 brd 192.168.1.255 scope global br0\n       valid_lft forever preferred_lft forever\n    inet6 fe80::16da:e9ff:feb5:7a88/64 scope link \n       valid_lft forever preferred_lft forever\n6 : vb-MyContainer : <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast master br0 state UP group default qlen 1000\n    link/ether d2:7c:97:97:37:25 brd ff:ff:ff:ff:ff:ff:ff\n    inet6 fe80::d07c:97ff:fe97:3725/64 scope link \n       valid_lft forever preferred_lft forever\n```\n\n- sur le conteneur\n\n```\n$ ip a\n```\n\n```\n2 : host0 : <BROADCAST,MULTICAST,ALLMULTI,AUTOMEDIA,NOTRAILERS,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000\n    link/ether 5e:96:85:83:a8:5d brd ff:ff:ff:ff:ff:ff:ff\n    inet 192.168.1.73/24 brd 192.168.1.255 scope global host0\n       valid_lft forever preferred_lft forever\n    inet6 fe80::5c96:85ff:fe83:a85d/64 scope lien \n       valid_lft forever preferred_lft forever\n```\n\n"
+    },
+    {
+      "title": "Avertissement",
+      "level": 4,
+      "content": "- Nous avons maintenant une adresse IP pour br0 sur l'hôte et une pour host0 dans le conteneur.\n- deux nouvelles interfaces sont apparues : vb-MyContainer dans l'hôte et host0 dans le conteneur. Ceci est le résultat de l'option --network-bridge=br0 comme expliqué dans Systemd-nspawn#Use a network bridge pour plus de détails.\n- l'adresse DHCP sur host0 provient du fichier /usr/lib/systemd/network/80-container-host0.network du système.\n- sur l'hôte\n\n```\n$ brctl show\n```\n\n```\nbridge name\tbridge id\t\tSTP enabled\tinterfaces\nbr0\t\t8000.14dae9b57a88\tno\t\tenp7s0\n\t\t\t\t\t\t\tvb-MyContainer\n```\n\nla sortie de la commande ci-dessus confirme que nous avons un pont avec deux interfaces liées à.\n\n- sur l'hôte\n\n```\n$ ip route\n```\n\n```\ndefault via 192.168.1.254 dev br0 \n192.168.1.0/24 dev br0 proto kernel scope link src 192.168.1.87\n```\n\n- sur le conteneur\n\n```\n$ ip route\n```\n\n```\ndefault via 192.168.1.254 dev host0 \n192.168.1.0/24 dev host0 proto kernel scope link src 192.168.1.73\n```\n\nLes résultats de la commande ci-dessus confirment que nous avons activé les interfaces {ic|br0}} et {ic|host0}} avec une adresse IP et une passerelle 192.168.1.254. L'adresse de la passerelle a été automatiquement récupérée par systemd-networkd.\n\n"
+    },
+    {
+      "title": "Pont réseau avec adresses IP statiques",
+      "level": 3,
+      "content": "Définir une adresse IP statique pour chaque appareil peut être utile dans le cas de services web déployés (par exemple FTP, http, SSH). Chaque périphérique conservera la même adresse MAC lors des redémarrages si le fichier /usr/lib/systemd/network/99-default.link de votre système possède l'option MACAddressPolicy=persistent (par défaut). Ainsi, vous pourrez facilement router n'importe quel service sur votre passerelle vers le périphérique souhaité.\n\nLa configuration suivante doit être effectuée pour cette installation :\n\n- sur l'hôte\n\nLa configuration est très similaire à celle de la section #Pont réseau avec DHCP. Tout d'abord, une interface de pont virtuelle doit être créée et l'interface physique principale doit lui être liée. Cette tâche peut être accomplie avec les deux fichiers suivants, dont le contenu est identique à celui de la section DHCP.\n\n```\n/etc/systemd/network/MyBridge.netdev\n/etc/systemd/network/MyEth.network\n```\n\nEnsuite, vous devez configurer l'IP et le DNS de l'interface de pont virtuel nouvellement créée. Par exemple :\n\n```\n/etc/systemd/network/MyBridge.network\n```\n\n```\n[Match]\nName=br0\n\n[Network]\nDNS=192.168.1.254\nAddress=192.168.1.87/24\nGateway=192.168.1.254\n```\n\n- sur le conteneur\n\nPour obtenir la configuration d'une adresse IP statique sur le conteneur, nous devons remplacer le fichier /usr/lib/systemd/network/80-container-host0.network du système, qui fournit une configuration DHCP pour l'interface réseau host0 du conteneur. Pour ce faire, il suffit de placer la configuration dans /etc/systemd/network/80-container-host0.network. Par exemple :\n\n```\n/etc/systemd/network/80-container-host0.network\n```\n\n```\n[Match]\nName=host0\n\n[Network]\nDNS=192.168.1.254\nAddress=192.168.1.94/24\nGateway=192.168.1.254\n```\n\nAssurez-vous que systemd-networkd.service est activé dans le conteneur.\n\n"
+    },
+    {
+      "title": "Interface et intégration au bureau",
+      "level": 3,
+      "content": "systemd-networkd ne dispose pas d'une interface de gestion interactive appropriée, que ce soit via le shell de ligne de commande ou graphique.\n\nNéanmoins, certains outils sont disponibles pour afficher l'état actuel du réseau, recevoir des notifications ou interagir avec la configuration sans fil :\n\n- networkctl (via CLI) offre un vidage simple des états de l'interface réseau.\n- Lorsque networkd est configuré avec wpa_supplicant, wpa_cli et wpa_gui offrent la possibilité d'associer et de configurer les interfaces WLAN dynamiquement.\n- networkd-notify-gitAUR peut générer des notifications simples en réponse aux changements d'état de l'interface réseau (tels que la connexion/déconnexion et la réassociation).\n- Le daemon networkd-dispatcherAUR permet d'exécuter des scripts en réponse aux changements d'état de l'interface réseau, de manière similaire à NetworkManager-dispatcher.\n- Comme pour le résolveur DNS systemd-resolved, les informations sur les serveurs DNS actuels peuvent être visualisées avec resolvectl status.\n\n"
+    },
+    {
+      "title": "Configuration d'une IP statique ou DHCP basée sur le SSID (emplacement)",
+      "level": 3,
+      "content": "Il arrive souvent que le réseau sans fil de votre domicile utilise le DHCP et que le réseau sans fil de votre bureau utilise une IP statique. Cette configuration mixte peut être configurée comme suit :\n\n```\n/etc/systemd/network/24-wireless-office.network\n```\n\n```\n# special configuration for office WiFi network\n[Match]\nName=wlp2s0\nSSID=office_ap_name\n#BSSID=aa:bb:cc:dd:ee:ff\n\n[Network]\nAddress=10.1.10.9/24\nGateway=10.1.10.1\nDNS=10.1.10.1\n#DNS=8.8.8.8\n```\n\n```\n/etc/systemd/network/25-wireless-dhcp.network\n```\n\n```\n# use DHCP for any other WiFi network\n[Match]\nName=wlp2s0\n\n[Network]\nDHCP=ipv4\n```\n\n"
+    },
+    {
+      "title": "Collage d'une interface filaire et sans fil",
+      "level": 3,
+      "content": "Consulter également Liaison sans fil.\n\nLe bonding permet le partage de la connexion à travers plusieurs interfaces, donc si par exemple l'interface filaire est débranchée, le sans-fil reste connecté et la connectivité du réseau reste en place de manière transparente.\n\nCréez une interface de liaison. Dans ce cas, le mode est active-backup, ce qui signifie que les paquets sont acheminés par une interface secondaire si l'interface primaire tombe en panne.\n\n```\n/etc/systemd/network/30-bond0.netdev\n```\n\n```\n[NetDev]\nName=bond0\nKind=bond\n\n[Bond]\nMode=active-backup\nPrimaryReselectPolicy=always\nMIIMonitorSec=1s\n```\n\nDéfinissez l'interface filaire comme primaire :\n\n```\n/etc/systemd/network/30-ethernet-bond0.network\n```\n\n```\n[Match]\nName=enp0s25\n\n[Network]\nBond=bond0\nPrimarySlave=true\n```\n\nDéfinissez le réseau sans fil comme secondaire :\n\n```\n/etc/systemd/network/30-wifi-bond0.network\n```\n\n```\n[Match]\nName=wlan0\n\n[Network]\nBond=bond0\n```\n\nConfigurez l'interface de liaison comme vous le feriez pour une interface normale :\n\n```\n/etc/systemd/network/30-bond0.network\n```\n\n```\n[Match]\nName=bond0\n\n[Network]\nDHCP=ipv4\n```\n\nMaintenant, si le réseau filaire est débranché, la connexion devrait rester via le sans fil :\n\n```\n$ networkctl\n```\n\n```\nIDX LINK    TYPE     OPERATIONAL      SETUP     \n  1 lo      loopback carrier          unmanaged \n  2 enp0s25 ether    no-carrier       configured\n  3 bond0   bond     degraded-carrier configured\n  5 wlan0   wlan     enslaved         configured\n\n4 links listed.\n```\n\n"
+    },
+    {
+      "title": "Accélérer le démarrage lent de TCP",
+      "level": 3,
+      "content": "Sur une liaison à bande passante élevée avec une latence modérée (généralement une connexion Internet domestique supérieure à 10 Mbit/s), les paramètres par défaut de l'algorithme de démarrage lent TCP sont quelque peu conservateurs. Ce problème se manifeste par des téléchargements qui démarrent lentement et qui mettent plusieurs secondes à s'accélérer avant d'atteindre la pleine largeur de bande de la connexion. Il est particulièrement visible lors d'une mise à jour de pacman, où chaque paquet téléchargé démarre lentement et se termine souvent avant d'avoir atteint la vitesse maximale de la connexion.\n\nCes paramètres peuvent être ajustés pour que les connexions TCP démarrent avec des tailles de fenêtre plus grandes que les valeurs par défaut, évitant ainsi le temps qu'il faut pour qu'elles augmentent automatiquement à chaque nouvelle connexion TCP [1]. Bien que cela diminue généralement les performances sur les connexions lentes (ou si les valeurs sont trop élevées) en raison de la nécessité de retransmettre un plus grand nombre de paquets perdus, elles peuvent augmenter considérablement les performances sur les connexions avec une bande passante suffisante.\n\nIl est important d'effectuer une analyse comparative avant et après la modification de ces valeurs pour s'assurer que la vitesse du réseau est améliorée et non réduite. Si vous ne consultez pas les téléchargements qui commencent lentement et s'accélèrent progressivement, il n'est pas nécessaire de modifier ces valeurs car elles sont déjà optimales pour la vitesse de votre connexion. Lors de l'évaluation comparative, veillez à effectuer des tests sur un serveur distant à haute et à basse vitesse pour vous assurer que vous n'accélérez pas l'accès aux machines rapides au détriment de l'accès aux serveurs lents.\n\nPour ajuster ces valeurs, modifiez le fichier .network de la connexion :\n\n```\n/etc/systemd/network/eth0.network\n```\n\n```\n[Match]\nName=eth0\n\n#[Network]\n#Gateway=...  <-- Remove this if you have it, and put it in the Gateway= line below\n\n[Route]\n# This will apply to the gateway supplied via DHCP.  If you manually specify\n# your gateway, put it here instead.\nGateway=_dhcp4\n\n# The defaults for these values is 10.  They are a multiple of the MSS (1460 bytes).\nInitialCongestionWindow=10\nInitialAdvertisedReceiveWindow=10\n```\n\nLes valeurs par défaut de 10 fonctionnent bien pour les connexions plus lentes que 10 Mbit/s. Pour une connexion de 100 Mbit/s, une valeur de 30 fonctionne bien. La page de manuel systemd.network(5) § [ROUTE] SECTION OPTIONS indique qu'une valeur de 100 est considérée comme excessive.\n\nSi le paramètre sysctl net.ipv4.tcp_slow_start_after_idle est activé, la connexion reviendra à ces paramètres initiaux après un certain temps d'inactivité (souvent très court). Si ce paramètre est désactivé, la connexion maintiendra une fenêtre plus élevée si une fenêtre plus grande a été négociée pendant le transfert de paquets. Quel que soit le paramètre, chaque nouvelle connexion TCP commencera avec les paramètres Initial* définis ci-dessus.\n\nLe paramètre sysctl net.ipv4.tcp_congestion_control n'est pas directement lié à ces valeurs, car il contrôle la façon dont les fenêtres d'encombrement et de réception sont ajustées lorsqu'une liaison TCP est active, et particulièrement lorsque le chemin entre les deux hôtes est encombré et que le débit doit être réduit. Les valeurs Initial* ci-dessus définissent simplement les valeurs de fenêtre par défaut sélectionnées pour chaque nouvelle connexion, avant qu'un algorithme de congestion prenne le relais et les ajuste si nécessaire. Définir des valeurs initiales plus élevées raccourcit simplement une partie de la négociation pendant que l'algorithme de congestion tente de trouver les valeurs optimales (ou, à l'inverse, définir des valeurs initiales erronées ajoute un temps de négociation supplémentaire pendant que l'algorithme de congestion s'efforce de les corriger, ralentissant chaque connexion TCP nouvellement établie pendant quelques secondes supplémentaires).\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- systemd-networkd(8)\n- Messages de Tom Gundersen sur le blog de Core OS\n- Comment configurer systemd-networkd avec wpa_supplicant (Instruction de WonderWoofy sur les forums Arch)\n\n"
+    }
+  ]
+}

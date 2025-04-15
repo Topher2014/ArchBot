@@ -1,0 +1,101 @@
+{
+  "title": "Activating numlock on bootup (Español)",
+  "url": "https://wiki.archlinux.org/title/Activating_numlock_on_bootup_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-09-25** \n\n"
+    },
+    {
+      "title": "Arranque temprano (mkinitcpio)",
+      "level": 3,
+      "content": "Puede activar el bloqueo numérico justo después de que arranque el kernel en initramfs. Ésta es la única manera de asegurarse de que el bloqueo numérico esté activado incluso durante la introducción de la contraseña de cifrado de disco completo. Instale mkinitcpio-numlockAUR y añada el hook numlock mkinitcpio antes de encrypt en la matriz HOOKS en /etc/mkinitcpio.conf:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nHOOKS=(base udev autodetect keyboard keymap consolefont numlock modconf block encrypt lvm2 filesystems fsck)\n...\n```\n\nLuego regenere initramfs para que el cambio surta efecto.\n\nUna ventaja de utilizar este método es que la configuración de bloqueo numérico se replicará en el proceso de arranque posterior, y las nuevas consolas virtuales tendrán de forma predeterminada el bloqueo numérico activado.\n\n"
+    },
+    {
+      "title": "Con el servicio systemd",
+      "level": 3,
+      "content": "Primero cree una secuencia de comandos (script) para establecer el bloqueo numérico en los TTYs relevantes:\n\n```\n/usr/local/bin/numlock\n```\n\n```\n#!/bin/bash\n\nfor tty in /dev/tty{1..6}\ndo\n    /usr/bin/setleds -D +num < \"$tty\";\ndone\n```\n\nUna vez creado el script, deberá hacerlo ejecutable. De lo contrario, el script no se ejecutará.\n\nEntonces cree y active un servicio systemd:\n\n```\n/etc/systemd/system/numlock.service\n```\n\n```\n[Unit]\nDescription=numlock\n\n[Service]\nExecStart=/usr/local/bin/numlock\nStandardInput=tty\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "Extender getty@.service",
+      "level": 3,
+      "content": "Esto es más simple que usar un servicio separado y no codifica el número de VTs en una secuencia de comandos. Cree un drop-in snippet para getty@.service que se aplique sobre el original:\n\n```\n/etc/systemd/system/getty@.service.d/activate-numlock.conf\n```\n\n```\n[Service]\nExecStartPre=/bin/sh -c 'setleds -D +num < /dev/%I'\n```\n\nPara desactivas la sugerencia de activación del bloqueo numérico que se muestra en la pantalla de inicio de sesión, edite getty@tty1.service y añada --nohints a las opciones de agetty:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty '-p -- \\\\u' --nohints --noclear %I $TERM\n```\n\n"
+    },
+    {
+      "title": "Alternativa en Bash",
+      "level": 3,
+      "content": "Añada setleds -D +num a ~/.bash_profile. Tenga en cuenta que, a diferencia de los otros métodos, esto no tendrá efecto hasta después de iniciar sesión.\n\n"
+    },
+    {
+      "title": "X.org",
+      "level": 2,
+      "content": "Están disponibles varios métodos.\n\n"
+    },
+    {
+      "title": "startx",
+      "level": 3,
+      "content": "Instale el paquete numlockx e inclúyalo en el archivo ~/.xinitrc antes de exec:\n\n```\n#!/bin/sh\n#\n# ~/.xinitrc\n#\n# Executed by startx (run your window manager from here)\n#\n\nnumlockx &\n\nexec window_manager\n```\n\n"
+    },
+    {
+      "title": "MATE",
+      "level": 3,
+      "content": "De forma predeterminada, MATE guarda el último estado al cerrar sesión y lo restaura durante el siguiente inicio de sesión. Para activar el bloqueo numérico en cada inicio de sesión, debe cambiar los siguientes valores DCONF:\n\n```\ndconf write org.mate.peripherals-keyboard remember-numlock-state false\ndconf write org.mate.peripherals-keyboard numlock-state 'on'\n```\n\n"
+    },
+    {
+      "title": "KDE Plasma",
+      "level": 3,
+      "content": "Vaya a Configuración del sistema > Dispositivos de entrada > Teclado, en la pestaña Hardware, en la sección Bloqueo numérico en el inicio de Plasma, elija el comportamiento deseado del bloqueo numérico.\n\n"
+    },
+    {
+      "title": "GDM",
+      "level": 3,
+      "content": "Asegúrese de que tiene numlockx instalado y luego añada el siguiente código a ~/.xprofile:\n\n```\nif [ -x /usr/bin/numlockx ]; then\n      /usr/bin/numlockx on\nfi\n```\n\n"
+    },
+    {
+      "title": "GNOME",
+      "level": 3,
+      "content": "Ejecute el siguiente comando:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard numlock-state true\n```\n\nPara recordar el último estado de la tecla de bloqueo numérico (ya sea desactivada o activada), utilice:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard remember-numlock-state true\n```\n\nAlternativamente, puede añadir numlockx on (desde numlockx) a un script de inicio o ~/.profile.\n\n"
+    },
+    {
+      "title": "Xfce",
+      "level": 3,
+      "content": "En el archivo ~/.config/xfce4/xfconf/xfce-perchannel-xml/keyboards.xml, asegúrese de que los siguientes valores estén establecidos como verdadero (true):\n\n```\n<property name=\"Numlock\" type=\"bool\" value=\"true\"/>\n<property name=\"RestoreNumlock\" type=\"bool\" value=\"true\"/>\n```\n\n"
+    },
+    {
+      "title": "SDDM",
+      "level": 3,
+      "content": "En el archivo /etc/sddm.conf, bajo la sección [General], configure el valor del bloqueo numérico (Numlock) como activo (on):\n\n```\n[General]\n...\nNumlock=on\n```\n\n"
+    },
+    {
+      "title": "SLiM",
+      "level": 3,
+      "content": "En el archivo /etc/slim.conf busque la línea y descomentela (elimine el #):\n\n```\n#numlock             on\n```\n\n"
+    },
+    {
+      "title": "OpenBox",
+      "level": 3,
+      "content": "En el archivo ~/.config/openbox/autostart añada la línea:\n\n```\nnumlockx &\n```\n\nY luego guarde el archivo.\n\n"
+    },
+    {
+      "title": "LightDM",
+      "level": 3,
+      "content": "Véase LightDM#NumLock on by default.\n\n"
+    },
+    {
+      "title": "LXDM",
+      "level": 3,
+      "content": "Establezca la opción en /etc/lxdm/lxdm.conf:\n\n```\nnumlock=1\n```\n\n"
+    },
+    {
+      "title": "LXQt",
+      "level": 3,
+      "content": "Establezca la opción en ~/.config/lxqt/session.conf:\n\n```\n[Keyboard]\nnumlock=true\n```\n\n"
+    },
+    {
+      "title": "Sway",
+      "level": 3,
+      "content": "Véase Sway#Initially enable CapsLock/NumLock.\n\n"
+    }
+  ]
+}

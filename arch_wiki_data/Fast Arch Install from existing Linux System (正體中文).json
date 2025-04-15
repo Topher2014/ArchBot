@@ -1,0 +1,106 @@
+{
+  "title": "Fast Arch Install from existing Linux System (正體中文)",
+  "url": "https://wiki.archlinux.org/title/Fast_Arch_Install_from_existing_Linux_System_(%E6%AD%A3%E9%AB%94%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Install Arch Linux via SSH\n\nThis document describes the bootstrapping process required to install Arch Linux from a running Linux host system. After bootstrapping, the installation proceeds as described in the Installation guide.\n\nInstalling Arch Linux from a running Linux is useful for:\n\n- remotely installing Arch Linux, e.g. a (virtual) root server\n- replacing an existing Linux without an installation medium (see #Replacing the existing system without an installation medium)\n- creating a new Linux distribution or LiveMedia based on Arch Linux\n- creating an Arch Linux chroot environment, e.g. for a Docker base container\n- rootfs-over-NFS for diskless machines\n\nThe goal of the bootstrapping procedure is to setup an environment from which the scripts from arch-install-scripts (such as pacstrap(8) and arch-chroot(8)) can be run.\n\nIf the host system runs Arch Linux, this can be achieved by simply installing arch-install-scripts. If the host system runs another Linux distribution, you will first need to set up an Arch Linux-based chroot.\n\n"
+    },
+    {
+      "title": "Backup and preparation",
+      "level": 2,
+      "content": "Backup all your data including mails, webservers, etc. Have all information at your fingertips. Preserve all your server configurations, hostnames, etc.\n\nHere is a list of data you will likely need:\n\n- IP address\n- hostname(s), (note: rootserver are mostly also part of the providers domain, check or save your /etc/hosts before you delete)\n- DNS server (check /etc/resolv.conf)\n- SSH keys (if other people work on your server, they will have to accept new keys otherwise. This includes keys from your Apache, your mail servers, your SSH server and others.)\n- Hardware info (network card, etc. Refer to your pre-installed /etc/modules.conf )\n- Boot loader configuration files.\n\nIn general, it is a good idea to have a local copy of your original /etc directory on your local hard drive.\n\n"
+    },
+    {
+      "title": "From a host running Arch Linux",
+      "level": 2,
+      "content": "Install the arch-install-scripts package.\n\nFollow Installation guide#Mount the file systems to mount the filesystem that will be used for the root directory as well as all the other needed mount points. If you already use the /mnt directory for something else, just create another directory such as /mnt/install and use it as the mount point base for the rest of the installation.\n\nAt this stage, Arch Linux can either be installed from scratch or it can mirror the host installation. The two options are described thereafter.\n\n"
+    },
+    {
+      "title": "Create a new Arch installation",
+      "level": 3,
+      "content": "Follow Installation guide#Installation.\n\nIn the procedure, the first step, Installation guide#Select the mirrors, can be skipped since the host should already have a correct mirrorlist.\n\nNote: **from the host** \n\n"
+    },
+    {
+      "title": "Create a copy of an existing Arch installation",
+      "level": 3,
+      "content": "It is possible to replicate an existing Arch Linux installation by copying the host filesystem to the new partition and make some adjustments to it to make it bootable and unique.\n\nThe first step is to copy the host files into the mounted new partition, for this, consider using the approach exhibited in rsync#Full system backup.\n\nThen, follow the procedure described in Installation guide#Configure the system with some caveats and additional steps:\n\n- Installation guide#Time, Installation guide#Localization and Installation guide#Root password can be skipped.\n- Installation guide#Initramfs may be required in particular if changing file system. For example, from ext4 to Btrfs.\n- Regarding Installation guide#Boot loader, it is necessary to reinstall the boot loader.\n- Delete /etc/machine-id and create a new one with systemd-machine-id-setup(1).\n\nIf the mirrored Arch installation may be used within a different configuration or with another hardware, consider the following additional operations:\n\n- Use the CPU microcode update adapted to the target system during the step Installation guide#Boot loader\n- If any specific Xorg#Configuration was present on the host and may be incompatible with the target system, follow Moving an existing install into (or out of) a virtual machine#Disable any Xorg-related files\n- Make any other adjustment appropriate to the target system, like reconfiguring the network or the audio.\n\n"
+    },
+    {
+      "title": "From a host running another Linux distribution",
+      "level": 2,
+      "content": "There are multiple tools which automate a large part of the steps described in the following subsections. See their respective homepages for detailed instructions.\n\n- archstrap (Bash)\n- digitalocean-debian-to-arch (repartition disk, DigitalOcean specific; does not perform PGP signature verification)\n- image-bootstrap (Python; does not perform PGP signature verification)\n- vps2arch (Bash; does not perform PGP signature verification)\n\nThe manual way is presented in the following subsections. The idea is to either get pacman working directly on the host system, or to run an Arch system inside the host system, with the actual installation being executed from the Arch system. The nested system is contained inside a chroot.\n\n"
+    },
+    {
+      "title": "Using pacman from the host system",
+      "level": 3,
+      "content": "Pacman can be compiled on most Linux distributions, and used directly on the host system to bootstrap Arch Linux. The arch-install-scripts should run without issues directly from the downloaded sources on any recent distribution.\n\nSome distributions provide a package for pacman and/or arch-install-scripts in their official repositories which can be used for this purpose. As of July 2020, Void Linux is known to provide the pacman package, and Alpine Linux and Fedora are known to provide both pacman and arch-install-scripts.\n\n"
+    },
+    {
+      "title": "Creating a chroot",
+      "level": 3,
+      "content": "Two methods to setup and enter the chroot are presented below, from the easiest to the most complicated. Select only one of the two methods. Then, continue at #Using a chroot environment.\n\n"
+    },
+    {
+      "title": "Method A: Using the bootstrap tarball (recommended)",
+      "level": 4,
+      "content": "Download the bootstrap tarball from a mirror into /tmp/.\n\nDownload the bootstrap tarball signature from the download page and place it in the same directory. Do not download it from a mirror.\n\nVerify the signature with GnuPG.\n\nExtract the tarball:\n\n```\n# tar xf /path-to-bootstrap-image/archlinux-bootstrap-x86_64.tar.zst --numeric-owner\n```\n\nTake note of the final --numeric-owner option, which is important for preserving correct UID and GID numbers of extracted files in case your existing Linux system uses different numbers than Arch Linux.\n\nSelect a repository server by editing /tmp/root.x86_64/etc/pacman.d/mirrorlist.\n\nEnter the chroot:\n\n- If bash 4 or later is installed, and unshare supports the --fork and --pid options (util-linux 2.24 or later): # /tmp/root.x86_64/bin/arch-chroot /tmp/root.x86_64/\n- Otherwise, run the following commands:\n\n```\n# /tmp/root.x86_64/bin/arch-chroot /tmp/root.x86_64/\n```\n\n```\n# mount --bind /tmp/root.x86_64 /tmp/root.x86_64\n# cd /tmp/root.x86_64\n# cp /etc/resolv.conf etc\n# mount -t proc /proc proc\n# mount --make-rslave --rbind /sys sys\n# mount --make-rslave --rbind /dev dev\n# mount --make-rslave --rbind /run run    # (assuming /run exists on the system)\n# chroot /tmp/root.x86_64 /bin/bash\n```\n\n"
+    },
+    {
+      "title": "Method B: Using the installation environment's root file system image",
+      "level": 4,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nIt is possible to mount the root image of the latest Arch Linux installation medium and then chroot into it. This method has the advantage of providing a working Arch Linux installation right within the host system without the need to prepare it by installing specific packages.\n\nThe root image can be found on one of the mirrors under iso/latest/arch/x86_64/. The squashfs format is not editable, so we unsquash the root image and mount it.\n\nTo unsquash the root image, run\n\n```\n# unsquashfs airootfs.sfs\n```\n\nSelect a repository server by editing squashfs-root/etc/pacman.d/mirrorlist.\n\nBefore chrooting to the unsquashed root image, we need to set up some mount points and copy the resolv.conf for networking.\n\n```\n# mount --bind squashfs-root squashfs-root\n# mount -t proc none squashfs-root/proc\n# mount -t sysfs none squashfs-root/sys\n# mount -o bind /dev squashfs-root/dev\n# mount -o bind /dev/pts squashfs-root/dev/pts  ## important for pacman (for signature check)\n# cp -L /etc/resolv.conf squashfs-root/etc  ## this is needed to use networking within the chroot\n```\n\nNow, everything is prepared to chroot into the newly installed Arch environment:\n\n```\n# chroot squashfs-root bash\n```\n\n"
+    },
+    {
+      "title": "Using a chroot environment",
+      "level": 3,
+      "content": "The bootstrap environment is really barebones (no nano or lvm2). Therefore, we need to set up pacman in order to download other necessary packages.\n\n"
+    },
+    {
+      "title": "Initializing pacman keyring",
+      "level": 4,
+      "content": "Before starting the installation, pacman keys need to be setup. Run the following commands:\n\n```\n# pacman-key --init\n# pacman-key --populate\n```\n\nSee pacman/Package signing#Initializing the keyring for details.\n\n"
+    },
+    {
+      "title": "Downloading basic tools",
+      "level": 4,
+      "content": "Refresh the package lists and install what you need: base-devel, parted etc.\n\nNote: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n```\n# mount --bind directory-to-livecd-or-bootstrap directory-to-livecd-or-bootstrap\n```\n\n"
+    },
+    {
+      "title": "Installation tips",
+      "level": 3,
+      "content": "You can now proceed to Installation guide#Mount the file systems and follow the rest of the Installation guide.\n\nSome host systems or configurations may require certain extra steps. See the sections below for tips.\n\n"
+    },
+    {
+      "title": "Debian-based host",
+      "level": 4,
+      "content": "On some Debian-based host systems, pacstrap may produce the following error:\n\n```\n# pacstrap -K /mnt base\n```\n\n```\n==> Creating install root at /mnt\nmount: mount point /mnt/dev/shm is a symbolic link to nowhere\n==> ERROR: failed to setup API filesystems in new root\n```\n\nThis is because in some versions of Debian, /dev/shm points to /run/shm while in the Arch-based chroot, /run/shm does not exist and the link is broken. To correct this error, create a directory /run/shm:\n\n```\n# mkdir /run/shm\n```\n\n"
+    },
+    {
+      "title": "Fedora-based host",
+      "level": 4,
+      "content": "On Fedora based hosts and live USBs you may encounter problems when using genfstab to generate your fstab. Remove duplicate entries and the seclabel option where it appears, as this is SELinux-specific and will keep your system from booting normally.\n\n"
+    },
+    {
+      "title": "Things to check before you reboot",
+      "level": 2,
+      "content": "Before rebooting, double check a few details in your installation to achieve a successful installation. To do so, first chroot into the newly-installed system, and then:\n\n- create a user with password, so you can login via ssh. This is critical since root login is disabled by default since OpenSSH-7.1p2.\n- set a root password so that you can switch to root via su later\n- install a ssh solution and enable its server instance to start automatically at boot.\n- set up your network configuration in order to have a connection started automatically at boot.\n- set up a boot loader and configure it to use the swap partition you appropriated earlier as the root partition. You might want to configure your boot loader to be able to boot into your old system; it is helpful to re-use the server's existing /boot partition in the new system for this purpose.\n\n"
+    },
+    {
+      "title": "Replacing the existing system without an installation medium",
+      "level": 2,
+      "content": "Find ~700 MiB of free space somewhere on the disk, e.g. by partitioning a swap partition. You can disable the swap partition and set up your system there.\n\n"
+    },
+    {
+      "title": "Set old swap partition as new root partition",
+      "level": 3,
+      "content": "Check cfdisk, /proc/swaps or /etc/fstab to find your swap partition. Assuming your hard drive is located on sdaX (X will be a number).\n\nDo the following:\n\nDisable the swap space:\n\n```\n# swapoff /dev/sdaX\n```\n\nCreate a filesystem on it\n\n```\n# fdisk /dev/sda\n(set /dev/sdaX ID field to \"Linux\" - Hex 83)\n# mke2fs -j /dev/sdaX\n```\n\nCreate a directory to mount it in\n\n```\n# mkdir /mnt/newsys\n```\n\nFinally, mount the new directory for installing the intermediate system.\n\n```\n# mount -t ext4 /dev/sdaX /mnt/newsys\n```\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 3,
+      "content": "Install essentials packages and any other package required to get a system with internet connection up and running in the temporary partition, being careful with the limit of ~700 MiB space. When specifying packages to be installed with pacstrap, consider adding the -c flag to avoid filling up valuable space by downloading packages to the host system.\n\nOnce the new Arch Linux system is installed, fix the boot loader configuration, then reboot into the newly created system, and rsync the entire system to the primary partition.\n\n"
+    }
+  ]
+}

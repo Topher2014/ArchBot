@@ -1,0 +1,171 @@
+{
+  "title": "GRUB/Tips and tricks (Español)",
+  "url": "https://wiki.archlinux.org/title/GRUB/Tips_and_tricks_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **Este artículo o sección necesita ser traducido.** Este artículo o sección necesita ser traducido.\n\nEste artículo o sección necesita ser traducido.\n\n"
+    },
+    {
+      "title": "BIOS",
+      "level": 4,
+      "content": "Supongamos que la primera partición de su memoria USB es FAT32 y su partición es /dev/sdy1\n\n```\n# mkdir -p /mnt/usb\n# mount /dev/sdy1 /mnt/usb\n# grub-install --target=i386-pc --debug --boot-directory=/mnt/usb/boot /dev/sdy\n# grub-mkconfig -o /mnt/usb/boot/grub/grub.cfg\n```\n\nOpcionalmente puede hacer una copia de seguridad de grub.cfg:\n\n```\n# mkdir -p /mnt/usb/etc/default\n# cp /etc/default/grub /mnt/usb/etc/default\n# cp -a /etc/grub.d /mnt/usb/etc\n```\n\n```\n# sync; umount /mnt/usb\n```\n\n"
+    },
+    {
+      "title": "EFI",
+      "level": 4,
+      "content": "Para que grub escriba su imagen EFI en /boot/efi/EFI/BOOT/BOOTX64.efi, y el firmware de arranque sea capaz de encontrarlo sin ninguna entrada de arranque UEFI, use --removable cuando ejecute grub-install.\n\n"
+    },
+    {
+      "title": "Instalar en un disco con o sin particiones",
+      "level": 3,
+      "content": "Note: **desaconseja encarecidamente** \n\nPara configurar grub en un sector de inicio de partición, en un disco sin particiones (también llamado superfloppy) o en un disquete, ejecútelo (utilizando, por ejemplo/dev/sdaX como la partición /boot):\n\n```\n# chattr -i /boot/grub/i386-pc/core.img\n# grub-install --target=i386-pc --debug --force /dev/sdaX\n# chattr +i /boot/grub/i386-pc/core.img\n```\n\n- /dev/sdaX se utiliza sólo como ejemplo.\n- --target=i386-pc indica a grub-install que se instale sólo para sistemas BIOS. Se recomienda utilizar siempre esta opción para eliminar la ambigüedad en grub-install.\n\nDebe usar la opción --force para permitir el uso de listas de bloqueo (blocklists) y no debería usar --grub-setup=/bin/true (que es similar a simplemente generar core.img).\n\ngrub-install dará advertencias y le darán una idea de lo que podría fallar con este enfoque:\n\n```\n/sbin/grub-setup: warn: Attempting to install GRUB to a partitionless disk or to a partition. This is a BAD idea.\n/sbin/grub-setup: warn: Embedding is not possible. GRUB can only be installed in this setup by using blocklists.\n                        However, blocklists are UNRELIABLE and their use is discouraged.\n```\n\nSin --force puede obtener el siguiente error y grub-setup no configurará su código de arranque en el sector de arranque de la partición:\n\n```\n/sbin/grub-setup: error: will not proceed with blocklists\n```\n\nCon --force debería obtener:\n\n```\nInstallation finished. No error reported.\n```\n\nLa razón por la que grub-setup no lo permite por defecto es que en caso de partición o disco sin particiones GRUB confía en las listas de bloques integradas en el sector de arranque de la partición para localizar el archivo /boot/grub/i386-pc/core.img y el directorio de prefijos /boot/grub . Las ubicaciones de sector de core.img pueden cambiar cada vez que se altere el sistema de archivos de la partición (archivos copiados, eliminados, etc.). Para más información, véase https://bugzilla.redhat.com/show_bug.cgi?id=728742 y https://bugzilla.redhat.com/show_bug.cgi?id=730915.\n\nLa solución es establecer el indicador invariable en /boot/grub/i386-pc/core.img. (usando el comando chattr} como se mencionó anteriormente) para que las ubicaciones de sector del archivo core.img en el disco no se alteren. El indicador invariable en /boot/grub/i386-pc/core.img sólo debe configurarse si GRUB está instalado en un sector de arranque de partición o en un disco sin particiones, no en el caso de la instalación en MBR o la simple generación de core.img sin integrar ningún sector de arranque (mencionado anteriormente).\n\nDesafortunadamente, el archivo grub.cfg que se crea no contendrá el UUID apropiado para iniciar, incluso si no hay informe de errores.Vea https://bbs.archlinux.org/viewtopic.php?pid=1294604#p1294604. Para solucionar este problema, ejecute los siguientes comandos:\n\n```\n# mount /dev/sdxY /mnt        #Your root partition.\n# mount /dev/sdxZ /mnt/boot   #Your boot partition (if you have one).\n# arch-chroot /mnt\n```\n\nInstale linux\n\n```\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\n"
+    },
+    {
+      "title": "Generar sólo core.img",
+      "level": 3,
+      "content": "Para completar el directorio /boot/grub y generar un /boot/grub/i386-pc/core.img sin incorporar ningún código de sector de inicio GRUB en el MBR, región post-MBR o partición del sector de arranque, agregue --grub-setup=/bin/true a grub-install:\n\n```\n# grub-install --target=i386-pc --grub-setup=/bin/true --debug /dev/sda\n```\n\n- /dev/sda usado sólo como ejemplo.\n- --target=i386-pc ordena a grub-install a instalar solo para sistemas BIOS. Se recomienda utilizar siempre esta opción para eliminar la ambigüedad en grub-install.\n\nA continuación, puede encadenar GRUB core.img de GRUB Legacy o syslinux como kernel de Linux o como núcleo de arranque múltiple (consulte también Syslinux (Español)).\n\n"
+    },
+    {
+      "title": "Herramientas GUI de configuración",
+      "level": 2,
+      "content": "Es posible obtener estas herramientas gráficas instalando los siguientes paquetes:\n\n- grub-customizer — Para personalizar el gestor de arranque (GRUB o BURG)\n\n- grub2-editor-frameworks — Un módulo de control de KDE para configurar el gestor de arranque GRUB2. Port no oficial KF5\n\n- startupmanager — Aplicación gráfica para cambiar la configuración de GRUB Legacy, GRUB, Usplash y Splashy (abandonned)\n\n"
+    },
+    {
+      "title": "Configuración del aspecto",
+      "level": 2,
+      "content": "En GRUB puede cambiar el aspecto del menú. Asegúrese de haber inicializado el terminal gráfico de GRUB (gfxterm), utilizando una modalidad de vídeo adecuado (gfxmode). Para más información se puede consultar este apartado. La modalidad de vídeo establecida a continuación, se pasará al kernel a través de «gfxpayload», por lo tanto, esta solicitud asegurará que cada configuración del aspecto tenga efecto.\n\n"
+    },
+    {
+      "title": "Ajustar la resolución del framebuffer",
+      "level": 3,
+      "content": "GRUB permite ajustar el framebuffer tanto para él mismo como para el kernel. El antiguo parámetro vga= está en desuso. El método recomendado es modificar /etc/default/grub de la siguiente manera:\n\n```\nGRUB_GFXMODE=1024x768x32\nGRUB_GFXPAYLOAD_LINUX=keep\n```\n\nSe pueden especificar múltiples resoluciones, incluyendo la opción auto por defecto, por lo que es recomendable que modifique la línea en cuestión, de modo que quede como esta GRUB_GFXMODE=<resolución deseada>,<para fallback 1024x768>,auto. Para obtener más información, remítase a the GRUB gfxmode documentation. La propiedad gfxpayload se asegurará de que el kernel mantiene la resolución.\n\n- Solo las modalidades soportadas por la tarjeta gráfica a través de VESA BIOS Extensions (VBE) pueden ser utilizadas. Para ver la lista de las modalidades compatibles, instale hwinfo y ejecute hwinfo --framebuffer como root. Como alternativa, entre en la línea de órdenes de GRUB y ejecute la orden videoinfo.\n- Las versiones anteriores del driver propietario NVIDIA (probado con GeForce GTX 970, driver: nvidia 370) admite GRUB_GFXMODE en formato <width>x<height>-<depth> (e.g. 1920x1200-24, pero no 1920x1200x24). Esto no parece aplicarse a las nuevas tarjetas y controladores. Las tarjetas Pascal con controladores más recientes (probadas con GeForce GTX 1060 y nvidia 381.22) no funcionarán con el formato sugerido, por lo que si se intenta utilizarlas se producirán graves problemas, entre los que se incluyen, sin limitarse a ellos, caídas del sistema y bloqueos de hardware. El controlador y las tarjetas actuales se configuran mejor con GRUB_GFXMODE en el formato estándar <width>x<height>x<depth>.\n- Asegúrese de ejecutar grub-mkconfig -o /boot/grub/grub.cfg después de realizar cambios.\n\nSi este método falla, la antigua opción vga= sigue siendo válida. Añadimos vga= a la opción \"GRUB_CMDLINE_LINUX_DEFAULT=\" en /etc/default/grub. Por ejemplo: \"GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash vga=792\" establece una resolución de 1024x768\n\n"
+    },
+    {
+      "title": "Imagen de fondo y fuentes bitmap",
+      "level": 3,
+      "content": "GRUB es compatible con imágenes de fondo y fuentes de mapa de bits en el formato pf2. La fuente unifont está incluida en el paquete grub con el nombre unicode.pf2 o, solo para carácteres ASCII, con el nombre ascii.pf2.\n\nLos formatos de imagen soportados incluyen tga, png e jpeg, siempre que los respectivos módulos se carguen. La resolución máxima aplicable depende del hardware en uso.\n\nAntes de continuar, siga las disposiciones indicadas en resolución del framebuffer.\n\nA continuación, edite el archivo /etc/default/grub como sigue:\n\n```\nGRUB_BACKGROUND=\"/boot/grub/mi_imagen\"\n#GRUB_THEME=\"/ruta/a/gfxtheme\"\nGRUB_FONT=\"/ruta/a/font.pf2\"\n```\n\nRegenere grub.cfg para aplicar los cambios. Si la inserción de la imagen se realiza correctamente, debería ver el mensaje Found background image..., al ejecutar la orden anterior. Si no, quiere decir que la imagen no se ha incorporado en el archivo grub.cfg.\n\nEn este caso, compruebe que:\n\n- La ruta y el nombre de la imagen en /etc/default/grub es correcta.\n- La imagen tiene un tamaño y formato adecuados (tga, png, jpg a 8 bits).\n- La imagen se guarda en modo RGB y no indexado.\n- La modalidad consola no está habilitada en el archivo /etc/default/grub.\n- La orden de grub-mkconfig se ha hecho para poner la información relativa en un segundo plano en el archivo /boot/grub/grub.cfg.\n- Los scripts grub-mkconfig no harán referencia al nombre del archivo en grub.cfg si contienen espacios , así que asegúrese de que no los tiene\n\n"
+    },
+    {
+      "title": "Temas",
+      "level": 3,
+      "content": "A continuación se muestra un ejemplo para la configuración propuesta con el tema Starfield, incluido en el paquete suministrado con Arch.\n\nModifique /etc/default/grub:\n\n```\nGRUB_THEME=\"/boot/grub/themes/starfield/theme.txt\"\n```\n\nRegenere grub.cfg para aplicar los cambios. Si el tema se ha configurado correctamente, aparecerá en el terminal el mensaje Found theme: /boot/grub/themes/starfield/theme.txt.\n\nLa imagen de fondo, por lo general, no se visualiza cuando se utiliza un tema.\n\n"
+    },
+    {
+      "title": "Colores del menú",
+      "level": 3,
+      "content": "Como sucedía con GRUB Legacy, se pueden cambiar los colores del menú de GRUB. La lista de colores disponibles se pueden encontrar aquí. A continuación, un ejemplo:\n\nModifique /etc/default/grub de la siguiente manera:\n\n```\nGRUB_COLOR_NORMAL=\"light-blue/black\"\nGRUB_COLOR_HIGHLIGHT=\"light-cyan/blue\"\n```\n\n"
+    },
+    {
+      "title": "Menú oculto",
+      "level": 3,
+      "content": "Una de las características de GRUB es la capacidad de ocultar el menú y hacer que sea visible pulsando la tecla Esc, si es necesario. También puede decidir si se debe mostrar la cuenta atrás.\n\nModifique el archivo /etc/default/grub como sigue. Estas son las líneas que hay que añadir para activar esta función, la cuenta atrás se establece en 5 segundos y se hace visible para el usuario:\n\n```\nGRUB_TIMEOUT=5\nGRUB_TIMEOUT_STYLE='countdown'\n```\n\nGRUB_TIMEOUT es usado para indicar cuántos segundos tardará en mostrase el menú.\n\n"
+    },
+    {
+      "title": "Desactivar framebuffer",
+      "level": 3,
+      "content": "Si utiliza el controlador propietario de NVIDIA, puede que tenga que desactivar el framebuffer de GRUB, ya que podría interferir con el controlador.\n\nPara desactivarlo, edite /etc/default/grub y descomente la siguiente línea:\n\n```\nGRUB_TERMINAL_OUTPUT=console\n```\n\nOtra opción, si desea conservar el framebuffer para GRUB, es revertir al modo de texto justo antes de iniciarse el kernel. Para conseguir esto, modifique la variable en /etc/default/grub:\n\n```\nGRUB_GFXPAYLOAD_LINUX=text\n```\n\n"
+    },
+    {
+      "title": "Iniciar una imagen ISO9660 directamente desde GRUB",
+      "level": 2,
+      "content": "GRUB soporta el arranque de imágenes ISO directamente a través de dispositivos loopback, véase Multiboot USB drive#Using GRUB and loopback devices para obtener ejemplos.\n\n"
+    },
+    {
+      "title": "Nomenclatura permanente de dispositivos de bloque",
+      "level": 2,
+      "content": "Un esquema de nomenclatura de nombres persistentes para dispositivos de bloque es usar UUID, que son únicos y globales, para detectar particiones, en lugar de la «vieja» nomenclatura /dev/sd*. Las ventajas de este método están tratadas en el artículo anteriormente enlazado.\n\nLa nomenclatura persistente a través de las UUID del sistema de archivos se utiliza por defecto en GRUB.\n\nCuando se usan las UUID son controladas por una opción en /etc/default/grub:\n\n```\n# GRUB_DISABLE_LINUX_UUID=true\n```\n\n"
+    },
+    {
+      "title": "Utilizar etiquetas",
+      "level": 2,
+      "content": "Puede utilizar las etiquetas (cadenas que identifican particiones de una manera legible por el usuario), usando la opción --label con la orden search. En primer lugar, coloque una etiqueta a las particiones:\n\n```\n# tune2fs -L ETIQUETA DE LA PARTICIÓN\n```\n\nA continuación, agregue una entrada usando la etiqueta. He aquí un ejemplo:\n\n```\nmenuentry \"Arch Linux, session texte\" {\n search --label --set=root archroot\n linux /boot/vmlinuz-linux root=/dev/disk/by-label/archroot ro\n initrd /boot/initramfs-linux.img\n}\n```\n\n"
+    },
+    {
+      "title": "Proteger con contraseña el menú de GRUB",
+      "level": 2,
+      "content": "Si desea hacer GRUB más seguro, de modo que nadie pueda cambiar los parámetros de arranque o utilizar la línea de órdenes, puede agregar un nombre de usuario y contraseña para los archivos de configuración de GRUB. Para ello, ejecute grub-mkpasswd-pbkdf2. Es necesario introducir una contraseña y confirmarla:\n\n```\ngrub-mkpasswd-pbkdf2\n```\n\n```\n[...]\nYour PBKDF2 is grub.pbkdf2.sha512.10000.C8ABD3E93C4DFC83138B0C7A3D719BC650E6234310DA069E6FDB0DD4156313DA3D0D9BFFC2846C21D5A2DDA515114CF6378F8A064C94198D0618E70D23717E82.509BFA8A4217EAD0B33C87432524C0B6B64B34FBAD22D3E6E6874D9B101996C5F98AB1746FE7C7199147ECF4ABD8661C222EEEDB7D14A843261FFF2C07B1269A\n```\n\nDespués, añada las siguientes cadenas a /etc/grub.d/40_custom:\n\n```\n/etc/grub.d/40_custom\n```\n\n```\nset superusers=\"nombreusuario\"\npassword_pbkdf2 nombreusuario <contraseña>\n```\n\nDonde <contraseña> corresponde a la cadena generada por grub-mkpasswd_pbkdf2.\n\nHay que regenerar el archivo de configuración. La línea de órdenes y los parámetros de arranque de grub ahora estarán protegidos.\n\nLos ajustes anteriores se pueden hacer menos restrictivos y personalizar mediante la adición de más usuarios, como se explica en el capítulo sobre «Seguridad» del manual de GRUB.\n\n"
+    },
+    {
+      "title": "Protección con contraseña sólo para las opciones de edición y consola de GRUB",
+      "level": 3,
+      "content": "Añadiendo --unrestricted a la entrada de menú permitirá a cualquier usuario arrancar el sistema operativo , al tiempo que se evita que el usuario edite la entrada y el acceso a la consola de comandos grub. Sólo un superusuario o usuarios especificos con el modificador --user podrán editar la entrada del menú.\n\n```\n/boot/grub/grub.cfg\n```\n\n```\nmenuentry 'Arch Linux' --unrestricted --class arch --class gnu-linux --class os ...\n```\n\n"
+    },
+    {
+      "title": "Ocultar GRUB y hacerlo aparecer mediante la tecla Mayús",
+      "level": 2,
+      "content": "Para reducir al mínimo el tiempo de arranque es posible ocultar el menú de GRUB durante el tiempo de espera, lo que permite a GRUB ocultar el menú, haciéndolo aparecer unicamente cuando se presione la tecla Mayús durante la fase de inicio de GRUB.\n\nPara obtener este comportamiento, añada lo que sigue al archivo /etc/default/grub:\n\n```\nGRUB_FORCE_HIDDEN_MENU=\"true\"\n```\n\nA continuación cree el archivo [1], haga ejecutable el archivo y después regenere el archivo de configuración de grub:\n\n```\n# chmod a+x /etc/grub.d/31_hold_shift\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\n"
+    },
+    {
+      "title": "Combinar la utilización de UUID con scripts",
+      "level": 2,
+      "content": "Si desea utilizar la asignación de UUID para superar los mapeados poco fiables de los dispositivos realizadas por la BIOS, o si está teniendo dificultades con la sintaxis de GRUB, aquí hay un ejemplo que utiliza las UUID y un pequeño script para GRUB, para que apunte a las particiones correspondientes. Todo lo que uno debe hacer, es sustituir el ejemplo con las UUID correctas para su sistema (el ejemplo se aplica a sistemas con una partición de arranque separada y debe modificarse en consecuencia en caso de particiones adicionales).\n\n```\nmenuentry \"Arch Linux 64\" {\n         # Set the UUIDs for your boot and root partition respectively\n         set the_boot_uuid=ece0448f-bb08-486d-9864-ac3271bd8d07\n         set the_root_uuid=c55da16f-e2af-4603-9e0b-03f5f565ec4a\n   \n         # (Note: This may be the same as your boot partition)\n   \n         # Get the boot/root devices and set them in the root and grub_boot variables\n         search --fs-uuid $the_root_uuid --set=root\n         search --fs-uuid $the_boot_uuid --set=grub_boot\n   \n         # Check to see if boot and root are equal.\n         # If they are, then append /boot to $grub_boot (Since $grub_boot is actually the root partition)\n         if [ $the_boot_uuid == $the_root_uuid ] ; then\n             set grub_boot=($grub_boot)/boot\n         else\n             set grub_boot=($grub_boot)\n         fi\n   \n         # $grub_boot now points to the correct location, so the following will properly find the kernel and initrd\n         linux $grub_boot/vmlinuz-linux root=/dev/disk/by-uuid/$the_root_uuid ro\n         initrd $grub_boot/initramfs-linux.img\n }\n```\n\n"
+    },
+    {
+      "title": "Creación manual de grub.cfg",
+      "level": 2,
+      "content": "Un archivo grub.cfg básico contendrá las siguientes opciones:\n\n- (hdX,Y) indica la partición Y en el disco X. La numeración de partición comienza en 1, mientras que la del disco comienza en 0\n- set default=N le permite elegir qué entrada se inicia por defecto\n- set timeout=M indica el límite de tiempo en segundos antes que la elección predefinida se inicie\n- menuentry \"title\" {opciones de entrada} es una entrada de arranque con nombres title\n- set root=(hdX,Y) establece la partición de arranque, es decir, la que contiene el kernel y los módulos de GRUB (no es necesario una partición /boot separada, puede estar contenida como un deirecorio dentro de la partición root /).\n\n"
+    },
+    {
+      "title": "Desactivar submenú",
+      "level": 3,
+      "content": "Si tiene varios kernels instalados, por ejemplo linux y linux-lts, por defecto grub-mkconfig los agrupa en un submenú. Si no le gusta este comportamiento se puede volver a un solo menú, añadiendo la siguiente línea a /etc/default/grub:\n\n```\nGRUB_DISABLE_SUBMENU=y\n```\n\n"
+    },
+    {
+      "title": "Recordar el último sistema arrancado",
+      "level": 3,
+      "content": "GRUB puede recordar el último sistema arrancado y utilizarlo por defecto la próxima vez que ejecute el arranque. Esta característica es útil si tiene varios kernels (por ejemplo, el kernel actual de Arch y el LTS como fallback) o más sistemas operativos. Modifique /etc/default/grub y cambie el valor de GRUB_DEFAULT:\n\n```\nGRUB_DEFAULT=saved\n```\n\nEsto permitirá que GRUB arranque el sistema operativo guardado. Para activar la recuperación de la entrada seleccionada, añada la siguiente línea a /etc/default/grub:\n\n```\nGRUB_SAVEDEFAULT=true\n```\n\n"
+    },
+    {
+      "title": "Cambiar la entrada por defecto del menú",
+      "level": 3,
+      "content": "Para cambiar la entrada seleccionada por defecto, edite /etc/default/grub y cambie el valor de GRUB_DEFAULT:\n\nUtilizar números :\n\n```\nGRUB_DEFAULT=\"1>2\"\n```\n\nGrub identifica las entradas generadas en el menú contando desde cero. Eso significa que 0 se refiere a la primera entrada, la cual es el valor predeterminado, 1 para la segunda y así sucesivamente.Las entradas del menú principal y de los submenús están separadas por >.\n\nEl ejemplo anterior arranca la tercera entrada desde el menú principal 'Opciones avanzadas para Arch Linux'.\n\nO usar títulos de menú :\n\n```\nGRUB_DEFAULT='Arch Linux, with Linux core repo kernel'\n```\n\n"
+    },
+    {
+      "title": "Efectuar el arranque de una entrada no predeterminada por una sola vez",
+      "level": 3,
+      "content": "La orden grub-reboot es muy útil para arrancar otra entrada distinta de la predeterminada solo por una vez. GRUB carga la entrada especificada como primer argumento de la orden, de modo que la próxima vez, cuando el sistema reinicie, arrancará el sistema operativo indicado. Lo más importante es que GRUB vuelve a cargar la entrada por defecto para todos los sucesivos arranques. Por tanto, no es necesario cambiar el archivo de configuración o seleccionar una entrada en el menú de GRUB.\n\n"
+    },
+    {
+      "title": "Tocar una melodía",
+      "level": 2,
+      "content": "Puede reproducir una melodía a través del altavoz del PC mientras arranca modificando la variable GRUB_INIT_TUNE. Por ejemplo, para tocar el extracto de Berlioz de Sabbath Night of Symphonie Fantastique se puede añadir lo siguiente: (parte bassoon):\n\nGRUB_INIT_TUNE=\"312 262 3 247 3 262 3 220 3 247 3 196 3 220 3 220 3 262 3 262 3 294 3 262 3 247 3 220 3 196 3 247 3 262 3 247 5 220 1 220 5\"\n\nPara obtener información al respecto, puede consultar info grub -n play.\n\n"
+    },
+    {
+      "title": "Configuración manual de la imagen del núcleo para un arranque rápido",
+      "level": 2,
+      "content": "Si necesita un mapa de teclado especial u otros pasos complejos que GRUB no puede configurar automáticamente para hacer que /boot esté disponible para el entorno GRUB, puede generar una imagen del núcleo usted mismo. En los sistemas UEFI, la imagen del núcleo es el archivo grubx64.efi que carga el firmware de arranque. La creación de su propia imagen del núcleo le permitirá integrar cualquier módulo necesario para un inicio muy rápido, así como una secuencia de comandos de configuración para arrancar GRUB.\n\nEn primer lugar, tomando como ejemplo un requisito para el mapa de teclado dvorak integrado en el booteo-rápido en orden para ingresar una contraseña para encriptar /boot en un sistema UEFI:\n\nDetermine a partir del archivo generado /boot/grub/grub.cfg qué módulos son necesarios para montar el /boot encriptado. Por ejemplo, debajo de su entrada menuentry debería ver líneas similares a:\n\n```\ninsmod diskfilter cryptodisk luks gcry_rijndael gcry_rijndael gcry_sha256\ninsmod ext2\ncryptomount -u 1234abcdef1234abcdef1234abcdef\nset root='cryptouuid/1234abcdef1234abcdef1234abcdef'\n```\n\nTome nota de todos esos módulos: deberán incluirse en la imagen del núcleo. Ahora, cree un tarball que contenga su mapa de teclado. Esto se incluirá en la imagen del núcleo como un memdisk:\n\n```\n# ckbcomp dvorak | grub-mklayout > dvorak.gkb\n# tar cf memdisk.tar dvorak.gkb\n```\n\nAhora cree un archivo de configuración para utilizarlo en la imagen del núcleo de GRUB. Este está en el mismo formato que su configuración normal de grub, pero sólo necesita contener unas pocas líneas para encontrar y cargar el archivo de configuración principal en la partición /boot:\n\n```\nearly-grub.cfg\n```\n\n```\nroot=(memdisk)\nprefix=($root)/\n\nterminal_input at_keyboard\nkeymap /dvorak.gkb\n\ncryptomount -u 1234abcdef1234abcdef1234abcdef\nset root='cryptouuid/1234abcdef1234abcdef1234abcdef'\nset prefix=($root)/grub\n\nconfigfile grub.cfg\n```\n\nFinalmente, genere la imagen principal, enumerando todos los módulos que se determinan necesarios en el grub.cfg, junto con cualquier módulo utilizado en el script early-grub.cfg. El ejemplo anterior necesita memdisk, tar, at_keyboard, keylayouts y configfile.\n\n```\n# grub-mkimage -c early-grub.cfg -o grubx64.efi -O x86_64-efi -m memdisk.tar diskfilter cryptodisk luks gcry_rijndael gcry_sha256 ext2 memdisk tar at_keyboard keylayouts configfile\n```\n\nLa imagen del núcleo de EFI generada ahora se puede usar de la misma manera que la imagen que se genera automáticamente mediante grub-install: colóquela en su partición EFI y habilítela con efibootmgr, o configúrela según corresponda para el firmware de su sistema.\n\n"
+    },
+    {
+      "title": "Lecturas adicionales de UEFI",
+      "level": 2,
+      "content": "A continuación encontrará otra información relevante sobre la instalación de Arch a través de UEFI.\n\n"
+    },
+    {
+      "title": "Método de instalación alternativo",
+      "level": 3,
+      "content": "Normalmente, GRUB guarda todos los archivos, incluidos los de configuración, en /boot, independientemente de dónde esté montada la partición de sistema EFI.\n\nSi desea mantener estos archivos dentro de la propia partición del sistema EFI, añada --boot-directory=esp al comando grub-install:\n\n```\n# grub-install --target=x86_64-efi --efi-directory=esp --bootloader-id=grub --boot-directory=esp --debug\n```\n\nEsto pone todos los archivos GRUB en esp/grub, en lugar de en /boot/grub. Cuando utilice este método, asegúrese de que grub-mkconfig ha puesto el archivo de configuración en el mismo lugar:\n\n```\n# grub-mkconfig -o esp/grub/grub.cfg\n```\n\nPor lo demás, la configuración es la misma.\n\n"
+    },
+    {
+      "title": "Solución al firmware de UEFI",
+      "level": 3,
+      "content": "Algunos firmware UEFI requieren que el código de arranque .efi tenga un nombre específico y se coloque en una ubicación específica: esp/EFI/boot/bootx64.efi (donde esp es el punto de montaje de la partición UEFI). De lo contrario, en estos casos, la instalación no se podrá iniciar. Afortunadamente, esto no causará ningún problema con otro firmware que no lo requiera..\n\nPara ello, primero cree el directorio necesario y, a continuación, copie la parte de grub .efi, renombrándolo en el proceso:\n\n```\n# mkdir esp/EFI/boot\n# cp esp/EFI/grub_uefi/grubx64.efi esp/EFI/boot/bootx64.efi\n```\n\n"
+    },
+    {
+      "title": "Crear una entrada GRUB en el gestor de arranque del firmware",
+      "level": 3,
+      "content": "grub-install intenta crear automáticamente una entrada de menú en el gestor de arranque. Si no lo hace, vea efibootmgr para instrucciones de uso y efibootmgr para crear una entrada de menú. Sin embargo, es probable que el problema sea que no haya arrancado su CD/USB en modo UEFI, vea también como Crear un USB arrancable con UEFI desde la ISO.\n\n"
+    },
+    {
+      "title": "GRUB independiente",
+      "level": 3,
+      "content": "Esta sección asume que está creando un GRUB independiente para sistemas x86_64 (x86_64-efi). Para los sistemas EFI de 32 bits (IA32), reemplace x86_64-efi con i386-efi cuando corresponda.\n\nEs posible crear una aplicación grubx64_standalone.efi que tenga todos los módulos integrados en un archivo tar dentro de la aplicación UEFI, eliminando así la necesidad de tener un directorio separado con todos los módulos de GRUB UEFI y otros archivos relacionados. Esto se hace usando el comando grub-mkstandalone (incluido en grub) de la siguiente manera:\n\n```\n# echo 'configfile ${cmdpath}/grub.cfg' > /tmp/grub.cfg\n# grub-mkstandalone -d /usr/lib/grub/x86_64-efi/ -O x86_64-efi --modules=\"part_gpt part_msdos\" --locales=\"en@quot\" --themes=\"\" -o \"esp/EFI/grub/grubx64_standalone.efi\" \"boot/grub/grub.cfg=/tmp/grub.cfg\" -v\n```\n\nA continuación, copie el fichero de configuración de GRUB en esp/EFI/grub/grub.cfg y cree una entrada UEFI Boot Manager para esp/EFI/grub/grubx64_standalone.efi usando efibootmgr.\n\n"
+    },
+    {
+      "title": "Información técnica",
+      "level": 3,
+      "content": "El archivo GRUB EFI siempre espera que su archivo de configuración esté en ${prefix}/grub.cfg. Sin embargo, en el archivo independiente de GRUB EFI, el ${prefix} se encuentra dentro de un archivo tar e integrado dentro del propio archivo EFI de GRUB (dentro del entorno GRUB, se indica con \"(memdisk)\", sin comillas). Este archivo tar contiene todos los archivos que se almacenarían normalmente en /boot/grub en caso de una instalación normal de GRUB EFI.\n\nA causa del empaquetamiento de los contenidos de /boot/grub dentro de la imagen independiente, no depende del /boot/grub (externo) para nada. Por lo tanto, en el caso del archivo GRUB EFI independiente ${prefix}==(memdisk)/boot/grub y las lecturas del archivo GRUB EFI esperan que el archivo de configuración esté en ${prefix}/grub.cfg==(memdisk)/boot/grub/grub.cfg.\n\nPor lo tanto, para asegurarnos de que el archivo EFI de GRUB independiente , lee el grub.cfg externo ubicado en el mismo directorio que el archivo EFI (dentro del entorno GRUB, está indicado por ${cmdpath} ), creamos un simple /tmp/grub.cfg que encarga a GRUB a usar ${cmdpath}/grub.cfg como su configuración (configfile ${cmdpath}/grub.cfg ordenado en (memdisk)/boot/grub/grub.cfg). A continuación, le pedimos a grub-mkstandalone que copie este archivo /tmp/grub.cfg en ${prefix}/grub.cfg (que en realidad es (memdisk)/boot/grub/grub.cfg) utilizando la opción \"boot/grub/grub.cfg=/tmp/grub.cfg\".\n\nDe esta forma, el archivo independiente de GRUB EFI y el archivo actual grub.cfg pueden almacenarse en cualquier directorio dentro de la partición del sistema EFI (siempre que estén en el mismo directorio), haciéndolos portátiles.\n\n"
+    }
+  ]
+}

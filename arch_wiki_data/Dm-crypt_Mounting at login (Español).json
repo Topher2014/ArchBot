@@ -1,0 +1,26 @@
+{
+  "title": "Dm-crypt/Mounting at login (Español)",
+  "url": "https://wiki.archlinux.org/title/Dm-crypt/Mounting_at_login_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-11-22** \n\nArtículos relacionados\n\n- pam_mount\n\nEs posible configurar PAM y systemd (Español) para montar automáticamente una partición «home» cifrada con dm-crypt cuando su propietario inicie sesión y desmontarla cuando la cierre.\n\nEste tutorial supone que ya ha creado su partición cifrada, como se describe en Dm-crypt/Encrypting a non-root file system (Español).\n\n- Debe usar la misma contraseña para su cuenta de usuario y para LUKS.\n- En todos los ejemplos, reemplace SUNOMBRE con su nombre de usuario, 1000 con su ID de usuario y PARTICIÓN con el nombre del dispositivo de la partición cifrada.\n\n"
+    },
+    {
+      "title": "Montar al iniciar sesión",
+      "level": 2,
+      "content": "pam_exec se puede usar para desbloquear el dispositivo al iniciar sesión. Edite /etc/pam.d/system-login y añada la línea siguiente resaltada en negrita después de auth include system-auth:\n\n```\n/etc/pam.d/system-login\n```\n\n```\n...\n\nauth       include    system-auth\nauth       optional   pam_exec.so expose_authtok quiet /usr/bin/cryptsetup open /dev/PARTICIÓN home-SUNOMBRE\n\n...\n```\n\nAhora edite /etc/fstab para montar el dispositivo desbloqueado utilizando systemd.automount:\n\n```\n/etc/fstab\n```\n\n```\n...\n\n/dev/mapper/home-SUNOMBRE  /home/SUNOMBRE     ext4            rw,noatime,noauto,x-systemd.automount 0 2\n\n...\n```\n\nSu directorio «home» se montará automáticamente en el primer acceso realizado por su entorno de escritorio o intérprete de órdenes.\n\n"
+    },
+    {
+      "title": "Desmontar al cerrar sesión",
+      "level": 2,
+      "content": "Después de cerrar todas sus sesiones, systemd-logind cierra automáticamente user@1000.service. Por lo tanto, puede especificar qué punto de montaje se requerirá y systemd lo desmontará automáticamente:\n\n```\n/etc/systemd/system/home-SUNOMBRE.mount.d/logout.conf\n```\n\n```\n[Unit]\nRequires=user@1000.service\n```\n\nSin embargo, esto creará un bucle de dependencia circular que no puede resolverse automáticamente por systemd , por lo que debe describir las dependencias y ordenarlas de forma explícita:\n\n```\n/etc/systemd/system/user@1000.service.d/homedir.conf\n```\n\n```\n[Unit]\nRequires=home-SUNOMBRE.mount\nAfter=home-SUNOMBRE.mount\n```\n\n"
+    },
+    {
+      "title": "Bloquear",
+      "level": 3,
+      "content": "Después de desmontar, el dispositivo seguirá desbloqueado, y será posible montarlo sin volver a ingresar la contraseña. Puede configurar y activar un servicio que se inicie cuando el dispositivo se desbloquea (BindsTo=dev-mapper-home\\x2dSUNOMBRE.device) y expire después de que el dispositivo se desmonta (Requires,Before=home-SUNOMBRE.mount), bloqueando el dispositivo en el proceso (ExecStop=cryptsetup close):\n\n```\n/etc/systemd/system/cryptsetup-SUNOMBRE.service\n```\n\n```\n[Unit]\nDefaultDependencies=no\nBindsTo=dev-PARTICIÓN.device\nAfter=dev-PARTICIÓN.device\nBindsTo=dev-mapper-home\\x2dSUNOMBRE.device\nRequires=home-SUNOMBRE.mount\nBefore=home-SUNOMBRE.mount\nConflicts=umount.target\nBefore=umount.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nTimeoutSec=0\nExecStop=/usr/bin/cryptsetup close home-SUNOMBRE\n\n[Install]\nRequiredBy=dev-mapper-home\\x2dSUNOMBRE.device\n```\n\n"
+    }
+  ]
+}

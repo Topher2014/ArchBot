@@ -1,0 +1,61 @@
+{
+  "title": "File chooser",
+  "url": "https://wiki.archlinux.org/title/File_chooser",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Flatpak\n- PipeWire#WebRTC screen sharing\n\nFrom the Flatpak documentation:\n\nPortals were designed for use with applications sandboxed through Flatpak, but any application can use portals to provide uniform access to features independent of desktops and toolkits. This is commonly used, for example, to allow screen sharing on Wayland via PipeWire, or to use file open and save dialogs on Firefox that use the same toolkit as your current desktop environment.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install xdg-desktop-portal and one or more backends. The package includes a systemd/User service that will be automatically started via D-Bus.\n\n"
+    },
+    {
+      "title": "Backends",
+      "level": 2,
+      "content": "When an application sends a request to the portal, it is handled by xdg-desktop-portal, which then forwards it to a backend implementation. This allows implementations to provide suitable user interfaces that fit into the user's desktop environments, and access environment-specific APIs for requests like opening a URI or recording the screen. Multiple backends can be installed and used at the same time. For example, a Sway setup may use xdg-desktop-portal-wlr for screen sharing support and xdg-desktop-portal-gtk as a fallback for all other interfaces that xdg-desktop-portal-wlr does not implement.\n\nPortal backend definitions are located in /usr/share/xdg-desktop-portal/portals/*.portal. Each portal backend file contains a list of interfaces that it can handle, and the desktop environments which it supports.\n\n"
+    },
+    {
+      "title": "List of backends and interfaces",
+      "level": 3,
+      "content": "The following table lists all backends available and their support for certain common interfaces.\n\nTable content:\nBackend | Supported environment | Toolkit | Access portal | Account portal | App chooser portal | Background portal | Clipboard portal | Dynamic launcher portal | Email portal | File chooser portal | Global shortcuts portal | Inhibit portal | Input capture portal | Notification portal | Print portal | Remote desktop portal | Screen cast portal | Screenshot portal | Secret portal | Settings portal | Wallpaper portal\nxdg-desktop-portal-cosmic | COSMIC | iced | Yes | No | No | No | No | No | No | Yes | No | No | No | No | No | No | Yes | Yes | No | Yes | No\nxdg-desktop-portal-dde | Deepin | Qt 5 | Yes | Yes | Yes | Yes | No | No | No | Yes | Yes | Yes | No | Yes | No | No | No | Yes | Yes | Yes | Yes\nxdg-desktop-portal-gnome | GNOME | GTK 4 | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes\nxdg-desktop-portal-gtk | generic | GTK 3 | Yes | Yes | Yes | No | No | Yes | Yes | Yes | No | Yes | No | Yes | Yes | No | No | No | No | Yes | No\nxdg-desktop-portal-hyprland | Hyprland1 | Qt 6 | No | No | No | No | No | No | No | No | Yes | No | Yes | No | No | No | Yes | Yes | No | No | No\nxdg-desktop-portal-kde | KDE Plasma | Qt 6 | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No\nxdg-desktop-portal-liri-gitAUR | Liri | Qt 5 | Yes | Yes | Yes | Yes | No | No | Yes | Yes | No | Yes | No | Yes | Yes | No | Yes | Yes | No | Yes | Yes\nxdg-desktop-portal-lxqt | LXQt | Qt 6 | No | No | No | No | No | No | No | Yes | No | No | No | No | No | No | No | No | No | No | No\nxdg-desktop-portal-tdAUR | theDesk | Qt 6 | Yes | Yes | No | No | No | No | No | Yes | No | No | No | Yes | No | No | No | Yes | No | Yes | No\nxdg-desktop-portal-wlr | wlroots | – | No | No | No | No | No | No | No | No | No | No | No | No | No | No | Yes | Yes | No | No | No\nxdg-desktop-portal-xapp | Cinnamon2 | – | No | No | No | Yes | No | No | No | No | No | Yes | No | No | No | No | No | Yes | No | Yes | Yes\n\n1. Works with all wlroots-based compositors, but provides extra functionality when used with Hyprland such as sharing individual windows.\n1. Provides partial support also for MATE and Xfce.\n\nThe following packages provide a specific backend only, and not specific to a desktop environment:\n\n- darkman implements the Settings portal backend (only for color scheme setting).\n- gnome-keyring implements the Secret portal backend.\n- kwallet implements the Secret portal backend.\n- xdg-desktop-portal-shanaAUR implements the File chooser portal backend. It redirects requests to GNOME/GTK/KDE/LXQt backends.\n- xdg-desktop-portal-termfilechooser-gitAUR implements the File chooser portal backend. It allows using a terminal file manager as a file chooser.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "When a request is made, xdg-desktop-portal will use the /usr/share/xdg-desktop-portal/DE-portals.conf file, where DE is based on the XDG_CURRENT_DESKTOP environment variable. These files are provided by the desktop environments themselves and determine which backends should be used when a specific environment is running.\n\nIf you want to override the desktop environment defaults, or your desktop environment does not provide a default configuration, you may create a portal configuration file at $XDG_CONFIG_HOME/xdg-desktop-portal/portals.conf to determine which backends you want to use, either generally or for each individual interface. If you use multiple desktop environments, you may also create multiple $XDG_CONFIG_HOME/xdg-desktop-portal/DE-portals.conf files for each environment.\n\nFor example, if your desktop environment does not have a portal backend, and you want to use xdg-desktop-portal-gtk as a generic fallback but also use the LXQt file picker through xdg-desktop-portal-lxqt, you can use the following configuration:\n\n```\n~/.config/xdg-desktop-portal/portals.conf\n```\n\n```\n[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.FileChooser=lxqt\n```\n\nSee portals.conf(5) for more information.\n\n"
+    },
+    {
+      "title": "Force desktop environment",
+      "level": 3,
+      "content": "In some cases, such as when you have a standalone window manager, you might want to make xdg-desktop-portal to think you are using a specific desktop environment. This can be achieved by setting the XDG_CURRENT_DESKTOP environment variable for the xdg-desktop-portal.service user unit using a drop-in snippet. For example, to use the backend associated with KDE:\n\n```\n~/.config/systemd/user/xdg-desktop-portal.service.d/override.conf\n```\n\n```\n[Service]\nEnvironment=\"XDG_CURRENT_DESKTOP=KDE\"\n```\n\n"
+    },
+    {
+      "title": "Portal does not start",
+      "level": 3,
+      "content": "For xdg-desktop-portal-wlr and xdg-desktop-portal-hyprland to work, the XDG_CURRENT_DESKTOP and WAYLAND_DISPLAY environment variables have to be set in the systemd user session.\n\nXDG_CURRENT_DESKTOP has to be set to the name of your compositor, e.g. XDG_CURRENT_DESKTOP=sway. WAYLAND_DISPLAY is set automatically by the compositor.\n\nCheck whether these variables are set with systemctl --user show-environment. If they are not set, import these environment variables into the systemd user session and dbus by running the following commands before launching the compositor (e.g., include them in the compositor's configuration file).\n\n```\n$ systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP\n$ dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=compositor_name\n```\n\n- Sway provides a drop-in file which does this automatically, see Sway#Configuration.\n- Hyprland may not automatically set these environment variables. You can specify them manually, see Hyprland Wiki.\n\nSee [1] and [2] for more details.\n\n"
+    },
+    {
+      "title": "Using multiple monitors with xdg-desktop-portal-wlr",
+      "level": 3,
+      "content": "xdg-desktop-portal-wlr requires an external chooser to select the shared monitor. By default, it looks for slurp, wofi and bemenu in this order. When using slurp, after a request for screen sharing you will be presented with a crosshair cursor and you will need to click the screen you want to share. When using wofi or bemenu, you will be presented with a menu of available displays to share. If no choosers are available, xdg-desktop-portal-wlr will fallback to the first monitor found. For more information, see xdg-desktop-portal-wlr(5) § SCREENCAST OPTIONS.\n\n"
+    },
+    {
+      "title": "Poor font rendering in GTK applications on KDE Plasma",
+      "level": 3,
+      "content": "Some GTK apps require xdg-desktop-portal-gtk on Plasma in order to render font correctly. Install it and then run:\n\n```\n$ /usr/lib/xdg-desktop-portal --replace\n```\n\n"
+    },
+    {
+      "title": "GTK (possibly others) file chooser not working",
+      "level": 3,
+      "content": "If the application runs on X via xwayland (easiest way to check is to run xeyes and see whether they follow the mouse over the application in question), then xdg-desktop-portal-gtk will show up on demand, but after you select the file nothing will happen. In that case adding DISPLAY=:0 to the xdg-desktop-portal-gtk environment might help. To do this you can either follow the instructions above about import-environment or just edit the systemd user unit file of xdg-desktop-portal-gtk. Alternatively you can force the application under wayland (i.e if it's using electron).\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Project homepage\n- Portal Documentation: Lists all APIs applications and backends can implement.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "title": "Load the module at boot (Español)",
+  "url": "https://wiki.archlinux.org/title/Load_the_module_at_boot_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-10-09** \n\nArtículos relacionados\n\n- Problemas de arranque\n- Kernel\n- Parámetros del kernel\n- Compilar un módulo del kernel\n\nLos módulos del kernel son fragmentos de código que se pueden cargar y descargar en el kernel según se requiera. Extienden la funcionalidad del kernel sin necesidad de reiniciar el sistema.\n\nPara crear un módulo del kernel, puede leer La guía de programación del módulo del kernel de Linux. Un módulo se puede configurar como integrado o cargable. Para cargar o eliminar dinámicamente un módulo, debe configurarse como un módulo cargable en la configuración del kernel (por lo tanto, la línea relacionada con el módulo mostrará la letra M).\n\n"
+    },
+    {
+      "title": "Obtener información",
+      "level": 2,
+      "content": "Los módulos se almacenan en /usr/lib/modules/versión_kernel. Puede utilizar la orden uname -r para obtener la versión actual de su kernel.\n\nPara mostrar qué módulos del kernel están cargados actualmente:\n\n```\n$ lsmod\n```\n\nPara mostrar información sobre un módulo:\n\n```\n$ modinfo nombre_módulo\n```\n\nPara enumerar las opciones que se establecen para un módulo cargado:\n\n```\n$ systool -v -m nombre_módulo\n```\n\nPara visualizar la configuración completa de todos los módulos:\n\n```\n$ modprobe -c | less\n```\n\nPara mostrar la configuración de un módulo en particular:\n\n```\n$ modprobe -c | grep nombre_módulo\n```\n\nPara listar las dependencias de un módulo (o alias), incluido el propio módulo:\n\n```\n$ modprobe --show-depends nombre_módulo\n```\n\n"
+    },
+    {
+      "title": "Carga automática de módulos",
+      "level": 2,
+      "content": "Hoy en día, udev maneja automáticamente la carga de todos los módulos necesarios, por lo que si no necesita utilizar ningún módulo fuera del árbol del kernel, no es necesario colocar módulos que deben cargarse en el arranque en ningún archivo de configuración. Sin embargo, hay casos en los que es posible que desee cargar un módulo adicional durante el proceso de arranque, o incluir en la lista negra otro para que su computadora funcione correctamente.\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 3,
+      "content": "Los módulos del kernel se pueden enumerar explícitamente en archivos bajo /etc/modules-load.d/ para que systemd los cargue durante el arranque. Cada archivo de configuración se nombra del tipo /etc/modules-load.d/programa.conf. Los archivos de configuración simplemente contienen una lista de nombres de módulos del kernel para cargar, uno en cada línea. Las líneas vacías y las líneas cuyo primer carácter que no sea un espacio en blanco sea # o ; se ignoran.\n\n```\n/etc/modules-load.d/virtio-net.conf\n```\n\n```\n# Cargue virtio_net.ko en el arranque\nvirtio_net\n```\n\nVéase modules-load.d(5) para más detalles.\n\n"
+    },
+    {
+      "title": "Carga anticipada del módulo",
+      "level": 3,
+      "content": "Es posible que la imagen initramfs no contenga los módulos del kernel solicitados en /etc/modules-load.d/, también puede que carezca de los archivos que se han configurado en esa carpeta. La carga anticipada del módulo depende del generador initramfs utilizado:\n\n- mkinitcpio: véase Mkinitcpio#MODULES\n- dracut: véase Dracut#Early kernel module loading\n- booster: véase Booster#Early module loading\n\n"
+    },
+    {
+      "title": "Manejo manual de módulos",
+      "level": 2,
+      "content": "Los módulos del kernel son manejados por herramientas proporcionadas por el paquete kmod. Puede utilizar estas herramientas manualmente.\n\nPara cargar un módulo:\n\n```\n# modprobe nombre_módulo\n```\n\nPara cargar un módulo por nombre de archivo (es decir, uno que no está instalado en /usr/lib/modules/$(uname -r)/):\n\n```\n# insmod nombre_archivo [argumentos]\n```\n\nPara descargar un módulo:\n\n```\n# modprobe -r nombre_módulo\n```\n\nO alternativamente:\n\n```\n# rmmod nombre_módulo\n```\n\n"
+    },
+    {
+      "title": "Configurar las opciones del módulo",
+      "level": 2,
+      "content": "Para pasar un parámetro a un módulo del kernel, puede pasarlo manualmente con modprobe o asegurarse de que ciertos parámetros siempre se apliquen utilizando un archivo de configuración de modprobe o usando la línea de órdenes del kernel.\n\n"
+    },
+    {
+      "title": "Manualmente en tiempo de carga utilizando modprobe",
+      "level": 3,
+      "content": "La forma básica de pasar parámetros a un módulo es utilizando la orden modprobe. Los parámetros se especifican en la línea de órdenes utilizando asignaciones simples de clave=valor:\n\n```\n# modprobe nombre_módulo nombre_parámetro=valor_parámetro\n```\n\n"
+    },
+    {
+      "title": "Utilizando archivos en /etc/modprobe.d/",
+      "level": 3,
+      "content": "Los archivos en el directorio /etc/modprobe.d/ se pueden utilizar para pasar la configuración del módulo a udev, que usará modprobe para administrar la carga de los módulos durante el arranque del sistema. Los archivos de configuración en este directorio pueden tener cualquier nombre, dado que terminan con la extensión .conf. La sintaxis es:\n\n```\n/etc/modprobe.d/myfilename.conf\n```\n\n```\noptions nombre_módulo nombre_parámetro=valor_parámetro\n```\n\nPor ejemplo:\n\n```\n/etc/modprobe.d/thinkfan.conf\n```\n\n```\n# En ThinkPads, esto permite que el demonio 'thinkfan' controle la velocidad del ventilador\noptions thinkpad_acpi fan_control=1\n```\n\n"
+    },
+    {
+      "title": "Utilizando la línea de órdenes del kernel",
+      "level": 3,
+      "content": "Si el módulo está integrado en el kernel, también puede pasar opciones al módulo mediante la línea de órdenes del kernel. Para todos los cargadores de arranque comunes, la siguiente sintaxis es correcta:\n\n```\nnombre_módulo.nombre_parámetro=valor_parámetro\n```\n\nPor ejemplo:\n\n```\nthinkpad_acpi.fan_control=1\n```\n\nSimplemente añada esto a la línea del kernel de su cargador de arranque, como se describe en Parámetros del kernel.\n\n"
+    },
+    {
+      "title": "Aliasing",
+      "level": 2,
+      "content": "Los alias son nombres alternativos para un módulo. Por ejemplo: alias mimod nombre_módulo_realmente_largo significa que puede utilizar modprobe mimod en lugar de modprobe nombre_módulo_realmente_largo. También puede utilizar comodines al estilo del intérprete de órdenes, por lo que alias mimod* nombre_módulo_realmente_largo significa que modprobe mimod-algo tiene el mismo efecto. Para crear un alias:\n\n```\n/etc/modprobe.d/myalias.conf\n```\n\n```\nalias mimod nombre_módulo_realmente_largo\n```\n\nAlgunos módulos tienen alias que se utilizan para cargarlos automáticamente cuando una aplicación los necesita. Desactivar estos alias puede evitar la carga automática, pero aún permitirá que los módulos se carguen manualmente.\n\n```\n/etc/modprobe.d/modprobe.conf\n```\n\n```\n# Prevent Bluetooth autoload\nalias net-pf-31 off\n```\n\n"
+    },
+    {
+      "title": "Lista negra",
+      "level": 2,
+      "content": "La lista negra, en el contexto de los módulos del kernel, es un mecanismo para evitar que se cargue el módulo del kernel. Esto podría ser útil si, por ejemplo, no se necesita el hardware asociado, o si cargar ese módulo causa problemas: por ejemplo, puede haber dos módulos del kernel que intentan controlar la misma pieza de hardware, y cargarlos juntos daría como resultado un conflicto.\n\nAlgunos módulos se cargan como parte de initramfs. mkinitcpio -M imprimirá todos los módulos detectados automáticamente: para evitar que initramfs cargue algunos de esos módulos, inclúyalos en la lista negra en un archivo .conf en /etc/modprobe.d y será añadido por el hook de modconf durante la generación de la imagen. Ejecutar mkinitcpio -v mostrará una lista de todos los módulos extraídos por varios hooks (por ejemplo, hook de filesystems, hook de block, etc.). Recuerde añadir ese archivo .conf a la matriz (array) FILES en /etc/mkinitcpio.conf si no tiene el hook de modconf en su HOOKS (por ejemplo, se ha desviado de la configuración predeterminada), y una vez que haya incluido en la lista negra los módulos regenere el initramfs, y reinicie después.\n\n"
+    },
+    {
+      "title": "Utilizar archivos en /etc/modprobe.d/",
+      "level": 3,
+      "content": "Cree un archivo .conf dentro de /etc/modprobe.d/ y añada una línea para cada módulo que desee incluir en la lista negra, utilizando la palabra clave blacklist. Si, por ejemplo, desea evitar que se cargue el módulo pcspkr para evitar sonidos a través del altavoz de la computadora:\n\n```\n/etc/modprobe.d/nobeep.conf\n```\n\n```\n# No cargar el módulo 'pcspkr' en el arranque.\nblacklist pcspkr\n```\n\nNote: Sin embargo, existe una solución para este comportamiento; la orden install indica a modprobe que ejecute una orden personalizada en lugar de insertar el módulo en el kernel como de costumbre, por lo que puede forzar que el módulo siempre falle al cargar con:\n\nSin embargo, existe una solución para este comportamiento; la orden install indica a modprobe que ejecute una orden personalizada en lugar de insertar el módulo en el kernel como de costumbre, por lo que puede forzar que el módulo siempre falle al cargar con:\n\n```\n/etc/modprobe.d/blacklist.conf\n```\n\n```\n...\ninstall nombre_módulo /bin/true\n...\n```\n\n"
+    },
+    {
+      "title": "Utilizar la línea de órdenes del kernel",
+      "level": 3,
+      "content": "También puede incluir módulos en la lista negra desde el gestor de arranque.\n\nSimplemente añada module_blacklist=nombremódulo1,nombremódulo2,nombremódulo3 a la línea del kernel de su gestor de arranque, como se describe en Parámetros del kernel.\n\n"
+    },
+    {
+      "title": "Los módulos no cargan",
+      "level": 3,
+      "content": "En caso de que un módulo específico no se cargue y el registro de arranque (accesible ejecutando journalctl -b como superusuario root) diga que el módulo está en la lista negra, pero el directorio {{ic|/etc/modprobe.d/} } no muestra una entrada correspondiente, compruebe otro directorio fuente de modprobe en /usr/lib/modprobe.d/ para ver las entradas en la lista negra.\n\nUn módulo no se cargará si la cadena \"vermagic\" contenida dentro del módulo del kernel no coincide con el valor del kernel que se está ejecutando actualmente. Si se sabe que el módulo es compatible con el kernel en ejecución actual, la verificación \"vermagic\" se puede ignorar con modprobe --force-vermagic.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Desactivar el pitido del altavoz del PC\n- Escribir un controlador WMI - una introducción a LWM\n\n"
+    }
+  ]
+}

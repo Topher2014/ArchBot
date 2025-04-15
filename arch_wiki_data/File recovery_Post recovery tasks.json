@@ -1,0 +1,56 @@
+{
+  "title": "File recovery/Post recovery tasks",
+  "url": "https://wiki.archlinux.org/title/File_recovery/Post_recovery_tasks",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- File recovery\n- Sort images by resolution\n\n"
+    },
+    {
+      "title": "List only unique files by checksum",
+      "level": 2,
+      "content": "- To list only files where photorec could restore original names you can add if(index(A,\"_\") != 0) before print in awk. You can also use the awk as stand alone command on an already created file to list only file names or extensions you need.\n- To list only extensions you can use D=B;gsub(/[^*\\.]*\\./,\"\",D) in awk that will cut everything until the last . dot that will show only gz even from tar.gz extension or you can use sub instead of gsub that will cut only until the first dot in the filename.\n\nWhen files are restored it might be that many of them have the same hash sum and by making a list of the unique files including only one of the found duplicate files you will speed up gathering extra information about files with other utilities by using stored file names and path in it.\n\n```\nfind -type f -print0 | \\\n xargs -0  md5sum | \\\n awk '// {Count[$1]++;\n if( Count[$1] == 1 ){C=substr($0,index($0,\"./\"));A=$0;sub(/^.*\\//,\"\",A);B=substr(A,index(A,\"_\")+1);HASHsum=$1;\n print A\"|\"B\"|\"C\"|\"HASHsum}}'\n```\n\nThis will print out result on screen with pattern: filename|restored_filename|full_path_to_filename|check_sum\n\n```\nf851733136_WindowMaker_Dockapps.pdf|WindowMaker_Dockapps.pdf|./f851733136_WindowMaker_Dockapps.pdf|272cc4fcdc8027e3b8b53318f08f3f01\n```\n\n"
+    },
+    {
+      "title": "Clean up and sort file names",
+      "level": 3,
+      "content": "To make destination file names more bash friendly you can remove special symbols, spaces and sort by second column for a better overview of duplicate names with different checksums. To the duplicate file names will be added a number with ¤ as a separator in front of the restored_filename. The script will use file created by script from above and print result to stdout.\n\n```\nclean_and_sort.sh\n```\n\n```\nif [ ! -z \"$1\" ];then\n  awk -F\"|\" '{B=$2;\n   gsub(/\\(/,\"\",B);gsub(/\\)/,\"\",B);\n   gsub(/!/,\"\",B); gsub(/?/,\"\",B);\n   gsub(/\\[/,\"\",B);gsub(/\\]/,\"\",B);\n   gsub(/{/,\"\",B); gsub(/}/,\"\",B);\n   gsub(/&/,\"\",B); gsub(/=/,\"\",B);\n   gsub(/\\^/,\"\",B);gsub(/~/,\"\",B);\n   gsub(\" \",\"\",B) ;gsub(/#/,\"\",B);\n   gsub(/\\\"/,\"\",B);gsub(/;/,\"\",B);\n   gsub(/\\\\/,\"\",B);gsub(/\\//,\"\",B);\n   sub(/-*/,\"\",B); sub(/+*/,\"\",B);\n   print $1\" | \"B\" | \"$3}' \"$1\" | \\\n  sort --field-separator=\\| -s -d -k 2  \\\nawk -F'|' '{B=$2;Count[B]++;sub(/ */,\"\",B);if( Count[$2] == 1 ){print $1\"|\"B\"|\"$3}else{print $1\"|\"Count[$2]-1\"¤\"B\"|\"$3\"|\"$4} }'\nelse echo 'Path to file is missing!'\nfi\n```\n\nFile names with special symbols especially if file names begins with them are harder to manage with commands like mv or cp without using quotes or backslash \\ but if you want to keep information about them then they can be replaced with HTML hex codes instead of removing all of them.\n\n"
+    },
+    {
+      "title": "Creation of a file with data for arrays",
+      "level": 3,
+      "content": "In this example the xdg-mime is used to gather information about the mime types but the file --mime-type -b and file -i -b commands does the same output as the xdg-mime query filetype command, with more or less details. This script will collect a lot of more additional information about the files into the info-mime-size-db.txt. Put the script in the destination directory that you used in photorec, make it executable and use path to files from the list with unique checksums described from above. e.g. awk -F\" | \" '{system(\"start-collect-file-info.sh \"$3\" \"$1\" \"$2)}' file_list-unique_checksums.\n\n```\nstart-collect-file-info.sh\n```\n\n```\n#!/bin/bash\nif [ ! -z \"$1\" ] && [ ! -z \"$2\" ] && [ ! -z \"$3\" ]; then\nif [ -f \"$1\"  ]; then\necho \"$1\"\necho \"$(file \"$1\" -F\"|\"  )'|'$(xdg-mime query filetype \"$1\")'|'$(du -h \"$1\" |awk '{print $1}' )|$2|$3\" >> info-mime-size-db.txt\nelse\necho The « \"$1\" » is not a valid file name.\nfi\nfi\n```\n\nThe script will build a file with pattern path to file/file name | info about the file | mime type | size | filename | restored_filename, here is an example:./recup_dir.1/f872690288_image.jpg|JPEG image data, JFIF standard 1.01|image/jpeg|24K|f872690288_image.jpg|image.jpg\n\n"
+    },
+    {
+      "title": "Post recovery tasks",
+      "level": 3,
+      "content": "This will help you more to understand the script and make your own scripts base on it. You can also put all necessary parts together into a script, modify patterns for files to search and run it. You need to create a database file with name info-mime-size-db.txt with information about files.\n\n- Remove the echo command in front of the cp and mkdir otherwise the script will only show what is going to to be done without restoring anything to a destination, do a dry run. To use echo command is good for verify that settings for filenames and destinations looks correctly.\n- Those scripts are only examples for restoration of files from folders created by photorec, be careful!\n\n"
+    },
+    {
+      "title": "Head of the script",
+      "level": 4,
+      "content": "Here is a simple check if the info-mime-size-db.txt exists in the current directory to prevent possible errors with rest of the script.\n\n```\n#!/bin/bash\nif [ -f info-mime-size-db.txt ]; then echo The file info-mime-size-db.txt exists continuing... ;\n  else \n  echo Error!! the info-mime-size-db.txt file cannot be found;exit 1; \nfi\n```\n\n"
+    },
+    {
+      "title": "Start variables",
+      "level": 4,
+      "content": "```\nCountAll=\"0\"\nCountToLimit=\"0\"\nBaseSubDirName=\"MyRestoredFiles\"\nDestination=\"$HOME/NameOfBaseFolder/${BaseSubDirName}-MoreDetailsInFolderName/\"\nNewDirNumber=\"0\"\nCountToLimit=\"0\"\n```\n\n"
+    },
+    {
+      "title": "Populate an array",
+      "level": 4,
+      "content": "Here will be a short examples about how to speed up population of the array from a file with patterns by using bash standard expressions instead of awk, grep and sed. The ArrayOfFiles array will contain full path to the file and the ArrayOfsorted will contain original names restored by photorec but without random generated part.\n\n```\nWhileArray=0;\nwhile read i; do\nif [[ \"$i\" =~ \"gif\" ]]||[[ \"$i\" =~ \"jpeg\" ]];then\nArrayOfFiles[WhileArray]=${i/'|'*/}\nArrayOfsorted[WhileArray]=${i/[^*|]*|/}\nWhileArray=$((WhileArray+1));\nfi;\ndone <  info-mime-size-db.txt\necho done, the array is full\n```\n\n"
+    },
+    {
+      "title": "Loops for restoration",
+      "level": 4,
+      "content": "This is a finale part of a script that manages restoration of files. When limit of files in a destination sub-directory reached then it creates and new one numbered sub-directory in the destination folder and continuing to copy files there.\n\n```\nSizeOfArray=${#ArrayOfFiles[@]}\nwhile [  \"${SizeOfArray}\" != \"${CountAll}\" ]; do\n\nIfExist=\"${Destination}${BaseSubDirName}${NewDirNumber}\"\nif [ ! -d \"${IfExist}\" ]; then echo mkdir -v \"${IfExist}\" -p;fi\n\nCountToLimit=$((CountToLimit+1 ))\nFileName=${ArrayOfsorted[CountAll]}\n    if [ $CountToLimit -gt 25 ]; then\nCountToLimit=\"0\"\nNewDirNumber=$((NewDirNumber+1))\nfi;\nNewDestination=\"$IfExist\"\n\necho cp -fv \"$PWD/${ArrayOfFiles[CountAll]}\" \"${IfExist}${FileName}\"\nCountAll=$((CountAll+1))\ndone\n```\n\n"
+    },
+    {
+      "title": "Enough if files are few",
+      "level": 2,
+      "content": "If it is not so many files with the same extension then it will be enough to use something like find -name *.xcf -exec copy \"{}\" $HOME/Desktop \\; to avoid the overload of a destination folder you can calculate how many files are found find -type f -name *xcf | wc -l.\n\n"
+    }
+  ]
+}

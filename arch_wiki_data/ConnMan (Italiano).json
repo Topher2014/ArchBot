@@ -1,0 +1,131 @@
+{
+  "title": "ConnMan (Italiano)",
+  "url": "https://wiki.archlinux.org/title/ConnMan_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Network configuration\n- Wireless network configuration\n\nConnMan is a command-line network manager designed for use with embedded devices and fast resolve times. It is modular through a plugin architecture, but has native DHCP and NTP support.[1]\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the connman package. wpa_supplicant, bluez, and openvpn are optional dependencies required for Wi-Fi, Bluetooth, and VPN functionality respectively.\n\nBefore enabling connman.service, ensure any existing network configuration is disabled.\n\nConnMan comes with the connmanctl(1) CLI, there are various #Front-ends available.\n\n"
+    },
+    {
+      "title": "Front-ends",
+      "level": 3,
+      "content": "- cmst — Qt GUI for ConnMan.\n\n- connman-ncurses — Simple ncurses UI for ConnMan; not all of connman functionality is implemented, but usable (with X or from terminal without X), see the wiki.\n\n- ConnMan-UI — GTK3 client applet.\n\n- rofi-connman — rofi/dmenu-powered frontend\n\n- Econnman — Enlightenment desktop panel applet.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nConnMan comes with the connmanctl command-line interface, see connmanctl(1). If you do not provide any commands connmanctl starts as an interactive shell.\n\nConnMan automatically handles wired connections.\n\n"
+    },
+    {
+      "title": "Enabling and disabling Wi-Fi",
+      "level": 4,
+      "content": "To check if Wi-Fi is enabled you can run connmanctl technologies and check for the line that says Powered: True/False. To power the Wi-Fi on you can run connmanctl enable wifi or if you need to disable it you can run connmanctl disable wifi. Other ways to enable Wi-Fi could include using the Fn keys on the laptop to turn it on or running ip link set interface up.\n\n"
+    },
+    {
+      "title": "Connecting to an open access point",
+      "level": 4,
+      "content": "To scan the network connmanctl accepts simple names called technologies. To scan for nearby Wi-Fi networks:\n\n```\n$ connmanctl scan wifi\n```\n\nTo list the available networks found after a scan run (example output):\n\n```\n$ connmanctl services\n```\n\n```\n*AO MyNetwork               wifi_dc85de828967_68756773616d_managed_psk\n    OtherNET                wifi_dc85de828967_38303944616e69656c73_managed_psk\n    AnotherOne              wifi_dc85de828967_3257495245363836_managed_wep\n    FourthNetwork           wifi_dc85de828967_4d7572706879_managed_wep\n    AnOpenNetwork           wifi_dc85de828967_4d6568657272696e_managed_none\n```\n\nTo connect to an open network, use the second field beginning with wifi_:\n\n```\n$ connmanctl connect wifi_dc85de828967_4d6568657272696e_managed_none\n```\n\nYou should now be connected to the network. Check using connmanctl state or ip addr.\n\n"
+    },
+    {
+      "title": "Connecting to a protected access point",
+      "level": 4,
+      "content": "For protected access points you will need to provide some information to the ConnMan daemon, at the very least a password or a passphrase.\n\nThe commands in this section show how to run connmanctl in interactive mode, it is required for running the agent command. To start interactive mode simply type:\n\n```\n$ connmanctl\n```\n\nYou then proceed almost as above, first scan for any Wi-Fi technologies:\n\n```\nconnmanctl> scan wifi\n```\n\nTo list services:\n\n```\nconnmanctl> services\n```\n\nNow you need to register the agent to handle user requests. The command is:\n\n```\nconnmanctl> agent on\n```\n\nYou now need to connect to one of the protected services. To do this easily, just use tab completion for the wifi_ service. If you were connecting to OtherNET in the example above you would type:\n\n```\nconnmanctl> connect wifi_dc85de828967_38303944616e69656c73_managed_psk\n```\n\nThe agent will then ask you to provide any information the daemon needs to complete the connection. The information requested will vary depending on the type of network you are connecting to. The agent will also print additional data about the information it needs as shown in the example below.\n\n```\nAgent RequestInput wifi_dc85de828967_38303944616e69656c73_managed_psk\n  Passphrase = [ Type=psk, Requirement=mandatory ]\n  Passphrase?\n```\n\nProvide the information requested, in this example the passphrase, and then type:\n\n```\nconnmanctl> quit\n```\n\nIf the information you provided is correct you should now be connected to the protected access point.\n\n"
+    },
+    {
+      "title": "Using iwd instead of wpa_supplicant",
+      "level": 4,
+      "content": "ConnMan can use iwd to connect to wireless networks. As connman will start wpa_supplicant when it finds it, it is recommended to uninstall wpa_supplicant.\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nNote that ConnMan is probably unnecessary for IWD users, as IWD can handle its own network configuration, in which case connmand should be stopped.\n\nCurrently the -i-option of iwd seems to cause that the Wi-Fi interface gets hidden from connman.\n\nCreate the following service file which should cause connman to use iwd to connect to wireless networks, regardless if wpa_supplicant is installed.\n\n```\n/etc/systemd/system/connman_iwd.service\n```\n\n```\n[Unit]\nDescription=Connection service\nDefaultDependencies=false\nConflicts=shutdown.target\nRequiresMountsFor=/var/lib/connman\nAfter=dbus.service network-pre.target systemd-sysusers.service iwd.service\nBefore=network.target multi-user.target shutdown.target\nWants=network.target\nRequires=iwd.service\n\n[Service]\nType=dbus\nBusName=net.connman\nRestart=on-failure\nExecStart=/usr/bin/connmand --wifi=iwd_agent -n\nStandardOutput=null\nCapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_TIME CAP_SYS_MODULE\nProtectHome=true\nProtectSystem=true\n\n[Install]\nWantedBy=multi-user.target\n```\n\nThen enable/start the connman_iwd service.\n\nAdvantage of using iwd instead of wpa_supplicant is, that the ping times seem to be much more consistent and the connection seems to be more reliable.\n\n"
+    },
+    {
+      "title": "Settings",
+      "level": 3,
+      "content": "Settings and profiles are automatically created for networks the user connects to often. They contain fields for the passphrase, essid and other information. Profile settings are stored in directories under /var/lib/connman/ by their service name. To view all network profiles run:\n\n```\n# cat /var/lib/connman/*/settings\n```\n\n"
+    },
+    {
+      "title": "Technologies",
+      "level": 3,
+      "content": "Various hardware interfaces are referred to as Technologies by ConnMan.\n\nTo list available technologies run:\n\n```\n$ connmanctl technologies\n```\n\nTo get just the types by their name one can use this one liner:\n\n```\n$ connmanctl technologies | awk '/Type/ { print $NF }'\n```\n\nTo interact with them one must refer to the technology by type. Technologies can be toggled on/off with:\n\n```\n$ connmanctl enable technology_type\n```\n\nand:\n\n```\n$ connmanctl disable technology_type\n```\n\nFor example to toggle off Wi-Fi:\n\n```\n$ connmanctl disable wifi\n```\n\n"
+    },
+    {
+      "title": "Avoid changing the hostname",
+      "level": 3,
+      "content": "By default, ConnMan changes the transient hostname (see hostnamectl(1)) on a per network basis. This can create problems with X authority: If ConnMan changes your hostname to something else than the one used to generate the xauth magic cookie, then it will become impossible to create new windows. Symptoms are error messages like No protocol specified and Can't open display: :0.0. Manually resetting the host name fixes this, but a permanent solution is to prevent ConnMan from changing your host name in the first place. This can be accomplished by adding the following to /etc/connman/main.conf:\n\n```\n[General]\nAllowHostnameUpdates=false\n```\n\nMake sure to restart the connman.service after changing this file.\n\nFor testing purposes it is recommended to watch the systemd journal and plug the network cable a few times to see the action.\n\n"
+    },
+    {
+      "title": "Prefer Ethernet to wireless",
+      "level": 3,
+      "content": "By default ConnMan does not prefer Ethernet over wireless, which can lead to it deciding to stick with a slow wireless network even when ethernet is available. You can tell connman to prefer Ethernet adding the following to /etc/connman/main.conf:\n\n```\n[General]\nPreferredTechnologies=ethernet,wifi\n```\n\n"
+    },
+    {
+      "title": "Exclusive connection",
+      "level": 3,
+      "content": "ConnMan allows you to be connected to both Ethernet and wireless at the same time. This can be useful as it allows programs that established a connection over Wi-Fi to stay connected even after you connect to ethernet. But some people prefer to have only a single unambiguous connection active at a time. That behavior can be activated by adding the following to /etc/connman/main.conf:\n\n```\n[General]\nSingleConnectedTechnology=true\n```\n\n"
+    },
+    {
+      "title": "Connecting to eduroam (802.1X)",
+      "level": 3,
+      "content": "WPA2 Enterprise networks such as eduroam require a separate configuration file before connecting to the network. For example, create /var/lib/connman/eduroam.config:\n\n```\neduroam.config\n```\n\n```\n[service_eduroam]\nType=wifi\nName=eduroam\nEAP=peap\nCACertFile=/etc/ssl/certs/certificate.cer\nPhase2=MSCHAPV2\nIdentity=user@foo.edu\nAnonymousIdentity=anonymous@foo.edu\nPassphrase=password\n```\n\nRestart wpa_supplicant.service and connman.service to connect to the new network.\n\n- Options are case-sensitive, e.g. EAP = ttls instead of EAP = TTLS.[3]\n- Consult the institution hosting the eduroam network for various settings such as username, password, EAP, Phase2output, and needed certificates.\n\nFor more information, see connman-service.config(5) and Wireless network configuration#eduroam.\n\n"
+    },
+    {
+      "title": "Avoiding conflicts with local DNS server",
+      "level": 3,
+      "content": "If you are running a local DNS server, it will likely have problems binding to port 53 (TCP and/or UDP) after installing Connman. This is because Connman includes its own DNS proxy which also tries to bind to those ports. If you see log messages from BIND or dnsmasq like\n\n```\nnamed[529]: could not listen on UDP socket: address in use\n```\n\nthis could be the problem. To verify which application is listening on the ports, you can execute ss -tulpn as root.\n\nTo fix this connmand can be started with the options -r or --nodnsproxy by overriding the systemd service file. Create the folder /etc/systemd/system/connman.service.d/ and add the file disable_dns_proxy.conf:\n\n```\n/etc/systemd/system/connman.service.d/disable_dns_proxy.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/connmand -n --nodnsproxy\n```\n\nMake sure to reload the systemd daemon and restart the connman.service, and your DNS proxy, after adding this file.\n\n"
+    },
+    {
+      "title": "/etc/resolv.conf",
+      "level": 4,
+      "content": "If you want to know the DNS servers received from DHCP while keeping a custom /etc/resolv.conf, then append RuntimeDirectory=connman to the above file (clear the ExecStart lines if not needed). Now connman will write them to /var/run/connman/resolv.conf instead.\n\n"
+    },
+    {
+      "title": "Using systemd-resolved",
+      "level": 4,
+      "content": "ConnMan has systemd-resolved support, which replaces its internal DNS proxy with a module that configures systemd-resolved with the correct DNS servers and search domains for the interface whenever it connects to a network. Using systemd-resolved is known to improve compatibility with Tailscale since ConnMan's internal proxy and Tailscale can fight over /etc/resolv.conf, which is better mediated by both talking to resolved instead.\n\nTo use this support, ConnMan needs to be rebuilt: checkout the package using the Arch build system, set the configure flag --with-dns-backend=systemd-resolved, rebuild the package, and install the modified version. After installing the modified package, set up the stub resolver as /etc/resolv.conf then restart connman.service, systemd-resolved.service, and (if using it) tailscale.service.\n\n"
+    },
+    {
+      "title": "Blacklist interfaces",
+      "level": 3,
+      "content": "If something like Docker is creating virtual interfaces Connman may attempt to connect to one of these instead of your physical adapter if the connection drops. A simple way of avoiding this is to blacklist the interfaces you do not want to use. Connman will by default blacklist interfaces starting with vmnet, vboxnet, virbr and ifb, so those need to be included in the new blacklist as well.\n\nBlacklisting interface names is also useful to avoid a race condition where connman may access eth# or wlan# before systemd/udev can change it to use a Predictable Network Interface Names like enp4s0. Blacklisting the conventional (and unpredictable) interface prefixes makes connman wait until they are renamed.\n\nIf it does not already exist, create /etc/connman/main.conf:\n\n```\n[General]\nNetworkInterfaceBlacklist=vmnet,vboxnet,virbr,ifb,docker,veth,eth,wlan\n```\n\nOnce connman.service has been restarted this will also hide all the veth####### interfaces from GUI tools like Econnman.\n\n"
+    },
+    {
+      "title": "Error /net/connman/technology/wifi: Not supported",
+      "level": 3,
+      "content": "Currently, connman does not support scanning for Wi-Fi networks with iwd, at the moment this functionality is available with wpa_supplicant only (see [4]). To connect to Wi-Fi with iwd, enable/start iwd.service and then either follow instructions in Iwd to connect to the Wi-Fi or you can also use any of the #Front-ends. In order to have Wi-Fi scanning support from within connman, install wpa_supplicant and then restart connman.service after you stop iwd.service.\n\n"
+    },
+    {
+      "title": "Error /net/connman/technology/wifi: No carrier",
+      "level": 3,
+      "content": "You have enabled your Wi-Fi with:\n\n```\n$ connmanctl enable wifi\n```\n\nIf wireless scanning leads to above error, this may be due to an unresolved bug. If it does not resolve even though wireless preconditions[dead link 2023-09-16 ⓘ] are met, try again after disabling competing network managers and rebooting.\n\nThis may also simply be caused by the wireless interface being blocked by rfkill, which can occur after restarting wpa_supplicant. Use rfkill list to check.\n\n"
+    },
+    {
+      "title": "\"Not registered\", or \"Method \"Connect\" with signature ... doesn't exist\"",
+      "level": 3,
+      "content": "When issuing commands, you may see errors like the following:\n\nFrom a connmanctl prompt:\n\n```\nconnmanctl> connect service_id\n```\n\n```\nError /net/connman/service/SSID: Method \"Connect\" with signature \"\" on interface \"net.connman.Service\" doesn't exist\n```\n\nFrom the shell:\n\n```\n# connmanctl connect service_id\n```\n\n```\nError /net/connman/service/service_id: Not registered\n```\n\nThese errors are produced because the agent is not running. Start the agent from a connmanctl prompt with agent on, and try again.\n\n"
+    },
+    {
+      "title": "Error Failed to set hostname/domainname",
+      "level": 3,
+      "content": "connman can fail to set hostname or domainname due to lack of CAP_SYS_ADMIN.\n\nYou will need to edit connman.service (and other like connman-vpn.service , etc ...) to modify the CapabilityBoundingSet line to add CAP_SYS_ADMIN.\n\nSee EPERM under sethostname(2) § ERRORS or setdomainname(2) § ERRORS for more details.\n\n"
+    },
+    {
+      "title": "Unknown route on connection",
+      "level": 3,
+      "content": "A log entry for an unknown route appears each time a connect is done. For example:\n\n```\n...\nconnmand[473]: wlp2s0 {add} route 82.165.8.211 gw 10.20.30.4 scope 0 <UNIVERSE>\nconnmand[473]: wlp2s0 {del} route 82.165.8.211 gw 10.20.30.4 scope 0 <UNIVERSE>\n...\n```\n\nIt likely is Connman performing a connectivity check to the ipv4.connman.net host (which resolves to the IP address 82.165.8.211 at current).[5] See the Connman README for more information on why and what - apart from the connecting IP - it transmits. This behaviour can be prevented by adding the following to /etc/connman/main.conf:\n\n```\n[General]\nEnableOnlineCheck=false\n```\n\nThis setting will cause that the default device will not switch to ONLINE, but stay in READY state.connman.conf(5) However, the connection will still be functional.\n\nThe connection itself is also functional (unless behind a captive portal) if the check is blocked by a firewall rule:\n\n```\n# ip6tables -A OUTPUT -d ipv6.connman.net -j REJECT\n# iptables -A OUTPUT -d ipv4.connman.net,ipv6.connman.net -j REJECT\n```\n\n"
+    },
+    {
+      "title": "File /proc/net/pnp doesn't exist",
+      "level": 3,
+      "content": "If you see this in your error log it is caused by bug in connman [6] and can be ignored.Bug Report\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Git repository documentation — for further detailed documentation\n\n"
+    }
+  ]
+}

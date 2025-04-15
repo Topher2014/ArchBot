@@ -1,0 +1,71 @@
+{
+  "title": "Systemd-resolved (Français)",
+  "url": "https://wiki.archlinux.org/title/Systemd-resolved_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- systemd-networkd (Français)\n- Domain name resolution (Français)\n- Avahi (Français)\n\nsystemd-resolved est un service systemd qui fournit la résolution de nom de réseau aux applications locales via une interface D-Bus, le service NSS resolve (nss-resolve(8)), et une interface locale 127.0.0.53. Consultez systemd-resolved(8) pour son utilisation.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "systemd-resolved fait parti du paquet systemd qui est installé par défaut.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "systemd-resolved fournit un service de résolution pour le Domain Name System (DNS) (ce qui inclut DNSSEC et DNS over TLS), Multicast DNS (mDNS) et Link-Local Multicast Name Resolution (LLMNR).\n\nLe résolveur peut être configuré en éditant /etc/systemd/resolved.conf et/ou les fichiers de configuration .conf de substitution dans /etc/systemd/resolved.conf.d/. Voir resolved.conf(5).\n\nPour utiliser systemd-resolved démarrez et activez systemd-resolved.service.\n\n"
+    },
+    {
+      "title": "DNS",
+      "level": 3,
+      "content": "Les logiciels qui se basent sur getaddrinfo(3) de glibc (ou équivalent) fonctionneront tel quel, puisque, par défaut, /etc/nsswitch.conf est configuré pour utiliser nss-resolve(8) quand il est disponible.\n\nPour fournir la résolution de nom de domaine pour les logiciels qui lisent /etc/resolv.conf directement, comme les navigateurs et GnuPG, systemd-resolved a quatre différents mode pour manipuler le fichier—stub, static, uplink et foreign. Ils sont décrit dans systemd-resolved(8) § /ETC/RESOLV.CONF. Nous allons, ici, nous concentrer sur le mode recommandé, i.e. le mode \"stub\" qui utilise /run/systemd/resolve/stub-resolv.conf.\n\n/run/systemd/resolve/stub-resolv.conf contient une référence au programme local 127.0.0.53 comme étant le seul serveur DNS et une liste de domaine de recherche. C'est le mode opératoire recommandé pour propager la configuration de systemd-resolved vers tous les clients. Pour l'utiliser, il suffit de remplacer /etc/resolv.conf avec un lien symbolique vers le fichier dont nous parlons:\n\n```\n# ln -rsf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf\n```\n\n- Ne pas configurer correctement /etc/resolv.conf mènera à des erreurs de résolution DNS.\n- Créer le lien symbolique /etc/resolv.conf ne sera pas possible tant que vous êtes en arch-chroot, puisque le fichier est lié avec un fichier à l'extérieur de votre système. Au lieu de faire cela, il vous faut créer le lien symbolique depuis l'extérieur du chroot. E.g. # ln -sf /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf\n\n```\n# ln -sf /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf\n```\n\n"
+    },
+    {
+      "title": "Affecter les serveurs DNS",
+      "level": 4,
+      "content": "systemd-resolved fonctionnera tel quel avec un network manager utilisant /etc/resolv.conf. Aucune configuration particulière n'est requise puisque systemd-resolved sera détecté en suivant le lien symbolique /etc/resolv.conf. Ce sera le cas avec systemd-networkd, NetworkManager, et iwd.\n\nCependant, si le client DHCP et VPN utilise le programme resolvconf pour affecter les serveurs et les domaine de recherche (Voir openresolv#Users pour une liste de programme qui utilsent resolvconf), alors le paquet additionnel systemd-resolvconf est requis pour fournir le lien symbolique /usr/bin/resolvconf.\n\n- systemd-resolved a une interface limitée avec resolvconf et peut ne pas fonctionner avec tout les clients, voir resolvectl(1) § COMPATIBILITY WITH RESOLVCONF(8) pour plus d'informations.\n- systemd-resolvconf fonctionne seuleument quand systemd-resolved.service est démarré. Si vous n'utilisez pas systemd-resolved, alors assurez vous que le paquet systemd-resolvconf est désinstallé, autrement il va causer des problèmes avec les logiciels de réseau qui attendent un binaire /usr/bin/resolvconf fonctionnel.\n\nDans le mode stub et static, des serveurs DNS particuliers peuvent être placé dans le fichier de configuration resolved.conf(5):\n\n```\n/etc/systemd/resolved.conf.d/dns_servers.conf\n```\n\n```\n[Resolve]\nDNS=192.168.35.1 fd7b:d0bd:7a6e::1\nDomains=~.\n```\n\nNote: Pour d'avantage d'informations sur la configuration des liens consultez Systemd-networkd (Français)#Fichiers network.\n\n- Sans l'option Domains=~. dans resolved.conf(5), systemd-resolved pourrait utiliser le serveur DNS par lien, si n'importe lequel affecte le Domains=~. dans la configuration d'un lien.\n- Cette option n'affectera pas les requêtes de nom de domaine qui correspondent au nom de domaine spécifique spécifié dans la configuration d'un lien. Elles seront toujours résolu en utilisant le serveur DNS respectif au lien.\n\nPour d'avantage d'informations sur la configuration des liens consultez Systemd-networkd (Français)#Fichiers network.\n\nSi systemd-resolved ne reçoit pas d'addresses de serveurs DNS depuis le network manager et qu'aucune addresse de serveurs n'est configurée manuellement alors systemd-resolved se repli sur les adresses DNS de secours pour s'assurer que la résolution DNS fonctionne toujours.\n\nLes adresses peuvent être changées en définissant FallbackDNS dans resolved.conf(5). E.g.:\n\n```\n/etc/systemd/resolved.conf.d/fallback_dns.conf\n```\n\n```\n[Resolve]\nFallbackDNS=127.0.0.1 ::1\n```\n\nPour supprimer la fonctionnalité de serveurs de secours, activez l'option FallbackDNS en ne spécifiant aucune adresse:\n\n```\n/etc/systemd/resolved.conf.d/fallback_dns.conf\n```\n\n```\n[Resolve]\nFallbackDNS=\n```\n\n"
+    },
+    {
+      "title": "DNSSEC",
+      "level": 4,
+      "content": "La validation DNSSEC peut être activée en changeant l'option DNSSEC dans resolved.conf(5).\n\n- Affectez DNSSEC=allow-downgrade pour valider DNSSEC seuleument quand le serveur en amont prend en charge la fonctionnalité.\n- Affectez DNSSEC=true pour toujours valider DNSSEC, ce qui va casser la résolution DNS avec les serveurs de nom de domaines qui ne prend pas en charge la fonctionnalité. E.g:\n\n```\n/etc/systemd/resolved.conf.d/dnssec.conf\n```\n\n```\n[Resolve]\nDNSSEC=true\n```\n\n- Si votre serveurs DNS ne prend pas en charge DNSSEC et vous observez des problèmes avec la valeurs par défaut \"allow-downgrade\" (e.g. systemd issue 10579), vous pouvez explicitement désactiver le support DNSSEC de systemd-resolved en affectant DNSSEC=false.\n- systemd-resolved peut désactiver DNSSEC après quelques validations infructueuses . Si l'option DNSSEC est affectée à true, alors la résolution DNS stoppera de fonctionner complétement. Voir systemd issue 9867.\n\nVous pouvez tester la validation en requêtant un nom de domaine avec une signature invalide:\n\n```\n$ resolvectl query sigfail.verteiltesysteme.net\n```\n\n```\nsigfail.verteiltesysteme.net: resolve call failed: DNSSEC validation failed: invalid\n```\n\nEnsuite testez un nom de domaine avec une signature valide:\n\n```\n$ resolvectl query sigok.verteiltesysteme.net\n```\n\n```\nsigok.verteiltesysteme.net: 134.91.78.139\n\n-- Information acquired via protocol DNS in 266.3ms.\n-- Data is authenticated: yes\n```\n\n"
+    },
+    {
+      "title": "DNS via TLS",
+      "level": 4,
+      "content": "DNS via TLS est désactivé par défaut. Pour l'activer, changez l'option DNSOverTLS dans la section [Resolve] dans resolved.conf(5). Pour activer la validation du certificat du serveurs DNS de votre fournisseur, incluez leur nom d'hôte dans l'option DNS avec le format ip_address#hostname. E.g:\n\n```\n/etc/systemd/resolved.conf.d/dns_over_tls.conf\n```\n\n```\n[Resolve]\nDNS=9.9.9.9#dns.quad9.net\nDNSOverTLS=yes\n```\n\nngrep peut être utile pour tester si DNS via TLS fonctionne puisque DNS via TLS utilise toujours les ports 853 et jamais le port 53. La commande ngrep port 53 ne doit produire aucune sortie quand le nom de domaine est résolu via TLS et ngrep port 853 doit produire un contenu chiffré.\n\nWireshark peut aussi être utilisé pour plus de détails sur l'inspection des paquets DNS via TLS.\n\n"
+    },
+    {
+      "title": "mDNS",
+      "level": 3,
+      "content": "systemd-resolved est capable de fonctionner comme un résolveur et un répondeur multicast DNS.\n\nLe résolveur fournit une résolution de hostname en utilisant un schénma de nom \"hostname.local\".\n\nmDNS ne sera activé seuleument pour une connexion si le support mDNS de systemd-resolved a été activé, et si la configuration du network manager en vigueur active mDNS pour la connexion.\n\nLe support mDNS de systemd-resolved peut être activé par son option MulticastDNS (Voir resolved.conf(5) § OPTIONS).\n\nActiver mDNS pour chaque connexion indépendamment les unes des autres, dépends du network manager:\n\n- Pour systemd-networkd, affectez l'option MulticastDNS dans la section [Network] dans le fichier de configuration de la connexion. Vous pourriez aussi avoir à affecter l'option Multicast=yes dans la section [Link]. Voir systemd.network(5).\n- Autrement, pour NetworkManager, affectez l'option mdns dans la section [connection] du fichier de configuration de la connexion. Lancez la commande nmcli connection modify interface_name connection.mdns {yes|no|resolve} qui fera cela pour vous. Voir nm-settings(5).\n\n- Si Avahi a été installé, vous devriez envisager de désactiver ou masquer avahi-daemon.service et avahi-daemon.socket pour éviter des conflits avec systemd-resolved.\n- Si vous avez l'intention d'utiliser mDNS et un firewall, assurez vous d'ouvrir les ports UDP 5353.\n\n"
+    },
+    {
+      "title": "LLMNR",
+      "level": 3,
+      "content": "Link-Local Multicast Name Resolution est un protocole de résolution de hostname créé par Microsoft.\n\nLLMNR ne sera activé pour la connexion si l'option global LLMNR de systemd-resolved dans resolved.conf(5) § OPTIONS et l'option de la connexion du network manager est activé. Par défaut systemd-resolved active le répondeur LLMNR; systemd-networkd et NetworkManager[2] l'active pour les connexion.\n\n- Pour systemd-networkd l'option est LLMNR dans la section [Network]. Voir systemd.network(5) § [NETWORK] SECTION OPTIONS.\n- Pour NetworkManager l'option est llmnr dans la section [connection]. Voir nm-settings(5) § connection setting.\n\nSi vous avez l'intention d'utiliser LLMNR et un firewall, assurez vous d'ouvrir les ports UDP et TCP 5355.\n\n"
+    },
+    {
+      "title": "Requêtes",
+      "level": 2,
+      "content": "Pour requêter les entrées DNS, mDNS ou LLMNR vous pouvez utiliser l'utilitaire resolvectl.\n\nPar exemple, pour requêter une entrée DNS:\n\n```\n$ resolvectl query archlinux.org\n```\n\n```\narchlinux.org: 2a01:4f8:172:1d86::1\n               138.201.81.199\n\n-- Information acquired via protocol DNS in 48.4ms.\n-- Data is authenticated: no\n```\n\n"
+    },
+    {
+      "title": "systemd-resolved ne cherche pas le domaine local",
+      "level": 3,
+      "content": "systemd-resolved peut ne pas chercher le domaine local quand on lui donne juste le nom de l'hôte, même si UseDomains=yes ou Domains=[domain-list] est présent dans le fichier de systemd-networkd .network approprié, et que ce fichier produit la bonne search [domain-list] dans resolv.conf. Vous pouvez lancer networkctl status ou resolvectl status pour vérifier que les domaines de recherche sont en fait bien lu.\n\nContournements possible:\n\n- Désactivez LLMNR pour laisser systemd-resolved continuer immédiatement en concaténant le suffixe DNS.\n- Supprimer le hosts de la base de donnée /etc/nsswitch.conf (e.g., en supprimant l'option [!UNAVAIL=return] après le service resolve)\n- Pencher pour utiliser les nom de domaines totalement qualifiés.\n- Uitilsez /etc/hosts pour résoudre les noms de domaines.\n- Replier vous sur le dns de glibc au lieu d'utiliser le resolve de systemd.\n\n"
+    },
+    {
+      "title": "systemd-resolved ne résout pas les nom d'hôte sans suffix",
+      "level": 3,
+      "content": "Pour faire en sort que systemd-resolved resolve les nom d'hôte qui ne sont pas des nom de domaines totalement qualifié, ajoutez ResolveUnicastSingleLabel=yes à /etc/systemd/resolved.conf.\n\nCela semble ne marcher qu'avec LLMNR désactivé (LLMNR=no).\n\nSi vous utilisez systemd-networkd, vous pourriez vouloir que le nom de domaine fournit par le serveur DHCP ou l'IPV6 RA soit utilisé comme nom de domaine de recherche. C'est désactivé par défaut, pour l'activer il faut l'ajouter dans le fichier .network de l'interface:\n\n```\n[DHCPv4]\nUseDomains=true\n\n[IPv6AcceptRA]\nUseDomains=yes\n```\n\nVous pouvez vérifier ce que systemd-resolved possède pour chaque interface avec:\n\n```\n$ resolvectl domain\n```\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Un problème de résolution de nom avec systemd-resolved que nous avont trouvé dans la nature par Francisco Ros\n- Voir resolvectl(1) § EXAMPLES pour plus d'exemples.\n\n"
+    }
+  ]
+}

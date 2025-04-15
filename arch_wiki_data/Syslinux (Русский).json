@@ -1,0 +1,186 @@
+{
+  "title": "Syslinux (Русский)",
+  "url": "https://wiki.archlinux.org/title/Syslinux_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- Процесс загрузки Arch\n- Загрузчик\n\nSyslinux — это набор загрузчиков, способных загружать образы с жестких дисков, компакт-дисков, а также через сеть с использованием PXE. Он поддерживает файловые системы FAT, ext2, ext3, ext4 и Btrfs.\n\n"
+    },
+    {
+      "title": "Обзор процесса загрузки",
+      "level": 3,
+      "content": "1. Этап 1 : Часть 1 - Загрузка MBR - При запуске BIOS загружает 440 байт загрузочного кода MBR, расположенного в начале диска (/usr/lib/syslinux/bios/mbr.bin или /usr/lib/syslinux/bios/gptmbr.bin)\n1. Этап 1 : Часть 2 - Поиск активного раздела. На первом этапе загрузки MBR ищет раздел, помеченный, как активный (с установленным boot-флагом). Предположим, это раздел /boot\n1. Этап 2 : Часть 1 - Выполнение загрузочной записи тома - Первый этап загрузочной записи MBR начинает выполнение Загрузочной Записи Тома (VBR) с раздела /boot. При использовании syslinux загрузочный код VBR находится в стартовом секторе /boot/syslinux/ldlinux.sys, который был создан командой extlinux --install. Обратите внимание, что ldlinux.sys — не то же самое, что ldlinux.c32\n1. Этап 2 : Часть 2 - Выполнение /boot/syslinux/ldlinux.sys - VBR загрузит остальную часть /boot/syslinux/ldlinux.sys. Расположение сектора /boot/syslinux/ldlinux.sys не должно измениться, иначе syslinux не выполнит загрузку Примечание: В случае использования Btrfs указанный выше способ не сработает, поскольку файлы переместятся в результате изменения расположения сектора ldlinux.sys. Поэтому в BTRFS весь код ldlinux.sys укладывается в пространство после VBR, а не устанавливается в /boot/syslinux/ldlinux.sys, в отличие от тех случаев, когда используются другие файловые системы\n1. Этап 3 - Загрузка /boot/syslinux/ldlinux.c32 - /boot/syslinux/ldlinux.sys загрузит /boot/syslinux/ldlinux.c32 (основной модуль), который содержит остаток основной части syslinux, не умещающейся в ldlinux.sys (из-за ограничений на размер файла). ldlinux.c32 должен присутствовать в каждой установке syslinux/extlinux и соответствовать версии ldlinux.sys, установленной на раздел. В противном случае, syslinux не выполнит загрузку. Смотрите http://bugzilla.syslinux.org/show_bug.cgi?id=7 для получения дополнительной информации\n1. Этап 4 - Поиск и загрузка файла конфигурации - После того, как Syslinux загрузится полностью, он ищет файл /boot/syslinux/syslinux.cfg (или /boot/syslinux/extlinux.conf в некоторых случаях) и загружает его, если он найден. Если нет, появится приглашение командной строки boot:. Этот шаг и остаток неосновной части syslinux (модули /boot/syslinux/*.c32, за исключением lib*.c32 и ldlinux.c32) требуют наличия модулей /boot/syslinux/lib*.c32 (библиотек) (https://wiki.syslinux.org/wiki/index.php/Common_Problems#ELF). Модули библиотек lib*.c32 и неосновные модули *.c32 должны соответствовать версии ldlinux.sys, установленной на раздел\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 3,
+      "content": "Установите пакет syslinux из официальных репозиториев.\n\n- Начиная с версии Syslinux 4, Extlinux и Syslinux являются одним и тем же\n- Пакет gptfdisk необходим для поддержки GPT с использованием автоматического скрипта\n- Если ваш загрузочный раздел отформатирован в FAT, вам также потребуется пакет mtools\n\n"
+    },
+    {
+      "title": "Автоматическая установка",
+      "level": 4,
+      "content": "- Скрипт syslinux-install_update является специфичным для Arch Linux, и по этой причине не предоставляется/поддерживается разработчиками Syslinux. Пожалуйста, направляйте все багрепорты, связанные с этим скриптом, в Arch Bug Tracker, а не в upstream\n- Если вы обновляете Syslinux с версии 5.xx (или старше) до версии 6.xx, пожалуйста, переустановите (а не обновите) Syslinux BIOS вручную (без использования установочного скрипта) один раз, следуя указаниям из раздела #Ручная установка. Установочный скрипт не способен корректно обновить Syslinux до версии 6.xx\n\nСкрипт syslinux-install_update установит Syslinux, скопирует модули *.c32 в /boot/syslinux, установит boot-флаг и загрузочный код в MBR. Он может работать с дисками MBR и GPT с программным RAID:\n\n1. Если вы используете отдельный раздел /boot, удостоверьтесь, что он примонтирован. Используйте для этого команду lsblk; если вы не видите точку монтирования /boot, примонтируйте раздел до того, как вы приступите к следующему шагу\n1. Запустите syslinux-install_update с опциями -i (установить файлы), -a (пометить раздел, как активный, при помощи boot-флага) и -m (установить загрузочный код MBR): # syslinux-install_update -i -a -m Если эта команда выдает ошибку Установка Syslinux BIOS не удалась (Syslinux BIOS install failed), вероятно, проблема в том, что исполняемый файл extlinux не может найти раздел, содержащий /boot: # extlinux --install /boot/syslinux extlinux: cannot find device for path /boot/syslinux extlinux: cannot open device (null) Это может случиться, например, при обновлении с LILO, который при загрузке текущего пользовательского (custom) ядра изменил параметр ядра в командной строке с, допустим, root=/dev/sda1 на его числовой эквивалент root=801, о чем свидетельствуют /proc/cmdline и вывод команды mount. Исправьте ситуацию либо используя ручную установку, как описано ниже, с указанием --device=/dev/sda1 для extlinux, либо просто перезагрузившись на обычное ядро Arch Linux, поскольку оно использует initramfs, благодаря чему проблема исчезнет.\n1. Создайте или отредактируйте файл /boot/syslinux/syslinux.cfg, следуя указаниям из раздела #Настройка.\n\n```\n# syslinux-install_update -i -a -m\n```\n\n```\n# extlinux --install /boot/syslinux\n extlinux: cannot find device for path /boot/syslinux\n extlinux: cannot open device (null)\n```\n\n- Если вы перезагрузите вашу систему сейчас, вы по-прежнему получите приглашение командной строки Syslinux. Для автоматической загрузки вашей системы или появления меню загрузки необходимо создать конфигурационный файл\n- Если вы находитесь в другом корневом каталоге (например, при загрузке с установочного носителя), установите Syslinux следующей командой:\n\n```\n# syslinux-install_update.sh -i -a -m -c /mnt/\n```\n\n"
+    },
+    {
+      "title": "Ручная установка",
+      "level": 4,
+      "content": "- Если вы не уверены в том, какой тип таблицы разделов используете (MBR или GPT), вы можете это проверить следующей командой:\n\n```\n# blkid -s PTTYPE -o value /dev/sda\ngpt\n```\n\n- Если вы пытаетесь восстановить ранее установленную систему при помощи live CD, выполните chroot перед тем, как использовать эти команды. Если вы этого не сделаете, вы должны добавлять путь (не пути /dev/) до точки монтирования в каждой команде\n\nЗагрузочный раздел, на который вы планируете установить Syslinux, должен содержать файловую систему FAT, ext2, ext3, ext4 или Btrfs. Вы должны устанавливать его по пути точки монтирования, а не на устройство /dev/sdXY. Вы не должны устанавливать его в корневой каталог файловой системы, например, устройства /dev/sda1, примонтированного в /boot. Вы можете установить Syslinux в каталог syslinux:\n\n```\n# mkdir /boot/syslinux\n# cp -r /usr/lib/syslinux/bios/*.c32 /boot/syslinux/                           ## скопируйте ВСЕ файлы *.c32 из /usr/lib/syslinux/bios/, А НЕ СОЗДАВАЙТЕ СИМВОЛЬНЫЕ ССЫЛКИ\n# extlinux --install /boot/syslinux\n```\n\nПосле этого установите загрузочный код Syslinux (mbr.bin или gptmbr.bin) в 440-байтную область загрузочного кода MBR (не путать с MBR как таблицей разделов msdos) диска, как описано в следующем разделе.\n\nЗагляните в основную статью: Master Boot Record (Русский).\n\nТеперь вам необходимо пометить ваш загрузочный раздел как активный в вашей таблице разделов. Вот несколько приложений, способных это сделать: fdisk, cfdisk, sfdisk, parted/gparted (\"boot-флаг\"). Должно получиться примерно следующее:\n\n```\n# fdisk -l /dev/sda\n```\n\n```\n[...]\n  Device Boot      Start         End      Blocks   Id  System\n/dev/sda1   *        2048      104447       51200   83  Linux\n/dev/sda2          104448   625142447   312519000   83  Linux\n```\n\nУстановите MBR:\n\n```\n# dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/mbr.bin of=/dev/sda\n```\n\nАльтернативная MBR, которую предоставляет Syslinux: altmbr.bin. Эта MBR не сканирует диск на наличие загрузочного раздела; вместо этого, последнему байту MBR присваивается значение, отображающее то, с какого раздела необходимо выполнять загрузку. Вот пример того, как altmbr.bin может быть скопирован:\n\n```\n# printf '\\x5' | cat /usr/lib/syslinux/bios/altmbr.bin - | \\\ndd bs=440 count=1 iflag=fullblock conv=notrunc of=/dev/sda\n```\n\nВ этом случае один байт со значением 5 добавляется к содержимому altmbr.bin и итоговые 440 байт пишутся в MBR устройства sda. Syslinux был установлен на первый логический раздел (/dev/sda5) диска.\n\nЗагляните в основную статью: GUID Partition Table.\n\nВторой бит атрибутов (атрибут \"legacy_boot\") должен быть установлен для раздела /boot:.\n\n```\n# sgdisk /dev/sda --attributes=1:set:2\n```\n\nЭто переключит атрибут legacy BIOS bootable на разделе 1. Для проверки:\n\n```\n# sgdisk /dev/sda --attributes=1:show\n```\n\n```\n1:2:1 (legacy BIOS bootable)\n```\n\nУстановите MBR:\n\n```\n# dd bs=440 conv=notrunc count=1 if=/usr/lib/syslinux/bios/gptmbr.bin of=/dev/sda\n```\n\nЕсли это не сработает, вы также можете попробовать:\n\n```\n# syslinux-install_update -i -m\n```\n\n"
+    },
+    {
+      "title": "Системы с UEFI",
+      "level": 2,
+      "content": "- В приведенных ниже командах $esp — это точка монтирования ESP (Системного Раздела EFI)\n- efi64 обозначает x86_64 UEFI системы, для IA32 (32-bit) замены EFI efi64 с efi32 в приведенных ниже командах\n- Для syslinux файлы ядра и initramfs должны быть в ESP, поскольку syslinux (на данный момент) не имеет возможности получать доступ к файлам вне раздела, которым он \"владеет\" (например, вне ESP в данном случае). По этой причине рекомендуется монтировать ESP в /boot\n- Автоматический установочный скрипт /usr/bin/syslinux-install_update не поддерживает установку на системы с UEFI\n- Синтаксис конфигурации в syslinux.cfg для UEFI такой же, как и для BIOS\n\n"
+    },
+    {
+      "title": "Недостатки UEFI Syslinux",
+      "level": 3,
+      "content": "- UEFI Syslinux syslinux.efi не может быть подписан sbsign (из sbsigntool) для UEFI Secure Boot. Багрепорт: http://bugzilla.syslinux.org/show_bug.cgi?id=8\n\n- Использование TAB при редактировании параметров ядра в меню UEFI Syslinux ведет к \"нечитаемому тексту\" (строки текста накладываются друг на друга). Багрепорт: http://bugzilla.syslinux.org/show_bug.cgi?id=9\n\n- UEFI Syslinux не поддерживает chainloading других приложений EFI, таких как UEFI Shell или Windows Boot Manager. Багрепорт: http://bugzilla.syslinux.org/show_bug.cgi?id=17\n\n- UEFI Syslinux может не загружаться в некоторых виртуальных машинах вроде QEMU/OVMF или VirtualBox, в продуктах/версиях VMware, а также в некоторых эмуляторах окружения UEFI, таких как DUET. Участник проекта Syslinux не подтвердил наличие этой проблемы при использовании VMware Workstation 10.0.2 и Syslinux-6.02. Отчеты об ошибках: http://bugzilla.syslinux.org/show_bug.cgi?id=21 и http://bugzilla.syslinux.org/show_bug.cgi?id=23\n\n- Memdisk недоступен для UEFI. Багрепорт: http://bugzilla.syslinux.org/show_bug.cgi?id=30\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 3,
+      "content": "- Установите пакеты syslinux и efibootmgr из официальных репозиториев. Затем настройте syslinux в Системном Разделе EFI (ESP), как показано ниже\n\n- Скопируйте файлы syslinux в ESP (замените $esp на точку монтирования ESP, обычно это /boot):\n\n```\n# mkdir -p $esp/EFI/syslinux\n# cp -r /usr/lib/syslinux/efi64/* $esp/EFI/syslinux\n```\n\n- Настройте загрузочную запись для Syslinux, используя efibootmgr:\n\n```\n# efibootmgr -c -d /dev/sdX -p 1 -l /EFI/syslinux/syslinux.efi -L \"Syslinux\"\n```\n\n- Создайте или отредактируйте файл $esp/EFI/syslinux/syslinux.cfg, следуя указаниям из раздела #Настройка\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Конфигурационный файл Syslinux, syslinux.cfg, должен быть создан в том же каталоге, в котором установлен Syslinux. В нашем случае это /boot/syslinux/ для систем с BIOS и $esp/EFI/syslinux/ для систем с UEFI.\n\nЗагрузчик будет искать как syslinux.cfg (предпочтительно), так и extlinux.conf\n\nNote: **0.1** \n\n- Взамен LINUX, ключевое слово KERNEL также может быть использовано. KERNEL пытается определить тип файла, в то время как LINUX всегда ожидает ядро Linux\n- Одна единица в параметре TIMEOUT читается как 0.1 секунды\n\n"
+    },
+    {
+      "title": "Приглашение командной строки",
+      "level": 4,
+      "content": "Это простой конфигурационный файл, который отобразит приглашение командной строки boot: и выполнит автоматическую загрузку через 5 секунд. Если вы хотите, чтобы загрузка начиналась сразу же, без вывода приглашения, установите параметр PROMPT в значение 0.\n\nКонфигурация:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nPROMPT 1\n TIMEOUT 50\n DEFAULT arch\n \n LABEL arch\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux.img\n \n LABEL archfallback\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux-fallback.img\n```\n\n"
+    },
+    {
+      "title": "Текстовое меню загрузки",
+      "level": 4,
+      "content": "Syslinux также позволяет вам использовать меню загрузки. Для этого скопируйте модуль menu в ваш каталог Syslinux:\n\n```\n# cp /usr/lib/syslinux/bios/menu.c32 /boot/syslinux/\n```\n\nКонфигурация:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nUI menu.c32\n PROMPT 0\n \n MENU TITLE Boot Menu\n TIMEOUT 50\n DEFAULT arch\n \n LABEL arch\n         MENU LABEL Arch Linux\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux.img\n \n LABEL archfallback\n         MENU LABEL Arch Linux Fallback\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux-fallback.img\n```\n\nДля получения дополнительных подробностей смотрите документацию по Syslinux или Syslinux wiki.\n\n"
+    },
+    {
+      "title": "Графическое меню загрузки",
+      "level": 4,
+      "content": "Syslinux также позволяет вам использовать графическое меню загрузки. Для этого скопируйте COM32 модуль vesamenu в ваш каталог Syslinux:\n\n```\n# cp /usr/lib/syslinux/bios/vesamenu.c32 /boot/syslinux/\n```\n\nВ этой конфигурации используется такой же дизайн меню, как и на установочном образе Arch. Ее можно найти по адресу gitlab.archlinux.org. Фоновое изображение Arch Linux можно скачать там же. Скопируйте его в /boot/syslinux/splash.png.\n\nКонфигурация:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nUI vesamenu.c32\n DEFAULT arch\n PROMPT 0\n MENU TITLE Boot Menu\n MENU BACKGROUND splash.png\n TIMEOUT 50\n \n MENU WIDTH 78\n MENU MARGIN 4\n MENU ROWS 5\n MENU VSHIFT 10\n MENU TIMEOUTROW 13\n MENU TABMSGROW 11\n MENU CMDLINEROW 11\n MENU HELPMSGROW 16\n MENU HELPMSGENDROW 29\n \n # Смотрите https://wiki.syslinux.org/wiki/index.php/Comboot/menu.c32\n \n MENU COLOR border       30;44   #40ffffff #a0000000 std\n MENU COLOR title        1;36;44 #9033ccff #a0000000 std\n MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all\n MENU COLOR unsel        37;44   #50ffffff #a0000000 std\n MENU COLOR help         37;40   #c0ffffff #a0000000 std\n MENU COLOR timeout_msg  37;40   #80ffffff #00000000 std\n MENU COLOR timeout      1;37;40 #c0ffffff #00000000 std\n MENU COLOR msg07        37;40   #90ffffff #a0000000 std\n MENU COLOR tabmsg       31;40   #30ffffff #00000000 std\n \n \n LABEL arch\n         MENU LABEL Arch Linux\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux.img\n \n \n LABEL archfallback\n         MENU LABEL Arch Linux Fallback\n         LINUX ../vmlinuz-linux\n         APPEND root=/dev/sda2 rw\n         INITRD ../initramfs-linux-fallback.img\n```\n\nС версии Syslinux 3.84, vesamenu.c32 поддерживает указание необходимого разрешения через параметр MENU RESOLUTION $WIDTH $HEIGHT. Для этого вставьте строку MENU RESOLUTION 1440 900 в ваш файл конфигурации (в данном примере используется разрешение 1440x900). Фоновое изображение должно иметь такое же разрешение, в противном случае Syslinux откажется загружать меню.\n\n"
+    },
+    {
+      "title": "Параметры ядра",
+      "level": 3,
+      "content": "Параметры ядра устанавливаются при помощи строки APPEND файла syslinux.cfg. Рекомендуется внести эти изменения, в том числе, и для режима fallback.\n\nВ самых простых случаях должно быть изменено лишь имя раздела в параметре root. Измените /dev/sda2 на то, что необходимо для указания на верный корневой раздел.\n\n```\nAPPEND root=/dev/sda2\n```\n\nЕсли вы хотите использовать UUID для постоянного именования устройств, а не их номера, измените значение строки APPEND, как показано ниже, заменив 1234 на UUID вашего корневого раздела:\n\n```\nAPPEND root=UUID=1234 rw\n```\n\nЕсли вы используете шифрование LUKS, измените строку APPEND для использования вашего шифрованного тома:\n\n```\nAPPEND root=/dev/mapper/group-name cryptdevice=/dev/sda2:name rw\n```\n\nЕсли вы используете программный RAID с mdadm, измените строку APPEND для указания вашего RAID-массива. В приведенном ниже примере указывается три массива RAID 1, и один из них устанавливается в качестве корневого:\n\n```\nAPPEND root=/dev/md1 rw md=0,/dev/sda2,/dev/sdb2 md=1,/dev/sda3,/dev/sdb3 md=2,/dev/sda4,/dev/sdb4\n```\n\nЕсли загрузка с раздела raid проваливается с использованием kernel device node method, более надежным способом является использование меток разделов:\n\n```\nAPPEND root=МЕТКА=МЕТКА_КОРНЕВОГО_РАЗДЕЛА rw\n```\n\n"
+    },
+    {
+      "title": "Автозагрузка",
+      "level": 3,
+      "content": "Если вы не хотите, чтобы выводилось меню Syslinux, используйте #Приглашение командной строки, при этом установив параметр PROMPT в значение 0. Убедитесь, что в вашем syslinux.cfg указана опция DEFAULT.\n\n"
+    },
+    {
+      "title": "Безопасность",
+      "level": 3,
+      "content": "Syslinux имеет два уровня безопасности загрузчика: мастер-пароль для всего меню и отдельные пароли для пунктов. В файле syslinux.cfg используйте\n\n```\nMENU MASTER PASSWD пароль\n```\n\nчтобы установить мастер-пароль загрузчика, и\n\n```\nMENU PASSWD пароль\n```\n\nвнутри блока LABEL, чтобы установить пароль на отдельные пункты загрузки.\n\n"
+    },
+    {
+      "title": "Передача управления другому загрузчику (chainloading)",
+      "level": 3,
+      "content": "Если вам необходимо передать управление другому загрузчику (например, для загрузки Windows), скопируйте модуль chain.c32 в ваш каталог Syslinux (для получения подробностей прочитайте инструкции из предыдущих разделов). Затем создайте секцию в конфигурационном файле:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\n...\n LABEL windows\n         MENU LABEL Windows\n         COM32 chain.c32\n         APPEND hd0 3\n...\n```\n\nhd0 3 — это третий раздел на первом устройстве BIOS. Счет устройств ведется с нуля, а счет разделов на устройствах — с единицы.\n\nЕсли вы не уверены в том, какое устройство в BIOS считается \"первым\", вы можете использовать идентификатор MBR, или же, если вы используете GPT, метки файловой системы. Чтобы использовать идентификатор MBR, выполните команду\n\n```\n# fdisk -l /dev/sdb\n```\n\n```\nDisk /dev/sdb: 128.0 GB, 128035676160 bytes \n 255 heads, 63 sectors/track, 15566 cylinders, total 250069680 sectors\n Units = sectors of 1 * 512 = 512 bytes\n Sector size (logical/physical): 512 bytes / 512 bytes\n I/O size (minimum/optimal): 512 bytes / 512 bytes\n Disk identifier: 0xf00f1fd3\n  \n Device Boot      Start         End      Blocks   Id  System\n /dev/sdb1            2048     4196351     2097152    7  HPFS/NTFS/exFAT\n /dev/sdb2         4196352   250066943   122935296    7  HPFS/NTFS/exFAT\n```\n\nзаменив /dev/sdb на то устройство, которое вам необходимо. Использование шестнадцатеричного идентификатора диска (Disk identifier) 0xf00f1fd3 в этом случае в файле syslinux.cfg будет выглядеть так:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\n...\n LABEL windows\n         MENU LABEL Windows\n         COM32 chain.c32\n         APPEND mbr:0xf00f1fd3\n...\n```\n\nДля получения дополнительных подробностей про chainloading смотрите Syslinux wiki.\n\nЕсли на том же разделе у вас установлен GRUB, вы можете передать ему управление, используя:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\n...\n LABEL grub2\n        MENU LABEL Grub2\n        COM32 chain.c32\n        append file=../grub/boot.img\n...\n```\n\nЭто может быть необходимо для загрузки из образов ISO.\n\n"
+    },
+    {
+      "title": "Chainloading для других систем Linux",
+      "level": 3,
+      "content": "Передача управления другому загрузчику, такому, как в Windows, является достаточно тривиальной задачей. Но в Syslinux возможна только загрузка файлов, находящихся на том же разделе, что и конфигурационный файл. Таким образом, если у вас установлена другая система Linux на другом разделе без отдельного /boot, появляется необходимость в применении Extlinux. По существу, Extlinux может быть установлен в \"суперблок\" раздела и обозначен, как отдельный загрузчик. Extlinux является частью проекта Syslinux и включен в пакет syslinux.\n\nСледующие инструкции подразумевают, что Syslinux у вас уже установлен. Также они подразумевают, что используется типичный путь к конфигурации Arch Linux /boot/syslinux и разделом для передачи управления / является раздел /dev/sda3.\n\nЗагрузитесь в имеющийся Linux (вероятно, на разделе, который указан в Syslinux для загрузки), примонтируйте другой корневой раздел в желаемую точку монтирования. В данном примере будет использоваться /mnt. Также, если вы используете отдельный раздел /boot во второй операционной системе, он также должен быть примонтирован. В приведенном примере предполагается, что это /dev/sda2.\n\n```\n# mount /dev/sda3 /mnt\n# mount /dev/sda2 /mnt/boot (необходимо только в случае отдельного /boot)\n```\n\nУстановите Extlinux и скопируйте необходимые файлы *.c32:\n\n```\n# extlinux -i /mnt/boot/syslinux\n# cp /usr/lib/syslinux/bios/*.c32 /mnt/boot/syslinux\n```\n\nСоздайте файл /mnt/boot/syslinux/syslinux.cfg. Вот пример файла конфигурации:\n\n```\n/boot/syslinux/syslinux.cfg на /dev/sda3\n```\n\n```\ntimeout 10\n\nui menu.c32\n\nlabel Other Linux\n    linux /boot/vmlinuz-linux\n    initrd /boot/initramfs-linux.img\n    append root=/dev/sda3 rw quiet\n\nlabel MAIN\n    com32 chain.c32\n    append hd0 0\n```\n\nВзято со страницы пользователя Djgera.\n\n"
+    },
+    {
+      "title": "Использование memtest",
+      "level": 3,
+      "content": "Установите пакет memtest86+ из официальных репозиториев.\n\nИспользуйте такую секцию LABEL для запуска memtest:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\n...\n LABEL memtest\n         MENU LABEL Memtest86+\n         LINUX ../memtest86+/memtest.bin\n...\n```\n\n"
+    },
+    {
+      "title": "HDT",
+      "level": 3,
+      "content": "HDT (Hardware Detection Tool) отображает информацию об аппаратном обеспечении. Как и раньше, файл .c32 должен быть скопирован из каталога /boot/syslinux/. Для информации PCI скопируйте файл /usr/share/hwdata/pci.ids в /boot/syslinux/pci.ids и добавьте следующее в ваш конфигурационный файл:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nLABEL hdt\n         MENU LABEL Hardware Info\n         COM32 hdt.c32\n```\n\n"
+    },
+    {
+      "title": "Перезагрузка и выключение",
+      "level": 3,
+      "content": "Используйте следующие секции для возможности перезагрузки или выключения вашей машины:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nLABEL reboot\n         MENU LABEL Reboot\n         COM32 reboot.c32\n \n LABEL poweroff\n         MENU LABEL Power Off\n         COM32 poweroff.c32\n```\n\n"
+    },
+    {
+      "title": "Очистка экрана",
+      "level": 3,
+      "content": "Для очистки экрана при выходе из меню добавьте следующую строку:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nMENU CLEAR\n```\n\n"
+    },
+    {
+      "title": "Раскладка клавиатуры",
+      "level": 3,
+      "content": "Если вам часто приходится редактировать параметры загрузки, вы можете захотеть изменить раскладку клавиатуры. Это позволит вам проще вводить \"=\", \"/\" и другие символы.\n\nСначала вы должны создать совместимую раскладку (в данном примере — немецкая):\n\n```\n$ cp /usr/share/kbd/keymaps/i386/qwertz/de.map.gz .\n$ cp /usr/share/kbd/keymaps/i386/qwerty/us.map.gz .\n$ gunzip de.map.gz\n$ gunzip us.map.gz\n$ mv de.map de.kmap\n$ mv us.map us.kmap\n# keytab-lilo de > de.ktl\n```\n\nСкопируйте файл de.ktl от имени суперпользователя в каталог /boot/syslinux/ и назначьте root'a владельцем:\n\n```\n# chown root:root /boot/syslinux/de.ktl\n```\n\nТеперь отредактируйте syslinux.conf, добавив:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nKBDMAP de.ktl\n```\n\n"
+    },
+    {
+      "title": "Скрытие меню",
+      "level": 3,
+      "content": "Используйте опцию:\n\n```\n/boot/syslinux/syslinux.cfg\n```\n\n```\nMENU HIDDEN\n```\n\nчтобы скрыть меню и отображать только таймер. Нажмите любую клавишу в это время, и меню появится на экране.\n\n"
+    },
+    {
+      "title": "PXELINUX",
+      "level": 3,
+      "content": "PXELINUX предоставляется пакетом syslinux.\n\nСкопируйте загрузчик {l,}pxelinux.0 (предоставляемый пакетом syslinux) в boot-каталог клиента. При использовании версии 5.00 (и более новых) также скопируйте ldlinux.c32 из того же пакета:\n\n```\n# cp /usr/lib/syslinux/bios/pxelinux.0 \"$root/boot\"\n# cp /usr/lib/syslinux/bios/ldlinux.c32 \"$root/boot\"\n# mkdir \"$root/boot/pxelinux.cfg\"\n```\n\nМы также создали каталог pxelinux.cfg, в котором PXELINUX по умолчанию ищет конфигурационные файлы. Поскольку мы не хотим иметь различий между разными MAC хоста, мы создаем конфигурацию по умолчанию:\n\n```\n# vim \"$root/boot/pxelinux.cfg/default\"\n```\n\n```\ndefault linux\n\nlabel linux\nkernel vmlinuz-linux\nappend initrd=initramfs-linux.img quiet ip=:::::eth0:dhcp nfsroot=10.0.0.1:/arch\n```\n\nИли, если вы используете NBD, пропишите следующую строку:\n\n```\nappend ro initrd=initramfs-linux.img ip=:::::eth0:dhcp nbd_host=10.0.0.1 nbd_name=arch root=/dev/nbd0\n```\n\nPXELINUX использует тот же синтаксис конфигурации, что и SYSLINUX; обратитесь к upstream-документации для получения дополнительной информации.\n\nЯдро и initramfs будут переданы через TFTP, так что пути к ним должны быть прописаны относительно корня TFTP.\n\nДля загрузки pxelinux замените filename \"/grub/i386-pc/core.0\"; в /etc/dhcpd.conf на filename \"/pxelinux.0\"\n\n"
+    },
+    {
+      "title": "Загрузка файлов образа ISO9660 при помощи memdisk",
+      "level": 3,
+      "content": "Syslinux поддерживает прямую загрузку из ISO-образов при помощи модуля memdisk. Для просмотра примеров обратитесь к разделу Использование Syslinux и memdisk.\n\n"
+    },
+    {
+      "title": "Использование приглашения Syslinux",
+      "level": 3,
+      "content": "Вы можете ввести имя блока LABEL записи, которую вы хотите загрузить (из тех, что указаны в файле syslinux.cfg). Если вы использовали конфигурации из приведенных примеров, просто напишите:\n\n```\nboot: arch\n```\n\nЕсли вы получите ошибку о том, что конфигурационный файл не может быть загружен (configuration file could not be loaded), вы можете передать необходимые параметры загрузки, например:\n\n```\nboot: ../vmlinuz-linux root=/dev/sda2 rw initrd=../initramfs-linux.img\n```\n\nЕсли у вас нет доступа к boot: в ramfs, и, следовательно, временно не можете загрузить ядро:\n\n```\n# mkdir -p /new_root\n```\n\n```\n# mount /dev/sd[a-z][1-9] /new_root\n```\n\n"
+    },
+    {
+      "title": "Fsck не работает на корневом разделе",
+      "level": 3,
+      "content": "Если журнал корневой файловой системы поврежден, в ramfs emergency shell примонтируйте корневую файловую систему:\n\n```\n# mount /dev/корневой раздел /new_root\n```\n\nИ возьмите оттуда двоичный файл tune2fs (он не включен в состав Syslinux):\n\n```\n# cp /new_root/sbin/tune2fs /sbin/\n```\n\nСледуйте инструкциям в fsck#ext2fs: no external journal для создания нового журнала корневого раздела.\n\n"
+    },
+    {
+      "title": "No Default or UI found on some computers",
+      "level": 3,
+      "content": "Некоторые производители материнских плат предоставляют меньшую совместимость загрузки с устройств USB, чем другие. В то время, как устройства USB, отформатированные в ext4, могут загружаться на более свежих компьютерах, некоторые машины могут зависнуть, если загрузочный раздел, содержащий ядро и initrd, не является разделом FAT16. Для предотвращения загрузки ldlinux на более старых машинах и провала чтения syslinux.cfg, используйте cfdisk, чтобы создать раздел FAT16 (<=2GB), и отформатируйте его при помощи пакета dosfstools:\n\n```\n# mkfs.msdos -F 16 /dev/sda1\n```\n\nЗатем установите и настройте Syslinux.\n\n"
+    },
+    {
+      "title": "Missing operating system",
+      "level": 3,
+      "content": "Если вы видите это сообщение, удостоверьтесь, что разделу, содержащему /boot, присвоен boot-флаг. Если флаг включен, возможно, раздел начинается с сектора 1, а не с 63 или 2048. Проверьте это с помощью fdisk -l. Если предположение верно, вы можете передвинуть раздел(ы) при помощи gparted с диска восстановления. Или же, если у вас отдельный загрузочный раздел, вы можете создать резервную копию /boot при помощи\n\n```\n# cp -a /boot /boot.bak\n```\n\nа затем загрузиться с установочного образа Arch. Далее используйте cfdisk, чтобы удалить раздел /boot и создать его заново. Теперь он должен начинаться с правильного сектора, 63. Примонтируйте ваши разделы и выполните chroot. Восстановите /boot следующей командой:\n\n```\n# cp -a /boot.bak/* /boot\n```\n\nПроверьте правильность файла /etc/fstab, выполните:\n\n```\n# syslinux-install_update -iam\n```\n\nи перезагрузитесь.\n\nВы также получите это сообщение об ошибке, если пытаетесь загрузиться с массива RAID 1 и создали массив с слишком новой версией метаданных, которую Syslinux не понимает. По состоянию на август 2013 года по умолчанию mdadm создаст массив с версией 1.2 метаданных, но Syslinux не понимает версии, новее 1.0. В этом случае вам необходимо пересоздать массив RAID, используя флаг --metadata=1.0 в mdadm.\n\n"
+    },
+    {
+      "title": "Windows загружается, игнорируя Syslinux",
+      "level": 3,
+      "content": "Решение: Убедитесь, что разделу, содержащему /boot, присвоен boot-флаг. Также убедитесь, что этот флаг не включен на разделе с Windows. Смотрите раздел установки выше.\n\nMBR, идущий в Syslinux, ищет первый активный раздел, имеющий boot-флаг. Раздел с Windows, вероятно, был найден первым и имел этот флаг.\n\n"
+    },
+    {
+      "title": "После выбора пункта меню ничего не происходит",
+      "level": 3,
+      "content": "Вы выбираете пункт меню, и ничего не происходит, экран только \"обновляется\". Обычно это означает, что в файле syslinux.cfg имеется ошибка. Нажмите Tab для редактирования параметров загрузки. В качестве альтернативы, вы можете нажать Esc и прописать имя блока LABEL вашей загрузочной записи (например, arch). Другой причиной может быть то, что у вас не установлено ядро. Найдите способ получить доступ к вашей файловой системе (например, используя live CD), удостоверьтесь, что файл /mount/vmlinuz-linux существует и имеет ненулевой размер. Если это не так, переустановите ядро.\n\n"
+    },
+    {
+      "title": "Невозможно удалить ldlinux.sys",
+      "level": 3,
+      "content": "Файл ldlinux.sys имеет защитный атрибут, предотвращающий его удаление или перезапись. Это сделано потому, что расположение файла не должно меняться, иначе Syslinux должен быть переустановлен. Чтобы удалить его, выполните:\n\n```\n# chattr -i /boot/syslinux/ldlinux.sys\n# rm /boot/syslinux/ldlinux.sys\n```\n\n"
+    },
+    {
+      "title": "Белый блок в верхнем левом углу при использовании vesamenu",
+      "level": 3,
+      "content": "Проблема: По состоянию на linux-3.0, драйвер modesetting пытается сохранять текущее содержимое экрана после смены разрешения (по крайней мере, это происходит с моим Intel, когда Syslinux работает в текстовом режиме). Возникает ошибка с комбинированием модуля vesamenu в Syslinux (белый блок — попытка сохранить меню Syslinux, но драйвер не может \"ухватить\" картинку из графического режима vesa).\n\nЕсли у вас прописано свое разрешение и vesamenu с ранним modesetting, попробуйте проделать следующее с вашим syslinux.cfg для удаления белого блока и продолжения вывода графического режима:\n\n```\nAPPEND root=/dev/sda6 rw 5 vga=current quiet splash\n```\n\n"
+    },
+    {
+      "title": "Chainloading Windows не работает, когда она установлена на другом диске",
+      "level": 3,
+      "content": "Если Windows установлена не на том диске, на котором установлен Arch, и у вас возникает проблема с передачей управления другому загрузчику, попробуйте следующую конфигурацию:\n\n```\nLABEL Windows\n       MENU LABEL Windows\n       COM32 chain.c32\n       APPEND mbr:0xdfc1ba9e swap\n```\n\nЗамените код mbr тем, что есть на диске с windows (детали выше), и добавьте swap в опции.\n\n"
+    },
+    {
+      "title": "Чтение логов загрузчика",
+      "level": 3,
+      "content": "В некоторых случаях, например, когда загрузчику не удается загрузить ядро, крайне желательно узнать дополнительную информацию о процессе загрузки. Syslinux отображает сообщения об ошибках на экране, но появляющееся меню быстро их скрывает. Чтобы избежать этого, необходимо отключить menu UI в syslinux.cfg и использовать приглашение по умолчанию — \"command-line\". Это означает:\n\n- Отменить указание UI\n- Отменить ONTIMEOUT\n- Отменить ONERROR\n- Отменить MENU CLEAR\n- Использовать больший TIMEOUT\n- Использовать PROMPT 1\n- Использовать DEFAULT <problematic_label>\n\nДля получения более информативных отладочных сообщений необходимо перекомпилировать пакет syslinux с дополнительными CFLAGS:\n\n```\n-DDEBUG_STDIO=1 -DCORE_DEBUG=1\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Официальный сайт\n- Конфигурация PXELinux[устаревшая ссылка 2020-08-06 ⓘ]\n- Мультизагрузка USB с использованием Syslinux[устаревшая ссылка 2020-08-06 ⓘ]\n\n"
+    }
+  ]
+}

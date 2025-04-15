@@ -1,0 +1,136 @@
+{
+  "title": "Solid State drive (Español)",
+  "url": "https://wiki.archlinux.org/title/Solid_State_drive_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-02-23** \n\nArtículos relacionados\n\n- Solid state drive/NVMe\n- Solid state drive/Memory cell clearing\n- Benchmarking/Data storage devices\n- Improving performance (Español)#Dispositivos de almacenamiento\n\nEste articulo abarca temas espaciales para operar Unidades de estado sólido (en inglés: SSDs) y otros tipos de almacenamiento de datos basados en flash. Si quiere particionar un SSD para algún objetivo en especifico, puede que le sea útil ver la Lista de sistemas de archivos optimizados para memoria flash (en inglés). Para uso general, simplemente elija su Sistema de archivos preferido.\n\n"
+    },
+    {
+      "title": "TRIM",
+      "level": 3,
+      "content": "La mayoría de los SSD soportan el comando ATA_TRIM para mantener el rendimiento a largo plazo y nivelar el desgaste. Un artículo de TechSpot compara el rendimiento de un disco antes y después de ser llenado de datos.\n\nDesde la versión 3.8 del kernel de Linux, el soporte para TRIM se ha añadido a los distintos sistemas de archivos de manera continua. Vea la siguiente tabla para un resumen indicativo:\n\nTable content:\nSistema de archivos | TRIM continuo(opción discard) | TRIM periódico(fstrim) | Referenciasy notas\nBtrfs | Sí | Sí | \nExt3 | No | ? | \nExt4 | Sí | Sí | \"discard, nodiscard(*)\" en [1]\nF2FS | Sí | Sí | \nJFS | Sí | Sí | [2]\nNILFS2 | Sí | Sí | \nNTFS-3G | No | Sí | Desde la versión 2015.3.14, [3]\nVFAT | Sí | Sí | fstrim es soportado desde la versión 4.19 del kernel\nXFS | Sí | Sí | [4]\n\nPara verificar que su disco soporte TRIM, ejecute:\n\n```\n$ lsblk --discard\n```\n\nY vea los valores de las columnas DISC-GRAN (granlaridad de descarte) y DISC-MAX (bytes maximos por descarte). Los valores que no sean cero indican soporte para TRIM.\n\nAlternativamente, instale el paquete hdparm y ejecute:\n\n```\n# hdparm -I /dev/sda | grep TRIM\n```\n\n```\n*  Data Set Management TRIM supported (limit 1 block)\n```\n\n"
+    },
+    {
+      "title": "TRIM periódico",
+      "level": 4,
+      "content": "El paquete util-linux provee los archivos de unidad de systemd fstrim.service y fstrim.timer. Al habilitar el temporizador, el servicio se va a ejecutar una vez a la semana. El servicio ejecuta fstrim(8) en todos los sistemas de archivos de los dispositivos que soporten la operación discard.\n\nEl temporizador depende en la marca de tiempo de /var/lib/systemd/timers/stamp-fstrim.timer (el cual va a ser creado en la primera invocación) para saber si es que ha pasado una semana desde la ultima invocación. Así que no hay que preocuparse si se va a ejecutar muy frecuentemente, como de una manera anacron.\n\nPara averiguar el comportamiento y estatus de las unidades, vea journalctl. Par cambiar la periodicidad del temporizador o el comando a ejecutar, edite los archivos de unidad proveídos.\n\n"
+    },
+    {
+      "title": "TRIM continuo",
+      "level": 4,
+      "content": "Note: **o** \n\nEn vez de ejecutar los comandos TRIM cada tanto (por defecto es una vez por semana si usa fstrim.timer), también es posible emitirlos cada vez que un archivo es borrado. Eso ultimo se conoce como TRIM continuo.\n\nUsando la opción de montado discard en /etc/fstab habilita TRIM continuo al operar el dispositivo:\n\n```\n/dev/sda1 /      ext4 defaults,discard  0 1\n```\n\nEn un sistema de archivos ext4, el parámetro discard puede ser establecido como la opción de montado por defecto usando tune2fs:\n\n```\n# tune2fs -o discard /dev/sdXY\n```\n\nUsar las opciones de montado por defecto en vez de una entrada en /etc/fstab es particularmente útil para discos externos, por que esa particion será montada con las opciones por defecto también en otras maquinas. De esta manera, no se tendrá que editar /etc/fstab en cada maquina.\n\n"
+    },
+    {
+      "title": "TRIM un dispositivo completo",
+      "level": 4,
+      "content": "Si quiere hacerle TRIM a un dispositivo completo de una sola vez, p.ej. para una nueva instalación, o si quiere vender su SSD, puede usar el comando blkdiscard, el cual va a descartar todos los bloques instantáneamente en un dispositivo.\n\n```\n# blkdiscard /dev/sdX\n```\n\n"
+    },
+    {
+      "title": "LVM (Gestor de Volúmenes Lógicos)",
+      "level": 4,
+      "content": "Las peticiones TRIM que son enviadas desde el sistema de archivos al volumen lógico son enviadas automáticamente a o los volúmenes físicos. No se necesita configuración adicional.\n\nNinguna de las operaciones LVM (lvremove, lvreduce, y todas las otras) envían peticiones TRIM a o los volúmenes físicos por defecto. Esto para permitir restaurar la configuración previa del grupo de volúmenes con vgcfgrestore(8). El valor de issue_discards en /etc/lvm/lvm.conf controla si los descartes son enviados a los volúmenes físicos subyacentes del volumen lógico cuando este ya no esta ocupando el espacio del volumen físico.\n\n"
+    },
+    {
+      "title": "dm-crypt",
+      "level": 4,
+      "content": "Para los sistemas de archivos que no sean raíz, configure /etc/crypttab para que incluya discard en la lista de opciones para dispositivos de bloques encriptados (vea dm-crypt/System configuration#crypttab).\n\nPara el sistema de archivos raíz, siga las instrucciones de dm-crypt (Español)/Specialties (Español)#Soporte Discard/TRIM para unidades de estado sólido (SSD) para añadir el parámetro del kernel apropiado a la configuración del gestor de arranque.\n\n"
+    },
+    {
+      "title": "Maximizar el rendimiento",
+      "level": 3,
+      "content": "Siga los consejos en Improving performance (Español)#Dispositivos de almacenamiento para maximizar en rendimiento de sus discos.\n\n"
+    },
+    {
+      "title": "Tamaño nativo del sector",
+      "level": 4,
+      "content": "La mayoría de SSDs reportan que el tamaño de sus sectores es de 512 bytes a pesar de usar sectores de un tamaño mayor (tipicamente de 4 kB, 8 kB, o algunas veces mas). Al reportarse como dispositivos de 512 bytes, los sistemas de archivos no pueden optimizarse automáticamente para el tamaño nativo de sus sectores, y esto debe ser especificado manualmente al crearlo para evitar un rendimiento menos optimo.\n\nComo alternativa a definir el tamaño de sector detectado automáticamente, a algunos SSDs se les puede cambiar el tamaño de sus sectores en el formato para que reporten un tamaño más parecido al que tienen.\n\nPara ver si un dispositivo NVMe lo soporta, use el comando Identificar «Namespace».\n\n```\n# nvme id-ns /dev/nvme0n1\n```\n\n```\nnlbaf  : 0\n[...]\nlbaf 0 : ms:0  lbads:9 rp:0 (in use)\n```\n\nnlbaf es la cantidad de formatos LBA menos 1, para que así haya solo un formato soportado. La lista de formatos esta al final de la salida. lbaf 0 significa formato LBA #0. Tiene un lbads (Tamaño de Datos LBA: LBA data size) de 9, lo que significa que los sectores son de 29 o 512 bytes. Si el dispositivo puede ocupar sectores de 4 kB, habrá otra entrada con 12 lbads. El valor de rp (Rendimiento Relativo: Relative Performance) indica que formato va a dar el mejor rendimiento, siendo 0 el mejor. ms es (probablemente) el numero de bytes de metadatos extra por sector, y esto no esta soportado muy bien en Linux, así que lo mejor es seleccionar un formato con un valor de 0 aquí.\n\nPara cambiar el tamaño del sector, use nvme format y especifique el valor preferido con el parámetro --lbaf.\n\nPara dispositivos SATA, debe usar los programas proveídos por el manufacturador. No todos los dispositivos SATA soportan que el tamaño de sus sectores sea cambiado.\n\n- Intel: Use la Intel Memory and Storage (MAS) (Herramienta de Memoria y Almacenamiento de Intel) (intel-mas-cli-toolAUR) con la opción -set PhysicalSectorSize=4096.\n\n"
+    },
+    {
+      "title": "Hdparm muestra un estado de \"frozen\" «congelado»",
+      "level": 4,
+      "content": "El BIOS de algunas placas madre dan un comando de «congelado de seguridad» a los dispositivos de almacenamiento conectados al iniciarse. Como también el BIOS de algunos SSDs (y HDDs) están puestos con «congelado de seguridad» de fábrica. Ambos resultan en que la contraseña de los ajustes de seguridad del dispositivo esté congelada (frozen), como se muestra en la salida siguiente:\n\n```\n# hdparm -I /dev/sda\n```\n\n```\nSecurity: \n \tMaster password revision code = 65534\n \t\tsupported\n \tnot\tenabled\n \tnot\tlocked\n \t\tfrozen\n \tnot\texpired: security count\n \t\tsupported: enhanced erase\n \t4min for SECURITY ERASE UNIT. 2min for ENHANCED SECURITY ERASE UNIT.\n```\n\nLas operaciones como hacerle formato al dispositivo o instalar un sistema operativo no son afectadas por el «congelado de seguridad».\n\nLa salida anterior muestra que el dispositivo no está bloqueado (not locked) por la contraseña al iniciar del HDD o la protección anti malware del estado congelado (frozen) (el que evita que el dispositivo sea bloqueado con una contraseña durante la ejecución de un malware).\n\nSi lo que pretende es ponerle contraseña a un dispositivo «congelado», va a requerir un BIOS de una placa madre que lo soporte. Muchos portátiles lo soportan por que es un requisito para las unidades con autocifrado, el puede que el soporte no sea trivial para la placa de un servidor o computador de escritorio. Para la placa Intel DH67CL/BL, esta tiene que ponerse en «modo de mantenimiento» con un jumper para acceder a la configuración (vea [10], [11][enlace roto 2023-07-30]).\n\nSi lo que quiere es borrar los datos del SSD, vea Securely wipe disk (Español)#hdparm y #Limpiado de células de memoria en SSDs.\n\n"
+    },
+    {
+      "title": "Limpiado de células de memoria en SSDs",
+      "level": 4,
+      "content": "En alguna ocasión, el usuario puede querer restaurar las células de un SSD al estado virginal que tenia cuando fue instalado, por lo tanto, restaurándolo a su velocidad de escritura de fábrica por defecto. La velocidad de escritura tiende a degradarse a través del tiempo incluso en SSDs con soporte nativo para TRIM. TRIM solo protege contra el borrado de archivos, no contra el reemplazo de estos con, p.ej., guardado incremental.\n\nEsa restauración se puede hacer fácilmente con los tres pasos mencionados en el artículo SSD memory cell clearing. Si la razón para restaurar su estado es para sacarle los datos al disco, puede que no quiera utilizar el BIOS para realizarlo de manera segura. Vea Securely wipe disk (Español)#Memoria flash para más información y ejemplos de como limpiar los datos del disco.\n\n"
+    },
+    {
+      "title": "Unidades con autocifrado",
+      "level": 4,
+      "content": "Como se muestra en #Hdparm muestra un estado de \"frozen\" «congelado», ponerle una contraseña un dispositivo de almacenamiento (SSD/HDD) en el BIOS puede también inicializar la encriptación por hardware de los dispositivos que lo soporten. Si el dispositivo se rige por el estándar OPAL, esto se puede hacer sin la capacidad d respectiva el BIOS de poner una contraseña, vea unidades con autocifrado.\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 2,
+      "content": "Es posible que el problema que está experimentando sea un bug del firmware que no sea especifico de Linux, así que antes de intentar solucionar el problema que afecte al SSD, debe ver si hay actualizaciones disponibles para:\n\n- El firmware del SSD\n- El firmware del BIOS del la placa madre\n\nIncluso si es un bug en el firmware, puede que sea posible evitarlo. Así que si no hay actualizaciones para el firmware o si se siente vacilante al actualizarlo, lo siguiente puede ayudarlo.\n\n"
+    },
+    {
+      "title": "Solucionando errores de NCQ",
+      "level": 3,
+      "content": "Algunos SSDs y chipsets SATA no funcionan correctamente con Linux Native Command Queueing (NCQ) (Cola de Comandos Nativa de Linux). Algunos errores comunes en dmesg se parecen a esto:\n\n```\n[ 9.115544] ata9: exception Emask 0x0 SAct 0xf SErr 0x0 action 0x10 frozen\n[ 9.115550] ata9.00: failed command: READ FPDMA QUEUED\n[ 9.115556] ata9.00: cmd 60/04:00:d4:82:85/00:00:1f:00:00/40 tag 0 ncq 2048 in\n[ 9.115557] res 40/00:18:d3:82:85/00:00:1f:00:00/40 Emask 0x4 (timeout)\n```\n\nPara deshabilitar NCQ al inicio, añada libata.force=noncq a la consola del kernel en la configuración del gestor de arranque. Para deshabilitar NCQ en el disco 0 en el puerto 9, use libata.force=9.00:noncq\n\nAlternativamente, puede deshabilitar NCQ para un disco en especifico sin tener que reiniciar con sysfs:\n\n```\n# echo 1 > /sys/block/sdX/device/queue_depth\n```\n\nSi esto (y ademas de actualizar el firmware) no resuelve el problema o causa otros más, entonces, haga un reporte de errores.\n\n"
+    },
+    {
+      "title": "Solucionando problemas relacionados a la gestión de energía de SATA",
+      "level": 3,
+      "content": "Algunos SSDs (p.ej. Transcend MTS400) fallan cuando cuando SATA Active Link Power Management, ALPM, está habilitado. ALPM está deshabilitado por defecto, y es habilitado por un demonio de ahorro de energía (p.ej. TLP, Laptop Mode Tools).\n\nSi empieza a tener problemas relacionados con SATA al ocupar esa clase de demonios, puede intentar deshabilitar ALPM estableciendo su estado a max_performance tanto para la batería como los perfiles alimentados por CA.\n\n"
+    },
+    {
+      "title": "SSD externo con soporte TRIM",
+      "level": 3,
+      "content": "Varios chips puente de USB-a-SATA (como VL715, VL716 etc.) y de USB-a-PCIe (como el JMicron JMS583 usados en carcasas para NVMe como IB-1817M-C31) soportan que comandos parecidos a los de TRIM sean enviados a través del controlador de USB Attached SCSI (llamado «uas» en Linux).\n\nPero el kernel puede que no detecte esta característica automáticamente, y no usarla. Asumiendo que que el dispositivo de bloques es /dev/sdX, usted puede ver si la soporta usando el comando:\n\n```\nsg_readcap -l /dev/sdX\n```\n\nSi en la salida encuentra una linea que diga «Logical block provisioning: lbpme=0», entonces ya sabe que el kernel asume que el dispositivo no soporta «Logical Block Provisioning Management (Gestión de Aprovisionamiento de Bloques Lógicos)» porque el bit (LBPME) no esta puesto.\n\nSi ese es el caso, entonces puede ver si la pagina de «Vital Product Data» (VPD) (Datos Vitales del Producto) en «Logical Block Provisioning» de su dispositivo dice los métodos soportados para desmapear datos. Puede hacer esto con el comando:\n\n```\nsg_vpd -a /dev/sdX\n```\n\nBusque lineas como estas en la salida:\n\n```\nUnmap command supported (LBPU): 1\nWrite same (16) with unmap bit supported (LBPWS): 0\nWrite same (10) with unmap bit supported (LBPWS10): 0\n```\n\nEste ejemplo le muestra que su dispositivo soporta el comando «UNMAP».\n\nVea la salida de:\n\n```\ncat /sys/block/sdX/device/scsi_disk/*/provisioning_mode\n```\n\nSi el kernel no detecto la capacidad de desmapear datos en su dispositivo, entonces esto va a retornar probablemente «full» (lleno). Aparte del «full», el controlador de almacenamiento SCSI del kernel puede usar los siguientes valores para el «provisioning_mode»:\n\n```\nunmap\nwritesame_16\nwritesame_10\nwritesame_zero\ndisabled\n```\n\nPara el ejemplo anterior, puede establecer «provisioning_mode» a «unmap» para pedirle al kernel que lo use:\n\n```\necho \"unmap\" >/sys/block/sdX/device/scsi_disk/*/provisioning_mode\n```\n\nEsto debería permitirle usar inmediatamente herramientas como «blkdiscard» en /dev/sdX o «fstrim» en los sistemas de archivos montados en /dev/sdX.\n\nSi quiere habilitar automáticamente «provisioning_mode» cuando un dispositivo de cierto proveedor/producto sea conectado, puede ser automatizado con el mecanismo «udev». Primero, encuentre el Proveedor USB y las Ids del Producto:\n\n```\ncat /sys/block/sdX/../../../../../../idVendor\ncat /sys/block/sdX/../../../../../../idProduct\n```\n\nY entonces, cree o añada a un archivo de reglas udev (Por ejemplo usando un idVendor de 152d e idProduct de 0583):\n\n```\necho 'ACTION==\"add|change\", ATTRS{idVendor}==\"152d\", ATTRS{idProduct}==\"0583\", SUBSYSTEM==\"scsi_disk\", ATTR{provisioning_mode}=\"unmap\"' >>/etc/udev/rules.d/10-uas-discard.rules\n```\n\n(Usted también puede usar el comando lsusb para buscar el idVendor/idProduct.)\n\n"
+    },
+    {
+      "title": "ADATA",
+      "level": 3,
+      "content": "ADATA tiene una utilidad disponible para linux (i686) en su pagina de soporte[enlace roto 2024-12-15]. El enlace para el firmware más reciente va a aparecer después de seleccionar el modelo. La utilidad de actualizado para Linux viene con el firmware y tiene que ser ejecutada como root. Puede que necesite darle los permisos correctos al archivo binario primero.\n\n"
+    },
+    {
+      "title": "Crucial",
+      "level": 3,
+      "content": "Crucial provee la opción de actualizar el firmware con una imagen ISO. Estas imágenes pueden ser encontradas después de seleccionar el producto en su SSD pagina de soporte y descargando el «Manual Boot File» (Archivo de Inicio Manual).\n\nLos que posean un modelo M4 Crucial pueden ver si una actualización para el firmware es necesaria con smartctl.\n\n```\n$ smartctl --all /dev/sdX\n```\n\n```\n==> WARNING: This drive may hang after 5184 hours of power-on time:\nhttps://www.tomshardware.com/news/Crucial-m4-Firmware-BSOD,14544.html\nSee the following web page for firmware updates:\nhttps://www.crucial.com/usa/en/support-ssd\n```\n\nA los usuarios que obtengan esta advertencia se les recomienda respaldar todos sus datos importantes y considerar actualizar inmediatamente. Vea estas instrucciones para actualizar el firmware del Crucial MX100 usando la imagen ISO y Grub.\n\n"
+    },
+    {
+      "title": "Intel",
+      "level": 3,
+      "content": "Intel tiene una Herramienta de Actualizado de Firmware basada en un sistema Linux para sistemas operativos que no sean compatibles con el software «Caja de herramientas para Unidades de estado solido de Intel®» para Windows.\n\nTambién esta una nueva herramienta de consola para Linux que puede reinstalar el firmware llamada Intel Memory and Storage (MAS) Tool (Herramienta de Memoria y Almacenado de Intel) disponible en el AUR como intel-mas-cli-toolAUR. También hay una guiá para el usuario en PDF[enlace roto 2024-07-30] disponible.\n\nUn ejemplo de como revisar e estado del firmware es:\n\n```\n# intelmas show -intelssd 0\n```\n\n```\nDevicePath : /dev/nvme0n1\nDeviceStatus : Healthy\nFirmware : 002C\nFirmwareUpdateAvailable : The selected Intel SSD contains current firmware as of this tool release.\n```\n\n-intelssd 0 puede ser omitido si solo hay un solo SSD Intel en el sistema, o puede pasar 1 para el segundo SSD, y así sucesivamente.\n\nSi hay una actualización disponible, esta puede ser instalada ejecutando intelmas load -intelssd 0. La guiá de usuario sugiere que este procedimiento debe ser realizado dos veces en Linux, con un reinicio entremedio. El firmware más reciente es distribuido como parte de la herramienta MAS, así que no es necesario descargarlo de manera separada.\n\n"
+    },
+    {
+      "title": "Kingston",
+      "level": 3,
+      "content": "La herramienta KFU esta disponible en el AUR para los discos basados en Sandforce, kingston_fw_updaterAUR.\n\n"
+    },
+    {
+      "title": "Mushkin",
+      "level": 3,
+      "content": "Los discos de una marca menos conocida, Mushkin, también ocupan los controladores de Sandforce, y tienen una utilidad para Linux (casi idéntica a la de Kingstone) para actualizar su firmware.\n\n"
+    },
+    {
+      "title": "OCZ",
+      "level": 3,
+      "content": "OCZ tiene una Command Line Online Update Tool (CLOUT) (Herramienta de Actualización por Internet Para Consola) disponible para Linux. El AUR provee ocz-ssd-utilityAUR, ocztoolboxAUR y oczcloutAUR.\n\n"
+    },
+    {
+      "title": "Samsung",
+      "level": 3,
+      "content": "Samsung señala que otros métodos de actualización aparte de usar su Magician Software «no están soportados», pero es posible actualizar. El Magician Software puede ser usado para hacer un USB del que se pueda iniciar con la actualización del firmware. Samsung provee imágenes ISO arrancables que se pueden usar para actualizar el firmware. Otra opción es usar el samsung_magician-consumer-ssdAUR de Samsung, que esta disponible en el AUR. Magician solo soporta SSDs de marca Samsung; los que son manufacturados por Samsung para los OEM (p.ej. Lenovo) no son soportados.\n\nLos usuarios que prefieran hacer la actualización de firmware desde el live USB creado en Linux (sin ocupar el software «Magician» de Sansung en Microsoft Windows) pueden referirse a este articulo por referencia.\n\n"
+    },
+    {
+      "title": "Actualizando en Linux",
+      "level": 4,
+      "content": "Alternativamente, el firmware puede actualizarse de manera nativa, sin tener que hacer un USB arrancable, como se muestra más abajo. Primero visite la pagina de descargas de Samsung y descargue el firmware más reciente para Windows, el que esta disponible como una imagen de disco. Desde aquí en adelante, Samsung_SSD_840_EVO_EXT0DB6Q.iso se usa como nombre de archivo de ejemplo, así que cámbielo debidamente.\n\nConfigure la imagen del disco:\n\n```\n$ udisksctl loop-setup -r -f Samsung_SSD_840_EVO_EXT0DB6Q.iso\n```\n\nEsto va a hacer que la imagen ISO este disponible como un loop device, y va a mostrar su ubicación. Asumiendo que esa es /dev/loop0:\n\n```\n$ udisksctl mount -b /dev/loop0\n```\n\nObtenga el contenido del disco:\n\n```\n$ mkdir Samsung_SSD_840_EVO_EXT0DB6Q\n$ cp -r /run/media/$USER/CDROM/isolinux/ Samsung_SSD_840_EVO_EXT0DB6Q\n```\n\nDesmonte el disco:\n\n```\n$ udisksctl unmount -b /dev/loop0\n$ cd Samsung_SSD_840_EVO_EXT0DB6Q/isolinux\n```\n\nHay una imagen de FreeDOS que contiene el firmware. Monte la imagen como antes:\n\n```\n$ udisksctl loop-setup -r -f btdsk.img\n$ udisksctl mount -b /dev/loop1\n$ cp -r /run/media/$USER/C04D-1342/ Samsung_SSD_840_EVO_EXT0DB6Q\n$ cd Samsung_SSD_840_EVO_EXT0DB6Q/C04D-1342/samsung\n```\n\nObtenga el numero de disco con magician:\n\n```\n# magician -L\n```\n\nAsumiendo que es 0:\n\n```\n# magician --disk 0 -F -p DSRD\n```\n\nVerifique que el firmware más reciente este instalado:\n\n```\n# magician -L\n```\n\nFinalmente, reinicie.\n\n"
+    },
+    {
+      "title": "SanDisk",
+      "level": 3,
+      "content": "SanDisk hace imágenes ISO del firmware para permitir actualizar el firmware en sistemas operativos que no son soportados por su «SanDisk SSD Toolkit».\n\nUno debe elegir el firmware para el modelo del SSD correcto, y la capacidad correcta que tiene (p.ej. 60GB, o 256GB). Después de aplicar la imagen ISO con el firmware, simplemente reinicie el PC para iniciar desde el CD/DVD arrancable (puede que funcione desde un USB).\n\nLas imágenes ISO solo contienen un kernel de Linux y un initrd. Extraigalos a la partición /boot e inicie con ellos con GRUB o Syslinux para actualizar el firmware.\n\nVea también:\n\n- SanDisk Extreme SSD Notas de la versión del firmware[enlace roto 2024-12-15] y Actualización manual del firmware versión R211[enlace roto 2024-12-15]\n- SanDisk Ultra SSD Notas de la versión del firmware[enlace roto 2024-12-15] y Actualización manual del firmware versión 365A13F0[enlace roto 2024-12-15]\n- SanDisk Ultra+ SSD Notas de la versión del firmware[enlace roto 2024-12-15] y Actualización manual del firmware versión X2316RL[enlace roto 2024-12-15] - use smartctl -a /dev/sdX para determinar si esta ocupando un modelo «H2» o «HP».\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Discusión en Reddit acerca de instalar Arch Linux en un SSD (en inglés)\n- Re: Cambiando el Leafsize y Nodesize en Btrfs\n- Re: Alineación del SSD y tamaño del sector en Btrfs (en inglés)\n- ¿Información falsa de (el alineado de) Erase Block? (en inglés)\n- ¿Se necesita alinear el tamaño de Erase Block en SSDs modernos? (en inglés)\n- Soportando la operación eficaz de SSDs en Btrfs (en inglés)\n- SSD, tamaño de Erase Block y LVM: PV en un dispositivo en bruto, Alineamiento (en inglés)\n\n"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "title": "MSI GE75 Raider 8SX",
+  "url": "https://wiki.archlinux.org/title/MSI_GE75_Raider_8SX",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nTouchpad |  | Minor Issues\nKeyboard | 1038:1122 | Yes\nGPU (Intel) | 8086:3e9b | Yes\nRTX 2080 |  | Untested\nRTX 2070 |  | Untested\nRTX 2060 | 10de:1f11 | Yes\nWebcam | 5986:211c | Yes\nEthernet | 1969:e0b1 | Yes\nBluetooth | 8087:0aaa | Yes\nSD-card reader | 0bda:0129 | Untested\nAudio | 8086:a348 | Needs Configuration\nWireless | 8086:a370 | Yes\nTPM |  | Untested\n\nMSI GE75 Raider 8SX refers to the following laptop models:\n\n- MSI GE75 Raider 8SG\n- MSI GE75 Raider 8SF\n- MSI GE75 Raider 8SE\n\nThe only apparent difference between the models is the dedicated Nvidia GPU.\n\n"
+    },
+    {
+      "title": "CPU",
+      "level": 2,
+      "content": "Like with many laptop models, these models seem to be designed to run your CPU at a steamy 90+°C when under load. The thermals are already better than on Windows out of the gate on Arch Linux, thermals (and therefore performance) can and should be further improved by undervolting via the intel-undervolt utility, you do this at your own risk.\n\nDisabling CPU vulnerability mitigations can also improve performance significantly for this machine, like with undervolting you do this at your own risk.\n\n"
+    },
+    {
+      "title": "Integrated graphics",
+      "level": 3,
+      "content": "The iGPU works without problems, has Intel GVT-g support too.\n\n"
+    },
+    {
+      "title": "8SG (Nvidia RTX 2080)",
+      "level": 3,
+      "content": "Untested (Should work fine on proprietary nvidia driver)\n\n"
+    },
+    {
+      "title": "8SF (Nvidia RTX 2070)",
+      "level": 3,
+      "content": "Untested (Should work fine on proprietary nvidia driver)\n\n"
+    },
+    {
+      "title": "8SE (Nvidia RTX 2060)",
+      "level": 3,
+      "content": "Although the dedicated graphics seem to be working perfectly with PRIME, there are a few odd issues that might occur on the 8SE.\n\n- Performance issues of various kinds when the display refresh rate is misconfigured (correct refresh rate is 144hz)\n- Hard system (GPU Driver Crash?) freeze when running some games with VSync disabled (Tested in Subnautica and No Man's Sky) and in some games for unknown reasons (War Thunder); It also happens when recording long videos with ffmpeg using nvenc (5 min+). This issue can be solved by not using PRIME offloading (e.g. use the dGPU as your main graphics card for X, for instance through optimus-manager-gitAUR)\n- *RESOLVED* When using mpv with its vulkan renderer, you may experience major issues when resizing the window. Setting vulkan-queue-count=1 and swapchain-depth=1 fixes the issue. See git issue for mpv.\n- Prime-sync seems not to work when following common instructions to enable it/check if it is enabled, although functionally the card is fine when used with prime, when using the dgpu to run x (with nvidia-xurn or optimus manager) instead of the iGPU, there will be a very high amount of tearing.\n\nThe crashing and mpv issues could be regressions, most likely in the nvidia drivers, they were not present in early 2019.\n\nIt is uncertain if these issues are bound to the model or if they are faults in the specific device tested on. Overall, all issues are something that is easy to workaround (ensure refresh rate is correctly configured for the display in X, make sure to keep vsync on in video games, use the suggested settings for mpv and use prime normally when you want to use the GPU).\n\n"
+    },
+    {
+      "title": "Audio",
+      "level": 2,
+      "content": "This series has some audio issues on Linux.\n\n"
+    },
+    {
+      "title": "Known issues",
+      "level": 3,
+      "content": "- Sound from headphones is tied to the volume of the speaker channel which gets muted whenever headphones are plugged in. Headphones will be almost entirely muted. Run amixer -c 0 set Speaker 100 to temporarily fix. The issue can be resolved with the driver options mentioned below.\n- Laptop Speakers sound pretty bad by default, can be resolved with driver options below.\n- Crackling/popping noises/artifacts in audio occur frequently at start & end of audio streams, barely noticable in speakers but very noticable in headphones. No known solution, although increasing buffer size can sometimes reduce it.c\n- Crackling in Pipewire (besides just at start & end of streams), solutions in the relevant section below.\n\n"
+    },
+    {
+      "title": "Driver options",
+      "level": 3,
+      "content": "There are two driver options that are known to positively impact this model.\n\nThe below setting improves the sound from the laptop speakers (presumably by enabling the LFEs), and the issue with headphones being muted when plugged in.\n\n```\n/etc/modprobe.d/modprobe.conf\n```\n\n```\noptions snd_hda_intel model=lenovo-y530\n```\n\nThe below setting fixes the muted headphones on plugin but does not affect the laptop speakers.\n\n```\n/etc/modprobe.d/modprobe.conf\n```\n\n```\noptions snd_hda_intel model=clevo-p950\n```\n\n"
+    },
+    {
+      "title": "ALSA",
+      "level": 3,
+      "content": "To run applications that require PulseAudio on ALSA you can use apulseAUR, but there may still be applications you have problems getting audio in.\n\n"
+    },
+    {
+      "title": "PulseAudio",
+      "level": 3,
+      "content": "Default settings are fine, so long as one of the above driver options is used.\n\nNo setting to eliminate crackling at the start & end of audio streams has been found. If you are having crackling problems try setting environment variable PULSE_LATENCY_MSEC to 40, 60 or 80.\n\n"
+    },
+    {
+      "title": "PipeWire",
+      "level": 3,
+      "content": "Some applications may cause crackling if not allowed to run sound at their preferred sample rate, this issue can be solved by setting:\n\n```\n/etc/pipewire/pipewire.conf\n```\n\n```\ndefault.clock.allowed-rates = [ 44100 48000 ]    # See reason it is not default: https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PipeWire#setting-global-sample-rate\n```\n\nA lot of crackling issues can also be solved by increasing the audio buffer size/adding latency.\n\nIncrease the buffer size to 1024 and reduce the alsa period size:\n\n```\n/etc/pipewire/media-session.d/alsa-monitor.conf\n```\n\n```\napi.alsa.period-size   = 128  # See: https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-ALSA#alsa-buffer-properties\napi.alsa.headroom      = 1024\n```\n\nAlternatively, if you prefer not to set a global buffer size, you can instead configure pipewire-pulse applications to have a larger buffer:\n\n```\n/etc/pipewire/pipewire-pulse.conf\n```\n\n```\npulse.min.req = 1024/48000              # Requests minimum latency at 21ms, avoid setting this any higher.\n#or\npulse.min.quantum      = 1024/48000     # Forces minimum latency to 21ms, you should avoid using this setting.\n```\n\nTo set latency on a per application basis use environment variables PULSE_LATENCY_MSEC (pipewire-pulse) or PIPEWIRE_LATENCY (everything else):\n\n```\nPULSE_LATENCY_MSEC=X    # Replace X with a number (integer)\nPIPEWIRE_LATENCY=1024/48000 # 21ms, does not work for pipewire-pulse!\n```\n\nWhen using PULSE_LATENCY_MSEC environment variable, always check in pw-top and see the QUANT and RATE values, actual latency is QUANT/RATE=LATENCY (in seconds).\n\nIt is recommended to either target a quantum of 1024 or 2048 when trying to fix crackling (when 1024 quantum is not enough to prevent crackling, 2048 often is).\n\nNo setting to eliminate crackling at the start & end of audio streams has been found, but setting quantum to 2048 for the problematic applications often helps.\n\n"
+    },
+    {
+      "title": "TouchPad",
+      "level": 2,
+      "content": "Has some scrolling & palm detection issues, but otherwise works fine. It is recommended to disable tap-to-click functionality due to the palm detect issues.\n\nRefer to below keyboard section if you want to be able to use the toggle touchpad button (FN+F3).\n\nGestures not tested.\n\n"
+    },
+    {
+      "title": "RGB Backlighting",
+      "level": 3,
+      "content": "RGB Backlighting can be configured via the msi-perkeyrgbAUR utility. If a lighting profile has been configured on Windows prior to booting Linux, the keyboard will remember it.\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 3,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nKey | Detected | Labeled | Working | Effect\nFn+NumPad- | No | Yes | Yes | Keyboard Backlighting Increase\nFn+NumPad+ | No | Yes | Yes | Keyboard Backlighting Decrease\nFn+NumPad0 | Yes | Yes | Yes | XF86AudioMute\nFn+Left | Yes | Yes | Yes | XF86AudioLowerVolume\nFn+Right | Yes | Yes | Yes | XF86AudioRaiseVolume\nFn+Up | Yes | Yes | Yes | XF86MonBrightnessUp\nFn+Down | Yes | Yes | Yes | XF86MonBrightnessDown\nFn+F2 | Yes | Yes | Yes | XF86Display\nFn+F3 | Yes | Yes | Yes | XF86TouchpadToggle\nFn+F4 | Yes | Yes | Partially | P1 (Turbo Mode)\nFn+F5 | Yes | Yes | Partially | Eco Mode/XF86Battery\nFn+F6 | Yes | Yes | Yes | XF86WebCam\nFn+F7 | No | Yes | No | Transmission (Gaming Mode)\nFn+F8 | Yes | No | Yes | XF86WLAN\nFn+F9 | Yes | No | Yes | XF86Bluetooth\nFn+F10 | Yes | Yes | Yes | Airplane Mode\nFn+F12 | Yes | Yes | Yes | XF86Sleep\nFn+PageUp | Yes | Yes | Yes | Home\nFn+PageDown | Yes | Yes | Yes | End\n\nThe Airplane Mode, WLan and Bluetooth buttons will only work if you, add acpi_osi=! acpi_osi=\"Windows 2009\" to your kernel parameters.\n\nThe Fn+F3, Fn+F4 and Fn+F5 keys all get detected with keysyms, but they are all either unassigned or wrongly assigned. To make these keys usable, you need to add this to your ~/.Xmodmap:\n\n```\nkeycode  93 = XF86TouchpadToggle NoSymbol XF86TouchpadToggle\nkeycode 120 = XF86Tools NoSymbol XF86Tools\nkeycode 126 = XF86Battery NoSymbol XF86Battery\n```\n\nUnderstandably, the Turbo and Eco mode buttons do not do anything on Linux since we do not have the Dragon Center software required for those buttons to do anything. You can however now use sxhkd, xbindkeys or your window manager to bind those keys to whatever custom function you want.\n\nThere is a remaining issue however where when Fn+F3 is pressed, Meta+Ctrl are also pressed, this issue is also present on Windows (probably a hardware flaw). This issue sometimes seems to interfere with the buttons functionality. For instance default keybinds for XF86TouchpadToggle will not work due to the forced modifiers. Even if you do change the keybind in your DE by going to the appropriate shortcut and hitting Fn+F3 to register it, it is not actually guaranteed to work (in KDE for instance you may get a popup that says the touchpad is on/off, but the touchpad is never actually toggled)\n\nIn the end to be able to toggle your touchpad you may need to bind it to a custom script.\n\n"
+    }
+  ]
+}

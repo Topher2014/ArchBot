@@ -1,0 +1,116 @@
+{
+  "title": "Transmission (Русский)",
+  "url": "https://wiki.archlinux.org/title/Transmission_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Transmission — это легкий и кроссплатформенный BitTorrent-клиент.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Существует несколько пакетов для установки Transmission:\n\n- transmission-cli – демон для CLI и #Web интерфейс.\n- transmission-gtk – графический интерфейс на базе GTK 3.\n- transmission-qt – графический интерфейс на базе Qt 5.\n- tremcAUR или tremc-gitAUR – Curses-интерфейс для демона.\n- stigAUR или stig-gitAUR – Curses-интерфейс для демона.\n- transmission-remote-gtk – интерфейс на базе GTK 3 для демона.\n\n"
+    },
+    {
+      "title": "Настройка GUI версий",
+      "level": 2,
+      "content": "Обе версии GUI, transmission-gtk и transmission-qt, могут функционировать автономно без отдельно запущенного демона.\n\nВерсии с графическим интерфейсом настроены для работы из коробки, но пользователь может захотеть изменить некоторые настройки. По умолчанию путь к файлам конфигурации GUI - ~/.config/transmission.\n\nРуководство по параметрам конфигурации можно найти в Github-репозитории Transmission.\n\n"
+    },
+    {
+      "title": "Transmission демон и CLI",
+      "level": 2,
+      "content": "Команды transmission-cli:\n\n"
+    },
+    {
+      "title": "Запуск и остановка демона",
+      "level": 3,
+      "content": "Демон Transmission может быть запущен:\n\n- Как пользователь transmission, путем запуска/включения службы transmission.service. Пользователь может быть изменен, как описано в разделе #Выбор пользователя.\n- Как ваш собственный пользователь, запустив программу под своим именем:\n\n```\n$ transmission-daemon\n```\n\nПри запуске демона будет создан файл начальной конфигурации. Смотрите раздел #Настройка демона.\n\nЗатем демон может быть остановлен с помощью:\n\n```\n$ pkill -3 transmission-daemon\n```\n\nАльтернативным вариантом остановки Transmission является использование команды transmission-remote:\n\n```\n$ transmission-remote --exit\n```\n\n"
+    },
+    {
+      "title": "Сокращение спама журнала",
+      "level": 3,
+      "content": "Запуск transmission-daemon может привести к появлению большого количества нежелательных записей в журнале. Вывод можно отфильтровать, запустив его с помощью небольшого скрипта-обертки. Следующий пример также предоставляет некоторые уведомления:\n\n```\ntranswrap.sh\n```\n\n```\n#!/bin/zsh\nkillall transmission-daemon 2> /dev/null\ntransmission-daemon --foreground --log-info 2>&1 | while read line; do\n\techo $line |\n\t\tgrep -v \"announcer.c:\\|platform.c:\\|announce done (tr-dht.c:\" |\n\t\tgrep -v \"Saved.*variant.c:\" |\n\t\twhile read line; do\n\t\t\techo $line | grep -q \"Queued for verification (verify.c:\" &&\n\t\t\t\tnotify-send --app-name=\"Transmission Started\" \"${line#* * }\"\n\t\t\techo $line | grep -q \"changed from .Incomplete. to .Complete.\" &&\n\t\t\t\tnotify-send --app-name=\"Transmission Complete\" \"${line#* * }\"\n\t\t\techo $line | systemd-cat --identifier=\"TransWrap\" --priority=5\n\t\tdone 2>&1 > /dev/null\n\tdone&disown\n```\n\n"
+    },
+    {
+      "title": "Netctl",
+      "level": 4,
+      "content": "Может быть желательно запускать передачу только в определенных сетях. Следующий скрипт проверяет, что соединение установлено со списком разрешенных сетей, а затем запускает transmission-daemon.\n\n```\n/etc/netctl/hooks/90-transmission.sh\n```\n\n```\n#!/bin/bash\n\n# The SSIDs for which we enable this.\ndeclare -A ssids=(\n    [\"network_1\"]=y\n    [\"network_2\"]=y\n)\n\nif [[ ${ssids[$SSID]} ]]; then\n    case $ACTION in\n        CONNECT|REESTABLISHED)\n            # Need to wait, otherwise doesn't seem to bind to 9091.\n            sleep 30\n            systemctl start transmission\n            ;;\n        *)\n            systemctl stop transmission\n            ;;\n    esac\nfi\n```\n\n"
+    },
+    {
+      "title": "Wicd",
+      "level": 4,
+      "content": "Создайте скрипт запуска в папке /etc/wicd/scripts/postconnect и скрипт остановки в папке /etc/wicd/scripts/predisconnect. Не забудьте сделать их исполняемыми. Например:\n\n```\n/etc/wicd/scripts/postconnect/transmission\n```\n\n```\n#!/bin/bash\n\nsystemctl start transmission\n```\n\n```\n/etc/wicd/scripts/predisconnect/transmission\n```\n\n```\n#!/bin/bash\n\nsystemctl stop transmission\n```\n\n"
+    },
+    {
+      "title": "Выбор пользователя",
+      "level": 3,
+      "content": "Выберите способ запуска transmission:\n\n- В качестве отдельного пользователя, по умолчанию transmission (рекомендуется для повышения безопасности).\n\nПо умолчанию transmission создает пользователя и группу transmission, со своими домашними файлами по адресу /var/lib/transmission/, и запускается от имени этого \"пользователя\". Это мера предосторожности, благодаря которой transmission и его загрузки не имеют доступа к файлам вне /var/lib/transmission/. Настройка, работа и доступ к загрузкам должны выполняться с привилегиями \"root\" (например, с помощью sudo).\n\n- Под своим собственным пользователем.\n\nЧтобы настроить это, создайте drop-in файл для службы и укажите в нем свое имя пользователя:\n\n```\n/etc/systemd/system/transmission.service.d/username.conf\n```\n\n```\n[Service]\nUser=имя_пользователя\n```\n\n"
+    },
+    {
+      "title": "Настройка демона",
+      "level": 3,
+      "content": "Создайте файл начальной конфигурации путём запуска демона.\n\n- Если Transmission запущен под именем пользователя transmission, файл конфигурации будет расположен по адресу /var/lib/transmission/.config/transmission-daemon/settings.json.\n\n- Если вы запускаете Transmission под своим именем пользователя, файл конфигурации будет расположен по адресу ~/.config/transmission-daemon/settings.json.\n\nНастроить демон можно с помощью клиента Transmission или через веб-интерфейс, доступный через http://localhost:9091 в поддерживаемом браузере.\n\nРуководство по параметрам конфигурации можно найти на веб-сайте Transmission: https://github.com/transmission/transmission/blob/main/docs/Editing-Configuration-Files.md\n\nДля тех, кто работает под именем пользователя transmission, рекомендуется создать общий каталог загрузки с правильными разрешениями, чтобы разрешить доступ как пользователю transmission, так и системным пользователям, а затем соответствующим образом обновить конфигурационный файл. Например:\n\n```\n# mkdir /mnt/data/torrents\n# chown -R facade:transmission /mnt/data/torrents\n# chmod -R 775 /mnt/data/torrents\n```\n\nТеперь /mnt/data/torrents будет доступен для системного пользователя facade и для группы transmission, в которую входит пользователь transmission. Крайне не рекомендуется делать целевой каталог доступным для чтения/записи любым пользователям (т.е. не делайте chmod каталога на 777). Вместо этого дайте отдельным пользователям/группам соответствующие разрешения на соответствующие каталоги.\n\nВ качестве альтернативы можно добавить пользователя в группу transmission (#usermod -a -G transmission yourusername) и затем изменить разрешения на каталоги /var/lib/transmission и /var/lib/transmission/Downloads, чтобы разрешить доступ rwx членам группы transmission.\n\n"
+    },
+    {
+      "title": "Белый список хостов",
+      "level": 4,
+      "content": "Если вы планируете обращаться к демону Transmission по сети, используя имя хоста сервера, вам необходимо добавить это имя хоста в rpc-host-whitelist в settings.json. В противном случае при обращении к серверу вы получите ошибку \"421 Misdirected Request\".\n\nЕсли вы подключаетесь к демону, используя IP-адрес сервера, это не требуется.\n\n"
+    },
+    {
+      "title": "Watch dir",
+      "level": 4,
+      "content": "Если вы хотите Автоматически добавлять .torrent файлы из папки, но обнаружите, что опции watch-dir и watch-dir-enabled, установленные в конфигурационном файле, не работают, вы можете запустить демон передачи с флагом -c /path/to/watch/dir.\n\nЕсли вы используете systemd, отредактируйте блок transmission.service, как описано в разделе systemd (Русский)#Редактирование файлов юнитов.\n\n"
+    },
+    {
+      "title": "Включение IPv6",
+      "level": 4,
+      "content": "По умолчанию демон прослушивает только соединения IPv4. Чтобы также прослушивать соединения IPv6, измените опцию rpc-bind-address на \"::\" в settings.json.\n\n"
+    },
+    {
+      "title": "CLI примеры",
+      "level": 4,
+      "content": "Если вы хотите удалить все готовые торренты, вы можете использовать следующую команду с собственным именем пользователя и паролем:\n\n```\n# transmission-remote -n 'username:password' -l | grep 100% | awk '{print $1}'| paste -d, -s | xargs -i transmission-remote -t {} -r\n```\n\nSeed a torrent which has already been downloaded:\n\n```\n# transmission-remote [HOST] --torrent=example.torrent -a example.torrent --verify --download-dir=/dir/to/folder --start\n```\n\n"
+    },
+    {
+      "title": "GUI способ",
+      "level": 3,
+      "content": "После установки Transmission вы можете легко настроить веб-интерфейс. Все, что вам нужно сделать, это щелкнуть меню Правка и выбрать Параметры. Перейдите на вкладку Удалённое управление и включите Разрешить удаленный доступ.\n\nЗдесь у вас есть возможность изменить порт прослушивания по умолчанию с 9091.\n\nУстановите флажок Использовать аутентификацию и введите имя пользователя и пароль, чтобы можно было использовать аутентификацию.\n\nДля повышения безопасности вы можете ограничить доступ с любого IP-адреса, включив опцию Разрешить доступ только данным IP-адресам.\n\nТеперь вы готовы запустить веб-интерфейс, нажав на Открыть веб-клиент, что заставит ваш веб-браузер по умолчанию открыть его, или вручную достигнув http://TARGET_IP_ADDRESS:PORT с помощью любого поддерживаемого веб-браузера.\n\nЕсли вы не изменили порт прослушивания, по умолчанию используется порт 9091. В этом случае ссылка http://localhost:9091\n\n"
+    },
+    {
+      "title": "CLI способ",
+      "level": 3,
+      "content": "Вам не нужен графический интерфейс для настройки веб-интерфейса, демон предлагает те же самые опции. Вы можете получить доступ к веб-интерфейсу, не указывая никаких флагов. Смотрите раздел #Запуск и остановка демона\n\nТем не менее, вы можете указать все то, что вы видите в предыдущем разделе:\n\n```\n$ transmission-daemon --auth --username arch --password linux --port 9091 --allowed \"127.0.0.1\"\n```\n\nэквивалентно\n\n```\n$ transmission-daemon -t -u arch -v linux -p 9091 -a \"127.0.0.1\"\n```\n\n"
+    },
+    {
+      "title": "Дополнительная тема Web-интерфейса",
+      "level": 3,
+      "content": "Если пользовательский интерфейс веб-приложения по умолчанию кажется устаревшим и менее навороченным, чем ожидалось, попробуйте использовать https://git.eigenlab.org/sbiego/transmission-web-soft-theme для создания простой темы CSS.\n\nhttps://github.com/ronggang/transmission-web-control также предоставляет полную замену, которая может сосуществовать с пользовательским интерфейсом по умолчанию.\n\n"
+    },
+    {
+      "title": "Использование в качестве makepkg DLAGENT",
+      "level": 2,
+      "content": "Transmission можно использовать в качестве агента загрузки magnet для makepkg с помощью агента загрузки transmission-dlagentAUR.\n\nДля Magnet URI необходимо изменить их префикс с magnet:? на magnet://.\n\n"
+    },
+    {
+      "title": "Невозможно получить доступ к демону по сети",
+      "level": 3,
+      "content": "Демон запускается после инициализации network.service. Однако, если вы включите службу dhcpcd, а не службу для конкретного устройства, например, dhcpcd@enp1s0.service, может случиться так, что Transmission будет запущен слишком рано и не сможет привязаться к сетевому интерфейсу. Таким образом, веб-интерфейс окажется недоступен. Возможным решением является добавление строки Requires в файл юнита:\n\n```\n/etc/systemd/system/transmission.service.d/fixdep.conf\n```\n\n```\n[Unit]\nRequires=network.target\n```\n\n"
+    },
+    {
+      "title": "Web-интерфейс недоступен",
+      "level": 3,
+      "content": "```\n404: Not Found\n\nCouldn't find Transmission's web interface files!\n\nUsers: to tell Transmission where to look, set the TRANSMISSION_WEB_HOME environment variable to the folder where the web interface's index.html is located.\n\nPackage Builders: to set a custom default at compile time, #define PACKAGE_DATA_DIR in libtransmission/platform.c or tweak tr_getClutchDir () by hand.\n```\n\nДаже если вы используете графический интерфейс, вам все равно необходимо установить transmission-cli, чтобы веб-интерфейс работал.\n\n"
+    },
+    {
+      "title": "Failed to set send/receive buffer",
+      "level": 3,
+      "content": "Transmission может отобразить любое из этих сообщений в журнале при запуске:\n\n```\nUDP Failed to set receive buffer: requested 4194304, got 425984\nUDP Failed to set send buffer: requested 1048576, got 425984\n```\n\nЭто можно исправить, установив net.core.rmem_max=4194304 и net.core.wmem_max=1048576 с помощью sysctl.\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- Transmission wiki\n- Headless Usage\n- Transmission wiki on GitHub\n\n"
+    }
+  ]
+}

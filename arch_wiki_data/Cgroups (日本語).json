@@ -1,0 +1,136 @@
+{
+  "title": "Cgroups (日本語)",
+  "url": "https://wiki.archlinux.org/title/Cgroups_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- Linux コンテナ\n- systemd-nspawn\n- Docker\n- limits.conf\n\nControl groups (一般的には cgroup と知られています) とは、プロセスのグループを管理、制限、監査するための、Linux カーネルによって提供されている機能です。cgroup はプロセスの集合 (およびその部分集合) に対して操作することができる (また、異なるシステムユーザを用いることもできる) ので 、nice(1) コマンドや /etc/security/limits.conf のような他のアプローチと比べて、cgroup はより柔軟です。\n\nコントロールグループは様々なツールによってアクセスできます:\n\n- systemd ユニットファイルでディレクティブを使ってサービスやスライスに対する制限を指定する。\n- cgroup ファイルシステムに直接アクセスする。\n- cgcreate、cgexec、cgclassify (libcgroupAUR と libcgroup-gitAUR の一部です) のようなツールを使う。\n- \"Rules Engine Daemon\" を使って、特定のユーザ/グループ/コマンドをグループに自動的に移動する (/etc/cgrules.conf と cgconfig.service) (libcgroupAUR と libcgroup-gitAUR の一部です)。\n- Linux コンテナ (LXC) 仮想化などのような他のソフトウェアを使う。\n\nArch Linux の場合は、systemd がデフォルトのインストールの一部なので、cgroup を起動・管理する方法として systemd が最も簡単で推奨されます。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 systemd を使う 2.1 階層 2.2 プロセスの cgroup を見つける 2.3 cgroup のリソース使用量 2.4 カスタム cgroup 2.5 サービスとして 2.5.1 サービスユニットファイル 2.5.2 スライスでユニットをグループ化 2.6 root として 2.7 非特権ユーザとして 2.7.1 コントローラのタイプ 2.7.2 ユーザ委譲 2.7.3 ユーザ定義のスライス 2.8 実行時の調整\n- 3 libcgroup を使う 3.1 一時的なグループ 3.2 グループの設定を永続化する\n- 4 cgroup の仮想ファイルシステムを使う\n- 5 例 5.1 コマンドのメモリまたは CPU 使用を制限する 5.2 Matlab 5.2.1 systemd で 5.2.2 libcgroup で\n- 6 ドキュメント\n- 7 ヒントとテクニック 7.1 cgroup v1 を有効にする\n- 8 参照\n\n- 2.1 階層\n- 2.2 プロセスの cgroup を見つける\n- 2.3 cgroup のリソース使用量\n- 2.4 カスタム cgroup\n- 2.5 サービスとして 2.5.1 サービスユニットファイル 2.5.2 スライスでユニットをグループ化\n- 2.6 root として\n- 2.7 非特権ユーザとして 2.7.1 コントローラのタイプ 2.7.2 ユーザ委譲 2.7.3 ユーザ定義のスライス\n- 2.8 実行時の調整\n\n- 2.5.1 サービスユニットファイル\n- 2.5.2 スライスでユニットをグループ化\n\n- 2.7.1 コントローラのタイプ\n- 2.7.2 ユーザ委譲\n- 2.7.3 ユーザ定義のスライス\n\n- 3.1 一時的なグループ\n- 3.2 グループの設定を永続化する\n\n- 5.1 コマンドのメモリまたは CPU 使用を制限する\n- 5.2 Matlab 5.2.1 systemd で 5.2.2 libcgroup で\n\n- 5.2.1 systemd で\n- 5.2.2 libcgroup で\n\n- 7.1 cgroup v1 を有効にする\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "cgroup を自動的に管理するために、以下のパッケージのうち1つをインストールしていることを確認してください:\n\n- systemd - systemd サービスのリソースを管理するために必要です。\n- libcgroupAUR、libcgroup-gitAUR - スタンドアロンツールのセット (cgcreate、cgclassify、永続的な設定は cgconfig.conf)。\n\n"
+    },
+    {
+      "title": "階層",
+      "level": 3,
+      "content": "現在の cgroup 階層は systemctl status コマンドか systemd-cgls コマンドを使って見ることができます。\n\n```\n$ systemctl status\n```\n\n```\n● myarchlinux\n    State: running\n     Jobs: 0 queued\n   Failed: 0 units\n    Since: Wed 2019-12-04 22:16:28 UTC; 1 day 4h ago\n   CGroup: /\n           ├─user.slice \n           │ └─user-1000.slice \n           │   ├─user@1000.service \n           │   │ ├─gnome-shell-wayland.service \n           │   │ │ ├─ 1129 /usr/bin/gnome-shell\n           │   │ ├─gnome-terminal-server.service \n           │   │ │ ├─33519 /usr/lib/gnome-terminal-server\n           │   │ │ ├─37298 fish\n           │   │ │ └─39239 systemctl status\n           │   │ ├─init.scope \n           │   │ │ ├─1066 /usr/lib/systemd/systemd --user\n           │   │ │ └─1067 (sd-pam)\n           │   └─session-2.scope \n           │     ├─1053 gdm-session-worker [pam/gdm-password]\n           │     ├─1078 /usr/bin/gnome-keyring-daemon --daemonize --login\n           │     ├─1082 /usr/lib/gdm-wayland-session /usr/bin/gnome-session\n           │     ├─1086 /usr/lib/gnome-session-binary\n           │     └─3514 /usr/bin/ssh-agent -D -a /run/user/1000/keyring/.ssh\n           ├─init.scope \n           │ └─1 /sbin/init\n           └─system.slice \n             ├─systemd-udevd.service \n             │ └─285 /usr/lib/systemd/systemd-udevd\n             ├─systemd-journald.service \n             │ └─272 /usr/lib/systemd/systemd-journald\n             ├─NetworkManager.service \n             │ └─656 /usr/bin/NetworkManager --no-daemon\n             ├─gdm.service \n             │ └─668 /usr/bin/gdm\n             └─systemd-logind.service \n               └─654 /usr/lib/systemd/systemd-logind\n```\n\n"
+    },
+    {
+      "title": "プロセスの cgroup を見つける",
+      "level": 3,
+      "content": "あるプロセスの cgroup 名は、/proc/PID/cgroup で見ることができます。\n\n例えば、現在のシェルの cgroup は:\n\n```\n$ cat /proc/self/cgroup\n```\n\n```\n0::/user.slice/user-1000.slice/session-3.scope\n```\n\n"
+    },
+    {
+      "title": "cgroup のリソース使用量",
+      "level": 3,
+      "content": "systemd-cgtop コマンドを使用して、cgroup のリソース使用量を見ることができます:\n\n```\n$ systemd-cgtop\n```\n\n```\nControl Group                            Tasks   %CPU   Memory  Input/s Output/s\nuser.slice                                 540  152,8     3.3G        -        -\nuser.slice/user-1000.slice                 540  152,8     3.3G        -        -\nuser.slice/u…000.slice/session-1.scope     425  149,5     3.1G        -        -\nsystem.slice                                37      -   215.6M        -        -\n```\n\n"
+    },
+    {
+      "title": "カスタム cgroup",
+      "level": 3,
+      "content": "systemd.slice(5) systemd ユニットファイルを使うことで、カスタム cgroup 設定を定義できます。このユニットファイルは、systemd のディレクトリ内 (/etc/systemd/system/ など) に配置しなければなりません。リソースの割り当て可能な管理オプションは、systemd.resource-control(5) にてドキュメント化されています。\n\n以下は、1 つの CPU の 30% のみの使用を許可する slice ユニットの例です:\n\n```\n/etc/systemd/system/my.slice\n```\n\n```\n[Slice]\nCPUQuota=30%\n```\n\n"
+    },
+    {
+      "title": "サービスユニットファイル",
+      "level": 4,
+      "content": "リソースは、サービスの定義で、あるいはドロップインファイル として指定可能です:\n\n```\n[Service]\nMemoryMax=1G\n```\n\nこの例では、サービスのメモリ使用量を 1 GB に制限します。\n\n"
+    },
+    {
+      "title": "スライスでユニットをグループ化",
+      "level": 4,
+      "content": "サービスは、どのスライス内で実行するかを指定できます:\n\n```\n[Service]\nSlice=my.slice\n```\n\n"
+    },
+    {
+      "title": "root として",
+      "level": 3,
+      "content": "systemd-run を使うことで、指定されたスライス内でコマンドを実行することができます。\n\n```\n# systemd-run --slice=my.slice command\n```\n\n--uid=username オプションを使うことで、指定されたユーザとしてコマンドをスポーンできます。\n\n```\n# systemd-run --uid=username --slice=my.slice command\n```\n\n--shell オプションを使うことで、スライスの中でコマンドシェルをスポーンできます。\n\n"
+    },
+    {
+      "title": "非特権ユーザとして",
+      "level": 3,
+      "content": "非特権ユーザは、いくつかの条件を満たせば、そのユーザに与えられたリソースを新しい cgroup に配分することができます。\n\n非 root ユーザが cgroup リソースを管理できるようにするには、cgroup v2 を使用しなければなりません。\n\n"
+    },
+    {
+      "title": "コントローラのタイプ",
+      "level": 4,
+      "content": "すべてのリソースがユーザによって制御できるわけではありません。\n\nTable content:\nコントローラ | ユーザによって制御可能か | オプション\ncpu | 委譲する必要あり | CPUAccounting, CPUWeight, CPUQuota, AllowedCPUs, AllowedMemoryNodes\nio | 委譲する必要あり | IOWeight, IOReadBandwidthMax, IOWriteBandwidthMax, IODeviceLatencyTargetSec\nmemory | Yes | MemoryLow, MemoryHigh, MemoryMax, MemorySwapMax\npids | Yes | TasksMax\nrdma | No | ?\neBPF | No | IPAddressDeny, DeviceAllow, DevicePolicy\n\n"
+    },
+    {
+      "title": "ユーザ委譲",
+      "level": 4,
+      "content": "ユーザが cpu や io リソースを制御するには、リソースを委譲する必要があります。これはドロップインファイルを使うことで可能です。\n\n例えば、あなたのユーザ ID が 1000 の場合:\n\n```\n/etc/systemd/system/user@1000.service.d/delegate.conf\n```\n\n```\n[Service]\nDelegate=cpu cpuset io\n```\n\n再起動し、あなたのセッションのスライスが cpu と io コントローラを所有していることを確認してください:\n\n```\n$ cat /sys/fs/cgroup/user.slice/user-1000.slice/cgroup.controllers\n```\n\n```\ncpuset cpu io memory pids\n```\n\n"
+    },
+    {
+      "title": "ユーザ定義のスライス",
+      "level": 4,
+      "content": "ユーザのスライスファイルは ~/.config/systemd/user/ に配置できます。\n\n特定のスライス下でコマンドを実行するには:\n\n```\n$ systemd-run --user --slice=my.slice command\n```\n\nまた、ログインシェルをスライス内で実行することも可能です:\n\n```\n$ systemd-run --user --slice=my.slice --shell\n```\n\n"
+    },
+    {
+      "title": "実行時の調整",
+      "level": 3,
+      "content": "cgroup のリソースは、systemctl set-property コマンドを使うことで実行時に調整可能です。オプションについては systemd.resource-control(5) と同じです。\n\n例えば、すべてのユーザセッションに対してインターネットアクセスを切断するには:\n\n```\n$ systemctl set-property user.slice IPAddressDeny=any\n```\n\n"
+    },
+    {
+      "title": "libcgroup を使う",
+      "level": 2,
+      "content": "systemd を使って cgconfig を有効化できます。これにより、cgconfig.conf 内のエラーをより簡単に追跡できます。\n\n"
+    },
+    {
+      "title": "一時的なグループ",
+      "level": 3,
+      "content": "「一時的な」なグループをその場で作成できます。一般ユーザにカスタムのグループを作成する権限を与えることもできます。以下の groupname は cgroup 名です:\n\n```\n# cgcreate -a user -t user -g memory,cpu:groupname\n```\n\nこれで、groupname グループで調整可能なものはすべて、あなたのユーザによって書き込み可能です:\n\n```\n$ ls -l /sys/fs/cgroup/memory/groupname\n```\n\n```\ntotal 0\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cgroup.event_control\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cgroup.procs\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.rt_period_us\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.rt_runtime_us\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.shares\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 notify_on_release\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 tasks\n```\n\ncgroup は階層的なので、好きなだけサブグループを作成できます。通常のユーザが bash シェルを新しいサブグループ foo 下で実行したい場合:\n\n```\n$ cgcreate -g memory,cpu:groupname/foo\n$ cgexec    -g memory,cpu:groupname/foo bash\n```\n\n確認するには (レガシーな (v1) cgroup でのみ意味があります):\n\n```\n$ cat /proc/self/cgroup\n```\n\n```\n11:memory:/groupname/foo\n6:cpu:/groupname/foo\n```\n\n新しいサブディレクトリがこのグループ用に作成されました。このグループ内のすべてのプロセスのメモリ使用量を 10 MBに制限するには、以下を実行してください:\n\n```\n$ echo 10000000 > /sys/fs/cgroup/memory/groupname/foo/memory.limit_in_bytes\n```\n\nメモリ制限は RAM の使用に対してのみ適用されることに注意してください。一度タスクがこの制限に到達すると、タスクはスワップし始めます。しかし、他のプロセスのパフォーマンスに大きな影響を及ぼすことはありません。\n\n同じように、このグループの CPU の優先度 (\"shares\") も変更できます。デフォルトでは、すべてのグループは 1024 shares となっています。100 shares のグループは CPU 時間の約 10 % を獲得します:\n\n```\n$ echo 100 > /sys/fs/cgroup/cpu/groupname/foo/cpu.shares\n```\n\ncgroup のディレクトリを一覧表示することで、より多くのパラメータや統計を見ることができます。\n\nまた、すでに実行中のプロセスの cgroup を変更することもできます。すべての 'bash' コマンドをこのグループに移動するには:\n\n```\n$ pidof bash\n13244 13266\n$ cgclassify -g memory,cpu:groupname/foo `pidof bash`\n$ cat /proc/13244/cgroup\n11:memory:/groupname/foo\n6:cpu:/groupname/foo\n```\n\n"
+    },
+    {
+      "title": "グループの設定を永続化する",
+      "level": 3,
+      "content": "起動時に cgroup が作成されるようにしたい場合、代わりに /etc/cgconfig.conf でグループを定義することができます。例えば、\"groupname\" に制限を管理しタスクを追加する $USER のパーミッションとグループ $GROUP の users を定義します。サブグループの \"groupname/foo\" グループの定義は以下のようになります:\n\n```\n/etc/cgconfig.conf\n```\n\n```\ngroup groupname {\n  perm {\n# who can manage limits\n    admin {\n      uid = $USER;\n      gid = $GROUP;\n    }\n# who can add tasks to this group\n    task {\n      uid = $USER;\n      gid = $GROUP;\n    }\n  }\n# create this group in cpu and memory controllers\n  cpu { }\n  memory { }\n}\n\ngroup groupname/foo {\n  cpu {\n    cpu.shares = 100;\n  }\n  memory {\n    memory.limit_in_bytes = 10000000;\n  }\n}\n```\n\n- コメントは行の先頭から始めてください! コメントを表す # 文字は行の始めの文字として現れなければなりません。そうしないと、cgconfigparser が解析するときに問題が発生しますが、cgconfig を Systemd で起動しない限り、エラーとしては cgroup change of group failed しか報告されません。\n- permissions セクションは任意です。\n- /sys/fs/cgroup/ ディレクトリ階層には controllers サブディレクトリが全て含まれ、起動時に仮想ファイルシステムとして作成・マウントされます。$CONTROLLER-NAME { } コマンドを使って新しいグループエントリを作成することが可能です。何らかの理由で他の場所に階層を作成・マウントしたいときは、/etc/cgconfig.conf に以下のようにふたつ目のエントリを書く必要があります:\n\n```\nmount {    \n   cpuset = /your/path/groupname;\n }\n```\n\nこれは以下のシェルコマンドと同等です:\n\n```\n# mkdir /your/path/groupname\n # mount -t /your/path -o cpuset groupname /your/path/groupname\n```\n\n"
+    },
+    {
+      "title": "cgroup の仮想ファイルシステムを使う",
+      "level": 2,
+      "content": "systemd 232 以降では、次のセクションで説明する cgm メソッドについて説明しますが、このセクションでは代わりにメモリ使用量を制限する手動のメソッドについて説明します。\n\ngroupname で新しい cgroup を作成してください:\n\n```\n# mkdir /sys/fs/cgroup/memory/groupname\n```\n\n例: 最大のメモリ制限を 100MB に設定するには:\n\n```\n# echo 100000000 > /sys/fs/cgroup/memory/groupname/memory.limit_in_bytes\n```\n\nプロセスを cgroup に移動してください。\n\n```\n# echo pid > /sys/fs/cgroup/memory/groupname/cgroup.procs\n```\n\n"
+    },
+    {
+      "title": "コマンドのメモリまたは CPU 使用を制限する",
+      "level": 3,
+      "content": "以下の例は、指定されたコマンドを 2GB のメモリに制限する cgroup を示しています。\n\n```\n$ systemd-run --scope -p MemoryMax=2G --user command\n```\n\n以下の例は、コマンドを 1 つの CPU コアの 20% に制限するものです。\n\n```\n$ systemd-run --scope -p CPUQuota=\"20%\" --user command\n```\n\n"
+    },
+    {
+      "title": "Matlab",
+      "level": 3,
+      "content": "MATLAB にはマシンのメモリや CPU を食い尽くす事態に対する保護が存在しないため、高負荷な計算を行うとシステムがクラッシュする危険があります。以下の例は、始めの CPU コア 6 つとメモリ 5 GB に制限する cgroup です。\n\n"
+    },
+    {
+      "title": "systemd で",
+      "level": 4,
+      "content": "```\n~/.config/systemd/user/matlab.slice\n```\n\n```\n[Slice]\nAllowedCPUs=0-5\nMemoryHigh=6G\n```\n\nMatlab を以下のように実行してください (正しいパスを使ってください):\n\n```\n$ systemd-run --user --slice=matlab.slice /opt/MATLAB/2012b/bin/matlab -desktop\n```\n\n"
+    },
+    {
+      "title": "libcgroup で",
+      "level": 4,
+      "content": "```\n/etc/cgconfig.conf\n```\n\n```\ngroup matlab {\n    perm {\n        admin {\n            uid = username;\n        }\n        task {\n            uid = username;\n        }\n    }\n\n    cpuset {\n        cpuset.mems=\"0\";\n        cpuset.cpus=\"0-5\";\n    }\n    memory {\n        memory.limit_in_bytes = 5000000000;\n    }\n}\n```\n\nusername を変更することで、そのユーザとして Matlab を実行できます。\n\nまた、cpu 制限によって CPU share を制限することもできます。\n\n以下のように Matlab を実行してください (正しいパスを使ってください):\n\n```\n$ cgexec -g memory,cpuset:matlab /opt/MATLAB/2012b/bin/matlab -desktop\n```\n\n"
+    },
+    {
+      "title": "ドキュメント",
+      "level": 2,
+      "content": "- コントローラや特定のスイッチや調整可能項目の意味については、カーネルのドキュメント v1 または v2 を参照してください（または linux-docs をインストールして、/usr/src/linux/Documentation/cgroup を参照してください）\n- Linuxマニュアルページ: cgroups(7)\n- 詳細で完全なリソース管理ガイドは、Red Hat Enterprise Linux のドキュメント にあります。\n\nコマンドと設定ファイルについては、該当するmanページを参照してください。例: cgcreate(1) または cgrules.conf(5)\n\n"
+    },
+    {
+      "title": "cgroup v1 を有効にする",
+      "level": 3,
+      "content": "現在、cgroup v2 がデフォルトで有効になっており、cgroup v1 は廃止と見なされ、systemd v256 以降ではシステムが起動を拒否します。[1] 代わりに cgroup v1 に切り替えたい場合は、以下のカーネルパラメータを設定する必要があります:\n\n```\nSYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 systemd.unified_cgroup_hierarchy=0\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- systemd cgroups ハッカーガイド\n- cgroupv2: Linux's new unified control group system\n\n"
+    }
+  ]
+}

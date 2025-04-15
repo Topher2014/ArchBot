@@ -1,0 +1,131 @@
+{
+  "title": "Cron (日本語)",
+  "url": "https://wiki.archlinux.org/title/Cron_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- systemd/タイマー\n- crontab でパッケージを更新\n\nWikipedia より:\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 設定 2.1 有効化と自動起動 2.2 ジョブのエラーの対処 2.2.1 ssmtp の例 2.2.2 msmtp の例 2.2.3 esmtp の例 2.2.4 opensmtpd の例 2.2.5 長い cron ジョブ\n- 3 Crontab のフォーマット\n- 4 基本的なコマンド\n- 5 サンプル\n- 6 デフォルトエディタ\n- 7 X.org サーバーを使用するアプリケーションを実行\n- 8 非同期のジョブ処理 8.1 Cronie 8.2 Dcron 8.3 Cronwhip 8.4 Anacron 8.5 Fcron\n- 9 排他性の確保\n- 10 cronie\n- 11 Dcron\n- 12 参照\n\n- 2.1 有効化と自動起動\n- 2.2 ジョブのエラーの対処 2.2.1 ssmtp の例 2.2.2 msmtp の例 2.2.3 esmtp の例 2.2.4 opensmtpd の例 2.2.5 長い cron ジョブ\n\n- 2.2.1 ssmtp の例\n- 2.2.2 msmtp の例\n- 2.2.3 esmtp の例\n- 2.2.4 opensmtpd の例\n- 2.2.5 長い cron ジョブ\n\n- 8.1 Cronie\n- 8.2 Dcron\n- 8.3 Cronwhip\n- 8.4 Anacron\n- 8.5 Fcron\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "cron の実装はたくさん存在しますが、デフォルトではそのいずれもインストールされません。代わりにベースシステムは systemd/タイマー を使用しています。実装の比較については Gentoo の cron ガイド を見て下さい。\n\n利用可能なパッケージ:\n\n- cronie\n- fcron\n- dcronAUR\n- vixie-cronAUR\n- fcron-devAUR\n- scron-gitAUR\n\n"
+    },
+    {
+      "title": "有効化と自動起動",
+      "level": 3,
+      "content": "インストール後、デフォルトではデーモンは有効になりません。インストールされたパッケージは、systemctl で制御できるサービスを提供する可能性があります。たとえば、cronie は cronie.service を使用します。\n\n/etc/cron.daily/ および同様のディレクトリをチェックして、どのジョブが存在するかを確認します。cron サービスを有効にすると、それらすべてがトリガーされます。\n\n"
+    },
+    {
+      "title": "ジョブのエラーの対処",
+      "level": 3,
+      "content": "cron は、stdout および stderr からの出力を登録し、sendmail コマンドを介してユーザーのスプールに電子メールとして送信しようとします。/usr/bin/sendmail が見つからない場合、Cronie はメール出力を無効にします。メールがユーザーのスプールに書き込まれるためには、opensmtpd などの smtp デーモンがシステム上で実行されている必要があります。それ以外の場合は、sendmail コマンドを提供するパッケージをインストールして、リモートメールエクスチェンジャーにメールを送信するように設定できます。-m オプションを使用し、カスタムスクリプトを記述して、メッセージをログに記録することもできます。\n\n1. cronie.service ユニットを編集する。\n1. esmtpAUR, msmtp, opensmtpd, ssmtp をインストールする、もしくはカスタムスクリプトを書く。\n\n"
+    },
+    {
+      "title": "ssmtp の例",
+      "level": 4,
+      "content": "ssmtp は送信だけを行う sendmail エミュレータで、ローカルコンピュータから smtp サーバーにメールを送信できます。活発なメンテナンスはされていませんが、設定済みのメールハブに対してメールを転送する方法としては最もシンプルです。デーモンを実行する必要はなく、設定ファイルを3行編集するだけで設定できます (認証されていないメールをメールハブでリレーできる場合)。ssmtp はメールを受け取ったり、エイリアスを展開したり、キューを管理したりはしません。\n\nssmtpAUR をインストールしてください。/usr/bin/sendmail から /usr/bin/ssmtp にシンボリックリンクが作成されます。インストールしたら /etc/ssmtp/ssmtp.conf を編集してください。詳しくは ssmtp を参照。/usr/bin/sendmail に対してシンボリックリンクが作成されることで S-nail などのプログラム (/usr/bin/mail を提供するパッケージ) をそのまま使うことが可能です。\n\n/usr/bin/sendmail がインストールされていることを認識されるために cronie を再起動してください。\n\n"
+    },
+    {
+      "title": "msmtp の例",
+      "level": 4,
+      "content": "msmtp を使って cronie からメールを取得する方法は2つあります:\n\n1. msmtp-mta パッケージをインストールします。/usr/bin/sendmail から /usr/bin/msmtp にシンボリックリンクが作成されます。cronie を再起動して新しい sendmail コマンドが検出されていることを確認してください。msmtp にユーザー名をメールアドレスに変換する手段を用意する必要があります。 次のように crontab に MAILTO 行を追加する:MAILTO=your@email.com または: /etc/msmtprc に次の行を加えて: aliases /etc/aliases /etc/aliases を作成してください: your_username: your@email.com# Optional:default: your@email.com\n1. cronie.service ユニットを編集します。例えば、/etc/systemd/system/cronie.service.d/msmtp.conf を作成してください:[Service] ExecStart= ExecStart=/usr/bin/crond -n -m '/usr/bin/msmtp -t'\n\n- 次のように crontab に MAILTO 行を追加する:MAILTO=your@email.com または:\n- /etc/msmtprc に次の行を加えて: aliases /etc/aliases /etc/aliases を作成してください: your_username: your@email.com# Optional:default: your@email.com\n\n```\nMAILTO=your@email.com\n```\n\n```\naliases /etc/aliases\n```\n\n```\nyour_username: your@email.com# Optional:default: your@email.com\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/crond -n -m '/usr/bin/msmtp -t'\n```\n\n"
+    },
+    {
+      "title": "esmtp の例",
+      "level": 4,
+      "content": "esmtpAUR と procmail をインストールしてください。\n\nインストールした後、ルーティングを設定してください:\n\n```\n/etc/esmtprc\n```\n\n```\nidentity myself@myisp.com\n       hostname mail.myisp.com:25\n       username \"myself\"\n       password \"secret\"\n       starttls enabled\n       default\nmda \"/usr/bin/procmail -d%T\"\n```\n\nProcmail は配送モードで動作するのに root 権限を必要としますが cronjob を root で実行している場合は問題になりません。\n\n正しく動作しているかテストするには、ファイル message.txt を作成して中に \"test message\" を記述してください。\n\n同じディレクトリから次を実行してください:\n\n```\n$ sendmail user_name < message.txt\n```\n\nそして:\n\n```\n$ cat /var/spool/mail/user_name\n```\n\nテストメッセージと送信された日時が表示されるはずです。\n\n全てのジョブのエラー出力は /var/spool/mail/user_name にリダイレクトされます。\n\n権限の問題で、root にメールを作成・送信するのは困難です (例: su -c \"\")。esmtp の設定で root のメールを全て通常のユーザーに転送させることができます:\n\n```\n/etc/esmtprc\n```\n\n```\nforce_mda=\"user-name\"\n```\n\n適切なパーミッションにするために次のコマンドを実行してください:\n\n```\n$ chmod 710 ~/.esmtprc\n```\n\n"
+    },
+    {
+      "title": "opensmtpd の例",
+      "level": 4,
+      "content": "opensmtpd をインストールしてください。\n\n/etc/smtpd/smtpd.conf を編集します。以下の設定でローカル配信が可能になります:\n\n```\nlisten on localhost\naccept for local deliver to mbox\n```\n\n次のコマンドでテストが行えます:\n\n```\n# systemctl start smtpd\n$ echo test | sendmail user\n```\n\nuser は mbox フォーマットを扱えるメールクライアントを使うか、/var/spool/mail/user ファイルを見ることでメールを確認できます。全てが問題なく動作するようでしたら、opensmtpd を有効にします:\n\n```\n# systemctl enable smtpd\n```\n\nこの方法には、リモートサーバーに cron のローカルな通知が送信しないという利点があります。ネットワーク接続も必要ありません。欠点としては、新しいデーモンを実行する必要があります。\n\n- 執筆時点では Arch の opensmtpd パッケージは /var/spool/mail/user 下に必要なディレクトリを全て作成しません。ただし、デーモンが必要な所有者とパーミッションについて警告を出すので、それに従ってディレクトリを作成してください。\n- 上記の設定はリモート接続を受け入れませんが、用心として iptables などを使ってセキュリティレイヤーでポート25をブロックするのも良いでしょう。\n\n"
+    },
+    {
+      "title": "長い cron ジョブ",
+      "level": 4,
+      "content": "仮に cron によって以下のプログラムが実行されると:\n\n```\n#!/bin/sh\necho \"I had a recoverable error!\"\nsleep 1h\n```\n\n以下のことが起こります:\n\n1. cron がスクリプトを実行\n1. 出力があったらすぐに、cron は MTA を実行し、MTA にヘッダーをわたす。ジョブは完了しておらず、出力がまだあるかもしれないので、パイプは開きっぱなしになる。\n1. MTA は postfix との接続を開いて、残りのボディが来るまで待っている間、接続を開き続ける。\n1. 一時間以内に postfix はアイドル状態の接続を閉じて、以下のようなエラーを表示する:\n\n```\nsmtpmsg='421 ... Error: timeout exceeded' errormsg='the server did not accept the mail'\n```\n\nmoreutils の chronic または sponge コマンドを使うことでこの問題は解決できます。それぞれの man ページより:\n\nマニュアルには載っていませんが、chronic は標準出力を開く前のコマンド出力をバッファします (sponge も同じようにバッファを使います)。\n\n"
+    },
+    {
+      "title": "Crontab のフォーマット",
+      "level": 2,
+      "content": "crontab の基本的なフォーマットは:\n\n```\nminute hour day_of_month month day_of_week command\n```\n\n- minute は 0 から 59 までの値。\n- hour は 0 から 23 までの値。\n- day_of_month は 1 から 31 までの値。\n- month は 1 から 12 までの値。\n- day_of_week は 0 から 6 までの値、0 が日曜日。\n\nカンマを使うことで複数の時間を指定することができます。時間の範囲はハイフンで決めることができ、アスタリスクはワイルドカード文字になります。スペースはフィールドを分けるのに使います。例えば、次の行はスクリプト i_love_cron.sh を夏の期間 (6月, 7月, 8月) を除く平日の午前9時から午後4:55まで5分間隔で実行します:\n\n```\n*/5 9-16 * 1-5,9-12 1-5 ~/bin/i_love_cron.sh\n```\n\nさらに、crontab には特殊なキーワードもいくつか存在します:\n\n```\n@reboot : 起動時\n@yearly : 一年毎\n@annually ( == @yearly)\n@monthly : 一月毎\n@weekly : 一周毎\n@daily : 一日毎\n@midnight ( == @daily)\n@hourly : 一時間毎\n```\n\n例えば、起動時に i_love_cron.sh を実行する場合:\n\n```\n@reboot ~/bin/i_love_cron.sh\n```\n\n参照: http://www.adminschoice.com/crontab-quick-reference\n\n"
+    },
+    {
+      "title": "基本的なコマンド",
+      "level": 2,
+      "content": "Crontab を直接編集してはいけません。代わりに、ユーザーは crontab プログラムを使って crontab を編集してください。このコマンドを実行するには、ユーザーは users グループのメンバーである必要があります (gpasswd コマンドを見て下さい)。\n\ncrontab を一覧するには、次のコマンドを実行してください:\n\n```\n$ crontab -l\n```\n\ncrontab を編集するには、次のコマンドを使って下さい:\n\n```\n$ crontab -e\n```\n\ncrontab を削除するには、次のコマンドを使って下さい:\n\n```\n$ crontab -r\n```\n\n既に crontab が存在していて、古い crontab を完全に上書きするには次を使って下さい:\n\n```\n$ crontab saved_crontab_filename\n```\n\nコマンドライン (Wikipedia:ja:標準ストリーム) から crontab を上書きするには:\n\n```\n$ crontab -\n```\n\n他の誰かの crontab を編集するには、次のコマンドを root で実行してください:\n\n```\n# crontab -u username -e\n```\n\n同じフォーマット (コマンドに -u username を追加すること) は crontab の表示・削除にも使えます。\n\n"
+    },
+    {
+      "title": "サンプル",
+      "level": 2,
+      "content": "コマンド /bin/echo Hello, world! を毎月の毎日の毎時間の1分目 (つまり 12:01, 1:01, 2:01 ...) に実行するエントリ:\n\n```\n01 * * * * /bin/echo Hello, world!\n```\n\n1月の平日に5分ごと (つまり 12:00, 12:05, 12:10 ...) に同じジョブを実行するエントリ:\n\n```\n*/5 * * jan mon-fri /bin/echo Hello, world!\n```\n\n次の行は夏 (6月, 7月, 8月) 以外の毎月の平日 (月-金) の午前9時から午後5時まで5分間隔で (午後5時0分は除く) スクリプト i_love_cron.sh を実行します (\"man 5 crontab\" より):\n\n```\n*0,*5 9-16 * 1-5,9-12 1-5 /home/user/bin/i_love_cron.sh\n```\n\n定期的な設定は次の crontab テンプレートのように入力することも可能です:\n\n```\n# Chronological table of program loadings                                       \n# Edit with \"crontab\" for proper functionality, \"man 5 crontab\" for formatting\n# User: johndoe\n\n# mm  hh  DD  MM  W /path/progam [--option]...  ( W = weekday: 0-6 [Sun=0] )\n  21  01  *   *   * /usr/bin/systemctl hibernate\n  @weekly           $HOME/.local/bin/trash-empty\n```\n\n"
+    },
+    {
+      "title": "デフォルトエディタ",
+      "level": 2,
+      "content": "別の既定のエディターを使用するには、環境変数 で説明されているように、シェル初期化スクリプトで EDITOR 環境変数を定義します。\n\n通常のユーザーとして、環境変数を正しく取得するには、sudo の代わりに su を使用する必要があります。\n\n```\n$ su -c \"crontab -e\"\n```\n\nsu は新しいシェルで起動するため、この printf にエイリアスを設定するには、任意の文字列を運ぶ必要があります。\n\n```\nalias scron=\"su -c $(printf \"%q \" \"crontab -e\")\"\n```\n\n"
+    },
+    {
+      "title": "X.org サーバーを使用するアプリケーションを実行",
+      "level": 2,
+      "content": "Cron は X.org サーバー下では実行されないため、X.org サーバーアプリケーションを実行するために必要な環境変数を知りません。そのため、環境変数を定義する必要があります。xuserrun-gitAUR などのプログラムを使うことで X.org アプリケーションを実行できます:\n\n```\n17 02 * ... /usr/bin/xuserrun /usr/bin/xclock\n```\n\nもしくは環境変数を手動で定義する方法もあります (echo $DISPLAY で現在の DISPLAY の値がわかります):\n\n```\n17 02 * ... env DISPLAY=:0 /usr/bin/xclock\n```\n\ncron でデスクトップ通知の notify-send を実行している場合、notify-send は値を dbus に送信します。したがって、dbus に正しいバスに接続するように指示する必要があります。\n\nアドレスは、DBUS_SESSION_BUS_ADDRESS 環境変数を調べて同じ値に設定することで見つけることができます:\n\n```\n17 02 * ... env DBUS_SESSION_BUS_ADDRESS=your-address notify-send 'Foo bar'\n```\n\nSSH などを通す場合は、権限を与えてください:\n\n```\n# xhost +si:localuser:$(whoami)\n```\n\n"
+    },
+    {
+      "title": "非同期のジョブ処理",
+      "level": 2,
+      "content": "コンピュータをオフにしてもジョブがちゃんと実行されるようにしたい場合、複数の解決方法が存在します (簡単な順番で並んでいます):\n\n"
+    },
+    {
+      "title": "Cronie",
+      "level": 3,
+      "content": "Cronie には anacron が含まれています。プロジェクトのホームページより:\n\nCronie には特定時刻に指定したプログラムを起動するための標準 UNIX デーモンである crond と関連ツールが含まれています。Cronie はオリジナルの cron をベースとしており、pam や SELinux を利用できるようにするなどの改善がされています。\n\n"
+    },
+    {
+      "title": "Dcron",
+      "level": 3,
+      "content": "dcronAUR は標準で非同期のジョブ処理をサポートしています。以下のようにジョブの名前に @hourly, @daily, @weekly, @monthly を付けて下さい:\n\n```\n@hourly         ID=greatest_ever_job      echo This job is very useful.\n```\n\n"
+    },
+    {
+      "title": "Cronwhip",
+      "level": 3,
+      "content": "cronwhipAUR は見過ごされた cron ジョブを自動的に実行するスクリプトです。昔 Arch でデフォルトの cron 実装だった dcron で動作します。フォーラムスレッド も参照。\n\n"
+    },
+    {
+      "title": "Anacron",
+      "level": 3,
+      "content": "Anacron はジョブを非同期に処理する dcron を完全に置き換えます。\n\nAnacron は cronie に含まれており、設定ファイルは /etc/anacrontab です。フォーマットの情報は anacrontab(5) man ページにあります。anacron -T を実行することで /etc/anacrontab に問題がないかテストすることができます。\n\n"
+    },
+    {
+      "title": "Fcron",
+      "level": 3,
+      "content": "anacron と同じように、fcron はコンピュータの電源が落ちている場合を想定しますが、anacron とは違って、一日よりも短いインターバルでイベントを組むことができます。定期的にサスペンド・ハイバネートを行うような環境 (ノートパソコンなど) で有用です。cronwhip と同様に、fcron はコンピュータが落ちている間に実行すべきだったジョブを実行します。\n\ncronie を fcron で置き換える場合、spool ディレクトリが /var/spool/fcron になり、ユーザーの crontab を編集するときに crontab の代わりに fcrontab コマンドを使うことになるので注意してください。crontab はバイナリ形式で保存され、spool ディレクトリに foo.orig という名前のテキストファイルができます。手動でユーザーの crontab を編集するスクリプトを使っているのであれば、修正が必要です。\n\n伝統的なユーザーの crontab を fcron 方式に変換するクイックスクリプトレット:\n\n```\ncd /var/spool/cron && (\n for ctab in *; do\n  fcrontab ${ctab} -u ${ctab}\n done\n)\n```\n\nフォーラムスレッド も参照。\n\n"
+    },
+    {
+      "title": "排他性の確保",
+      "level": 2,
+      "content": "ジョブの実行時間が長くなる可能性がある場合 (例えばシステムのバックアップは変更箇所が多かったりネットワーク接続が遅かったりして長くなることがあります)、flock (util-linux) を使うことで cron ジョブが二重に実行されないようにすることができます。\n\n```\n5,35 * * * * /usr/bin/flock -n /tmp/lock.backup /root/make-backup.sh\n```\n\n"
+    },
+    {
+      "title": "cronie",
+      "level": 2,
+      "content": "cronie に関連するファイル階層は次のとおりです。\n\n```\n/etc/\n     |----- cron.d/\n              | ----- 0hourly\n     |----- cron.minutely/\n     |----- cron.hourly/\n              | ----- 0anacron\n     |----- anacrontab\n     |----- cron.daily/\n     |----- cron.monthly/\n     |----- cron.weekly/\n     |----- crontab\n     |----- cron.deny\n```\n\nCronie は cron と anacron の両方の機能を提供します。 cron は指定した時間にシステムが利用されている限り、一定時間間隔 (1分単位) でジョブを実行し、anacron は指定した時間にコマンドを実行します。 間隔を日数で指定する。 cron とは異なり、システムが継続的に稼働していることを前提としません。システムが起動するたびに、anacron は実行されるべきジョブがあるかどうかをチェックし、それに応じて処理します。\n\ncron ジョブは、/etc/cron.d ディレクトリの crontab のようなファイルで定義するか、/etc/crontab ファイル内に追加できます。後者はデフォルトでは存在しませんが、存在する場合は使用されます。/etc/cron.d/0hourly の指示に従って、/etc/cron.hourly 内の実行可能ファイルは毎時間実行されます (デフォルトでは毎時1分) /etc/cron.minutely 内のファイルは、/etc/cron.d/0hourly で適切に指示されている場合、毎分実行されます。実行可能ファイルは通常、シェルスクリプトであり、実行可能ファイルへのシンボリックリンクも使用できます。\n\nAnacron は、/etc/cron.daily、/etc/cron.weekly、および /etc/cron.monthly} 内のファイルを実行することにより、同様に機能します。 ディレクトリは、目的のジョブ頻度に応じてそこに配置されます。cron ジョブ /etc/cron.hourly/0anacron は、保留中のタスクを実行するために anacron が 1日1回実行されるようにします。\n\n- Cronie は run-parts を使って、異なるディレクトリのスクリプトを実行します。ファイル名にはドット (.) を含めてはいけません。なぜなら、デフォルトモードの run-parts はドットを黙って無視するからです (run-parts(8) 参照) 名前は大文字と小文字、数字、アンダースコア、マイナスハイフンのみで構成されている必要があります。\n- このような場合、systemctl status cronie の出力には CAN'T OPEN (/etc/crontab).No such file or digit というようなメッセージが表示されるかもしれません、しかし、これは cronie が必要としないので、無視することができます。\n- Cronie は /etc/cron.d/0hourly のパーミッションが重要です。もし /etc/cron.d/{hourly,weekly,daily} ...etc が破損していたり、不適切なパーミッションであれば、/etc/cron.d/0hourly のタスクは (アナクロンランチャーを含め) 実行されません。pacman -Qkk cronie はそのような問題があるかどうかを表示できます。\n\n```\n0 1 5 10 * /path/to/script.sh >/dev/null 2>&1\n```\n\n"
+    },
+    {
+      "title": "Dcron",
+      "level": 2,
+      "content": "cron デーモンは crontab という名前の設定ファイルをパースします。各ユーザーは別々の crontab ファイルを使うことで別個にコマンドを実行することができます。root ユーザーの crontab はシステム全体のコマンドのスケジュールを組みために使います (cron の実装によっては、ユーザーが /etc/crontab や /etc/cron.d ディレクトリを使うことができる場合もあります)。\n\n```\n/var/spool/cron/root\n```\n\n```\n# Run command at a scheduled time\n# Edit this 'crontab -e' for error checking, man 1 crontab for acceptable format\n\n# <@freq>                       <tags and command>\n@hourly         ID=sys-hourly   /usr/sbin/run-cron /etc/cron.hourly\n@daily          ID=sys-daily    /usr/sbin/run-cron /etc/cron.daily\n@weekly         ID=sys-weekly   /usr/sbin/run-cron /etc/cron.weekly\n@monthly        ID=sys-monthly  /usr/sbin/run-cron /etc/cron.monthly\n\n# mm  hh  DD  MM  W /path/command (or tags) # W = week: 0-6, Sun=0\n  21  01  *   *   * /usr/bin/systemctl suspend\n```\n\n以下の行は crontab エントリのフォーマットの例です。空白で区切られたフィールドに以下を指定します:\n\n1. @period\n1. ID=jobname (this tag is specific to dcron)\n1. command\n\ncrontab エントリの他の標準フォーマット:\n\n1. minute\n1. hour\n1. day\n1. month\n1. day of week\n1. command\n\ncrontab ファイルは通常 /var/spool/cron/username に保存され、root の crontab ファイルは /var/spool/cron/root になります。\n\n詳しい情報や設定例は crontab の man ページを見てください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Gentoo Linux Cron Guide\n\n"
+    }
+  ]
+}

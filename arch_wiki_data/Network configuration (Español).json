@@ -1,0 +1,171 @@
+{
+  "title": "Network configuration (Español)",
+  "url": "https://wiki.archlinux.org/title/Network_configuration_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2022-10-19** \n\nArtículos relacionados\n\n- Depuración de la red\n- Cortafuegos\n- Compartir por Internet\n- Enrutador\n\nEste artículo describe cómo configurar conexiones de red en la Capa 3 del modelo OSI y superiores. Los detalles específicos del medio se manejan en las subpáginas /Ethernet (Español) y /Wireless (Español).\n\n"
+    },
+    {
+      "title": "Comprobar la conexión",
+      "level": 2,
+      "content": "Para solucionar los problemas de una conexión de red, siga las siguientes condiciones y asegúrese de cumplirlas:\n\n1. Su interfaz de red está listada y activada. De lo contrario, compruebe el controlador del dispositivo; véase /Ethernet (Español)#Device driver o /Wireless (Español)#Device driver.\n1. Está conectado a la red. El cable está enchufado o está conectado a la LAN inalámbrica.\n1. Su interfaz de red tiene una dirección IP.\n1. Su tabla de enrutamiento está configurada correctamente.\n1. Puede hacer ping a una dirección IP local (por ejemplo, su puerta de enlace predeterminada).\n1. Puede hacer ping a una dirección IP pública (por ejemplo 9.9.9.9, que es un servidor DNS operado por Quad9 Foundation y es una dirección conveniente para realizar pruebas).\n1. Puede resolver nombres de dominio (por ejemplo archlinux.org).\n\n"
+    },
+    {
+      "title": "Ping",
+      "level": 3,
+      "content": "ping se utiliza para comprobar si puede comunicarse con un host.\n\n```\n$ ping www.example.com\n```\n\n```\nPING www.example.com (93.184.216.34): 56(84) data bytes\n64 bytes from 93.184.216.34: icmp_seq=0 ttl=56 time=11.632 ms\n64 bytes from 93.184.216.34: icmp_seq=1 ttl=56 time=11.726 ms\n64 bytes from 93.184.216.34: icmp_seq=2 ttl=56 time=10.683 ms\n...\n```\n\nPor cada respuesta recibida, la utilidad ping imprimirá una línea como la anterior hasta que la interrumpa (mediante Ctrl+c) de forma interactiva. Para obtener más información, véase el manual de ping(8). Tenga en cuenta que las computadoras se pueden configurar para que no respondan a las solicitudes de eco ICMP. [1]\n\nSi recibe un mensaje de error (véase indicaciones de error de ping) o no recibe respuesta, esto puede estar relacionado con una configuración incompleta, pero también con su puerta de enlace predeterminada o su proveedor de servicios de Internet (ISP). Puede ejecutar un traceroute para continuar con el diagnostico de la ruta al host.\n\n"
+    },
+    {
+      "title": "Administración de redes",
+      "level": 2,
+      "content": "Para configurar una conexión de red, siga los siguientes pasos:\n\n1. Asegúrese de que su interfaz de red esté listada y activada.\n1. Conéctese a la red. Conecte el cable Ethernet o conéctese a la LAN inalámbrica.\n1. Configure su conexión de red: dirección IP estática dirección IP dinámica: utilice DHCP\n\n- dirección IP estática\n- dirección IP dinámica: utilice DHCP\n\n"
+    },
+    {
+      "title": "net-tools",
+      "level": 3,
+      "content": "Arch Linux ha hecho obsoleto net-tools en favor de iproute2.[2]\n\nTable content:\nOrden obsoleta | Órdenes de reemplazo\narp | ip neighbor\nifconfig | ip address, ip link\nnetstat | ss\nroute | ip route\n\nPara obtener un resumen más completo, véase Órdenes de red de Linux obsoletos y sus reemplazos.\n\n"
+    },
+    {
+      "title": "iproute2",
+      "level": 3,
+      "content": "iproute2 es una dependencia del metapaquete base y proporciona la interfaz de línea de órdenes ip(8), utilizada para administrar interfaces de red, direcciones IP y la tabla de enrutamiento. Tenga en cuenta que la configuración realizada con ip se perderá después de reiniciar. Para una configuración persistente, puede utilizar un gestor de red o automatizar las órdenes ip usando scripts y unidades systemd. También tenga en cuenta que las órdenes ip generalmente se pueden abreviar para mayor claridad, sin embargo, se explican en detalle en este artículo.\n\n"
+    },
+    {
+      "title": "Interfaces de red",
+      "level": 3,
+      "content": "De forma predeterminada, udev asigna nombres a sus controladores de interfaz de red utilizando Nombres de interfaz de red predecibles, que antepone los nombres de las interfaces con en (alámbrico/Ethernet), wl (inalámbrico/WLAN), o ww (WWAN). Véase systemd.net-naming-scheme(7).\n\n"
+    },
+    {
+      "title": "Listar las interfaces de red",
+      "level": 4,
+      "content": "Tanto los nombres de las interfaces tanto las cableadas como las inalámbricas se pueden encontrar a través de ls /sys/class/net o ip link. Tenga en cuenta que lo es la interfaz virtual de bucle invertido y no se utiliza para realizar conexiones de red.\n\nLos nombres de los dispositivos inalámbricos también se pueden recuperar utilizando iw dev. Véase también /Wireless#Obtener el nombre de la interfaz.\n\nSi su interfaz de red no aparece en la lista, asegúrese de que el controlador de su dispositivo se haya cargado correctamente. Véase /Ethernet#Controlador de dispositivo o /Wireless#Controlador de dispositivo.\n\n"
+    },
+    {
+      "title": "Activar y desactivar interfaces de red",
+      "level": 4,
+      "content": "Las interfaces de red se pueden activar o desactivar utilizando ip link set interfaz up|down, véase ip-link(8).\n\nPara comprobar el estado de la interfaz enp2s0:\n\n```\n$ ip link show dev enp2s0\n```\n\n```\n2: enp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast master br0 state DOWN mode DEFAULT qlen 1000\n...\n```\n\nEl UP en <BROADCAST,MULTICAST,UP,LOWER_UP> indica que la interfaz está activa, no el posterior state DOWN.\n\n"
+    },
+    {
+      "title": "¿Dirección IP estática o dinámica?",
+      "level": 3,
+      "content": "Si está utilizando una red Wi-FI o un enrutador, por ejemplo en casa, lo más probable es que esté utilizando una dirección IP dinámica. La dirección IP es asignada por el Wi-Fi o el enrutador y es lo que su computadora debe configurar. O, si está en casa y su computadora está conectada al módem de su ISP, por ejemplo un módem por cable, que también utilizará una dirección IP dinámica. Las direcciones IP dinámicas pueden cambiar cada vez que enciende su computadora. En un entorno de trabajo, puede tener una dirección IP estática o dinámica. En casa, puede configurar su enrutador para que siempre asigne a su computadora la misma dirección IP, en cuyo caso está utilizando una dirección IP estática. Cuando utilice una dirección IP dinámica, deberá utilizar DHCP para que pueda configurar su interfaz de red con la dirección IP correcta. Además de configurar su dirección IP, DHCP también puede configurar su enrutamiento (cómo llegar desde donde se encuentra al lugar de la red al que se dirige), así como sus servidores de nombres, que convierten el nombre de host, por ejemplo google.com, en su dirección IP, ese número con puntos en él.\n\n"
+    },
+    {
+      "title": "Dirección IP estática",
+      "level": 3,
+      "content": "Se puede configurar una dirección IP estática con la mayoría de gestores de red y también dhcpcd.\n\nPara configurar manualmente una dirección IP estática, añada una dirección IP como se describe en #Direcciones IP, configure su tabla de enrutamiento y configure sus servidores DNS.\n\n"
+    },
+    {
+      "title": "Direcciones IP",
+      "level": 3,
+      "content": "Las direcciones IP se gestionan utilizando ip-address(8).\n\nLista de direcciones IP:\n\n```\n$ ip address show\n```\n\nAñadir una dirección IP a una interfaz:\n\n```\n# ip address add dirección/longitud_prefijo broadcast + dev interfaz\n```\n\n- la dirección se da en notación CIDR para suministrar también una máscara de subred\n- + es un símbolo especial que hace que ip derive la dirección de difusión de la dirección IP y la máscara de subred\n\nEliminar una dirección IP de una interfaz:\n\n```\n# ip address del dirección/longitud_prefijo dev interfaz\n```\n\nEliminar todas las direcciones que coincidan con un criterio, por ejemplo de una interfaz específica:\n\n```\n# ip address flush dev interfaz\n```\n\n"
+    },
+    {
+      "title": "Tabla de enrutamiento",
+      "level": 3,
+      "content": "La tabla de enrutamiento se utiliza para determinar si puede acceder a una dirección IP directamente o qué puerta de enlace (enrutador) debe usar. Si ninguna otra ruta coincide con la dirección IP, se utiliza la Puerta de enlace predeterminada.\n\nLa tabla de enrutamiento se administra mediante ip-route(8).\n\nPREFIJO es una notación CIDR o default para la puerta de enlace predeterminada.\n\nLista de rutas IPv4:\n\n```\n$ ip route show\n```\n\nLista de rutas IPv6:\n\n```\n$ ip -6 route\n```\n\nAñadir una ruta:\n\n```\n# ip route add PREFIJO via dirección dev interfaz\n```\n\nEliminar una ruta:\n\n```\n# ip route del PREFIJO via dirección dev interfaz\n```\n\n"
+    },
+    {
+      "title": "DHCP",
+      "level": 3,
+      "content": "Un Protocolo de configuración dinámica de host (DHCP) proporciona a los clientes una dirección IP dinámica, la máscara de subred, la dirección IP de la puerta de enlace predeterminada y, opcionalmente, los servidores de nombres DNS.\n\nPara utilizar DHCP, necesita un servidor DHCP en su red y un cliente DHCP:\n\nTable content:\nCliente | Paquete | Archiso | Nota | Unidades systemd\ndhcpcd | dhcpcd | Sí | DHCP, DHCPv6, ZeroConf, IP estática | dhcpcd.service, dhcpcd@interfaz.service\nISC dhclient | dhclient | Sí | DHCP, DHCPv6, BOOTP, IP estática | dhclient@interfaz.service\n\n- ISC finalizó el desarrollo del cliente DHCP de ISC a principios de 2022. Esta implementación de cliente ya no se mantiene y ya no debe utilizarse en producción.\n- No debe ejecutar dos clientes DHCP simultáneamente.\n- En lugar de utilizar directamente un cliente DHCP independiente, también puede usar un gestor de red, algunos de los cuales tienen un cliente DHCP integrado.\n- Alternativamente, iwd tiene un cliente DHCP integrado que se puede utilizar con alguna configuración: iwd#Enable built-in network configuration.\n\n- Puede comprobar si un servidor DHCP se está ejecutando con dhcping.\n- Mientras espera que se le asigne una IP, puede ejecutar algo como watch -n 1 ping -c 1 archlinux.org para confirmar que la red está conectada.\n\n"
+    },
+    {
+      "title": "Servidores",
+      "level": 4,
+      "content": "Table content:\nServidor | Paquete | IPv4 | IPv6 | GUI | Interfaces | Tipo(s) de almacenamiento | Nota\ndhcpd | dhcp | Sí | Sí | Glass-ISC-DHCP | ? | Archivo | \ndnsmasq | dnsmasq | Sí | Sí | No | ? | Archivo | También DNS, PXE y TFTP\nKea | kea | Sí | Sí | Stork | REST, RADIUS y NETCONF | Archivo, MySQL, PostgreSQL y Cassandra | También DNS\n\n"
+    },
+    {
+      "title": "Gestores de red",
+      "level": 3,
+      "content": "Un gestor de red le permite administrar la configuración de la conexión de red en los llamados perfiles de red para facilitar el cambio de red.\n\nTable content:\nGestor de red | GUI | Archiso [3] | Herramientas CLI | Soporte PPP (p.ej. modem 3G) | Cliente DHCP | Unidades systemd\nConnMan | 8 No oficial | No | connmanctl(1) | Sí (con ofonoAUR) | interno | connman.service\nnetctl | 2 No oficial | No | netctl(1), wifi-menu | Sí | dhcpcd o dhclient | netctl-ifplugd@interfaz.service, netctl-auto@interfaz.service\nNetworkManager | Sí | No | nmcli(1), nmtui(1) | Sí | interno o dhclient | NetworkManager.service\nsystemd-networkd | No | Sí (base) | networkctl(1) | No | interno | systemd-networkd.service, systemd-resolved.service\n\n"
+    },
+    {
+      "title": "Establecer el nombre de host",
+      "level": 2,
+      "content": "Un nombre de host es un nombre único creado para identificar una máquina en una red, configurado en /etc/hostname—véase hostname(5) y hostname(7) para más detalles. El archivo puede contener el nombre de dominio del sistema, si lo hay. Para establecer el nombre de host, modifique /etc/hostname para incluir una sola línea con minombredehost:\n\n```\n/etc/hostname\n```\n\n```\nminombredehost\n```\n\nAlternativamente, utilizando hostnamectl(1):\n\n```\n# hostnamectl set-hostname minombredehost\n```\n\nPara establecer temporalmente el nombre de host (hasta que se reinicie), utilice hostname(1) de inetutils:\n\n```\n# hostname minombredehost\n```\n\nPara configurar el nombre de host \"bonito\" (pretty) y otros metadatos de la máquina, véase machine-info(5).\n\n"
+    },
+    {
+      "title": "Resolución de nombre de host en red local",
+      "level": 3,
+      "content": "Para que su máquina sea accesible en su LAN a través de su nombre de host, puede:\n\n- modificar el archivo /etc/hosts para cada dispositivo en su LAN, véase hosts(5)\n- configurar un servidor DNS para resolver su nombre de host y hacer que los dispositivos LAN lo utilicen (por ejemplo, a través de #DHCP)\n- o de la forma más sencilla: utilizar un servicio de Redes de configuración cero: Resolución de nombre de host mediante NetBIOS de Microsoft. Proporcionado por Samba en Linux. Solo requiere nmb.service. Las computadoras que ejecutan Windows, macOS o Linux con nmb en ejecución podrán encontrar su máquina. Resolución de nombre de host mediante mDNS. Proporcionado por nss_mdns con Avahi (véase Avahi#Hostname resolution para obtener detalles de configuración) o systemd-resolved. Las computadoras que ejecutan macOS, o Linux con Avahi o resolución por systemd, podrán encontrar su máquina. La API Win32 anterior no es compatible con mDNS, lo que puede impedir que algunas aplicaciones antiguas de Windows accedan a su dispositivo.\n\n- Resolución de nombre de host mediante NetBIOS de Microsoft. Proporcionado por Samba en Linux. Solo requiere nmb.service. Las computadoras que ejecutan Windows, macOS o Linux con nmb en ejecución podrán encontrar su máquina.\n- Resolución de nombre de host mediante mDNS. Proporcionado por nss_mdns con Avahi (véase Avahi#Hostname resolution para obtener detalles de configuración) o systemd-resolved. Las computadoras que ejecutan macOS, o Linux con Avahi o resolución por systemd, podrán encontrar su máquina. La API Win32 anterior no es compatible con mDNS, lo que puede impedir que algunas aplicaciones antiguas de Windows accedan a su dispositivo.\n\n"
+    },
+    {
+      "title": "Cambiar el nombre de la interfaz",
+      "level": 3,
+      "content": "Puede cambiar el nombre del dispositivo definiendo el nombre manualmente con una regla udev. Por ejemplo:\n\n```\n/etc/udev/rules.d/10-network.rules\n```\n\n```\nSUBSYSTEM==\"net\", ACTION==\"add\", ATTR{address}==\"aa:bb:cc:dd:ee:ff\", NAME=\"net1\"\nSUBSYSTEM==\"net\", ACTION==\"add\", ATTR{address}==\"ff:ee:dd:cc:bb:aa\", NAME=\"net0\"\n```\n\nEstas reglas se aplicarán automáticamente en el arranque.\n\nUn par de cosas a comentar:\n\n- Para obtener la dirección MAC de cada tarjeta, utilice esta orden: cat /sys/class/net/nombre_dispositivo/address\n- Asegúrese de utilizar los valores hexadecimales en minúsculas en sus reglas de udev. No le gustan las mayúsculas.\n\nSi la tarjeta de red tiene una MAC dinámica, puede utilizar DEVPATH, por ejemplo:\n\n```\n/etc/udev/rules.d/10-network.rules\n```\n\n```\nSUBSYSTEM==\"net\", DEVPATH==\"/devices/platform/wemac.*\", NAME=\"int\"\nSUBSYSTEM==\"net\", DEVPATH==\"/devices/pci*/*1c.0/*/net/*\", NAME=\"en\"\n```\n\nPara obtener el DEVPATH de todos los dispositivos conectados actualmente, vea a dónde conducen los enlaces simbólicos en /sys/class/net/. Por ejemplo:\n\n```\nfile /sys/class/net/*\n```\n\n```\n/sys/class/net/enp0s20f0u4u1: symbolic link to ../../devices/pci0000:00/0000:00:14.0/usb2/2-4/2-4.1/2-4.1:1.0/net/enp0s20f0u4u1\n/sys/class/net/enp0s31f6:     symbolic link to ../../devices/pci0000:00/0000:00:1f.6/net/enp0s31f6\n/sys/class/net/lo:            symbolic link to ../../devices/virtual/net/lo\n/sys/class/net/wlp4s0:        symbolic link to ../../devices/pci0000:00/0000:00:1c.6/0000:04:00.0/net/wlp4s0\n```\n\nLa ruta del dispositivo debe coincidir con el nombre del dispositivo nuevo y antiguo, ya que la regla puede ejecutarse más de una vez en el arranque. Por ejemplo en la segunda regla, \"/devices/pci*/*1c.0/*/net/enp*\" sería incorrecto ya que dejará de coincidir una vez que se cambie el nombre a en. Solo la regla predeterminada del sistema se activará la segunda vez, lo que hará que el nombre se cambie de nuevo a, por ejemplo enp1s0.\n\nSi está utilizando un dispositivo de red USB (p. ej., Android phone tethering) que tiene una dirección MAC dinámica y desea poder utilizar diferentes puertos USB, puede usar una regla que coincida según el proveedor y el ID del producto:\n\n```\n/etc/udev/rules.d/10-network.rules\n```\n\n```\nSUBSYSTEM==\"net\", ACTION==\"add\", ATTRS{idVendor}==\"12ab\", ATTRS{idProduct}==\"3cd4\", NAME=\"net2\"\n```\n\nPara probar sus reglas, se pueden activar directamente desde el espacio de usuario, por ejemplo con udevadm --debug test /sys/class/net/*. Recuerde eliminar primero la interfaz que está intentando cambiar de nombre (por ejemplo ip link set enp1s0 down).\n\nNote: **debe evitarse el uso de nombres con el formato \"ethX\" y \"wlanX\"** \n\n"
+    },
+    {
+      "title": "Volver a los nombres de interfaz tradicionales",
+      "level": 3,
+      "content": "Si prefiere conservar los nombres de interfaz tradicionales como eth0, los nombres de interfaz de red predecibles pueden desactivarse enmascarando la regla udev:\n\n```\n# ln -s /dev/null /etc/udev/rules.d/80-net-setup-link.rules\n```\n\nAlternativamente, añada net.ifnames=0 a los parámetros del kernel.\n\n"
+    },
+    {
+      "title": "Establecer la MTU del dispositivo y la longitud de la cola",
+      "level": 3,
+      "content": "Puede cambiar el MTU del dispositivo y la longitud de la cola definiéndolos manualmente con una regla udev. Por ejemplo:\n\n```\n/etc/udev/rules.d/10-network.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"net\", KERNEL==\"wl*\", ATTR{mtu}=\"1500\", ATTR{tx_queue_len}=\"2000\"\n```\n\nmtu: El uso de un valor superior a 1500 (los llamados tramas jumbo) puede acelerar significativamente sus transferencias de red. Tenga en cuenta que todas las interfaces de red, incluidos los conmutadores de la red local, deben admitir la misma MTU para poder utilizar tramas gigantes. Para PPPoE, la MTU no debe ser superior a 1492. También puede configurar la MTU a través de systemd.netdev(5).\n\ntx_queue_len: Valor pequeño para dispositivos más lentos con una latencia alta como enlaces de módem e ISDN. Se recomienda un valor alto para el servidor conectado a través de conexiones a Internet de alta velocidad que realizan grandes transferencias de datos.\n\n"
+    },
+    {
+      "title": "Bonding o LAG",
+      "level": 3,
+      "content": "Véase netctl o systemd-networkd, o Wireless bonding.\n\n"
+    },
+    {
+      "title": "Alias de dirección IP",
+      "level": 3,
+      "content": "El alias de IP es el proceso de añadir más de una dirección IP a una interfaz de red. Con esto, un nodo en una red puede tener múltiples conexiones a una red, cada una con un propósito diferente. Los usos típicos son el alojamiento virtual de servidores Web y FTP, o la reorganización de servidores sin tener que actualizar ninguna otra máquina (esto es especialmente útil para los servidores de nombres).\n\n"
+    },
+    {
+      "title": "Ejemplo",
+      "level": 4,
+      "content": "Para configurar manualmente un alias, para algunas NIC, utilice iproute2:\n\n```\n# ip addr add 192.168.2.101/24 dev enp2s0 label enp2s0:1\n```\n\nPara eliminar un alias determinado:\n\n```\n# ip addr del 192.168.2.101/24 dev enp2s0:1\n```\n\nLos paquetes destinados a una subred utilizarán el alias principal de forma predeterminada. Si la IP de destino está dentro de una subred de un alias secundario, la IP de origen se establece respectivamente. Considere el caso en el que hay más de una NIC, las rutas predeterminadas se pueden listar con ip route.\n\n"
+    },
+    {
+      "title": "Modo promiscuo",
+      "level": 3,
+      "content": "Cambiar al modo promiscuo hará que una NIC (inalámbrica) reenvíe todo el tráfico que recibe al sistema operativo para su posterior procesamiento. Esto es opuesto al \"modo normal\" en el que una NIC eliminará tramas que no deba recibir. Se utiliza con mayor frecuencia para la solución avanzada de problemas de red y análisis de paquetes.\n\n```\n/etc/systemd/system/promiscuous@.service\n```\n\n```\n[Unit]\nDescription=Establecer el modo promiscuo en la interfaz %i\nAfter=network.target\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/ip link set dev %i promisc on\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n```\n\nSi desea activar el modo promiscuo en la interfaz enp2s0, active promiscuous@enp2s0.service.\n\n"
+    },
+    {
+      "title": "Investigar sockets",
+      "level": 3,
+      "content": "ss es una utilidad para investigar puertos de red y es parte del paquete iproute2. Tiene una funcionalidad similar a la utilidad obsolleta netstat.\n\nEntre sus usos se incluyen los siguientes:\n\nMostrar todos los sockets TCP con nombres de servicio:\n\n```\n$ ss -at\n```\n\nMostrar todos los sockets TCP con números de puerto:\n\n```\n$ ss -atn\n```\n\nMostrar todos los sockets UDP:\n\n```\n$ ss -au\n```\n\nPara obtener más información, véase ss(8).\n\n"
+    },
+    {
+      "title": "El problema de escalado de la ventana de TCP",
+      "level": 3,
+      "content": "Los paquetes TCP contienen un valor de \"ventana\" en sus encabezados que indica la cantidad de datos que el otro host puede enviar a cambio. Este valor se representa con solo 16 bits, por lo que el tamaño de la ventana es de 64 KiB como máximo. Los paquetes TCP se almacenan en caché durante un tiempo (tienen que reordenarse), y como la memoria es (o solía ser) limitada, un host podría quedarse sin ella fácilmente.\n\nEn 1992, a medida que había más y más memoria disponible, se escribió RFC:1323 para mejorar la situación: Escalado de ventana (Window Scaling). El valor de la \"ventana\", provisto en todos los paquetes, será modificado por un factor de escala definido una vez, al comienzo de la conexión. Ese factor de escala de 8 bits permite que la ventana sea hasta 32 veces mayor que los 64 KiB iniciales.\n\nParece que algunos enrutadores y cortafuegos defectuosos en Internet están reescribiendo el factor de escala a 0, lo que provoca malentendidos entre los hosts. El kernel de Linux 2.6.17 introdujo un nuevo esquema de cálculo que genera factores de escala más altos, lo que virtualmente hace que las consecuencias de los enrutadores y cortafuegos defectuosos sean más visibles.\n\nLa conexión resultante es, en el mejor de los casos, muy lenta o defectuosa.\n\n"
+    },
+    {
+      "title": "Cómo diagnosticar el problema",
+      "level": 4,
+      "content": "En primer lugar, una aclaración: este problema es extraño. En algunos casos, no podrá utilizar conexiones TCP (HTTP, FTP, ...) en absoluto y en otros, podrá comunicarse con algunos hosts (muy pocos).\n\nCuando tiene este problema, la salida de dmesg está bien, los registros están limpios y ip addr informará el estado normal... y en realidad todo parece normal.\n\nSi no puede navegar por ningún sitio web, pero puede hacer ping en algunos hosts aleatorios, es muy probable que esté experimentando este problema: el ping utiliza ICMP y no se ve afectado por los problemas de TCP.\n\nPuedes intentar utilizar Wireshark. Es posible que vea comunicaciones UDP e ICMP exitosas, pero comunicaciones TCP fallidas (solo con hosts externos).\n\n"
+    },
+    {
+      "title": "Maneras de arreglarlo",
+      "level": 4,
+      "content": "Para solucionarlo de la manera incorrecta, puede cambiar el valor de tcp_rmem, en el que se basa el cálculo del factor de escala. Aunque debería funcionar para la mayoría de los hosts, no está garantizado, especialmente para los muy distantes.\n\n```\n# echo \"4096 87380 174760\" > /proc/sys/net/ipv4/tcp_rmem\n```\n\nSimplemente desactive el ajuste de escala de la ventana. Dado que el escalado de ventana es una buena función de TCP, puede resultar incómodo desactivarla, especialmente si no puede reparar el enrutador defectuoso. Hay varias formas de desactivar el escalado de ventana, y parece que la forma más segura (que funcionará con la mayoría de los kernel) es añadir la siguiente línea a /etc/sysctl.d/99-disable_window_scaling.conf (véase también sysctl):\n\n```\nnet.ipv4.tcp_window_scaling = 0\n```\n\nEste problema es causado por enrutadores/cortafuegos defectuosos, así que permítanos cambiarlos. Algunos usuarios informaron que el enrutador defectuoso era su propio enrutador DSL.\n\n"
+    },
+    {
+      "title": "Más sobre eso",
+      "level": 4,
+      "content": "Esta sección se basa en el artículo de LWN Escalado de ventana TCP y enrutadores averiados y un artículo archivado de Kernel Trap: Escalado de ventana en Internet.\n\nTambién hay varios hilos relevantes en LKML.\n\n"
+    },
+    {
+      "title": "La segunda computadora conectada no puede utilizar el puente LAN",
+      "level": 3,
+      "content": "La primer computadora tiene dos LAN. La segunda computadora tiene una LAN y está conectada a la primera. Vayamos a la segunda para dar todo el acceso a la LAN después de la interfaz puenteada:\n\n```\n# sysctl net.bridge.bridge-nf-filter-pppoe-tagged=0\n# sysctl net.bridge.bridge-nf-filter-vlan-tagged=0\n# sysctl net.bridge.bridge-nf-call-ip6tables=0\n# sysctl net.bridge.bridge-nf-call-iptables=0\n# sysctl net.bridge.bridge-nf-call-arptables=0\n```\n\n"
+    },
+    {
+      "title": "localhost se resuelve a través de la red",
+      "level": 3,
+      "content": "nss-myhostname(8) (un módulo NSS proporcionado por systemd y activado de forma predeterminada en /etc/nsswitch.conf) proporciona localhost y la resolución del nombre de host local a una dirección IP. Sin embargo, algunos programas aún pueden leer /etc/hosts directamente; véase [4] [5] para ver ejemplos.\n\nPara evitar que dicho software resuelva localhost de forma no segura en la red, añada entradas para localhost al archivo hosts(5):\n\n```\n/etc/hosts\n```\n\n```\n127.0.0.1        localhost\n::1              localhost\n```\n\npredeterminado.\n\nPara permitir la resolución del nombre de host local, puede añadirlo adicionalmente al archivo hosts(5):\n\n```\n/etc/hosts\n```\n\n```\n127.0.0.1        localhost\n::1              localhost\n127.0.1.1        minombredehost\n```\n\nPara un sistema con una dirección IP permanente, reemplace 127.0.1.1 con esa dirección IP permanente. Para un sistema con un nombre de dominio completo, incluya el nombre de dominio completo antes del nombre de host (véase el siguiente enlace para conocer el razonamiento). Por ejemplo:\n\n```\n/etc/hosts\n```\n\n```\n127.0.0.1        localhost\n::1              localhost\n203.0.113.45     host1.fqdomain.example host1\n```\n\nComo resultado, el sistema resuelve ambas entradas:\n\n```\n$ getent hosts\n```\n\n```\n127.0.0.1       localhost\n127.0.0.1       localhost\n127.0.1.1       minombredehost\n```\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Guía de administradores de red de Linux\n- Referencia de Debian: Configuración de la red\n- RHEL7: Guía de redes\n- Supervisión y ajuste de la pila de red de Linux: Recepción de datos\n- Supervisión y ajuste de la pila de red de Linux: Envío de datos\n- Seguimiento del viaje de un paquete mediante puntos de seguimiento, rendimiento y eBPF\n\n"
+    }
+  ]
+}

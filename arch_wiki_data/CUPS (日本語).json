@@ -1,0 +1,191 @@
+{
+  "title": "CUPS (日本語)",
+  "url": "https://wiki.archlinux.org/title/CUPS_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- CUPS/プリンター共有\n- CUPS/プリンター別の問題\n- CUPS/トラブルシューティング\n- Samba\n- LPRng\n\nCUPS は、Linux® や他の Unix® ライクなオペレーティングシステムのための標準ベースのオープンソースな印刷システムです。OpenPrinting によって開発されています。\n\nArch Linux では、Apple CUPS フォークではなく、OpenPrinting CUPS フォークがパッケージングされています。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール 1.1 印刷の流れ\n- 2 接続インターフェイス 2.1 USB 2.2 パラレルポート 2.3 ネットワーク 2.3.1 既知の場所のプリンタを追加する 2.3.2 プリンタを発見する\n- 3 プリンタードライバー 3.1 AirPrint と IPP Everywhere 3.2 OpenPrinting CUPS フィルタ 3.3 Foomatic 3.4 Gutenprint 3.5 メーカー固有のドライバ\n- 4 プリンター URI 4.1 USB 4.2 パラレルポート 4.3 ネットワーク\n- 5 使用方法 5.1 CLI ツール 5.1.1 lp* 5.1.2 cups* 5.1.3 ink 5.2 ウェブインターフェイス 5.3 GUI アプリケーション\n- 6 設定 6.1 パーミッション 6.1.1 グループ 6.1.2 PolicyKit による管理者認証を許可する 6.2 デフォルトの用紙サイズ 6.3 アーカイブ PDF/A 6.4 ログファイル 6.5 cups-browsed 6.6 印刷サーバとリモート管理 6.7 ローカルの CUPS サーバーを使わない\n- 7 トラブルシューティング\n- 8 参照\n\n- 1.1 印刷の流れ\n\n- 2.1 USB\n- 2.2 パラレルポート\n- 2.3 ネットワーク 2.3.1 既知の場所のプリンタを追加する 2.3.2 プリンタを発見する\n\n- 2.3.1 既知の場所のプリンタを追加する\n- 2.3.2 プリンタを発見する\n\n- 3.1 AirPrint と IPP Everywhere\n- 3.2 OpenPrinting CUPS フィルタ\n- 3.3 Foomatic\n- 3.4 Gutenprint\n- 3.5 メーカー固有のドライバ\n\n- 4.1 USB\n- 4.2 パラレルポート\n- 4.3 ネットワーク\n\n- 5.1 CLI ツール 5.1.1 lp* 5.1.2 cups* 5.1.3 ink\n- 5.2 ウェブインターフェイス\n- 5.3 GUI アプリケーション\n\n- 5.1.1 lp*\n- 5.1.2 cups*\n- 5.1.3 ink\n\n- 6.1 パーミッション 6.1.1 グループ 6.1.2 PolicyKit による管理者認証を許可する\n- 6.2 デフォルトの用紙サイズ\n- 6.3 アーカイブ PDF/A\n- 6.4 ログファイル\n- 6.5 cups-browsed\n- 6.6 印刷サーバとリモート管理\n- 6.7 ローカルの CUPS サーバーを使わない\n\n- 6.1.1 グループ\n- 6.1.2 PolicyKit による管理者認証を許可する\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "cups パッケージをインストールしてください。\n\n任意で、PDF ドキュメントに\"印刷\"したい場合は、cups-pdf パッケージをインストールしてください。デフォルトでは、PDF ファイルは /var/spool/cups-pdf/username/ に保存されます。保存場所は /etc/cups/cups-pdf.conf で変更することができます。\n\nそして、cups.service を有効化し、起動してください。または、ソケットアクティベーションを使用することで、このサービスがプログラムによって必要とされる場合にのみ CUPS を起動させることもできます。\n\n"
+    },
+    {
+      "title": "印刷の流れ",
+      "level": 3,
+      "content": "関連する問題を解決したい場合は、CUPS がどう機能するかを知っておくことが重要です:\n\n1. '印刷' が選択された際、アプリケーションは PDF ファイルを CUPS に送信します (アプリケーションが他の形式を送信した場合、それらはまず PDF に変換されます)。\n1. CUPS はプリンタの PPD ファイル (プリンタ記述ファイル) を参照し、PDF ファイルをプリンタの理解できる言語 (PJL、PCL、ビットマップ、ネイティブな PDF など) へ変換するためにどのようなフィルタを使用する必要があるかを調べます。\n1. フィルタが PDF ファイルをプリンタの理解できる形式へ変換します。\n1. 最後に、そのデータがバックエンドへ送られます。例えば、プリンタが USB ポートに接続されている場合、USB バックエンドが使用されます。\n\n"
+    },
+    {
+      "title": "接続インターフェイス",
+      "level": 2,
+      "content": "様々なインターフェイスにおける、プリンタを認識させるための追加の手順を以下に載せています。\n\n"
+    },
+    {
+      "title": "USB",
+      "level": 3,
+      "content": "USB プリンタが認識されているかどうか確認するには、まず usbutils パッケージがインストールされていることを確認し、以下を実行してください:\n\n```\n$ lsusb\n```\n\n```\n(...)\nBus 001 Device 007: ID 03f0:1004 Hewlett-Packard DeskJet 970c/970cse\n```\n\n"
+    },
+    {
+      "title": "パラレルポート",
+      "level": 3,
+      "content": "パラレルポートプリンターを使うには、カーネルモジュール lp、parport、そして parport_pc が必要です。\n\n```\n# dmesg | grep -i parport\n```\n\n```\nparport0: Printer, Hewlett-Packard HP LaserJet 2100 Series\nlp0: using parport0 (polling)\n```\n\n"
+    },
+    {
+      "title": "既知の場所のプリンタを追加する",
+      "level": 4,
+      "content": "プリンタのアドレスがわかっている場合 (アドレスは、プリンタの画面に表示されたり、他の何らかの方法でネットワークをスキャンしたりなどして得られます)、プリンタを動的に発見する機能 (DNS-SD/mDNS) に頼る必要はありません。CUPS のキューを直接追加することで、プリンタを使用することができます。lpadmin でキューを追加する歩法については、次の章かドキュメント Setting up printers で見られます。\n\n"
+    },
+    {
+      "title": "プリンタを発見する",
+      "level": 4,
+      "content": "DNS-SD/mDNS を使ってプリンタを発見、使用、または共有するには、Avahi を使って .local ホストネーム解決をセットアップして、cups.service を再起動してください。\n\nSamba を使ってネットワークプリンターを共有する場合や、例えばシステムを Windows クライアント用のプリンターサーバーにする場合、samba パッケージが必要です。\n\n"
+    },
+    {
+      "title": "プリンタードライバー",
+      "level": 2,
+      "content": "最近 (2010年以降) のプリンタのほとんどは、AirPrint や IPP_Everywhere を実装しているのでドライバレスでの使用をサポートしています (以下を参照)。\n\nプリンターのドライバーは以下のソースのどこかから入手することができます。動作するのが確認されているドライバーの不完全なリストは CUPS/プリンター別の問題 を見てください。\n\nプリンターを動かすのに、CUPS は PPD ファイルを必要とします。また、大抵のプリンターではいくつかのフィルターも必要です。CUPS がどうやって PPD やフィルターを使用するのかは [1] に詳しく書かれています。\n\nOpenPrinting Printer List は多数のプリンターの推奨ドライバーを教えてくれます。個別のプリンターの PPD ファイルも提供されていますが、大抵の場合は foomatic や推奨されているドライバーパッケージから手に入ります。\n\nPPD ファイルが CUPS に供給されると、CUPS サーバーは PPD ファイルを再生成して /etc/cups/ppd/ に保存します。\n\nPKGBUILD を作成する前に PPD ファイルが動作することを確認するために、PPD ファイルを /usr/share/cups/model に手動で追加することができます。cups サービスを再起動したあとに、そのドライバが利用可能になるはずです。\n\n"
+    },
+    {
+      "title": "AirPrint と IPP Everywhere",
+      "level": 3,
+      "content": "CUPS には AirPrint と IPP Everywhere プリンタのサポートが含まれています。そのようなプリンタは自動的に発見されるはずです。\n\n"
+    },
+    {
+      "title": "OpenPrinting CUPS フィルタ",
+      "level": 3,
+      "content": "Linux Foundation の OpenPrinting ワークグループは、cups-filters を提供しています。これらは、かつて CUPS の一部だったがプロジェクトから外されたバックエンド、フィルタ、そしてその他のバイナリです。これらは、cups の依存関係である cups-filters パッケージで利用できます。\n\n非 PDF プリンタは、ghostscript をインストールする必要があります。PostScript プリンタは、gsfonts も必要である場合があります。\n\n"
+    },
+    {
+      "title": "Foomatic",
+      "level": 3,
+      "content": "Linux Foundation の OpenPrinting ワークグループの foomatic は、多くのプリンタドライバの PPD を (フリーとフリーでないもの両方) 提供しています。foomatic が何をするかに関する詳細は Foomatic from the Developer's View を参照してください。\n\nfoomatic を使うには、foomatic-db-engine と、以下から最低でも1つをインストールしてください:\n\n- foomatic-db - foomatic-db-engine によって PPD ファイルを生成するために使用される XML ファイルのコレクション。\n- foomatic-db-ppds — ビルド済み PPD ファイル群。\n- foomatic-db-nonfree — プリンタのメーカーからフリーでないライセンスの XML ファイルのコレクション。foomatic-db-engine によって PPD ファイルを生成するために使用されます。\n- foomatic-db-nonfree-ppds — フリーでないライセンスのビルド済み PPD ファイル群。\n\nfoomatic PPD は追加のフィルタを必要とする場合があります (例: min12xxwAUR)。\n\n"
+    },
+    {
+      "title": "Gutenprint",
+      "level": 3,
+      "content": "Gutenprint プロジェクトは、CUPS と GIMP で使うための、Canon、Epson、Lexmark、Sony、Olympus、Brother、HP、Ricoh、PCL、そして一部の汎用プリンタ用のドライバを提供しています。\n\ngutenprint と foomatic-db-gutenprint-ppds をインストールしてください。\n\n"
+    },
+    {
+      "title": "メーカー固有のドライバ",
+      "level": 3,
+      "content": "多くのプリンタメーカーは独自の Linux ドライバを配布しています。中には Arch の公式リポジトリや AUR から入手できるものもあります。\n\nこれらのドライバのうちいくつかは CUPS/プリンター別の問題 で詳しく説明されています。\n\n"
+    },
+    {
+      "title": "プリンター URI",
+      "level": 2,
+      "content": "以下は、必要に応じて手動で URI を生成する追加の手順をリストアップしています。一部のプリンタとドライバは、CUPS/プリンター別の問題 で説明されている通り、特殊な URI を必要とする場合があります。\n\n"
+    },
+    {
+      "title": "USB",
+      "level": 3,
+      "content": "CUPS は USB プリンタの URI を自動的に生成できるはずです (例: usb://HP/DESKJET%20940C?serial=CN16E6C364BH)。\n\n生成されない場合、CUPS/トラブルシューティング#USB プリンター でトラブルシューティングの手順を確認してください。\n\n"
+    },
+    {
+      "title": "パラレルポート",
+      "level": 3,
+      "content": "URI は parallel:device という形式である必要があります。例えば、プリンターが /dev/lp0 で接続されている場合、parallel:/dev/lp0 を使ってください。USB からパラレルポートに変換するアダプタを使っている場合、プリンター URI は parallel:/dev/usb/lp0 を使ってください。\n\n"
+    },
+    {
+      "title": "ネットワーク",
+      "level": 3,
+      "content": "#ネットワークに書かれているように Avahi を設定することで、CUPS はプリンター URI を探知します。avahi-discover を使ってプリンターの名前やアドレスを確認することもできます (例: BRN30055C6B4C7A.local/10.10.0.155:631)。\n\nAvahi を使わずに URI を手動で生成することも可能です。ネットワークプリンターで利用可能な URI スキーマのリストは CUPS のドキュメントを見てください。プリンターによって URI には細かい違いがあるので、プリンターのマニュアルや CUPS/プリンター別の問題もチェックしてください。\n\nSMB 共有におけるプリンタの URI は、smbspool(8) man ページで説明されています。\n\n例えば、smb://BEN-DESKTOP/HP Color LaserJet CP1510 series PCL6 は smb://BEN-DESKTOP/HP%20Color%20LaserJet%20CP1510%20series%20PCL6 となります。\n\n以下のコマンドを実行することで、URL エンコードされた文字列を得ることができます:\n\n```\n$ python -c 'from urllib.parse import quote; print(\"smb://\" + quote(\"BEN-DESKTOP/HP Color LaserJet CP1510 series PCL6\"))'\n```\n\nリモートの CUPS 印刷サーバーは ipp://hostname:631/printers/queue_name という形式の URI でアクセスできます。リモートの印刷サーバーをセットアップする方法は CUPS/プリンター共有#GNU/Linux システム間 を見てください。\n\n他の問題については CUPS/トラブルシューティング#ネットワークの問題を見てください。\n\n"
+    },
+    {
+      "title": "使用方法",
+      "level": 2,
+      "content": "CUPS は lp* ツールと cups* ツールを使って完全に制御できます。または、#ウェブインターフェイス や #GUI アプリケーション を使うこともできます。\n\n- queue はキューを識別するために使われる短くてわかりやすい名前です。名前に空白・特殊文字を含めることはできません。例えば、HP LaserJet 5P を使用する印刷キューの名前は \"hpljet5p\" などとします。複数のキューを物理的なプリンターに関連付けることができます。\n- location はプリンターの物理的な場所の説明です (例えば \"bedroom\" や \"kitchen\" など)。複数のプリンターを管理しやすくするためにあります。\n- description はプリンターの完全な説明です。大抵はプリンターの正式名称が使われます (\"HP LaserJet 5P\" など)。\n\n"
+    },
+    {
+      "title": "CLI ツール",
+      "level": 3,
+      "content": "コマンドラインツールに関するヒントはローカルの CUPS ドキュメントを参照してください。\n\nSNMP を使って URI を見つけるには:\n\n```\n$ /usr/lib/cups/backend/snmp ip_address\n```\n\n"
+    },
+    {
+      "title": "lp*",
+      "level": 4,
+      "content": "lpinfo コマンドは、-v オプションを付けるとシステムに接続されているプリンタの URI を一覧表示し、-m オプションを付けるとシステム上にインストールされている利用可能な全てのドライバ (CUPS 用語では \"モデル\") を一覧表示します。\n\nlpadmin ユーティリティは、-p queue_name オプションを付けると新しいキューを作成します。-p に -E を加えると、プリンタを有効化し、ジョブを受け入れるようになります。-v フラグはデバイスの URI を指定します。-m フラグは、使用するドライバ (CUPS 用語では \"モデル\") か PPD ファイルを指定します。\n\n-x フラグを使うことでプリンタを取り除くこともできます (先に #cups* を読んでください)。\n\n例:\n\n```\n# lpadmin -p HP_DESKJET_940C -E -v \"usb://HP/DESKJET%20940C?serial=CN16E6C364BH\" -m drv:///HP/hp-deskjet_940c.ppd.gz\n```\n\nドライバレスのキュー (Apple AirPrint か IPP Everywhere) の場合は:\n\n```\n# lpadmin -p AirPrint -E -v \"ipp://10.0.1.25/ipp/print\" -m everywhere\n```\n\nraw キューの場合 (PPD もフィルタも無し):\n\n```\n# lpadmin -p SHARED_PRINTER -m raw\n```\n\nモデルではなく PPD を指定する場合:\n\n```\n# lpadmin -p Test_Printer -E -v \"ipp://10.0.1.3/ipp/print\" -m pxlmono.ppd\n```\n\n- PPD を指定する場合、フルパスではなくファイル名だけを指定してください (例えば、/usr/share/ppd/cupsfilters/pxlmono.ppd ではなく pxlmono.ppd)。あるいは、-P コマンドラインスイッチを使うことでフルパスを使用することもできます。\n- 2021年現在、最近のプリンタの多くはドライバレスの印刷セットアップをサポートしており、-m everywhere を指定すると (上記の例では2番目)、プリンタが定義され、ネットワーク上のプリンタにクエリすることで .ppd ファイルが /etc/cups/ppd/ 内に作成されます。\n\nlpq ユーティリティはキューのチェックを行います。全てのキューをチェックするには -a フラグを追加してください。\n\nlprm ユーティリティはキューをクリアします。デフォルトの最後のキューではなく、全てのエントリを削除するには - を追加してください。\n\nlpr ユーティリティは印刷を行います。ファイルを N 回印刷するには -# N を使用してください。ヘッダを追加するには -p フラグを使用してください。\n\nlpr を使って印刷テストを行う例:\n\n```\n$ lpr /usr/share/cups/data/testprint\n$ echo 'Hello, world!' | lpr -p\n```\n\nlpstat ユーティリティは、-s フラグを付けて使用すると、ステータスをチェックします。-p フラグを付けると、チェックするキューを指定できます。\n\nlpoptions ユーティリティは、上記の lpadmin と同じ -p queue_name フラグを使用します。-l フラグを付けると、オプションを一覧表示します。-d フラグは、デフォルトのプリンタを引数 queue_name に設定します。-o フラグは、オプションに値を設定します:\n\n```\n$ lpoptions -p HP_DESKJET_940C -o PageSize=A4\n$ lpoptions -p HP_DESKJET_940C -o cupsIPPSupplies=true -o Duplex=DuplexNoTumble\n```\n\n"
+    },
+    {
+      "title": "cups*",
+      "level": 4,
+      "content": "ユーティリティ cupsaccept、cupsdisable、cupsenable、そして cupsreject は、その名の通りの動作を行います。それぞれの動作は次のとおりです:ジョブを受け入れるようにプリンタを設定する、プリンタを無効化する、プリンタをアクティブ化する、全ての受信タスクを拒否するようにプリンタを設定する。\n\n例として、プリンタをクリーンに取り除いてみましょう:\n\n```\n# cupsreject queue_name\n# cupsdisable queue_name\n# lpadmin -x queue_name\n```\n\n"
+    },
+    {
+      "title": "ink",
+      "level": 4,
+      "content": "インクレベルを見るには inkAUR をインストールしてください。\n\nユーザを lp ユーザグループに追加し、一旦ログアウトし、再度ログインしてください。\n\n詳細を見るには、オプションを付けずに ink を実行してください。\n\n"
+    },
+    {
+      "title": "ウェブインターフェイス",
+      "level": 3,
+      "content": "CUPS サーバは、ウェブインターフェイス (http://localhost:631/ で利用可能) から完全に管理することができます。\n\nウェブインターフェイスから管理を行うには、認証が必要です。#パーミッション を参照してください。\n\nAdministration (管理) ページを開いてください。\n\nPrinters (プリンター) ページを開き、編集したいキューを選択してください。\n\nPrinters (プリンター) ページを開き、キューを選択してください。\n\n"
+    },
+    {
+      "title": "GUI アプリケーション",
+      "level": 3,
+      "content": "CUPS を管理するのに十分な権限がユーザに無い場合、アプリケーションは起動時に root のパスワードを要求します。ユーザに root アクセスを要さない管理権限を与える方法は、#設定 を見てください。\n\n- Deepin Print Manager — Deepin デスクトップのためのプリンタ設定インターフェイス。\n\n- GtkLP — CUPS の GTK インターフェイス。\n\n- print-manager — 印刷ジョブとプリンターの管理ツール (KDE)。\n\n- system-config-printer — GTK プリンタ設定ツールと状態アプレット。\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "CUPS サーバの設定は /etc/cups/cupsd.conf と /etc/cups/cups-files.conf にあります (cupsd.conf(5) と cups-files.conf(5) を参照)。どちらかのファイルを編集したら、変更を適用するために cups.service を再起動してください。ほとんどのユーザにとって、デフォルトの設定で問題ありません。\n\n"
+    },
+    {
+      "title": "グループ",
+      "level": 4,
+      "content": "プリンタの管理権限を持つユーザグループは /etc/cups/cups-files.conf 内の SystemGroup で定義されています。デフォルトでは、sys グループ、root グループ、そして wheel グループが使用されています。\n\nCUPS のヘルパプログラムは、cups ユーザとグループとして実行されます。これにより、ヘルパプログラムがプリンタデバイスにアクセスしたり、/etc/cups/ 内の設定ファイル (cups グループによって所有されています) を読み込んだりすることができます。\n\n"
+    },
+    {
+      "title": "PolicyKit による管理者認証を許可する",
+      "level": 4,
+      "content": "PolicyKit を設定することで、ユーザは管理者パスワードを入力せずに GUI を使ってプリンタを設定できるようになります。\n\n以下は、wheel ユーザグループのメンバーにパスワード無しでのプリンタ管理を許可する例です:\n\n```\n/etc/polkit-1/rules.d/49-allow-passwordless-printer-admin.rules\n```\n\n```\npolkit.addRule(function(action, subject) { \n    if (action.id == \"org.opensuse.cupspkhelper.mechanism.all-edit\" && \n        subject.isInGroup(\"wheel\")){ \n        return polkit.Result.YES; \n    } \n});\n```\n\n"
+    },
+    {
+      "title": "デフォルトの用紙サイズ",
+      "level": 3,
+      "content": "cups は、libpaper サポートありでビルドされており、libpaper はデフォルトでレター用紙サイズ (lpoptions では PageSize と呼ばれています) を使用します。印刷キューを追加するたびに用紙サイズを変更する手間を省くために、/etc/papersize を編集してシステムのデフォルト用紙サイズを設定することができます。paper(1) を参照してください。\n\n"
+    },
+    {
+      "title": "アーカイブ PDF/A",
+      "level": 3,
+      "content": "以下は、互換性の高い形式で PDF ファイルを保存する方法です (通常、これらは Archival PDF や PDF/A、PDFA、ISO 19005 と呼ばれます)。\n\n現在、オプションはありません。なので、cups によって使用される、gs を呼び出すコマンドに追加する必要があります。\n\nTable content:\nこの記事またはセクションの正確性には問題があります。 理由: /etc/cups/cups.conf は cups パッケージに存在しません。なので、以下の設定例のコメントアウトされているデフォルト引数付きの GSCall オプションは存在しません。 (議論: トーク:CUPS#)\n\n```\n/etc/cups/cups.conf\n```\n\n```\n# GSCall %s -q -dCompatibilityLevel=%s -dNOPAUSE -dBATCH -dSAFER  -sDEVICE=pdfwrite -sOutputFile=\"%s\" -dAutoRotatePages=/PageByPage -dAutoFilterColorImages=false -dColorImageFilter=/FlateEncode -dPDFSETTINGS=/prepress -c .setpdfwrite -f %s\n\n# 上記は GSCall を呼び出す際のデフォルト引数です。-dNOPAUSE の前に -dPDFA を追加し、上記をアンコメントすると (デフォルトの設定が変わっているかもしれないので、以下の行を丸々コピペしないでください。あなたのシステム上のデフォルトを使用してください):\n\nGSCall %s -q -dCompatibilityLevel=%s -dPDFA -dNOPAUSE -dBATCH -dSAFER  -sDEVICE=pdfwrite -sOutputFile=\"%s\" -dAutoRotatePages=/PageByPage -dAutoFilterColorImages=false -dColorImageFilter=/FlateEncode -dPDFSETTINGS=/prepress -c .setpdfwrite -f %s\n```\n\n"
+    },
+    {
+      "title": "ログファイル",
+      "level": 3,
+      "content": "デフォルトでは、全てのログは /var/log/cups/ 内のファイルへ送られます。\n\nログレベルは /etc/cups/cupsd.conf で変更できます。cupsd.conf ドキュメントを参照してください。\n\n/etc/cups/cups-files.conf 内の AccessLog ディレクティブ、ErrorLog ディレクティブ、そして PageLog ディレクティブの値を syslog に変更することで、CUPS にログを代わりに systemd journal へ記録させることができます。元の提案された変更に関する情報は Fedora:Changes/CupsJournalLogging を参照してください。\n\n"
+    },
+    {
+      "title": "cups-browsed",
+      "level": 3,
+      "content": "Table content:\nこの記事またはセクションは情報が古くなっています。 理由: DNS-SD で広告されたプリンタを発見するために cups-browsed.service は必要ありません。これは cups.service によって行われます。cups-browsed.service は、LDAP サーバや、レガシーな CUPS プロトコル (CUPS サーバ ≤ 1.5) を使用するサーバでプリンタを発見する時にだけ必要になります。 (Discuss)\n\nCUPS は Avahi browsing を使ってネットワーク上の未知の共有プリンターを発見することができます。サーバーがどこにあるのかわからないくらい巨大な構成で有用です。この機能を使うには .local ホストネーム解決を設定して、avahi-daemon.service と cups-browsed.service の両方を起動してください。ジョブは何も処理されずにプリンターに直接送信されるため、作成されたキューが動作しない場合があります。しかし、IPP Everywhere や AirPrint をサポートするプリンタなど、ドライバレスのプリンタは設定せずに動作するはずです。\n\n- ネットワークプリンタの検索によってコンピュータの起動時間が大幅に長くなってしまうことがあります。\n- cups-browsed.service は、プリンタがネットワークに現れたり消えたりしたときに、そのプリンタを動的に追加したり削除したりするときにだけ必要になります。単に DNS-SD/mDNS 対応のネットワークプリンタを CUPS に追加したい場合は、必要ありません。\n\n"
+    },
+    {
+      "title": "印刷サーバとリモート管理",
+      "level": 3,
+      "content": "CUPS/プリンター共有 と CUPS/プリンター共有#リモート管理 を見てください。\n\n"
+    },
+    {
+      "title": "ローカルの CUPS サーバーを使わない",
+      "level": 3,
+      "content": "CUPS ではローカルにプリンターサーバーを立ち上げるかわりにリモートのプリンターサーバーに直接接続するように設定することができます。libcups パッケージのインストールが必要です。ただし、アプリケーションによってはリモートのサーバーを使用する場合も印刷するのに cups パッケージのインストールを必要とします。\n\nリモートの CUPS サーバーを使うには、CUPS_SERVER 環境変数を printerserver.mydomain:port に設定してください。例えば、単一の Firefox インスタンスにおいて別の印刷サーバを使用した場合は (printserver.mydomain:port の部分は、あなたの印刷サーバの名前/ポートに置き換えてください):\n\n```\n$ CUPS_SERVER=printserver.mydomain:port firefox\n```\n\nこの設定を永続化するには、設定ファイル /etc/cups/client.conf を作成し、それにリモート CUPS サーバーのホスト名を追加します:\n\n```\nServerName server\n```\n\nカスタムポートを指定することもできます:\n\n```\nServerName server:port\n```\n\n詳細は、[4] を参照してください。\n\n"
+    },
+    {
+      "title": "トラブルシューティング",
+      "level": 2,
+      "content": "CUPS/トラブルシューティング と CUPS/プリンター別の問題 を見てください。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- 公式 CUPS ドキュメント (ローカルにインストールされています)\n- Wikipedia:ja:CUPS\n- OpenPrinting ホームページ\n- 印刷処理の考え方 - 印刷ワークフローについての説明\n- OpenSuSE CUPS in a Nutshell - a quick CUPS overview\n- Gentoo:Printing\n- Debian の印刷ポータル - 詳細な技術的ガイド\n- Debian の印刷の概要 - CUPS 印刷システムの基本的な概要\n- CUPS メーリングリスト\n- CUPS メーリングリスト (Apple フォーク)\n- CUPS 問題トラッカー\n- CUPS 問題トラッカー (Apple フォーク)\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "Diretrizes de pacotes de ferramentas de compilação cruzada",
+  "url": "https://wiki.archlinux.org/title/Diretrizes_de_pacotes_de_ferramentas_de_compila%C3%A7%C3%A3o_cruzada",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nEssa página descreve como criar pacotes para cadeias de ferramentas de compilador cruzado. Outro método para compilação cruzada, faz uso de distcc em arquiteturas misturadas. Consulte Distcc#Cross compiling with distcc.\n\n"
+    },
+    {
+      "title": "Nota importante",
+      "level": 2,
+      "content": "Esta página descreve a nova maneira de fazer as coisas, inspirada nos seguintes pacotes:\n\n- mingw-w64-gcc e outros pacotes da série mingw-w64-*\n- arm-none-eabi-gcc e outros pacotes da série arm-none-eabi-*\n- E outros pacotes da série arm-wince-cegcc-*\n\n"
+    },
+    {
+      "title": "Compatibilidade de versão",
+      "level": 2,
+      "content": "Note: **todas** \n\nAs seguintes estratégias permitem que você selecione versões compatíveis do gcc, binutils, kernel e biblioteca C:\n\n- Regras gerais: existe uma correlação entre as versões gcc e binutils, use versões lançadas simultaneamente; é melhor usar os cabeçalhos mais recentes do kernel para compilar a libc, mas use o opção --enable-kernel (específica da glibc, outras bibliotecas C podem usar convenções diferentes) para reforçar o funcionamento em kernels mais antigos;\n- Repositórios oficiais: talvez seja necessário aplicar correções adicionais e hacks, mas as versões usadas pelo Arch Linux (ou seus forks específicos de arquitetura) provavelmente podem funcionar juntas;\n- Documentação de software: todo software GNU tem arquivos README e NEWS, documentando coisas como versões mínimas exigidas de dependências;\n- Outras distribuições: elas também fazem compilação cruzada;\n- https://clfs.org cobre etapas necessárias para compilação de compilador cruzado e menciona versões um pouco atualizadas de dependências.\n\n- existe uma correlação entre as versões gcc e binutils, use versões lançadas simultaneamente;\n- é melhor usar os cabeçalhos mais recentes do kernel para compilar a libc, mas use o opção --enable-kernel (específica da glibc, outras bibliotecas C podem usar convenções diferentes) para reforçar o funcionamento em kernels mais antigos;\n\n"
+    },
+    {
+      "title": "Compilando um compilador cruzado",
+      "level": 2,
+      "content": "A abordagem geral para construir um compilador cruzado é:\n\n1. binutils: Compile um cross-binutils, que vincula e processa para a arquitetura de destino\n1. cabeçalhos: Instale um conjunto de bibliotecas C e cabeçalhos de kernel para a arquitetura de destino use linux-api-headers como referência e pesse ARCH=target-architecture para o make crie um pacote de cabeçalhos libc (o processo para Glibc é descrito aqui[link inativo 2024-01-13 ⓘ])\n1. gcc-stage-1: Compile um compilador cruzado gcc básico (estágio 1). Isso será usado para compilar a biblioteca C. Ele não conseguirá compilar quase nada mais (porque ele não consegue se vincular à biblioteca C que ele não tem).\n1. libc: Compile a biblioteca C \"cross-compilada\" (usando o compilador cruzado do estágio 1).\n1. gcc-stage-2: Compile um compilador cruzado C completo (estágio 2)\n\n1. use linux-api-headers como referência e pesse ARCH=target-architecture para o make\n1. crie um pacote de cabeçalhos libc (o processo para Glibc é descrito aqui[link inativo 2024-01-13 ⓘ])\n\nO fonte dos cabeçalhos e libc podem variar conforme a plataforma.\n\n"
+    },
+    {
+      "title": "Nomenclatura de pacote",
+      "level": 2,
+      "content": "O nome do pacote não deve ser prefixado com a palavra cross- (foi proposto anteriormente, mas não foi adotado em pacotes oficiais, provavelmente devido ao comprimento adicional de nomes), e consistirá do nome do pacote, prefixado por trio GNU sem campo de fornecedor ou com \"desconhecido\" no campo do fornecedor; exemplo: arm-linux-gnueabihf-gcc. Se houver uma convenção de nomenclatura mais curta (por exemplo, mips-gcc), ela poderá ser usada, mas isso não é recomendado.\n\n"
+    },
+    {
+      "title": "Colocação de arquivos",
+      "level": 2,
+      "content": "As versões mais recentes do gcc e do binutils usam caminhos não conflitantes para sysroot e bibliotecas. Os executáveis devem ser colocados em /usr/bin/, para evitar conflitos aqui, prefixar todos eles com o nome da arquitetura.\n\nGeralmente, ./configure teria pelo menos os seguintes parâmetros:\n\n```\n_target=seu_alvo\n_sysroot=/usr/lib/${_target}\n...\n./configure \\\n    --prefix=${_sysroot} \\\n    --sysroot=${_sysroot} \\\n    --bindir=/usr/bin\n```\n\nsendo que seu_alvo pode ser, p. ex., \"i686-pc-mingw32\"\n\n"
+    },
+    {
+      "title": "Exemplo",
+      "level": 2,
+      "content": "Esse é o PKGBUILD do binutils para MinGW. Coisas interessantes de se observar são:\n\n- especificar o diretório raiz do ambiente cruzado\n- o uso de variáveis ${_pkgname} , ${_target} e ${_sysroot} para fazer o código mais legível\n- remoção de arquivos duplicados/conflitantes\n\n```\n# Maintainer: Allan McRae <allan@archlinux.org>\n\n# cross toolchain build order: binutils, headers, gcc (pass 1), w32api, mingwrt, gcc (pass 2)\n\n_target=i686-pc-mingw32\n_sysroot=/usr/lib/${_target}\n\npkgname=${_target}-binutils\n_pkgname=binutils\npkgver=2.19.1\npkgrel=1\npkgdesc=\"MinGW Windows binutils\"\narch=('i686' 'x86_64')\nurl=\"http://www.gnu.org/software/binutils/\"\nlicense=('GPL')\ndepends=('glibc>=2.10.1' 'zlib')\noptions=('!libtool' '!distcc' '!ccache')\nsource=(http://ftp.gnu.org/gnu/${_pkgname}/${_pkgname}-${pkgver}.tar.bz2)\nmd5sums=('09a8c5821a2dfdbb20665bc0bd680791')\n\nbuild() {\n  cd ${srcdir}/${_pkgname}-${pkgver}\n  mkdir binutils-build && cd binutils-build\n\n  ../configure --prefix=${_sysroot} --bindir=/usr/bin \\\n    --with-sysroot=${_sysroot} \\\n    --build=$CHOST --host=$CHOST --target=${_target} \\\n    --with-gcc --with-gnu-as --with-gnu-ld \\\n    --enable-shared --without-included-gettext \\\n    --disable-nls --disable-debug --disable-win32-registry\n  make\n  make DESTDIR=${pkgdir}/ install\n  \n  # clean-up cross compiler root\n  rm -r ${pkgdir}/${_sysroot}/{info,man}\n}\n```\n\nNote: **make** \n\n"
+    },
+    {
+      "title": "Por que não instalar em /opt?",
+      "level": 3,
+      "content": "Dois motivos:\n\n1. Primeiro, de acordo com o File Hierarchy Standard, esses arquivos pertencem apenas a um lugar no /usr.\n1. Em segundo lugar, a instalação em /opt é a última medida quando não há outra opção.\n\n"
+    },
+    {
+      "title": "O que é o negócio de out-of-path executables?",
+      "level": 3,
+      "content": "Essa coisa estranha facilita a compilação cruzada. Às vezes, os Makefiles do projeto não usam CC e outras variáveis e, em vez disso, usam 'gcc' diretamente. Se você quiser apenas tentar compilar esse projeto, a edição do Makefile pode ser uma operação muito demorada. No entanto, alterar o $PATH para usar \"nossos\" executáveis primeiro é uma solução muito rápida. Você então executaria PATH=/usr/arch/bin/:$PATH make em vez de make.\n\n"
+    },
+    {
+      "title": "O que fazer se a compilação falhar sem uma mensagem clara?",
+      "level": 3,
+      "content": "Para um erro ocorrido durante a execução do configure, leia $srcdir/pkgname-build/config.log. Para erro ocorrido durante compilação, role o log do console ou pesquise pela palavra \"error\".\n\n"
+    },
+    {
+      "title": "O que esse erro [error message] significa?",
+      "level": 3,
+      "content": "Muito provavelmente você fez algum dos erros não óbvios:\n\n- Muitos ou poucos sinalizadores de configuração. Tente usar um conjunto já comprovadamente correto de sinalizadores.\n- As dependências estão corrompidas. Por exemplo, arquivos de binutils perdidos ou colocados no lugar errado podem resultar em erros ocultos durante a configuração do gcc.\n- Você não adicionou export CFLAGS=\"\" à sua função build() (veja bug 25672 no Bugzilla do GCC).\n- Algumas combinações --prefix/--with-sysroot podem exigir que diretórios sejam graváveis (não óbvias em guias de clfs).\n- sysroot ainda não tem cabeçalhos de kernel/libc.\n- Se google-fu não ajudar, abandone imediatamente sua configuração atual e tente uma mais estável e de funcionamento confirmado.\n\n"
+    },
+    {
+      "title": "Por que os arquivos são instalados em lugares errados?",
+      "level": 3,
+      "content": "Vários métodos de execução da linha genérica make install acabam em resultados diferentes. Por exemplo, alguns destinos de make podem não fornecer suporte a DESTDIR e, em vez disso, requerem o uso de install_root. O mesmo para tooldir, prefix e outros argumentos semelhantes. Às vezes, fornecendo parâmetros como argumentos em vez de variáveis de ambiente, p. ex.\n\n```\n./configure CC=arm-elf-gcc\n```\n\nem vez de\n\n```\nCC=arm-elf-gcc ./configure\n```\n\ne vice-versa pode resultar em resultados diferentes (geralmente causados por auto-invocação recursiva de configure/make).\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- https://wiki.osdev.org/GCC_Cross-Compiler\n\n"
+    }
+  ]
+}

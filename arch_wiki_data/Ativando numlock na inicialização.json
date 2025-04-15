@@ -1,0 +1,86 @@
+{
+  "title": "Ativando numlock na inicialização",
+  "url": "https://wiki.archlinux.org/title/Ativando_numlock_na_inicializa%C3%A7%C3%A3o",
+  "sections": [
+    {
+      "title": "Usando um serviço separado",
+      "level": 3,
+      "content": "Primeiro crie um script para configurar o numlock em TTYs relevantes:\n\n```\n/usr/local/bin/numlock\n```\n\n```\n#!/bin/bash\n\nfor tty in /dev/tty{1..6}\ndo\n    /usr/bin/setleds -D +num < \"$tty\";\ndone\n```\n\nUma vez que o script é criado, você precisará torná-lo executável. Do contrário, o script não ser executado.\n\nEntão, crie e habilite um serviço systemd:\n\n```\n/etc/systemd/system/numlock.service\n```\n\n```\n[Unit]\nDescription=numlock\n\n[Service]\nExecStart=/usr/local/bin/numlock\nStandardInput=tty\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "Estendendo getty@.service",
+      "level": 3,
+      "content": "Isso é mais simples do que usar um serviço separado e não codifica o número de VTs em um script. Crie um trecho drop-in para getty@.service que são aplicados no topo da unidade original:\n\n```\n/etc/systemd/system/getty@.service.d/activate-numlock.conf\n```\n\n```\n[Service]\nExecStartPre=/bin/sh -c 'setleds -D +num < /dev/%I'\n```\n\nPara desativar a sugestão de ativação numlock exibida na tela de login, edite getty@tty1.service e adicione --nohints às opções agetty:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty '-p -- \\\\u' --nohints --noclear %I $TERM\n```\n\n"
+    },
+    {
+      "title": "Alternativa Bash",
+      "level": 3,
+      "content": "Adicione setleds -D +num para ~/.bash_profile. Observe que, diferentemente dos outros métodos, isso não terá efeito até que você efetue o login.\n\n"
+    },
+    {
+      "title": "X.org",
+      "level": 2,
+      "content": "Vários métodos estão disponíveis.\n\n"
+    },
+    {
+      "title": "startx",
+      "level": 3,
+      "content": "Instale o pacote numlockx e adicione isso para o arquivo ~/.xinitrc antes de exec:\n\n```\n#!/bin/sh\n#\n# ~/.xinitrc\n#\n# Executed by startx (run your window manager from here)\n#\n\nnumlockx &\n\nexec window_manager\n```\n\n"
+    },
+    {
+      "title": "MATE",
+      "level": 3,
+      "content": "Por padrão, o MATE salva o último estado no logout e o restaura durante o próximo login. Para habilitar o Numlock em cada login, você deve alterar os seguintes valores DCONF:\n\n```\ndconf write org.mate.peripherals-keyboard remember-numlock-state false\ndconf write org.mate.peripherals-keyboard numlock-state 'on'\n```\n\n"
+    },
+    {
+      "title": "KDE Plasma",
+      "level": 3,
+      "content": "Vá em Configurações do sistema > Dispositivos de entrada > Teclado, na aba Hardware, na seção Numlock ao iniciar o Plasma, escolha o comportamento desejado para o NumLock.\n\n"
+    },
+    {
+      "title": "GDM",
+      "level": 3,
+      "content": "Certifique-se de ter numlockx instalado e adicione o seguinte código ao ~/.xprofile:\n\n```\nif [ -x /usr/bin/numlockx ]; then\n      /usr/bin/numlockx on\nfi\n```\n\n"
+    },
+    {
+      "title": "GNOME",
+      "level": 3,
+      "content": "Execute o seguinte comando:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard numlock-state true\n```\n\nPara lembrar o último estado da tecla numlock (desabilitado ou habilitado), use:\n\n```\n$ gsettings set org.gnome.desktop.peripherals.keyboard remember-numlock-state true\n```\n\nAlternativamente, você pode adicionar numlockx on (de numlockx para um script de inicialização, como ~/.bashrc (se estiver usando Bash) ou ~/.profile.\n\n"
+    },
+    {
+      "title": "Xfce",
+      "level": 3,
+      "content": "No arquivo ~/.config/xfce4/xfconf/xfce-perchannel-xml/keyboards.xml, certifique-se de os seguintes valores estão configurados como 'true':\n\n```\n<property name=\"Numlock\" type=\"bool\" value=\"true\"/>\n<property name=\"RestoreNumlock\" type=\"bool\" value=\"true\"/>\n```\n\n"
+    },
+    {
+      "title": "SDDM",
+      "level": 3,
+      "content": "No arquivo /etc/sddm.conf, na seção [General], defina o valor Numlock como on:\n\n```\n[General]\n...\nNumlock=on\n```\n\n"
+    },
+    {
+      "title": "SLiM",
+      "level": 3,
+      "content": "No arquivo /etc/slim.conf encontre a linha e descomente-a (remova o #):\n\n```\n#numlock             on\n```\n\n"
+    },
+    {
+      "title": "OpenBox",
+      "level": 3,
+      "content": "No arquivo ~/.config/openbox/autostart adicione a linha:\n\n```\nnumlockx &\n```\n\nE salve o arquivo.\n\n"
+    },
+    {
+      "title": "LightDM",
+      "level": 3,
+      "content": "Veja LightDM#NumLock on by default.\n\n"
+    },
+    {
+      "title": "LXDM",
+      "level": 3,
+      "content": "Configure a opção em /etc/lxdm/lxdm.conf:\n\n```\nnumlock=1\n```\n\n"
+    },
+    {
+      "title": "LXQt",
+      "level": 3,
+      "content": "Configure a opção em ~/.config/lxqt/session.conf:\n\n```\n[Keyboard]\nnumlock=true\n```\n\n"
+    }
+  ]
+}

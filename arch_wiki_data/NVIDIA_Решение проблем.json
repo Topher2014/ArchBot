@@ -1,0 +1,156 @@
+{
+  "title": "NVIDIA/Решение проблем",
+  "url": "https://wiki.archlinux.org/title/NVIDIA/%D0%A0%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5_%D0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC",
+  "sections": [
+    {
+      "title": "Система не включается после установки драйвера",
+      "level": 3,
+      "content": "Если после установки драйвера NVIDIA система зависает, не доходя до экранного менеджера, попробуйте отключить kernel mode setting.\n\n"
+    },
+    {
+      "title": "Не удаётся запустить Xorg, или красный экран смерти",
+      "level": 3,
+      "content": "Если вы получаете красный экран и используете GRUB, отключите фреймбуфер GRUB, раскомментировав строку GRUB_TERMINAL_OUTPUT=console в файле /etc/default/grub. Подробнее: GRUB/Tips and tricks#Disable framebuffer.\n\n"
+    },
+    {
+      "title": "Чёрный экран при запуске X / Выключение компьютера при остановке X",
+      "level": 3,
+      "content": "Если вы установили обновление NVIDIA и ваш экран остаётся чёрным после запуска Xorg, или если остановка Xorg приводит к выключению компьютера, попробуйте следующие обходные пути:\n\n- Добавьте \"xrandr --auto\" в xinitrc\n- Используйте параметр ядра rcutree.gp_init_delay=1\n- Вы также можете попробовать добавить модуль nvidia в mkinitcpio.conf\n- Если экран всё равно чёрный после выполнения двух предыдущих пунктов, попробуйте переустановить nvidia и nvidia-utils именно в таком порядке, и, наконец, перезагрузить драйвер:\n\n```\n# modprobe nvidia\n```\n\n"
+    },
+    {
+      "title": "Экран(ы) найден(ы), но ни один из них не имеет пригодной для использования конфигурации",
+      "level": 3,
+      "content": "Иногда у NVIDIA и X возникают проблемы с поиском активного экрана. Если ваша видеокарта имеет несколько выходов, попробуйте подключить монитор к другим выходам. На ноутбуке это может быть связано с тем, что ваша видеокарта имеет VGA/TV выход. Xorg.0.log предоставит больше информации.\n\nЕщё можно попробовать добавить некорректную опцию Option \"ConnectedMonitor\" в секцию Section \"Device\", чтобы Xorg выкинул ошибку и показал, как её исправить. Здесь подробнее о настройке ConnectedMonitor.\n\nПосле повторного запуска X посмотрите Xorg.0.log, чтобы узнать правильные значения CRT-x, DFP-x, TV-x.\n\nnvidia-xconfig --query-gpu-info может быть полезен.\n\n"
+    },
+    {
+      "title": "X выдаёт ошибку \"Failing initialization of X screen\"",
+      "level": 3,
+      "content": "Если в /var/log/Xorg.0.log есть такое:\n\n```\n(EE) NVIDIA(G0): GPU screens are not yet supported by the NVIDIA driver\n(EE) NVIDIA(G0): Failing initialization of X screen\n```\n\nи nvidia-smi пишет No running processes found\n\nРешение заключается в том, чтобы сначала переустановить последнюю версию nvidia-utils, скопировать /usr/share/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf в /etc/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf, а затем отредактировать /etc/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf, добавить туда Option \"PrimaryGPU\" \"yes\" и перезагрузиться.\n\n"
+    },
+    {
+      "title": "Xorg не запускается при включении системы, но в остальном работает нормально",
+      "level": 3,
+      "content": "На очень быстро загружающихся системах systemd может попытаться запустить экранный менеджер до того, как драйвер NVIDIA полностью инициализируется. Вы можете увидеть такое сообщение в журнале Xorg, который запускается при включении компьютера:\n\n```\n/var/log/Xorg.0.log\n```\n\n```\n[     1.807] (EE) NVIDIA(0): Failed to initialize the NVIDIA kernel module. Please see the\n[     1.807] (EE) NVIDIA(0):     system's kernel log for additional error messages and\n[     1.808] (EE) NVIDIA(0):     consult the NVIDIA README for details.\n[     1.808] (EE) NVIDIA(0):  *** Aborting ***\n```\n\nВ таком случае нужно будет установить зависимость экранного менеджера от устройства DRI. Сначала создайте файлы для устройств DRI, создав новое правило udev.\n\n```\n/etc/udev/rules.d/99-systemd-dri-devices.rules\n```\n\n```\nACTION==\"add\", KERNEL==\"card*\", SUBSYSTEM==\"drm\", TAG+=\"systemd\"\n```\n\nЗатем добавьте вашему экранному менеджеру зависимость от этого устройства.\n\n```\n/etc/systemd/system/display-manager.service.d/10-wait-for-dri-devices.conf\n```\n\n```\n[Unit]\nWants=dev-dri-card0.device\nAfter=dev-dri-card0.device\n```\n\nЕсли у вас есть ещё видеокарты, нужные рабочему столу, перечислите их в Wants и After через пробел.\n\n"
+    },
+    {
+      "title": "Чёрный экран на системах со встроенным GPU",
+      "level": 3,
+      "content": "Если у вас система с интегрированным графическим процессором (например, Intel HD 4000, VIA VX820 Chrome 9 или AMD Cezanne) и установлен пакет nvidia, вы можете столкнуться с чёрным экраном при загрузке, при смене виртуального терминала или при выходе из X-сессии. Это может быть вызвано конфликтом между графическими модулями и решается внесением соответствующих модулей в чёрный список. Создайте файл /etc/modprobe.d/blacklist.conf и пропишите в нём запрет загрузки модулей:\n\n```\n/etc/modprobe.d/blacklist.conf\n```\n\n```\ninstall i915 /usr/bin/false\ninstall intel_agp /usr/bin/false\ninstall viafb /usr/bin/false\ninstall radeon /usr/bin/false\ninstall amdgpu /usr/bin/false\n```\n\n"
+    },
+    {
+      "title": "Ошибка \"no screens found\" при использовании нескольких видеокарт",
+      "level": 3,
+      "content": "Если есть несколько видеокарт и X не запускается с ошибкой:\n\n```\n[ 76.633] (EE) No devices detected.\n[ 76.633] Fatal server error:\n[ 76.633] no screens found\n```\n\nто вам нужно добавить BusID дискретной карты в конфигурацию X. Это может произойти в системах с процессором Intel и встроенном GPU или при подключении нескольких карт NVIDIA. Найдите свой BusID:\n\n```\n# lspci | grep -E \"VGA|3D controller\"\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation Xeon E3-1200 v2/3rd Gen Core processor Graphics Controller (rev 09)\n01:00.0 VGA compatible controller: NVIDIA Corporation GK107 [GeForce GTX 650] (rev a1)\n08:00.0 3D controller: NVIDIA Corporation GM108GLM [Quadro K620M / Quadro M500M] (rev a2)\n```\n\nЗатем исправьте это, добавив его в раздел \"Device\" карты в конфигурации X. В данном случае:\n\n```\n/etc/X11/xorg.conf.d/10-nvidia.conf\n```\n\n```\nSection \"Device\"\n    Identifier     \"Device0\"\n    Driver         \"nvidia\"\n    VendorName     \"NVIDIA Corporation\"\n    BusID          \"PCI:1:0:0\"\nEndSection\n```\n\nВ этом примере 01:00.0 становится 1:0:0, однако некоторые преобразования могут быть более сложными. lspci использует шестнадцатеричный формат для вывода, но в конфигурационных файлах BusID должен быть десятичным.\n\nТо есть, к примеру, 5e:00.0 из lspci нужно будет преобразовать в PCI:94:0:0.\n\n"
+    },
+    {
+      "title": "Ошибка modprobe: \"Could not insert 'nvidia': No such device\" на linux >=4.8",
+      "level": 3,
+      "content": "На linux 4.8 при попытке использовать видеокарту можно получить следующие ошибки:\n\n```\n$ modprobe nvidia -vv\n```\n\n```\nmodprobe: INFO: custom logging function 0x409c10 registered\nmodprobe: INFO: Failed to insert module '/lib/modules/4.8.6-1-ARCH/extramodules/nvidia.ko.gz': No such device\nmodprobe: ERROR: could not insert 'nvidia': No such device\nmodprobe: INFO: context 0x24481e0 released\ninsmod /lib/modules/4.8.6-1-ARCH/extramodules/nvidia.ko.gz\n```\n\n```\n# dmesg\n```\n\n```\n...\nNVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:139b)\nNVRM: installed in this system is not supported by the 370.28\nNVRM: NVIDIA Linux driver release.  Please see 'Appendix\nNVRM: A - Supported NVIDIA GPU Products' in this release's\nNVRM: README, available on the Linux driver download page\nNVRM: at www.nvidia.com.\n...\n```\n\nПроблема вызвана плохими коммитами, относящимися к управлению питанием PCIe в ядре Linux (как описано в этой ветке на NVIDIA DevTalk).\n\nОбходным решением является добавление pcie_port_pm=off в параметры ядра. Обратите внимание, что это отключает управление питанием PCIe для всех устройств.\n\n"
+    },
+    {
+      "title": "Система не возвращается из ждущего режима",
+      "level": 3,
+      "content": "Если в журнале вы видите:\n\n```\nkernel: nvidia-modeset: ERROR: GPU:0: Failed detecting connected display devices\nkernel: nvidia-modeset: ERROR: GPU:0: Failed detecting connected display devices\nkernel: nvidia-modeset: WARNING: GPU:0: Failure processing EDID for display device DELL U2412M (DP-0).\nkernel: nvidia-modeset: WARNING: GPU:0: Unable to read EDID for display device DELL U2412M (DP-0)\nkernel: nvidia-modeset: ERROR: GPU:0: Failure reading maximum pixel clock value for display device DELL U2412M (DP-0).\n```\n\nВозможное решение [1]:\n\nВыполните эту команду, чтобы получить строку version:\n\n```\n# strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1\n```\n\nИ добавьте параметр ядра acpi_osi=! \"acpi_osi=version\".\n\nТакже причиной проблемы может быть использование nvidia-open, как описано здесь:\n\n- https://bbs.archlinux.org/viewtopic.php?pid=2047692\n- https://github.com/NVIDIA/open-gpu-kernel-modules/issues/450\n- https://github.com/NVIDIA/open-gpu-kernel-modules/issues/223\n- https://github.com/NVIDIA/open-gpu-kernel-modules/issues/94\n\n"
+    },
+    {
+      "title": "Чёрный экран при возвращении из ждущего режима",
+      "level": 3,
+      "content": "Если в журнале ядра есть такие строки:\n\n```\narchlinux kernel: NVRM: GPU at PCI:0000:08:00: GPU-926ecdb0-adb1-6ee9-2fad-52e7214c5011\narchlinux kernel: NVRM: Xid (PCI:0000:08:00): 13, pid='<unknown>', name=<unknown>, Graphi>\narchlinux kernel: NVRM: Xid (PCI:0000:08:00): 13, pid='<unknown>', name=<unknown>, Graphi>\narchlinux kernel: NVRM: Xid (PCI:0000:08:00): 13, pid='<unknown>', name=<unknown>, Graphi>\narchlinux kernel: NVRM: Xid (PCI:0000:08:00): 13, pid='<unknown>', name=<unknown>, Graphi>\narchlinux kernel: NVRM: Xid (PCI:0000:08:00): 13, pid='<unknown>', name=<unknown>, Graphi>\n```\n\nВам нужно выполнить шаги, описанные в разделе NVIDIA/Советы и рекомендации#Сохранение видеопамяти в ждущем режиме.\n\n"
+    },
+    {
+      "title": "Сбои в целом",
+      "level": 3,
+      "content": "- Попробуйте отключить RenderAccel в xorg.conf.\n- Если Xorg пишет ошибки про \"conflicting memory type\" или \"failed to allocate primary buffer: out of memory\" или падает с сигналом 11, добавьте nopat в параметры ядра.\n- Если компилятор NVIDIA жалуется на разные версии GCC между текущей и той, которая использовалась для компиляции ядра, добавьте в /etc/profile:\n\n```\nexport IGNORE_CC_MISMATCH=1\n```\n\n- Если полноэкранные приложения зависают или вылетают, попробуйте включить опции Display Compositing и Direct fullscreen rendering в настройках среды рабочего стола.\n\n"
+    },
+    {
+      "title": "Визуальные глюки, зависания и ошибки в приложениях OpenGL",
+      "level": 3,
+      "content": "Если у вас новый процессор (Intel Sandy Bridge (2011), AMD Zen (2017) или новее), в нём есть кэш микроопераций, использование которого может привести к проблемам с драйвером NVIDIA в OpenGL из-за Cache Aliasing [2]. Обычно вы можете отключить этот кэш в настройках BIOS, но это снижает производительность [3]. Отключение также помогает справиться с серьёзными графическими глюками в приложениях Xwayland, хотя и не решает проблему полностью [4].\n\n"
+    },
+    {
+      "title": "Паника ядра после обновления и/или перезагрузки системы",
+      "level": 3,
+      "content": "Это известный баг в драйвере 550. [5] Причина ещё не известна, но он проявляется только на ноутбуках. Подробнее на форуме: BBS#293400\n\nВ качестве обходного пути можно перейти на nvidia-open-dkms (если видеокарта совместима с открытыми модулями ядра) или откатиться на более старую версию драйвера, например nvidia-535xx-dkmsAUR.\n\n"
+    },
+    {
+      "title": "Избавление от разрывов",
+      "level": 3,
+      "content": "- Сообщалось, что это снижает производительность некоторых приложений OpenGL и может вызвать проблемы в WebGL (тема на форуме NVIDIA).\n- Известно, что ForceFullCompositionPipeline ломает некоторые игры, использующие Vulkan и работающие через Proton, с драйвером версии 535.\n\nРазрывы (тиринг) можно избежать принудительным включением цепочки полного композитинга (full composition pipeline), независимо от используемого вами композитора. Для проверки работоспособности опции выполните:\n\n```\n$ nvidia-settings --assign CurrentMetaMode=\"nvidia-auto-select +0+0 { ForceFullCompositionPipeline = On }\"\n```\n\nИли нажмите кнопку Advanced в меню X Server Display Configuration. Выберите Force Composition Pipeline или Force Full Composition Pipeline и нажмите Apply.\n\nЧтобы сделать изменения постоянными, нужно прописать их в секцию \"Screen\" в настройках Xorg. При изменении TripleBuffering должен быть включен, а AllowIndirectGLXProtocol — отключен.\n\n```\n/etc/X11/xorg.conf.d/20-nvidia.conf\n```\n\n```\nSection \"Device\"\n        Identifier \"NVIDIA Card\"\n        Driver     \"nvidia\"\n        VendorName \"NVIDIA Corporation\"\n        BoardName  \"GeForce GTX 1050 Ti\"\nEndSection\n\nSection \"Screen\"\n    Identifier     \"Screen0\"\n    Device         \"Device0\"\n    Monitor        \"Monitor0\"\n    Option         \"ForceFullCompositionPipeline\" \"on\"\n    Option         \"AllowIndirectGLXProtocol\" \"off\"\n    Option         \"TripleBuffer\" \"on\"\nEndSection\n```\n\nЕсли у вас нет файла настроек Xorg, вы можете создать его для текущей видеокарты командой nvidia-xconfig (смотрите раздел NVIDIA (Русский)#Автоматическая настройка) и переместить его из /etc/X11/xorg.conf в предпочтительное место /etc/X11/xorg.conf.d/20-nvidia.conf.\n\n"
+    },
+    {
+      "title": "Несколько мониторов",
+      "level": 4,
+      "content": "В случае нескольких мониторов нужно указать ForceCompositionPipeline=On для каждого. Например:\n\n```\n$ nvidia-settings --assign CurrentMetaMode=\"DP-2: nvidia-auto-select +0+0 {ForceCompositionPipeline=On}, DP-4: nvidia-auto-select +3840+0 {ForceCompositionPipeline=On}\"\n```\n\nБез этого nvidia-settings отключит второй монитор.\n\nУзнать информацию о текущем состоянии экранов можно с помощью --query:\n\n```\n$ nvidia-settings --query CurrentMetaMode\n```\n\nСтрока из примера выше предназначена для двух мониторов 3840x2160, подключенных к DP-2 и DP-4. Вам нужно будет прочитать правильный CurrentMetaMode путём экспорта xorg.conf и добавить ForceCompositionPipeline для каждого из ваших мониторов. Установка ForceCompositionPipeline влияет только на целевой монитор.\n\n"
+    },
+    {
+      "title": "Повреждение экрана после сна",
+      "level": 3,
+      "content": "Это также относится к случаям, когда внешний монитор не пробуждается после сна.\n\nДрайвер NVIDIA обычно сохраняет только основные распределения видеопамяти в ждущем и спящем режимах. В результате потеря содержимого видеопамяти может привести к повреждению рендеринга и сбоям приложений.\n\nМожно включить сохранение всей видеопамяти, как описано в разделе NVIDIA/Советы и рекомендации#Сохранение видеопамяти в ждущем режиме.\n\nБаг, связанный с повреждением при использовании GDM, был исправлен в драйвере версии 515.43.04 [6].\n\n"
+    },
+    {
+      "title": "Повреждённый экран: проблема \"шести экранов\"",
+      "level": 3,
+      "content": "У некоторых пользователей с GeForce GT 100M после запуска X экран оказывается повреждённым, разделённым на 6 секций с ограниченным разрешением 640x480. Сообщалось о такой же проблеме с Quadro 2000 и мониторами высокого разрешения.\n\nЧтобы решить эту проблему, пропишите NoTotalSizeCheck в секции Device:\n\n```\nSection \"Device\"\n ...\n Option \"ModeValidation\" \"NoTotalSizeCheck\"\n ...\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Текст и значки не видны на драйвере 470",
+      "level": 3,
+      "content": "После обновления GTK4 у пользователей старых видеокарт с драйвером 470 начали появляться проблемы: текст и иконки случайным образом исчезают и появляются вновь только после наведения мыши на окно.[7]\n\nОбходные пути описаны на форуме.\n\n"
+    },
+    {
+      "title": "Плохая производительность после обновления драйвера",
+      "level": 3,
+      "content": "Если FPS упал относительно старых драйверов, проверьте, работает ли direct rendering (с помощью команды glxinfo из пакета mesa-utils):\n\n```\n$ glxinfo | grep direct\n```\n\nЕсли эта команда выведет:\n\n```\ndirect rendering: No\n```\n\nВозможным решением может быть откат к старой версии драйвера и последующая перезагрузка.\n\n"
+    },
+    {
+      "title": "Сильные лаги в Xorg",
+      "level": 3,
+      "content": "Например, некоторые пользователи Mutter сообщали о сильных лагах при воспроизведении видео, проигрывании анимаций или в играх.\n\nСмотрите NVIDIA/Советы и рекомендации#Сохранение видеопамяти в ждущем режиме.\n\nЭто должно решить проблему, однако если нет, то вам, скорее всего, не повезло. Попробуйте добавить такие переменные окружения:\n\n```\n/etc/environment\n```\n\n```\nCLUTTER_DEFAULT_FPS=ЧАСТОТА_ОБНОВЛЕНИЯ_ОСНОВНОГО_ДИСПЛЕЯ\n__GL_SYNC_DISPLAY_DEVICE=НАЗВАНИЕ_ВЫВОДА_ОСНОВНОГО_ДИСПЛЕЯ\n```\n\nЧерез NVIDIA Settings отключите Sync to VBlank и Allow flipping и настройте его запуск при загрузке с флагом --load-config-only. Это не устранит подтормаживания полностью, особенно на возможном втором (или третьем) мониторе, но должно улучшить ситуацию.\n\n"
+    },
+    {
+      "title": "Скачки нагрузки процессора при использовании карт серии 400",
+      "level": 3,
+      "content": "Это может быть вызвано тем, что PowerMizer постоянно изменяет тактовую частоту GPU. Переключив настройки PowerMizer с Adaptive на Performance, добавьте следующее в секцию Device настроек Xorg:\n\n```\nOption \"RegistryDwords\" \"PowerMizerEnable=0x1; PerfLevelSrc=0x3322; PowerMizerDefaultAC=0x1\"\n```\n\n"
+    },
+    {
+      "title": "Ошибка при запуске Vulkan-приложений",
+      "level": 3,
+      "content": "Если при запуске приложений, требующих Vulkan, вы видите такую ошибку\n\n```\nVulkan call failed: -4\n```\n\nПопробуйте удалить каталог ~/.nv или ~/.cache/nvidia.\n\n"
+    },
+    {
+      "title": "Нет звука через HDMI",
+      "level": 3,
+      "content": "Иногда аудиоустройства NVIDIA HDMI не отображаются в выводе команды\n\n```\n$ aplay -l\n```\n\nНа некоторых новых компьютерах аудиочип на графическом процессоре NVIDIA отключается при загрузке. Подробности на сайте NVIDIA и на форуме.\n\nВам нужно перезагрузить устройство NVIDIA с включенным звуком. Для этого убедитесь, что ваш GPU включен (в случае ноутбуков/Bumblebee) и на нём нет работающего X, потому что он перезагрузится:\n\n```\n# setpci -s 01:00.0 0x488.l=0x2000000:0x2000000\n# rmmod nvidia-drm nvidia-modeset nvidia\n# echo 1 > /sys/bus/pci/devices/0000:01:00.0/remove\n# echo 1 > /sys/bus/pci/devices/0000:00:01.0/rescan\n# modprobe nvidia-drm\n# xinit -- -retro\n```\n\nЕсли ваш терминал работает через NVIDIA, поместите эти строки в скрипт, чтобы не остаться без работающего экрана.\n\n"
+    },
+    {
+      "title": "Подсветка не выключается в некоторых случаях",
+      "level": 3,
+      "content": "По умолчанию DPMS должен отключать подсветку при установленных таймаутах или при запуске xset. Однако, вероятно, из-за ошибки в проприетарных драйверах NVIDIA в результате получается пустой экран без какого-либо отключения подсветки. Чтобы обойти это, пока ошибка не будет исправлена, можно использовать vbetool от имени root.\n\nСледующая команда выключит экран, а затем нажатие случайной клавиши включит подсветку снова:\n\n```\nvbetool dpms off && read -n1; vbetool dpms on\n```\n\nИли можно попробовать xrandr, который не требует root:\n\n```\nxrandr --output DP-1 --off; read -n1; xrandr --output DP-1 --auto\n```\n\n"
+    },
+    {
+      "title": "HardDPMS",
+      "level": 4,
+      "content": "С версии 415 в драйвере появилась новая функция под названием HardDPMS. По сообщениям некоторых пользователей, она решает проблемы с приостановкой мониторов, подключенных через DisplayPort. С версии 440.26 она включена по умолчанию, а если у вас старый драйвер, то HardDPMS можно установить в секциях Device или Screen. Например:\n\n```\n/etc/X11/xorg.conf.d/20-nvidia.conf\n```\n\n```\nSection \"Device\"\n    ...\n    Option         \"HardDPMS\" \"true\"\n    ...\nEndSection\n\nSection \"Screen\"\n    ...\n    Option         \"HardDPMS\" \"true\"\n    ...\nEndSection\n```\n\nHardDPMS будет срабатывать от настроек хранителя экрана, таких как BlankTime. Следующие ServerFlags настроят монитор(ы) на приостановку после 10 минут бездействия:\n\n```\n/etc/X11/xorg.conf.d/20-nvidia.conf\n```\n\n```\nSection \"ServerFlags\"\n    Option     \"BlankTime\" \"10\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "xrandr BadMatch",
+      "level": 3,
+      "content": "Если вы пытаетесь настроить WQHD монитор, например DELL U2515H, используя xrandr, и xrandr --addmode выдаёт ошибку X Error of failed request: BadMatch, это может быть связано с тем, что проприетарный драйвер NVIDIA обрезает максимальную частоту пиксельной синхронизации HDMI выхода до 225 МГц или ниже. Чтобы настроить монитор на максимальное разрешение, необходимо установить драйверы nouveau. Вы можете заставить nouveau использовать определённую частоту, прописав nouveau.hdmimhz=297 (или 330) в параметры ядра.\n\nДругой причиной может быть неправильный EDID вашего монитора. Смотрите #Переопределение EDID.\n\nЕщё причиной может быть то, что по умолчанию текущие драйверы NVIDIA разрешают только режимы, явно указанные в EDID; но иногда требуются частоты обновления и/или разрешения, о которых монитор не сообщает (хотя информация EDID верна; просто текущие драйверы NVIDIA слишком строгие).\n\nВ этом случае вы можете добавить опцию в xorg.conf, чтобы разрешить режимы, не указанные в EDID:\n\n```\nSection \"Device\"\n    Identifier     \"Device0\"\n    Driver         \"nvidia\"\n    VendorName     \"NVIDIA Corporation\"\n...\n    Option         \"ModeValidation\" \"AllowNonEdidModes\"\n...\nEndSection\n```\n\nЭтот параметр может быть установлен для каждого выхода. Подробности можно узнать в README - Appendix B. X Config Options.\n\n"
+    },
+    {
+      "title": "Переопределение EDID",
+      "level": 3,
+      "content": "Смотрите Kernel mode setting (Русский)#Принудительный режим и EDID, Xrandr#Troubleshooting и Qnix QX2710#Fixing X11 with Nvidia.\n\n"
+    },
+    {
+      "title": "Попытка разгона выдаёт Unknown Error",
+      "level": 3,
+      "content": "Если вы запускаете Xorg без прав root и пытаетесь разогнать видеокарту, вы получите ошибку вроде такой:\n\n```\n$ nvidia-settings -a \"[gpu:0]/GPUGraphicsClockOffset[3]=10\"\n```\n\n```\nERROR: Error assigning value 10 to attribute 'GPUGraphicsClockOffset' (trinity-zero:1[gpu:0]) as specified in assignment\n        '[gpu:0]/GPUGraphicsClockOffset[3]=10' (Unknown Error).\n```\n\nДля разгона необходимо запускать Xorg от имени root. Смотрите Xorg (Русский)#Использование Xorg без прав суперпользователя для подробностей.\n\n"
+    },
+    {
+      "title": "Проверка программного GL",
+      "level": 3,
+      "content": "Проприетарный драйвер NVIDIA игнорирует переменную окружения Mesa LIBGL_ALWAYS_SOFTWARE=1, но можно настроить libglvnd и EGL на использование Mesa с помощью следующих переменных окружения:\n\n```\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\n```\n\nчто приведёт к использованию Mesa libgl для GLX и EGL и таким образом позволит использовать программный GL для проверки, связана ли какая-то проблема с реализацией GL от NVIDIA или нет.\n\n"
+    }
+  ]
+}

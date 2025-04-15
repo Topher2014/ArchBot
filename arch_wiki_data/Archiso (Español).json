@@ -1,0 +1,91 @@
+{
+  "title": "Archiso (Español)",
+  "url": "https://wiki.archlinux.org/title/Archiso_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-12-11** \n\nArtículos relacionados\n\n- Remastering the Install ISO\n- Archiso as pxe server\n- Offline installation\n\nArchiso es un pequeño conjunto de scripts de bash capaz de compilar imagenes live en CD/DVD/USB plenamente funcionales basadas en Arch Linux. Es una herramienta muy genérica para generar imágenes oficiales, de manera que puede ser usada potencialmente para generar cualquier cosa, desde sistemas de rescate o discos de instalacion, hasta sistemas live CD/DVD/USB para intereses especiales, y quién sabe qué más. Simplemente, si involucra a Arch en una montaña brillante, puede hacerlo. El corazón y alma de Archiso es mkarchiso. Todas sus opciones están documentadas en la ayuda de utilización, de manera que su uso directo no será tratado aquí. En su lugar, este artículo actuará como guía para crear sus propios medios live en poco de tiempo.\n\nSi necesita únicamente un resumen técnico de los requisitos y los pasos de compilación, véase también la documentación oficial del proyecto.\n\n"
+    },
+    {
+      "title": "Preparar la instalación",
+      "level": 2,
+      "content": "Antes de empezar, necesitamos hacernos con los scripts de archiso que llevan a cabo gran parte del trabajo, para ello instalaremos el paquete archiso o (archiso-gitAUR).\n\nArchiso viene con dos «perfiles»: releng y baseline.\n\n- Si desea crear una versión live totalmente personalizada de Arch Linux, con todos sus programas y configuraciones favoritas preinstalados, utilice releng.\n- Si solo desea crear el soporte live más básico, sin paquetes preinstalados y una configuración minimalista, utilice baseline.\n\nAhora, copie el perfil de su elección en un directorio (archlive en el ejemplo siguiente) donde puede realizar ajustes y compilarlo. Ejecute lo siguiente, reemplazando perfil con releng o baseline.\n\n```\n# cp -r /usr/share/archiso/configs/perfil/ ~/archlive\n```\n\n- Si está utilizando el perfil releng para hacer una imagen totalmente personalizada, puede seguir en #Configurar el soporte live.\n\n- Si está utilizando el perfil baseline para crear una imagen de instalación mínima, no necesitará hacer ninguna personalización y puede ir directamente a #Compilar la ISO\n\n"
+    },
+    {
+      "title": "Configurar el soporte live",
+      "level": 2,
+      "content": "Esta sección detalla la configuración de la imagen que va a crear, premitiéndole definir los paquetes y configuraciones que quiere que contenga la imagen.\n\nDentro del directorio archlive creado según se ha indicado en #Preparar la instalación hay varios archivos y directorios; Solo nos interesan algunos de estos, principalmente:\n\n- el directorio packages.x86_64: aquí es donde se listan, línea por línea, los paquetes que desea instalar, y;\n- el directorio airootfs: este directorio actúa como una superposición o cubierte y es donde se realizan todas las personalizaciones.\n\nEn general, todas las tareas administrativas que normalmente haría después de una instalación nueva, excepto para la instalación de paquetes, pueden incluirse en archlive/airootfs/root/customize_airootfs.sh. Debe escribirse el script desde la perspectiva del nuevo entorno, por lo que la raíz / en la secuencia de órdenes del script se refiere a la raíz de la iso live que se creará.\n\n"
+    },
+    {
+      "title": "Instalar paquetes",
+      "level": 3,
+      "content": "Edite las listas de paquetes en packages.x86_64 para indicar qué paquetes se instalarán en el soporte live.\n\n"
+    },
+    {
+      "title": "Repositorio local personalizado",
+      "level": 4,
+      "content": "Con el fin de preparar paquetes personalizados o paquetes de AUR (Español)/Arch Build System (Español), también podría crear un repositorio local personalizado. Si desea admitir múltiples arquitecturas, se deben tomar precauciones para evitar que se produzcan errores. Cada arquitectura debe tener su propio árbol de directorios:\n\n```\n$ tree ~/customrepo/ | sed \"s/$(uname -m)/<arch>/g\"\n```\n\n```\n/home/archie/customrepo/\n└── <arch>\n    ├── customrepo.db -> customrepo.db.tar.xz\n    ├── customrepo.db.tar.xz\n    ├── customrepo.files -> customrepo.files.tar.xz\n    ├── customrepo.files.tar.xz\n    └── personal-website-git-b99cce0-1-<arch>.pkg.tar.xz\n\n1 directory, 5 files\n```\n\nLuego puede agregar su repositorio colocando lo siguiente en ~/archlive/pacman.conf, encima de las otras entradas del repositorio (para darle la máxima prioridad):\n\n```\n~/archlive/pacman.conf\n```\n\n```\n...\n# custom repository\n[customrepo]\nSigLevel = Optional TrustAll\nServer = file:///home/user/customrepo/$arch\n...\n```\n\nEl ejecutable repo-add verifica si el paquete es apropiado. Si este no es el caso, se encontrará con mensajes de error similares a este:\n\n```\n==> ERROR: '/home/archie/customrepo/<arch>/foo-<arch>.pkg.tar.xz' does not have a valid database archive extension.\n```\n\n"
+    },
+    {
+      "title": "Evitar la instalación de paquetes que pertenecen al grupo base",
+      "level": 4,
+      "content": "De forma predeterminada, /usr/bin/mkarchiso, un script que utiliza ~/archlive/build.sh, llama a uno de los arch-install-scripts denominado pacstrap sin el indicador -i, lo que hace que Pacman (Español) no espere la confirmación del usuario para instalar los paquetes durante el proceso de instalación.\n\nAl incluir en la lista negra los paquetes del grupo base agregándolos a la línea IgnorePkg en el archivo ~/archlive/pacman.conf, Pacman (Español) pregunta si aún deben instalarse, lo que significa que lo harán cuando se omita la confirmación del usuario. Para deshacerse de estos paquetes hay varias opciones:\n\n- Engorroso: añada el indicador -i a cada línea que llame a pacstrap en /usr/bin/mkarchiso.\n\n- Limpio: cree una copia de /usr/bin/mkarchiso en la que agregue el indicador y adapte ~/archlive/build.sh para que llame a la versión modificada del script de mkarchiso.\n\n- Avanzado: cree una función para ~/archlive/build.sh que elimine explícitamente los paquetes después de la instalación base. Esto le dejaría la comodidad de no tener que pulsar tantas veces «intro» durante el proceso de instalación.\n\n"
+    },
+    {
+      "title": "Instalar paquetes de multilib",
+      "level": 4,
+      "content": "Para instalar paquetes desde el repositorio multilib simplemente descoméntelo del repositorio en ~/archlive/pacman.conf:\n\n```\npacman.conf\n```\n\n```\n[multilib]\nSigLevel = PackageRequired\nInclude = /etc/pacman.d/mirrorlist\n```\n\n"
+    },
+    {
+      "title": "Añadir archivos a la imagen",
+      "level": 3,
+      "content": "Note: **todo** \n\nEl directorio airootfs actua como una cubierta, piense en él como el directorio raíz, /, de su sistema anfitrión, de manera que cada archivo que ponga dentro se copiará al arranque.\n\nAsí que, si tiene un conjunto de scripts de iptables en su sistema anfitrión que quiere poder usar en la posterior imagen live, cópielos así:\n\n```\n# cp -r /etc/iptables ~/archlive/airootfs/etc\n```\n\nColocar archivos del directorio home del usuario en la imagen live es un poco diferente. No los ponga en airootfs/home, en lugar de eso cree un directorio skel dentro de airootfs/ y colóquelos ahí. Después añadiremos las órdenes relevantes al archivo customize_airootfs.sh que vamos a crear para copiarlos en el arranque y definir los permisos.\n\nPrimero, cree el directorio skel:\n\n```\n# mkdir ~/archlive/airootfs/etc/skel\n```\n\nAhora copie los archivos de «home» al directorio skel, por ejemplo para .bashrc:\n\n```\n# cp ~/.bashrc ~/archlive/airootfs/etc/skel/\n```\n\nCuando se ejecuta ~/archlive/airootfs/root/customize_airootfs.sh y se crea un nuevo usuario, los archivos del directorio skel se copiarán automáticamente a la nueva carpeta de inicio («home»), con los permisos establecidos correctamente.\n\nDe manera similar, es necesario tener cuidado con los archivos de configuración especiales que residen en algún lugar descendiente de la jerarquía. Como ejemplo, el archivo de configuración /etc/X11/xinit/xinitrc reside en una ruta que puede sobrescribirse al instalar un paquete. Para emplazar el archivo de configuración, se debe colocar el archivo xinitrc personalizado en ~/archlive/airootfs/etc/skel/ y luego modificar customize_airootfs.sh para moverlo apropiadamente .\n\n"
+    },
+    {
+      "title": "Cargador de arranque",
+      "level": 3,
+      "content": "El archivo por defecto debería funcionar bien, de manera que no debería necesitar tocarlo.\n\nDebido a la naturaleza modular de isolinux, puedes usar un montón de añadidos, ya que todos los archivos *.c32 se pueden copiar y están disponibles. Eche un vistazo al sitio oficial de syslinux y al repositorio git de archiso. Utilizando dichos añadidos, es posible hacer menús visualmente atractivos y complejos. Consulte esto.\n\n"
+    },
+    {
+      "title": "UEFI Secure Boot",
+      "level": 4,
+      "content": "Si desea que su Archiso pueda iniciarse en un entorno donde esté activado UEFI Secure Boot, debe usar un cargador de arranque firmado. Puede seguir las instrucciones en Secure Boot#Using a signed boot loader.\n\n"
+    },
+    {
+      "title": "Gestor de inicio de sesión",
+      "level": 3,
+      "content": "Iniciar X con el arranque el sistema, en un sistema basado en systemd (Español), las cosas se manejan activando el archivo .service de su gestor de inicio de sesión. Si sabe qué enlace necesita para el archivo .service en cuestión: perfecto. Si no, puede averiguarlo fácilmente, en el caso de que esté usando el mismo gestor de pantallas en su sistema. Basta con escribir::\n\n```\n# ls -l /etc/systemd/system/display-manager.service\n```\n\nAhora cree el mismo enlace de software en ~/archlive/airootfs/etc/systemd/system. Para LXDM:\n\n```\n# ln -s /usr/lib/systemd/system/lxdm.service ~/archlive/airootfs/etc/systemd/system/display-manager.service\n```\n\nEsto activará LXDM al inicio del sistema en su sistema live.\n\nPor otro lado, puede activar el servicio en airootfs/root/customize_airootfs.sh junto con otros servicios que estés activados allí.\n\nSi desea que el entorno gráfico se inicie automáticamente durante el arranque, asegúrese de editar airootfs/root/customize_airootfs.sh y reemplace\n\n```\nsystemctl set-default multi-user.target\n```\n\ncon\n\n```\nsystemctl set-default graphical.target\n```\n\n"
+    },
+    {
+      "title": "Cambiar el acceso automáticamente",
+      "level": 3,
+      "content": "La configuración para el inicio de sesión automático de getty se encuentra en airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf.\n\nPuede modificar este archivo para cambiar el usuario que inicie sesión automáticamente:\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin isouser --noclear %I 38400 linux\n```\n\nO elimínelo por completo para desactivar el inicio de sesión automático.\n\n"
+    },
+    {
+      "title": "Compilar la ISO",
+      "level": 2,
+      "content": "Ya está listo para poner sus archivos en la .iso, la cual podrá grabar en un CD o USB:\n\nPrimero cree el directorio out/(opcional, build.sh lo creará si no existe):\n\n```\n# mkdir ~/archlive/out/\n```\n\nluego dentro de ~/archlive, ejecute:\n\n```\n# ./build.sh -v\n```\n\nEste script descargará e instalará los paquetes que especificó en work/*/airootfs, creará las imágenes del kernel y de init, aplicará las personalizaciones y finalmente compilará la iso en la carpeta out/.\n\n"
+    },
+    {
+      "title": "Reconstruir la ISO",
+      "level": 3,
+      "content": "La reconstrucción de la ISO después de las modificaciones no tiene soporte oficial. Sin embargo, es fácilmente factible aplicando dos pasos. Primero tiene que eliminar los archivos de bloqueo presentes en el directorio de trabajo:\n\n```\n# rm -v work/build.make_*\n```\n\nAdemás, se requiere editar el script airootfs/root/customize_airootfs.sh, y añadir una orden id al comienzo de la línea useradd como se muestra aquí. De lo contrario, la reconstrucción se detiene en este punto porque el usuario que se va a agregar ya existe FS#41865.\n\n```\n! id arch && useradd -m -p \"\" -g users -G \"adm,audio,floppy,log,network,rfkill,scanner,storage,optical,power,wheel\" -s /usr/bin/zsh arch\n```\n\nTambién elimine los datos persistentes, como los usuarios creados, o los enlaces simbólicos, como /etc/sudoers.\n\nLas reconstrucciones pueden acelerarse ligeramente editando el script pacstrap (ubicado en /bin/pacstrap) y cambiando lo siguiente en la línea 361:\n\nAntes:\n\n```\nif ! pacman -r \"$newroot\" -Sy \"${pacman_args[@]}\"; then\n```\n\nDespués:\n\n```\nif ! pacman -r \"$newroot\" -Sy --needed \"${pacman_args[@]}\"; then\n```\n\nEsto aumenta la velocidad del arranque inicial, ya que no tiene que descargar ni instalar ninguno de los paquetes básicos que ya están instalados.\n\n"
+    },
+    {
+      "title": "Utilizar la ISO",
+      "level": 2,
+      "content": "Véase la Guía de instalación para conocer distintas opciones.\n\n"
+    },
+    {
+      "title": "Ejecutar la ISO en QEMU",
+      "level": 2,
+      "content": "```\nqemu-system-x86_64 \\\n   -accel kvm \\\n   -boot order=d,menu=on,reboot-timeout=5000 \\\n   -m size=3072,slots=0,maxmem=$((3072*1024*1024)) \\\n   -k en \\\n   -name archiso,process=archiso_0 \\\n   -drive file=/path/to/archlinux-yyyy.mm.dd-x86_64.iso,media=cdrom,readonly=on \\\n   -display sdl \\\n   -vga virtio \\\n   -enable-kvm \\\n   -no-reboot \\\n   -no-shutdown\n```\n\n"
+    },
+    {
+      "title": "Documentación y tutoriales",
+      "level": 3,
+      "content": "- Página del proyecto Archiso\n- Documentación oficial\n\n"
+    }
+  ]
+}

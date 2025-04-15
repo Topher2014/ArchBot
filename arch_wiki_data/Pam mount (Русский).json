@@ -1,0 +1,36 @@
+{
+  "title": "Pam mount (Русский)",
+  "url": "https://wiki.archlinux.org/title/Pam_mount_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- dm-crypt/Mounting at login\n- PAM (Русский)\n\npam_mount можно использовать для автоматического монтирования зашифрованного домашнего раздела (зашифрованного, например, с помощью LUKS или eCryptfs) при входе пользователя в систему. Он будет монтировать /home (или любую другую желаемую точку монтирования) при входе в систему через менеджер входа или при входе в консоль. Пароль от зашифрованного диска должен совпадать с паролем пользователя Linux, поэтому вам не придётся вводить два разных пароля для входа в систему.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Установите пакет pam_mount.\n\nНастройки модуля находятся в файле /etc/security/pam_mount.conf.xml, документация по нему доступна в pam_mount.conf(5). Отредактируйте файл следующим образом:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<!-- Общий пример для зашифрованного раздела -->\n  <volume user=\"ПОЛЬЗОВАТЕЛЬ\" fstype=\"auto\" path=\"/dev/sdaX\" mountpoint=\"/home\" options=\"fsck,noatime\" />\n  \n  <!-- Пример использования CIFS -->\n  <volume\n      fstype=\"cifs\"\n      server=\"server.example.com\"\n      path=\"имя_ресурса\"\n      mountpoint=\"~/mnt/имя_ресурса\"\n      uid=\"10000-19999\"\n      options=\"sec=krb5i,vers=3.0,cruid=%(UIDПОЛЬЗОВАТЕЛЯ)\"\n  />\n  <mkmountpoint enable=\"1\" remove=\"true\" />\n\n</pam_mount>\n```\n\nПримечания:\n\n- Добавьте два переноса строки в конце файла, но перед последним закрывающим тегом </pam_mount>.\n- Замените ПОЛЬЗОВАТЕЛЬ на имя вашего пользователя.\n- Замените /dev/sdaX на соответствующее устройство или файл-контейнер.\n- fstype=\"auto\" можно заменить на любой тип, для которого существует исполняемый файл /usr/bin/mount.тип. Значение \"auto\" должно работать в большинстве случаев. Используйте fstype=\"crypt\", чтобы loop-устройство закрывалось при выходе из системы, для томов, нуждающихся в этом.\n- Добавьте параметры монтирования по необходимости. Имейте в виду, что mount.cifs не обращается к файлу smb.conf, поэтому вся нужная для подключения информация должна быть указана прямо в параметрах монтирования. В данном примере uid соответствует локальному параметру smb.conf «idmap config ... : range =», чтобы pam_mount не вызывался для пользователя, работающего только под Unix. Kerberos обозначается как krb5, SMB3.0 указывается потому, что другой конец может не поддерживать SMB1, который используется по умолчанию. Подпись включается с помощью буквы i на конце krb5i. Смотрите mount.cifs(8) для более подробной информации.\n\n"
+    },
+    {
+      "title": "Тома LUKS",
+      "level": 3,
+      "content": "Тома, зашифрованные с помощью LUKS, можно настроить примерно так:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<volume user=\"пользователь\" fstype=\"crypt\" path=\"/dev/disk/by-partuuid/uuid_раздела\" mountpoint=\"~\" options=\"crypto_name=имя_тома,allow_discard,fstype=btrfs,compress=zstd\" />\n```\n\nРазблокировка и монтирование тома выполняются с помощью mount.crypt, подробное описание опций доступно в mount.crypt(8) § Mount options.\n\n"
+    },
+    {
+      "title": "Тома VeraCrypt",
+      "level": 3,
+      "content": "pam_mount не поддерживает VeraCrypt напрямую, но есть обходной путь:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<volume user=\"пользователь\" fstype=\"crypt\" path=\"/dev/disk/by-partuuid/uuid_раздела\" mountpoint=\"vcrypt\"/>\n<volume user=\"пользователь\" fstype=\"auto\" path=\"/dev/mapper/vcrypt\" mountpoint=\"/media/точка_монтирования\"/>\n\n<cryptmount>cryptsetup --veracrypt open --type tcrypt %(VOLUME) %(MNTPT)</cryptmount>\n<cryptumount>cryptsetup close %(MNTPT)</cryptumount>\n```\n\nЕсли у вас также есть тома LUKS, вы можете использовать другой fstype для тома Veracrypt вместо crypt и cryptmount/cryptumount, например, ncpfs и ncpmount/ncpumount. Только убедитесь, что вы не используете файловую систему NCP.\n\n"
+    },
+    {
+      "title": "Шифрование F2FS",
+      "level": 3,
+      "content": "Существует трюк, чтобы заставить pam_mount добавить ключ расшифровки F2FS в список ключей вашего сеанса. Соль, которую вы выбрали при шифровании каталога(ов) с помощью f2fscrypt, должна совпадать с солью в /etc/security/pam_mount.conf.xml (0x1111 в примере ниже), а пароль должен совпадать с паролем пользователя. Этот пример предполагает, что вы не монтируете файловые системы FUSE с помощью pam_mount. Если всё-таки монтируете, то выберите другую пару тегов <*mount> вместо <fusemount> и <fuseumount>, например <ncpmount>/<ncpumount>.\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<fusemount>f2fscrypt add_key -S 0x1111</fusemount>\n<fuseumount>f2fscrypt new_session</fuseumount>\n<volume noroot=\"1\" ssh=\"0\" fstype=\"fuse\" path=\"/tmp/ненастоящий-путь-0\" mountpoint=\"/tmp/ненастоящий-путь-1\"/>\n```\n\n<volume> не делает ничего, кроме запуска команд, прописанных в <fusemount> и <fuseumount>. После входа в систему вы можете проверить, что в вашей связке ключей есть ключ расшифровки F2FS:\n\n```\n$ keyctl show\n```\n\n```\nSession Keyring\n 910133222 --alswrv   1000   100  keyring: _ses\n 301049775 --alswrv   1000 65534   \\_ keyring: _uid.1000\n 013481035 --alsw-v   1000   100   \\_ logon: f2fs:2e64cf4a5bafcd7\n```\n\n"
+    },
+    {
+      "title": "Настройка менеджера входа",
+      "level": 2,
+      "content": "В общем, вам нужно отредактировать файлы настроек в /etc/pam.d так, чтобы pam_mount вызывался при входе в систему. Важен правильный порядок записей в каждом файле. Необходимо отредактировать /etc/pam.d/system-login как показано ниже. Если вы используете экранный менеджер, убедитесь, что его файл настроек pam включает в себя system-login. Примеры настроек приведены ниже, добавленные строки выделены жирным шрифтом.\n\nСтрока pam_succeed_if перед pam_mount в сессии пропускает pam_mount (success=n означает пропуск следующих n строк), если через стек PAM запускается пользовательская служба systemd (то есть /etc/pam.d/systemd-user). Это позволяет избежать двойных попыток монтирования и ошибок, связанных со сбросом привилегий при запуске экземпляра systemd --user. Смотрите [1] и [2] для подробностей.\n\n```\n/etc/pam.d/system-login\n```\n\n```\n#%PAM-1.0\n\nauth       required   pam_shells.so\nauth       requisite  pam_nologin.so\nauth       optional   pam_mount.so\nauth       include    system-auth\n\naccount    required   pam_access.so\naccount    required   pam_nologin.so\naccount    include    system-auth\n\npassword   optional   pam_mount.so\npassword   include    system-auth\n\nsession    optional   pam_loginuid.so\nsession    optional   pam_keyinit.so       force revoke\nsession [success=1 default=ignore]  pam_succeed_if.so  service = systemd-user quiet\nsession    optional   pam_mount.so\nsession    include    system-auth\nsession    optional   pam_motd.so          motd=/etc/motd\nsession    optional   pam_mail.so          dir=/var/spool/mail standard quiet\n-session   optional   pam_systemd.so\nsession    required   pam_env.so           user_readenv=1\n```\n\n"
+    }
+  ]
+}

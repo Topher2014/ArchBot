@@ -1,0 +1,91 @@
+{
+  "title": "Hostapd",
+  "url": "https://wiki.archlinux.org/title/Hostapd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Network configuration\n- Wireless network configuration\n- Ad-hoc networking\n- Internet sharing\n- Router\n\nA software access point, also called virtual router or virtual Wi-Fi, enables a computer to turn its wireless interface into a Wi-Fi access point. It saves the trouble of getting a separate wireless router.\n\n"
+    },
+    {
+      "title": "Wi-Fi device must support AP mode",
+      "level": 3,
+      "content": "You need an nl80211 compatible wireless device, which supports the AP wireless mode. This can be verified by running the iw list command, under the Supported interface modes block there should be AP listed:\n\n```\n$ iw list\n```\n\n```\nWiphy phy1\n...\n\tSupported interface modes:\n\t\t * IBSS\n\t\t * managed\n\t\t * AP\n\t\t * AP/VLAN\n\t\t * WDS\n\t\t * monitor\n\t\t * mesh point\n...\n```\n\n"
+    },
+    {
+      "title": "Wireless client and software AP with a single Wi-Fi device",
+      "level": 3,
+      "content": "Creating a software AP is independent from your own network connection (Ethernet, wireless, ...). Many wireless devices even support simultaneous operation both as AP and as wireless \"client\" at the same time. Using that capability you can create a software AP acting as a \"wireless repeater\" for an existing network, using a single wireless device. The capability is listed in the following section in the output of iw list:\n\n```\n$ iw list\n```\n\n```\nWiphy phy1\n...\n        valid interface combinations:\n                 * #{ managed } <= 2048, #{ AP, mesh point } <= 8, #{ P2P-client, P2P-GO } <= 1,\n                   total <= 2048, #channels <= 1, STA/AP BI must match\n...\n```\n\nThe constraint #channels <= 1 means that your software AP must operate on the same channel as your Wi-Fi client connection; see the channel setting in hostapd.conf below.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nIf you want to use the capability/feature, perhaps because an Ethernet connection is not available, you need to create two separate virtual interfaces for using it. Virtual interfaces for a physical device wlan0 can be created as follows: The virtual interfaces with unique MAC address are created for the network connection (wlan0_sta) itself and for the software AP/hostapd \"wireless repeater\":\n\n```\n# iw dev wlan0 interface add wlan0_sta type managed addr 12:34:56:78:ab:cd  \n# iw dev wlan0 interface add wlan0_ap  type managed addr 12:34:56:78:ab:ce\n```\n\nThese can be made persistent using systemd.netdev(5) as described in BBS#236923. Alternatively if systemd-networkd is not in use, a systemd unit file can be created:\n\n```\n/etc/systemd/system/create-virtual-interface.service\n```\n\n```\n[Unit]\nDescription=Create virtual wireless interface\nRequires=sys-subsystem-net-devices-wlan0.device\nAfter=network.target\nAfter=sys-subsystem-net-devices-wlan0.device\n[Service]\nType=oneshot\nExecStart=/usr/bin/iw dev wlan0 interface add wlan0_ap type managed addr \"12:34:56:78:ab:ce\"\n[Install]\nWantedBy=multi-user.target\n```\n\nRandom MAC address can be generated using macchanger.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Setting up an access point consists of two main parts:\n\n1. Setting up the Wi-Fi link layer, so that wireless clients can associate to your computer's software access point and exchange IP packets with it.\n1. Setting up the network configuration on your computer, so that it properly relays IP packets between its own internet connection and the wireless clients.\n\n"
+    },
+    {
+      "title": "Wi-Fi link layer",
+      "level": 3,
+      "content": "The actual Wi-Fi link is established via the hostapd package, which has WPA2 support.\n\nhostapd comes with a default configuration file which includes numerous options listed and corresponding descriptions, you might want to take a look to gather some basic knowledge.\n\nAdjust the options in hostapd configuration file if necessary. Especially, change the ssid and the wpa_passphrase. ieee80211ac and ieee80211ax can be enabled for latest Wi-Fi 5 and Wi-Fi 6 adapters. The option ht_capab affects your AP's capabilities including channel width which is important to transfer speed.\n\nSee hostapd Linux documentation page for more information.\n\n```\n/etc/hostapd/hostapd.conf\n```\n\n```\ninterface=wlan0_ap\nbridge=br0\n\n# SSID to be used in IEEE 802.11 management frames\nssid=YourWiFiName\n# Driver interface type (hostap/wired/none/nl80211/bsd)\ndriver=nl80211\n# Country code (ISO/IEC 3166-1)\ncountry_code=US\n\n# Operation mode (a = IEEE 802.11a (5 GHz), b = IEEE 802.11b (2.4 GHz)\nhw_mode=g\n# Channel number\nchannel=7\n# Maximum number of stations allowed\nmax_num_sta=5\n\n# Bit field: bit0 = WPA, bit1 = WPA2\nwpa=2\n# Bit field: 1=wpa, 2=wep, 3=both\nauth_algs=1\n\n# Set of accepted cipher suites; disabling insecure TKIP\nwpa_pairwise=CCMP\n# Set of accepted key management algorithms\nwpa_key_mgmt=WPA-PSK\nwpa_passphrase=Somepassphrase\n\n# hostapd event logger configuration\nlogger_stdout=-1\nlogger_stdout_level=2\n\n## Enable 802.11n support\n#ieee80211n=1\n## Enable 802.11ac support\n#ieee80211ac=1\n## Enable 802.11ax support\n#ieee80211ax=1\n## QoS support\n#wmm_enabled=1\n## Use \"iw list\" to show device capabilities and modify ht_capab and vht_capab accordingly\n#ht_capab=[HT40+][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]\n#vht_capab=[RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]\n```\n\nFor automatically starting hostapd on boot, enable the hostapd.service.\n\nIf you are starting hostapd on boot, make sure the wireless network interface is brought up first, otherwise it will fail. To ensure your wireless interface is ready, edit the unit configuration file and state that it is bound to and should start after your network interface:\n\n```\n/etc/systemd/system/hostapd.service.d/override.conf\n```\n\n```\n[Unit]\nBindsTo=sys-subsystem-net-devices-wlan0.device\nAfter=sys-subsystem-net-devices-wlan0.device\n```\n\nAlso make sure that the interface is not managed by other network managers. If you are using NetworkManager, see NetworkManager#Ignore specific devices.\n\nNote: **Do not** \n\n"
+    },
+    {
+      "title": "Network configuration",
+      "level": 3,
+      "content": "There are two basic ways for implementing this:\n\n1. bridge: creates a network bridge on your computer, wireless clients will appear to access the same network interface and the same subnet that is used by your computer.\n1. NAT: with IP forwarding/masquerading and DHCP service, wireless clients will use a dedicated subnet, data from/to that subnet is NAT-ted. This is similar to a normal Wi-Fi router which is connected to the internet.\n\nThe bridge approach is simpler, but it requires that any service that is needed by the wireless clients, in particular DHCP, is available on the computer's external interface. This means it will not work if the external modem which assigns IP addresses, supplies the same one to different clients.\n\nThe NAT approach is more versatile, as it clearly separates Wi-Fi clients from your computer and it is completely transparent to the outside world. It will work with any kind of network connection, and (if needed) traffic policies can be introduced using the usual iptables approach.\n\nIt is possible to combine these two approaches: for example having a bridge that contains both an ethernet device and the wireless device with a static ip, offering DHCP and setting NAT configured to relay the traffic to an additional network device connected to the WAN.\n\n"
+    },
+    {
+      "title": "Bridge setup",
+      "level": 4,
+      "content": "You need to create a network bridge and add your network interface (e.g. eth0) to it. You should not add the wireless device (e.g. wlan0) to the bridge; hostapd will add it on its own.\n\nSee Network bridge.\n\n"
+    },
+    {
+      "title": "NAT setup",
+      "level": 4,
+      "content": "See Internet sharing#Configuration for configuration details.\n\nIn that article, the device connected to the LAN is net0. That device would be in this case your wireless device (e.g. wlan0).\n\n"
+    },
+    {
+      "title": "linux-wifi-hotspot",
+      "level": 3,
+      "content": "The linux-wifi-hotspotAUR package provides a script that can create either a bridged or a NATed access point for internet sharing. It combines hostapd, dnsmasq and iptables for the good functioning of the access point. Includes both command line and gui. The basic syntax to create a NATed virtual network is the following:\n\n```\n# create_ap wlan0 eth0 MyAccessPoint MyPassPhrase\n```\n\nAlternatively, the template configuration provided in /etc/create_ap.conf can be adapted to ones need and the script run with:\n\n```\n# create_ap --config /etc/create_ap.conf\n```\n\nTo use the GUI, run in terminal:\n\n```\n# wihotspot\n```\n\nEnable/start the create_ap.service to run the script at boot time with the configuration specified in /etc/create_ap.conf.\n\nFor more information see linux-wifi-hotspot on GitHub.\n\n"
+    },
+    {
+      "title": "RADIUS",
+      "level": 3,
+      "content": "See the FreeRADIUS wiki for instructions.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "nm-connection-editor",
+      "level": 3,
+      "content": "Install the dnsmasq package to be able to actually share the connection. Note that NetworkManager starts its own instance of dnsmasq, independent of dnsmasq.service, as a DHCP server.\n\nIt is not possible to create hotspot using the network-manager-applet.\n\n- Open nm-connection-editor (\"Edit Connections\" will open the it from nm-applet application menu in network-manager-applet)\n- Click the \"+\" button in the lower right then \"Wi-Fi\" as the Connection Type and Press \"Create...\".\n- In the Wi-Fi tab change the Mode to \"Hotspot\" and fill rest of the options.\n\n"
+    },
+    {
+      "title": "WLAN is very slow",
+      "level": 3,
+      "content": "Frequent causes for a lower than expected throughput include\n\n- An improper choice of operation mode with a hw_mode lower than the one supported can limit the router artificially. Check that a modern operating mode is selected.\n- A crowded or otherwise noise afflicted channel can severely degrade performance especially in densely populated areas. Try changing to a different channel or even switch frequencies.\n\n"
+    },
+    {
+      "title": "NetworkManager is interfering",
+      "level": 3,
+      "content": "hostapd may not work, if the device is managed by NetworkManager. You can mask the device using MAC:\n\n```\n/etc/NetworkManager/conf.d/unmanaged.conf\n```\n\n```\n[keyfile]\nunmanaged-devices=mac:hwaddr\n```\n\nOr interface name:\n\n```\n/etc/NetworkManager/conf.d/unmanaged.conf\n```\n\n```\n[keyfile]\nunmanaged-devices=interface-name:ifname\n```\n\n"
+    },
+    {
+      "title": "Cannot start AP mode in 5 GHz band",
+      "level": 3,
+      "content": "Apparently with the special country code 00 (global), all usable frequencies in the 5Ghz band will have the no-ir (no-initiating-radiation) flag set, which will prevent hostapd from using them. You will need to have wireless-regdb installed and have your country code set to make frequencies allowed in your country available for hostapd.\n\nNote that recent Intel devices have a Location-Aware Regulatory (LAR) feature, which ignores the userspace regulatory database and instead deduces the regulatory region by listening to other nearby access points. This means the devices will not transmit on any 5 GHz frequencies until they have first seen other access points on the 5 GHz frequency bands, preventing any 5 GHz transmission at all in many cases. Older kernels had an option to disable this which was removed in 2019 due to it causing the firmware to crash. Since this removal, Intel cards supporting LAR can no longer be used as access points in the 5 GHz band.\n\n"
+    },
+    {
+      "title": "Windows 10+ refuses to connect with hostapd using WPA3",
+      "level": 3,
+      "content": "Windows seems to refuse connecting to WPA3 access points with hostapd. Using wpa=2 instead of wpa=3 may solve the issue.\n\n"
+    },
+    {
+      "title": "Access point does not accept running in 40Mhz mode (HT)",
+      "level": 3,
+      "content": "You may receive the following message:\n\n```\n20/40 MHz operation not permitted on channel pri=13 sec=9 based on overlapping BSSes\n```\n\nThat means that too many nearby access points are detected by your Wi-Fi device. It then refuses to use more than 20Mhz channel width in order to share more fairly the wireless spectrum. You may be able to disable that with noscan=1, but that may likely violate local regulatory requirements.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Hostapd : The Linux Way to create Virtual Wi-Fi Access Point\n- tutorial and script for configuring a subnet with DHCP and DNS\n\n"
+    }
+  ]
+}

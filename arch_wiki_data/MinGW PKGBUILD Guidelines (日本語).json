@@ -1,0 +1,41 @@
+{
+  "title": "MinGW PKGBUILD Guidelines (日本語)",
+  "url": "https://wiki.archlinux.org/title/MinGW_PKGBUILD_Guidelines_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32ビット – CLR – クロス – Eclipse – Electron – Free Pascal – GNOME – Go – Haskell – Java – KDE – カーネル – Lisp – MinGW – Node.js – ノンフリー – OCaml – Perl – PHP – Python – R – Ruby – Rust – VCS – ウェブ – Wine\n\nこのページでは、GCC を使って Windows で動作するソフトウェアの PKGBUILD を記述する方法を説明しています。Linux 上で Windows のソフトウェアをビルドする方法は2つあります:\n\n- mingw-w64: secure crt, Vista+ API, DDK (ReactOS), DirectX (Wine) をサポートする32ビットと64ビットのツールチェイン。サポートされている機能の完全なリストと、MinGW.org と違うところについては、こちら を見て下さい。mingw-w64-gcc パッケージでインストールできます。\n- MinGW: DirectX を部分的にサポートする32ビットのツールチェイン。スレッドローカルストレージと浮動小数点ライブラリのサポートの実装に長年問題を抱えています。公式リポジトリと AUR からは削除されました。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 パッケージの命名規則\n- 2 パッケージング\n- 3 サンプル 3.1 Autotools 3.2 CMake\n\n- 3.1 Autotools\n- 3.2 CMake\n\n"
+    },
+    {
+      "title": "パッケージの命名規則",
+      "level": 2,
+      "content": "mingw-w64 のパッケージには mingw-w64-pkgname という名前を付けて下さい。パッケージの静的なバージョンをビルドする場合は、パッケージの名前に -static を付けます (必要な場合については下を参照)。\n\n"
+    },
+    {
+      "title": "パッケージング",
+      "level": 2,
+      "content": "多数のビルド環境が存在し低水準な問題に溢れているためクロスプラットフォームパッケージの作成は非常に困難です。以下の事柄に注意してください:\n\n- depends に常に mingw-w64-crt を追加する (依存している他のパッケージが明示的に依存している場合は除く)\n- makedepends に常に mingw-w64-gcc を追加する (mingw-w64-configureAUR や mingw-w64-cmakeAUR を使用する場合は除く)\n- options に常に !strip, staticlibs, !buildflags を追加する。\n- オリジナルの pkgdesc を常に使い、pkgdesc の末尾に (mingw-w64) と追記する。\n- 公式パッケージのオリジナルの pkgver を常に使用・追従する。\n- ライブラリの32ビット版と64ビット版の両方を常にビルドする。\n- 全てのファイルを常に /usr/i686-w64-mingw32 と /usr/x86_64-w64-mingw32 プリフィックスの下に配置する。\n- アーキテクチャは必ず any を使う (ビルド環境で実行する必要がある実行ファイルを含む場合は除く)\n- 衝突が発生しないかぎり、共有・静的バイナリの両方をビルドする。\n- 不必要なドキュメントは削除する (rm -r $pkgdir/usr/i686-w64-mingw32/share/{doc,info,man}, rm -r $pkgdir/usr/x86_64-w64-mingw32/share/{doc,info,man})\n- configure スクリプトでビルドするときは mingw-w64-configureAUR を使用する。\n- CMake でビルドするときは mingw-w64-cmakeAUR を使用する。\n- Meson でビルドするときは mingw-w64-mesonAUR を使用する。\n- configure スクリプトなどを使わず直接書かれた Makefile を用いてビルドするときは mingw-w64-makeAUR を使用する。\n- QMake でビルドするときは mingw-w64-qt5-baseAUR を使用する。\n- 下の PKGBUILD のサンプルでしているように package() の for ループで ${_arch}-strip を使ってシンボルを除去する。 DLL や静的ライブラリ、実行ファイルが適切な場所に収まるまで $pkgdir で繰り返し find コマンドを実行すると良いでしょう。 バイナリが DLL の場合、${_arch}-strip --strip-unneeded *.dll を使用する。 バイナリが静的ライブラリの場合、${_arch}-strip -g *.a を使用する。\n- パッケージがモジュール型の場合 (特定のビルド依存関係が必要ですが、その依存関係はエンドユーザーにとってオプションです) これらを makedepends と optdepends に追加します。既存のパッケージを更新する場合は、必ず depends からそれらを減算してください。使用例: mingw-w64-allegroAUR\n- パッケージが $pkgdir/usr/${_arch}/bin/*-config スクリプトをインストールする場合、$pkgdir/usr/bin/${_arch}-*-config にシンボリックリンクを作成する。\n- パッケージが autoconf を使用する場合、autoconf bug #108405 を避けるために configure で明示的に --build=\"$CHOST\" を設定するか mingw-w64-configureAUR を使用する。\n\n- DLL や静的ライブラリ、実行ファイルが適切な場所に収まるまで $pkgdir で繰り返し find コマンドを実行すると良いでしょう。 バイナリが DLL の場合、${_arch}-strip --strip-unneeded *.dll を使用する。 バイナリが静的ライブラリの場合、${_arch}-strip -g *.a を使用する。\n\n- バイナリが DLL の場合、${_arch}-strip --strip-unneeded *.dll を使用する。\n- バイナリが静的ライブラリの場合、${_arch}-strip -g *.a を使用する。\n\n上で述べたように、ファイルはすべて /usr/i686-w64-mingw32 と /usr/x86_64-w64-mingw32 にインストールする必要があります。具体的には、すべての DLL は実行時に必要な動的ライブラリであるため、/usr/*-w64-mingw32/bin に配置する必要があります。対応する .dll.a ファイルは /usr/*-w64-mingw32/lib に配置する必要があります。不要なドキュメントやその他のファイルを /usr/share から削除してください。クロスコンパイルパッケージはユーザー向けではなく、コンパイラとバイナリ配布のみを目的としているため、パッケージをできるだけ小さくするように努める必要があります。\n\nmingw-w64 パッケージの pkgver を、公式 Arch Linux リポジトリ (テストリポジトリではなく) の対応する通常パッケージの pkgver と常に一致させるようにしてください。これにより、クロスコンパイルされたソフトウェアが予期しないバグを発生させることなく、Windows 上でまったく同じように動作することが保証されます。Arch のパッケージが古い場合は、通常、十分な理由があるため、最新のアップストリームリリースを使用する代わりに Arch バージョンに従う必要があります。対応するネイティブパッケージが AUR にある場合、多くの AUR パッケージは孤立しているか、メンテナンスされていないことが多いため、このバージョンポリシーに従う必要はありません。\n\n"
+    },
+    {
+      "title": "サンプル",
+      "level": 2,
+      "content": "以下の例は一般的な決まり事やビルド環境をカバーしています。\n\n"
+    },
+    {
+      "title": "Autotools",
+      "level": 3,
+      "content": "```\npkgname=mingw-w64-foo\npkgver=1.0\npkgrel=1\npkgdesc=\"Foo bar (mingw-w64)\"\narch=('any')\nurl=\"http://www.foo.bar\"\nlicense=('GPL')\nmakedepends=('mingw-w64-configure')\ndepends=('mingw-w64-crt')\noptions=('!strip' '!buildflags' 'staticlibs')\nsource=(\"http://www.foo.bar/foobar.tar.gz\")\nsha256sums=('8f32d4617390d1c2d16f26a27ab60d97807b35440d45891fa340fc2648b04406')\n\n_architectures=\"i686-w64-mingw32 x86_64-w64-mingw32\"\n\nbuild() {\n  cd \"${srcdir}/foo-$pkgver/\"\n  for _arch in ${_architectures}; do\n    mkdir -p build-${_arch} && pushd build-${_arch}\n    ${_arch}-configure ..\n    make\n    popd\n  done\n}\n\npackage() {\n  for _arch in ${_architectures}; do\n    cd \"${srcdir}/foo-$pkgver/build-${_arch}\"\n    make DESTDIR=\"${pkgdir}\" install\n    ${_arch}-strip --strip-unneeded \"$pkgdir\"/usr/${_arch}/bin/*.dll\n    ${_arch}-strip -g \"$pkgdir\"/usr/${_arch}/lib/*.a\n  done\n}\n```\n\n"
+    },
+    {
+      "title": "CMake",
+      "level": 3,
+      "content": "```\npkgname=mingw-w64-foo\npkgver=1.0\npkgrel=1\npkgdesc=\"Foo bar (mingw-w64)\"\narch=('any')\nurl=\"http://www.foo.bar\"\nlicense=('GPL')\nmakedepends=('mingw-w64-cmake')\ndepends=('mingw-w64-crt')\noptions=('!strip' '!buildflags' 'staticlibs')\nsource=(\"http://www.foo.bar/foobar.tar.gz\")\nsha256sums=('8f32d4617390d1c2d16f26a27ab60d97807b35440d45891fa340fc2648b04406')\n\n_architectures=\"i686-w64-mingw32 x86_64-w64-mingw32\"\n\nbuild() { \n  cd \"$srcdir/foo-$pkgver/\"\n  for _arch in ${_architectures}; do\n    mkdir -p build-${_arch} && pushd build-${_arch}\n    ${_arch}-cmake ..\n    make\n    popd\n  done\n}\n\npackage() {\n  for _arch in ${_architectures}; do\n    cd \"${srcdir}/foo-$pkgver/build-${_arch}\"\n    make DESTDIR=\"${pkgdir}\" install\n    ${_arch}-strip --strip-unneeded \"$pkgdir\"/usr/${_arch}/bin/*.dll\n    ${_arch}-strip -g \"$pkgdir\"/usr/${_arch}/lib/*.a\n  done\n}\n```\n\n"
+    }
+  ]
+}

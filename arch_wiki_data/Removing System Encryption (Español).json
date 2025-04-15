@@ -1,0 +1,56 @@
+{
+  "title": "Removing System Encryption (Español)",
+  "url": "https://wiki.archlinux.org/title/Removing_System_Encryption_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-09-18** \n\nEliminar el cifrado de un sistema encriptado con dm-crypt y LUKS.\n\n"
+    },
+    {
+      "title": "Requisitos previos",
+      "level": 2,
+      "content": "- Un sistema de archivos raíz encriptado u otro sistema de archivos que no se monte mientras se inicia en el sistema operativo.\n- Suficiente espacio de disco para almacenar una copia de seguridad.\n- Un soporte (CD/USB) live de Arch Linux (u otro).\n- Unas pocas horas.\n\n"
+    },
+    {
+      "title": "Arrancar en un entorno Live",
+      "level": 2,
+      "content": "Descargue y grabe la última imagen de Arch, reinicie el sistema y arraánquela desde el soporte.\n\n"
+    },
+    {
+      "title": "Nota sobre diferentes configuraciones",
+      "level": 3,
+      "content": "He aquí una configuración de muestra:\n\nTable content:\ndisco\nntfs | grupo de volúmenes (lvm) | ntfs\notro so | cryptswap (volumen lógico) | cryptroot (volumen lógico) | Compartido\nluks | luks\nswap | root (xfs)\n\nLas secciones grises solo agregan un marco de referencia y se pueden ignorar. Las particiones verdes serán modificadas. El texto verde debe coincidir con la configuración de su sistema. La partición amarilla se utilizará como espacio de almacenamiento y se puede cambiar a voluntad. En el sistema de ejemplo: myvg contiene volúmenes lógicos llamados cryptroot y cryptswap. Están ubicados en /dev/myvg/cryptroot y /dev/myvg/cryptswap. En el arranque, luks se usa junto con algunas entradas de crypttab para crear /dev/mapper/root y /dev/mapper/swap. El espacio intercambio no se desencriptará como parte de esta guía, ya que deshacer el cifrado de intercambio no requiere una copia de seguridad o restauración complejas.\n\nEl sistema de ejemplo no es indicativo de todos los sistemas. Diferentes sistemas de archivos requieren diferentes herramientas para realizar copias de seguridad y restaurar sus datos de manera efectiva. LVM puede ignorarse si no se usa. XFS requiere xfs_copy para garantizar una copia de seguridad y una restauración eficaces, DD no es suficiente. DD se puede usar con ext2,3 y 4 (por favor, que alguien comente sobre jfs, reiserfs y reiser4fs).\n\n"
+    },
+    {
+      "title": "Una vez localizadas las particiones",
+      "level": 3,
+      "content": "Cargar los módulos necesarios:\n\n```\nmodprobe dm-mod #device mapper/lvm\nmodprobe dm-crypt #luks\n```\n\nActivar el grupo de volúmenes lvm:\n\n```\npvscan #eescaneo de volúmenes físicos\nvgscan #escaneo de grupo de volúmenes\nlvscan #escaneo de volúmenes lógicos\nlvchange -ay myvg/cryptroot\n```\n\nAbra el sistema de archivos encriptado con luks para que pueda leerse:\n\n```\ncryptSetup luksOpen /dev/myvg/cryptroot root\n```\n\nIntroduzca la contraseña. Nota: la única partición en la que se operará que debe montarse en este punto es la partición de respaldo. Si ya está montada una partición distinta de la partición de respaldo, ahora se puede desmontar de manera segura.\n\n"
+    },
+    {
+      "title": "Montar el espacio de respaldo",
+      "level": 4,
+      "content": "Solo si se utiliza NTFS para almacenar la copia de seguridad, instale ntfs-3g.\n\nEl siguiente paso es importante para el almacenamiento de respaldo.\n\n```\n# mount -t ntfs-3g -o rw /dev/sda5 /media/Shared\n```\n\no utilice netcat para almacenar la copia de seguridad en un sistema remoto\n\nTODO: añadir instrucciones netcat.\n\n"
+    },
+    {
+      "title": "Realizar una copia de respaldo de los datos",
+      "level": 2,
+      "content": "Utilizar xfs_copy:\n\n```\nxfs_copy -db /dev/mapper/root /media/Shared/backup_root.img\n```\n\nNota: el indicador -d conserva los uuids y -b garantiza que no se intente realizar E/S directa en ninguno de los archivos de destino.\n\nUtilizar dd:\n\n```\ndd if=/dev/mapper/root of=/media/Shared/backup_root.img\n```\n\n"
+    },
+    {
+      "title": "Revertir el cifrado",
+      "level": 2,
+      "content": "Ahora llega el momento crucial, el punto de no retorno por decirlo así. Asegúrese de que está listo para realizar esta operación. Si planea deshacerlo más adelante, tendrá que comenzar casi desde cero. Y no se imagina lo divertido que puede ser eso.\n\n```\ncryptsetup luksClose root\nlvm lvremove myvg/cryptroot\n```\n\n"
+    },
+    {
+      "title": "Restaurar los datos",
+      "level": 2,
+      "content": "Tenemos que crear un nuevo volumen lógico para alojar nuestro sistema de archivos raíz, luego lo restauraremos.\n\n```\nlvm lvcreate -l 100%FREE -n root myvg\nxfs_copy -db /media/Shared/backup_root.img /dev/myvg/root #advierta que el segundo nombre de unidad se cambia ahora.\n```\n\n"
+    },
+    {
+      "title": "Reconfigurar el sistema operativo",
+      "level": 2,
+      "content": "Debe iniciar su sistema operativo y modificar /etc/crypttab, /etc/mkinitcpio.conf, /etc/fstab, y posiblemente /boot/grub/menu.lst.\n\n"
+    }
+  ]
+}

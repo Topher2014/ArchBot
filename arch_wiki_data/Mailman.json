@@ -1,0 +1,91 @@
+{
+  "title": "Mailman",
+  "url": "https://wiki.archlinux.org/title/Mailman",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Mailman is a mailing list management system. It is used in conjunction with a mail server.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mailman3 package.\n\nMailman can be used in conjunction with Postorius (for configuration) and Hyperkitty (for archiving).\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "All configuration for Mailman takes place in /etc/mailman.cfg. The schema explaining all possible configuration options and setting the defaults is stored in /usr/lib/python3.8/site-packages/mailman/config/schema.cfg.\n\nThe configuration is also accessible via the command line. Run the following command as the mailman user (e.g. using sudo or su):\n\n```\n[mailman]$ mailman conf\n```\n\n"
+    },
+    {
+      "title": "Database",
+      "level": 3,
+      "content": "Mailman by default uses an SQLite database in /var/lib/mailman/data/, but can be configured to use MariaDB or PostgreSQL.\n\n"
+    },
+    {
+      "title": "SQLite",
+      "level": 4,
+      "content": "The default location for the SQLite database is already reflected in the schema.cfg and therefore does not have to be set in Mailman's configuration.\n\n```\n/etc/mailman.cfg\n```\n\n```\n[database]\nurl: sqlite:////var/lib/mailman/data/mailman.db\n```\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 4,
+      "content": "Install the python-pymysql package and configure a database on MariaDB.\n\n```\n/etc/mailman.cfg\n```\n\n```\n[database]\nclass: mailman.database.mysql.MySQLDatabase\nurl: mysql+pymysql://myuser:mypassword@mymysqlhost/mailman?charset=utf8&use_unicode=1\n```\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "Install the python-psycopg2 package and create a database using PostgreSQL.\n\n```\n/etc/mailman.cfg\n```\n\n```\n[database]\nclass: mailman.database.postgresql.PostgreSQLDatabase\nurl: postgres://myuser:mypassword@mypghost/mailman\n```\n\n"
+    },
+    {
+      "title": "REST API",
+      "level": 3,
+      "content": "Mailman exposes its REST API based on the settings in the [webservice] section of the configuration. Make sure to replace the default values for admin_user and admin_pass (do not use the example values below).\n\n```\n/etc/mailman.cfg\n```\n\n```\n[webservice]\nadmin_user: my_new_admin_user_name\nadmin_pass: my_new_admin_user_password\n```\n\n"
+    },
+    {
+      "title": "ARC",
+      "level": 3,
+      "content": "By default DMARC and DKIM are disabled. The configuration takes place in the [ARC] section of the configuration file. Make sure to set necessary values and read the documentation about the defaults.\n\n```\n/etc/mailman.cfg\n```\n\n```\n[ARC]\nenabled: yes\nauthserv_id: mailserver.tld\ntrusted_authserv_ids: subdomain.mailserver.tld, other.mailserver.tld\nprivkey: /path/to/privatekey.pem\nselector: test\ndomain: mailserver.tld\n```\n\n"
+    },
+    {
+      "title": "MTA",
+      "level": 3,
+      "content": "To connect a mail-transfer-agent (MTA), it is necessary to configure the [mta] section in the configuration file. Upstream documentation covers examples for postfix, exim and sendmail, but other MTAs are technically possible.\n\n"
+    },
+    {
+      "title": "Postfix",
+      "level": 4,
+      "content": "To connect to a local postfix instance the following configuration section can be used:\n\n```\n/etc/mailman.cfg\n```\n\n```\n[mta]\nincoming: mailman.mta.postfix.LMTP\noutgoing: mailman.mta.deliver.deliver\nlmtp_host: mail.example.com\nlmtp_port: 8024\nsmtp_host: mail.example.com\nsmtp_port: 25\n```\n\nThe postfix configuration has to be extended to ensure compatibility (see upstream notes).\n\n```\n/etc/postfix/main.cf\n```\n\n```\n[..]\nrecipient_delimiter = +\nunknown_local_recipient_reject_code = 550\nowner_request_special = no\n[..]\n```\n\nAdditionally, postfix needs to be made aware of mailman's transport maps. Depending on the postfix configuration these may look similar to the following.\n\n```\n/etc/postfix/main.cf\n```\n\n```\n[..]\ntransport_maps = hash:/var/lib/mailman/data/postfix_lmtp\nlocal_recipient_maps = hash:/var/lib/mailman/data/postfix_lmtp\nrelay_domains = hash:/var/lib/mailman/data/postfix_domains\n[..]\n```\n\nIf postmap is not directly accessible by mailman for creating the default hash-based alias maps, it is possible to generate regular expression based alias maps instead. To overwrite the default Python-class based configuration, mailman allows the use of a configuration file. Create the following file:\n\n```\n/etc/postfix-mailman.cfg\n```\n\n```\n[postfix]\npostmap_command: /usr/bin/postmap\ntransport_file_type: regex\n```\n\nAdd the file to the [mta] section in mailman's configuration file.\n\n```\n/etc/mailman.cfg\n```\n\n```\n[mta]\n[..]\nconfiguration: /etc/postfix-mailman.cfg\n```\n\nAfterwards the regexp based exports can then be used in the postfix configuration.\n\n```\n/etc/postfix/main.cf\n```\n\n```\n[..]\ntransport_maps = regexp:/var/lib/mailman/data/postfix_lmtp\nlocal_recipient_maps = regexp:/var/lib/mailman/data/postfix_lmtp\nrelay_domains = regexp:/var/lib/mailman/data/postfix_domains\n[..]\n```\n\nTo connect to a local postfix instance with a virtual mail setup, first set an alias domain. Afterwards alter the respective configuration.\n\n```\n/etc/postfix/main.cf\n```\n\n```\n[..]\nlocal_recipient_maps = regexp:/var/lib/mailman/data/postfix_lmtp\ntransport_maps = regexp:/var/lib/mailman/data/postfix_lmtp\nvirtual_mailbox_domains = regexp:/var/lib/mailman/data/postfix_domains\nvirtual_alias_maps = regexp:/var/lib/mailman/data/postfix_vmap\n[..]\n```\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "Enable and start mailman3.service.\n\nSeveral systemd services with timers exist, taking care of various aspects of the list management:\n\n- mailman3-digests.timer: for sending out daily digests to subscribers\n- mailman3-gatenews.timer: for hourly polling of NNTP servers for news\n- mailman3-notify.timer: for sending out daily notifications to admins about pending requests\n\n"
+    },
+    {
+      "title": "Integrate with a mail server",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Integrate with Hyperkitty",
+      "level": 3,
+      "content": "Mailman does not automatically archive mails on its own. The Hyperkitty web application is used for this purpose. Based on a plugin, mailman is able to send mails to a Hyperkitty instance for archival.\n\nInstall the mailman3-hyperkitty package and configure /etc/mailman-hyperkitty.cfg.\n\n```\n/etc/mailman-hyperkitty.cfg\n```\n\n```\n[general]\nbase_url: https://example.tld/hyperkitty/\napi_key: super_secret_password\n```\n\nAfterwards, make mailman aware of the plugin:\n\n```\n/etc/mailman.cfg\n```\n\n```\n[archiver.hyperkitty]\nclass: mailman_hyperkitty.Archiver\nenable: yes\nconfiguration: /etc/mailman-hyperkitty.cfg\n```\n\n"
+    },
+    {
+      "title": "Migrate from mailman < 3.0",
+      "level": 3,
+      "content": "Mailman offers the possibility of importing mailman < 3.0 based list databases (config.pck). Run the following command as the mailman user (e.g. using sudo or su):\n\n```\n[mailman]$ mailman import21 LISTSPEC PICKLE_FILE\n```\n\nHere, LISTSPEC represents a fully-qualified name of a list to import (e.g. list@example.com) and PICKLE_FILE the path to the list's config.pck file.\n\nNote: **must** \n\n"
+    },
+    {
+      "title": "REST API",
+      "level": 3,
+      "content": "Mailman exposes a REST API, which can be interfaced using custom tooling, based on python-mailmanclient.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Mailman Documentation - The upstream documentation\n- Mailmanclient Documentation - The upstream documentation\n- Connecting to Mailman - The upstream documentation on mailman3-hyperkitty\n- Mailman Suite Documentation - The (high level) upstream documentation for the entire Mailman Suite (Mailman, Hyperkitty and Postorius)\n\n"
+    }
+  ]
+}

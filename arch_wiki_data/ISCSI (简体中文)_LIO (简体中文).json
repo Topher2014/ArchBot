@@ -1,0 +1,46 @@
+{
+  "title": "ISCSI (简体中文)/LIO (简体中文)",
+  "url": "https://wiki.archlinux.org/title/ISCSI_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)/LIO_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "LIO (LinuxIO) is the in-kernel iSCSI target (since Linux 2.6.38).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The iSCSI target fabric is included since Linux 3.1.\n\nThe important kernel modules are target_core_mod and iscsi_target_mod, which should be in the kernel and loaded automatically.\n\nIt is highly recommended to use the free branch versions of the packages: targetcli-fbAUR, python-rtslib-fbAUR and python-configshell-fb.\n\nStart/enable the target.service, included in python-rtslib-fbAUR, to load necessary modules, mount the configfs and load previously saved iSCSI target configuration.\n\n"
+    },
+    {
+      "title": "targetcli",
+      "level": 2,
+      "content": "Run targetcli status as root to see some information about the running configuration.\n\nYou can use targetcli to create the whole configuration, see targetcli(8).\n\nThe configuration shell creates most names and numbers for you automatically, but you can also provide your own settings. At any point in the shell you can type help in order to see what commands you can issue here.\n\nAfter starting the target (see above) you enter the configuration shell with\n\n```\n# targetcli\n```\n\nIn this shell you include a block device (here: /dev/disk/by-id/md-name-nas:iscsi) to use with\n\n```\n/> cd backstores/block\n/backstores/block> create md_block0 /dev/disk/by-id/md-name-nas:iscsi\n```\n\nYou then create an iSCSI Qualified Name (IQN) and a target portal group (TPG) with:\n\n```\n...> cd /iscsi\n/iscsi> create\n```\n\nIn order to tell LIO that your block device should get used as backstore for the target you issue\n\n```\n.../tpg1> cd luns\n.../tpg1/luns> create /backstores/block/md_block0\n```\n\nThen you need to create a portal, making a daemon listen for incoming connections:\n\n```\n.../luns/lun0> cd ../../portals\n.../portals> create\n```\n\nTargetcli will tell you the IP and port where LIO is listening for incoming connections (defaults to 0.0.0.0 (all)). You will need at least the IP for the clients. The port should be the standard port 3260.\n\nIn order for a client/initiator to connect you need to include the IQN of the initiator in the target configuration:\n\n```\n...> cd ../../acls\n.../acls> create iqn.2005-03.org.open-iscsi:SERIAL\n```\n\nInstead of iqn.2005-03.org.open-iscsi:SERIAL you use the IQN of an initiator. It can normally be found in /etc/iscsi/initiatorname.iscsi. You have to do this for every initiator that needs to connect. Targetcli will automatically map the created LUN to the newly created ACL.\n\nThe last thing you have to do in targetcli when everything works is saving the configuration with:\n\n```\n...> cd /\n/> saveconfig\n```\n\nThe will the configuration in /etc/target/saveconfig.json. You can now safely start and stop target.service without losing your configuration.\n\n"
+    },
+    {
+      "title": "Authentication",
+      "level": 3,
+      "content": "Authentication per CHAP is enabled per default for your targets. You can either setup passwords or disable this authentication.\n\n"
+    },
+    {
+      "title": "Disable Authentication",
+      "level": 4,
+      "content": "Navigate targetcli to your target (i.e. /iscsi/iqn.../tpg1) and:\n\n```\n.../tpg1> set attribute authentication=0\n```\n\n"
+    },
+    {
+      "title": "Set Credentials",
+      "level": 4,
+      "content": "Navigate to a certain ACL of your target (i.e. /iscsi/iqn.../tpg1/acls/iqn.../) and\n\n```\n...> get auth\n```\n\nwill show you the current authentication credentials.\n\n```\n...> set auth userid=<username in target>\n...> set auth password=<password in target>\n...> set auth mutual_userid=<username in initiator>  (optional)\n...> set auth mutual_password=<password in initiator>  (optional)\n```\n\nThe first two fields are the username and password of the target. The initiator will use this to log into the target. The last two fields (prefixed with \"mutual_\") are the username and password of the initiators (note that all initiators will have the same username and password). These two are optional parameters and it ensures that initiators will only accept connections from permitted targets.\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "- With targetcli sessions you can list the current open sessions.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- targetcli\n- Persistent block device naming in order to use the correct block device for a target\n\n"
+    }
+  ]
+}

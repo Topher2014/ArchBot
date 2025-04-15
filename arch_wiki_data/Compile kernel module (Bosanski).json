@@ -1,0 +1,46 @@
+{
+  "title": "Compile kernel module (Bosanski)",
+  "url": "https://wiki.archlinux.org/title/Compile_kernel_module_(Bosanski)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Kernel (Bosanski)\n- Kernel modules\n\nNekad možda poželiš kompajlirati Linux kernel modul bez da rekompajliras cijeli kernel.\n\n"
+    },
+    {
+      "title": "Build okruženje",
+      "level": 2,
+      "content": "Prvo moraš instalirati potrebne build dependency-e poput kompajlera(base-devel) i linux-headers.\n\nSljedeće moraš preuzeti source code kernela kojeg koristiš. Možeš pokušati noviji kernel nego što koristiš ali su velike šanse da se module neće loadati.\n\nPronađi kernel verziju sa\n\n```\n$ uname -r\n```\n\nOnda preuzmi potrebne source codove, vidi Kernels/Traditional compilation#Download the kernel source. Ukoliko skineš zadnji source koristeći Git, potrebno je checkout potrebnu verziju koristeći tag (npr. v4.1).\n\n"
+    },
+    {
+      "title": "Source konfiguracija",
+      "level": 2,
+      "content": "Kada imaš source code, uđi u taj folder i clean ga sa (pobrisat će .config.old i promijeniti naziv .config u .config.old)\n\n```\n$ make mrproper\n```\n\nZatim je potrebno kopirati .config trenutnog kernel u ovaj folder koristeći\n\n```\n$ cp /usr/lib/modules/$(uname -r)/build/.config ./\n$ cp /usr/lib/modules/$(uname -r)/build/Module.symvers ./\n```\n\nZatim, pobrini se da je konfiguracija podešena za kernel source-ove (ako koristiš kernel source za tačnu verziju, onda ne bi trebalo ništa da pita, ali noviji source-ovi nego trenutni kernel mogu pitati za nove opcije)\n\nTakođer, ukoliko modul koji želiš da kompajliraš ima neke kompilacijske opcije poput debug build možeš ih podesiti sa bilo kojim alatom od make config/menuconfig/xconfig (vidi README)\n\n```\n$ make oldconfig\n```\n\n"
+    },
+    {
+      "title": "Kompajliranje module",
+      "level": 2,
+      "content": "Da bi se modul učitao propisno, morate naći tačnu verziju EXTRAVERSION komponente trenutne verzije kernela da biste mogli matchati tačne verzije u kernel source-u. EXTRAVERSION je variabla koja je smještena na vrhu Makefile, ali Makefile u vanilla kernelu će EXTRAVERSION biti prazna; podešena je u dijelu Arch kernel build procesa. Vrijednost EXTRAVERSION trenutnog kernela (obično -1) može se naći na jedan od dva načina:\n\n1. Na vrhu /usr/lib/modules/$(uname -r)/build/Makefile fajla\n1. Ukucaj uname -r i pogledaj između trećeg broja verzije i -ARCH (Arch specifično podešenje LOCALVERSION podešeno u .config fajlu). Npr, sa kernel verzijom 4.9.65-1-ARCH, EXTRAVERSION je -1.\n\nNakon što je EXTRAVERSION poznat, pripremimo source za kompajlirano modula:\n\n```\n$ make EXTRAVERSION=<TVOJA EXTRAVERSION OVDJE> modules_prepare\n```\n\nPrimjer:\n\n```\n$ make EXTRAVERSION=-1 modules_prepare\n```\n\nAlternativno, ako sretni da učitate module sa modprobe koristeći --force-vermagic opciju da se ignoriše nepoklapanje u verziji kernela, možete jednostavno pokrenuti:\n\n```\n$make modules_prepare\n```\n\nNa kraju, kompajlirajte željeni module time što navedete njegov folder. (Možete pronaći lokaciju modula koristeći modinfo ili find)\n\n```\n$ make M=fs/btrfs\n```\n\n"
+    },
+    {
+      "title": "out-of-tree kompajliranje module",
+      "level": 2,
+      "content": "preuzmi oficijalni source code trenutnog linux kernela kao što je opisano u Kernel/Arch build system:\n\n```\n$ cd && mkdir build\n$ pkgctl repo clone linux\n```\n\nzatim usmjeri na checkirani source prilikom kompajliranja modula:\n\n```\n$ cd build/mymod\n$ make -C ~/build/linux/src/archlinux-linux M=$PWD modules\n```\n\n"
+    },
+    {
+      "title": "Instaliranje module",
+      "level": 2,
+      "content": "Sada, nakon uspješnog kompajliranja module samo morate gzip i kopirati u svoj trenutni kernel.\n\nUkoliko zamjenjujete neki već postojeći module, morate ga prepisati (zapamtite da reinstaliranje linux će ga zamijeniti sa defaultnim modulom)\n\n```\n$ xz fs/btrfs/btrfs.ko\n# cp -f fs/btrfs/btrfs.ko.xz /usr/lib/modules/$(uname -r)/kernel/fs/btrfs/\n```\n\nAlternativno, možete staviti update-ovani module u updates folder (kreirajte ga ukoliko ne postoji).\n\n```\n$ cp fs/btrfs/btrfs.ko.xz /usr/lib/modules/$(uname -r)/updates\n```\n\nAko dodajete novi modul, možete ga samo kopirati u extramodules (note, ovo je samo primjer jer se btrfs neće loadati odavde)\n\n```\n# cp fs/btrfs/btrfs.ko.xz /usr/lib/modules/$(uname -r)/extramodules/\n```\n\nAko kompajlirate module za rani boot (npr. updated modul) koji je kopirati u Initramfs onda morate regenerisati sa njim (u suprotnom, module se neće loadati). Dalje, ukoliko koristite \"updates\" folder metodu, možda ćete morati rebuildati modul dependency tree sa \"depmod\" prije regenerisanja Initramfs.\n\n```\n# mkinitcpio -p linux\n```\n\n"
+    },
+    {
+      "title": "mogući errori",
+      "level": 2,
+      "content": "Ako EXTRAVERSION nije ispravno podešena, sljedeći error se mogu pojaviti\n\n```\n# insmod mymod.ko\ninsmod: ERROR: could not insert module mymod.ko: Invalid module format\n# modprobe mymod\nmodprobe: ERROR: could not insert 'mymod': Exec format error\n```\n\ndodavanje force-vermagic ignoriše mismatch verzije\n\n```\nmodprobe mymod --force-vermagic\n```\n\n"
+    },
+    {
+      "title": "Vidi i",
+      "level": 2,
+      "content": "- Linux Kernel Newbies\n- The Linux Kernel Module Programming Guide\n\n"
+    }
+  ]
+}

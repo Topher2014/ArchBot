@@ -1,0 +1,66 @@
+{
+  "title": "Tinc (Español)",
+  "url": "https://wiki.archlinux.org/title/Tinc_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-10-06** \n\ntinc es un demonio de red privada virtual (siglas en inglés VPN) que utiliza túneles y cifrado para crear una red privada segura entre equipos en Internet.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete tinc.\n\n"
+    },
+    {
+      "title": "Configurar una red privada",
+      "level": 2,
+      "content": "En este ejemplo, crearemos una red privada virtual, vpnname, entre dos equipos, alpha y beta, donde el primero es el punto de entrada para el segundo, de modo que beta intente conectarse a alpha en el arranque.\n\nPara cada red privada virtual, debe crear un directorio separado /etc/tinc/network.\n\nTambién puede comenzar copiando la configuración de muestra:\n\n```\n# cp -r /usr/share/tinc/examples/* /etc/tinc/vpnname\n```\n\nEn /etc/tinc/vpnname/tinc.conf especifique el nombre de la máquina del equipo (que puede diferir del nombre de equipo real del sistema) y la ubicación del dispositivo tun/tap.\n\n"
+    },
+    {
+      "title": "Configuración de alfa",
+      "level": 3,
+      "content": "```\n/etc/tinc/vpnname/tinc.conf\n```\n\n```\nName = alpha\nDevice = /dev/net/tun\n```\n\n```\n/etc/tinc/vpnname/tinc-up\n```\n\n```\n#!/bin/sh\nip link set $INTERFACE up\nip addr add  192.168.0.1/24 dev $INTERFACE\n```\n\n```\n/etc/tinc/vpnname/tinc-down\n```\n\n```\n#!/bin/sh\nip addr del 192.168.0.1/24 dev $INTERFACE\nip link set $INTERFACE down\n```\n\ntinc-up y tinc-down deben hacerse ejecutables.\n\n"
+    },
+    {
+      "title": "Configuración de beta",
+      "level": 3,
+      "content": "```\n/etc/tinc/vpnname/tinc.conf\n```\n\n```\nName = beta\nDevice = /dev/net/tun\nConnectTo = alpha\n```\n\n```\n/etc/tinc/vpnname/tinc-up\n```\n\n```\n#!/bin/sh\nip link set $INTERFACE up\nip addr add 192.168.0.2/24 dev $INTERFACE\n```\n\n```\n/etc/tinc/vpnname/tinc-down\n```\n\n```\n#!/bin/sh\nip addr del 192.168.0.2/24 dev $INTERFACE\nip link set $INTERFACE down\n```\n\ntinc-up y tinc-down deben hacerse ejecutables.\n\n"
+    },
+    {
+      "title": "Configuración de los equipos",
+      "level": 3,
+      "content": "Los archivos de configuración para los diferentes equipos se almacenan en el directorio /etc/tinc/vpnname/hosts/. En este ejemplo, necesitamos los dos archivos en cada máquina.\n\n```\n/etc/tinc/vpnname/hosts/alpha\n```\n\n```\nAddress = 10.0.0.1\nPort = 655\nSubnet = 192.168.0.1/32\n```\n\n```\n/etc/tinc/vpnname/hosts/beta\n```\n\n```\nPort = 655\nSubnet = 192.168.0.2/32\n```\n\nDespués de crear un archivo para cada equipo, debe generar un par de claves, utilizando:\n\n```\n# tincd -n vpnname -K\n```\n\nque crea la clave privada en /etc/tinc/vpnname/tinc.rsa_key.priv y la clave pública en el archivo del equipo correspondiente.\n\nEn el último paso, deberá intercambiar los archivos de configuración de los equipos, de modo que tanto alfa como beta en /etc/tinc/vpnname/hosts/ estén en cada equipo.\n\n"
+    },
+    {
+      "title": "Iniciar una red privada",
+      "level": 2,
+      "content": "Después de haber creado la configuración adecuada en /etc/tinc/vpnname, puede probar la nueva red privada con:\n\n```\n# tincd -n vpnname\n```\n\nSi desea activarla al inicio, debe activar el servicio apropiado:\n\n```\n# systemctl enable tinc@vpnname\n```\n\n"
+    },
+    {
+      "title": "Utilizar dispositivos TAP y puentes de red",
+      "level": 2,
+      "content": "A veces es razonable usar dispositivos TAP en lugar de dispositivos TUN. Por ejemplo, si desea añadir el dispositivo tinc a un puente de red ya existente. Simplemente añada la opción «Mode» a tinc.conf.\n\nRecuerde hacer esto en cada equipo.\n\n```\n/etc/tinc/vpnname/tinc.conf\n```\n\n```\nName = node\nMode = switch\nDevice = /dev/net/tun\nConnectTo = other\n```\n\nLos posibles archivos tinc-up/down podrían verse así:\n\n```\n/etc/tinc/vpnname/tinc-up\n```\n\n```\n#!/bin/sh\nip link set $INTERFACE up\nbrctl addif br0 $INTERFACE\n```\n\n```\n/etc/tinc/vpnname/tinc-down\n```\n\n```\n#!/bin/sh\nbrctl delif br0 $INTERFACE\nip link set $INTERFACE down\n```\n\nY finalmente reinicie su demonio tinc: tinc@vpnname.\n\n"
+    },
+    {
+      "title": "Iniciar Tinc automáticamente en el arranque",
+      "level": 2,
+      "content": "Tinc se puede configurar para iniciarse automáticamente en el momento del arranque utilizando unidades de systemd.\n\nSi desea poder iniciar, detener o recargar todas sus redes a la vez, debe activar el servicio tinc:\n\n```\n# systemctl enable tinc\n```\n\nLuego, para cada red que desee iniciar automáticamente, debe activarla individualmente:\n\n```\n# systemctl enable tinc@vpnname\n# systemctl enable tinc@another_vpnname\n...\n```\n\n"
+    },
+    {
+      "title": "He actualizado mi sistema y ahora tinc no se inicia",
+      "level": 3,
+      "content": "En caso de una actualización del kernel de Linux, debe reiniciar el sistema o reinstalar el paquete del kernel en ejecución.\n\n"
+    },
+    {
+      "title": "Estoy ejecutando un kernel personalizado y tinc no se inicia",
+      "level": 3,
+      "content": "Asegúrese de que tiene el soporte TUN/TAP activado.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- tincd(8)\n- tinc documentation\n\n"
+    }
+  ]
+}

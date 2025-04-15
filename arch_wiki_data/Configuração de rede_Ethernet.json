@@ -1,0 +1,86 @@
+{
+  "title": "Configuração de rede/Ethernet",
+  "url": "https://wiki.archlinux.org/title/Configura%C3%A7%C3%A3o_de_rede/Ethernet",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Esse artigo descreve especificidades sobre Ethernet. Configuração de rede em geral está coberto em Configuração de rede.\n\n"
+    },
+    {
+      "title": "Verificando o estado",
+      "level": 3,
+      "content": "O udev deve detectar sua interface de rede (em inglês, network interface controller ou NIC) e carregará automaticamente o módulo de kernel necessário na inicialização. Verifique pela entrada \"Ethernet controller\" (ou similar) no resultado do comando lspci -v. Este comando dirá qual módulo do kernel é necessário para o funcionamento do dispositivo. Por exemplo:\n\n```\n$ lspci -v\n```\n\n```\n02:00.0 Ethernet controller: Attansic Technology Corp. L1 Gigabit Ethernet Adapter (rev b0)\n     ...\n     Kernel driver in use: atl1\n     Kernel modules: atl1\n```\n\nApós, veja se o driver foi carregado usando dmesg | grep nome_módulo. Exemplo:\n\n```\n# dmesg | grep atl1\n```\n\n```\n...\natl1 0000:02:00.0: eth0 link is up 100 Mbps full duplex\n```\n\nPule para a próxima sessão caso o driver tenha sido carregado com sucesso. Caso contrário, você precisará descobrir qual é o módulo necessário para o seu modelo de interface de rede em específico.\n\n"
+    },
+    {
+      "title": "Carregando o módulo",
+      "level": 3,
+      "content": "Pesquise na internet pelo modelo/driver para o seu chipset. Algumas módulos comuns são 8139too para as placas com um chipset da Realtek, ou sis900 para placas com um chipset da SiS. Assim que descobrir qual módulo deve usar, tente carregar o módulo manualmente. Caso você esbarre com algum erro dizendo que o módulo não foi encontrado, é possível que o driver não foi incluído no kernel do Arch Linux. Tente procurar no AUR pelo nome do módulo.\n\nCaso o udev não detecte ou não carregue o módulo de forma apropriada e automaticamente durante o boot, veja Módulo de kernel#Carregamento automático de módulos com systemd.\n\n"
+    },
+    {
+      "title": "ifplugd para laptops",
+      "level": 3,
+      "content": "O ifplugd é um daemon que configura automaticamente seu dispositivo Ethernet quando um cabo é conectado e desconfigura automaticamente quando desconectado. É útil para laptops com adaptadores de rede onboards, pois configurará a interface quando um cabo realmente for conectado. Outro uso é quando você deseja reiniciar as configurações de rede mas não deseja reiniciar o computador ou deseja fazer isto via linha de comando.\n\nPor padrão, ele é configurado para funcionar para o dispositivo eth0. Estas e outras configurações como tempo de espera podem ser alterados no arquivo /etc/ifplugd/ifplugd.conf.\n\n"
+    },
+    {
+      "title": "Trocando computadores no modem a cabo",
+      "level": 3,
+      "content": "Alguns ISP por cabo têm o modem a cabo configurado para reconhecer apenas um PC cliente, pelo endereço MAC da sua interface de rede. Uma vez que o modem a cabo aprendeu o endereço MAC do primeiro PC ou equipamento que fala com ele, ele não responderá de outro modo a outro endereço MAC. Assim, se você trocar um PC por outro (ou por um roteador), o novo PC (ou roteador) não funcionará com o modem a cabo, porque o novo PC (ou roteador) possui um endereço MAC diferente do antigo. Para reiniciar o modem a cabo para que reconheça o novo PC, você deve desligar e ligar o modem a cabo. Uma vez que o modem a cabo foi reiniciado e voltou totalmente on-line novamente (as luzes indicadoras foram instaladas), reinicie o PC recém-conectado para que ele faça uma solicitação DHCP ou faça com que ele solicite um novo lease (concessão) DHCP.\n\nCaso este método não funcione, você deverá clonar o endereço MAC do computador original. Veja também MAC address spoofing.\n\n"
+    },
+    {
+      "title": "Notificação de Congestionamento Explícito",
+      "level": 3,
+      "content": "Explicit Congestion Notification (ECN), Notificação de Congestionamento Explícito, pode causar problemas de tráfego com roteadores antigos/ruins [1]. Desde o systemd 239, está habilitado para tráfego de entrada e de saída.\n\nPara habilitar apenas ECN quando requisitado pelas conexões de entrada (padrão do kernel razoavelmente seguro):\n\n```\n# sysctl net.ipv4.tcp_ecn=2\n```\n\nPara desabilitar ECN completamente (para, por exemplo, testar se ECN estava causando problemas):\n\n```\n# sysctl net.ipv4.tcp_ecn=0\n```\n\nVeja também a documentação do kernel.\n\n"
+    },
+    {
+      "title": "Realtek sem link / Problema com WOL",
+      "level": 3,
+      "content": "Os usuários com o Realtek 8168 8169 8101 8111(C) baseados em NIC (placas e on-board) podem notar um problema onde a NIC parece estar desativada na inicialização e não tem nenhuma luz no Link. Isso geralmente pode ser encontrado em um sistema de dual boot, onde o Windows também está instalado. Parece que o uso dos drivers oficiais do Realtek (datado de qualquer coisa após maio de 2007) no Windows é a causa. Esses drivers mais recentes desativam o recurso Wake-On-LAN desabilitando a NIC no tempo de desligamento do Windows, onde ele permanecerá desabilitado até a próxima vez que o Windows for inicializado. Você poderá notar se esse problema está afetando você se a luz do Link estiver desligada até que o Windows seja iniciado; durante o desligamento do Windows, a luz do link será desligada. A operação normal deve ser que a luz do link esteja sempre ativada enquanto o sistema estiver ligado, mesmo durante o POST. Este problema também afetará outros sistemas operacionais sem drivers mais recentes (por exemplo, Live CDs). Aqui estão algumas correções para este problema.\n\n"
+    },
+    {
+      "title": "Habilitando a NIC diretamente no Linux",
+      "level": 4,
+      "content": "Siga Configuração de rede#Habilitando e desabilitando interfaces de rede para habilitar a interface.\n\n"
+    },
+    {
+      "title": "Revertendo/alterando driver do Windows",
+      "level": 4,
+      "content": "Você pode reverter o driver de NIC do Windows para o fornecido pela Microsoft (se disponível), ou reverter/instalar um driver Realtek oficial pré-datado de maio de 2007 (pode estar no CD que acompanhou o hardware).\n\n"
+    },
+    {
+      "title": "Habilitando WOL no driver do Windows",
+      "level": 4,
+      "content": "Provavelmente a melhor e mais correção é mudar essa configuração no driver do Windows. Desta forma, ele deve ser corrigido em todo o sistema e não apenas em Arch (ex.:, Live CDs, outros sistemas operacionais). No Windows, no Gerenciamento de dispositivos, encontre seu adaptador de rede Realtek e clique duas vezes nele. Na guia \"Avançado\", altere \"Wake-on-LAN após o desligamento\" para \"Ativar\".\n\nNo Windows XP (exemplo):\n\n```\nRealize duple clique no meu computador e escolha \"Propriedades\"\n --> Aba \"Hardware\"\n  --> Gerenciamento de dispositivo\n    --> Adaptadores de rede\n      --> \"duplo clique\" Realtek ...\n        --> Aba \"Avançada\"\n          --> Wake-On-Lan após o desligamento\n            --> Habilitar\n```\n\n"
+    },
+    {
+      "title": "Driver Realtek mais novo para Linux",
+      "level": 4,
+      "content": "Qualquer driver mais recente para estas placas Realtek pode ser encontrado para o Linux no site da Realtek (não testado, mas acredita que também resolve o problema).\n\n"
+    },
+    {
+      "title": "Ativando LAN Boot ROM na BIOS/CMOS",
+      "level": 4,
+      "content": "Parece que a configuração Periféricos integrados > Onboard LAN Boot ROM > Ativado na BIOS/CMOS reativa o chip de LAN da Realtek na inicialização do sistema, apesar do driver do Windows desabilitando no desligamento do sistema operacional.\n\n"
+    },
+    {
+      "title": "No interface with Atheros chipsets",
+      "level": 3,
+      "content": "Os usuários de alguns chips de Ethernet da Atheros estão relatando que não funciona pronto para uso (com mídia de instalação de fevereiro de 2014). A solução de trabalho para isso é instalar backports-patchedAUR[link quebrado: package not found].\n\n"
+    },
+    {
+      "title": "Broadcom BCM57780",
+      "level": 3,
+      "content": "Este chipset Broadcom às vezes não se comporta bem, a menos que você especifique a ordem dos módulos a serem carregados. Os módulos são broadcom e tg3, o primeiro que precisa ser carregado primeiro.\n\nEssas etapas devem ajudar se o seu computador tiver esse chipset:\n\n- Localize sua NIC na saída do lspci:\n\n```\n$ lspci | grep Ethernet\n```\n\n```\n02:00.0 Ethernet controller: Broadcom Corporation NetLink BCM57780 Gigabit Ethernet PCIe (rev 01)\n```\n\n- Se sua rede com fio não estiver funcionando de alguma maneira, desconecte seu cabo e, em seguida, faça o seguinte:\n\n```\n# modprobe -r tg3\n# modprobe broadcom\n# modprobe tg3\n```\n\n- Conecte seu cabo de rede de volta e verifique se o módulo foi carregado com sucesso com:\n\n```\n# dmesg | grep tg3\n```\n\n- Se esse procedimento resolveu o problema, você pode torná-lo permanente adicionando broadcom e tg3 (nesta ordem) para o vetor MODULES:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(.. broadcom tg3 ..)\n```\n\n- Gere novamente o initramfs\n- Alternativamente, você pode criar um /etc/modprobe.d/broadcom.conf:\n\n```\nsoftdep tg3 pre: broadcom\n```\n\n"
+    },
+    {
+      "title": "Realtek RTL8111/8168B",
+      "level": 3,
+      "content": "```\n# lspci | grep Ethernet\n```\n\n```\n03:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8111/8168B PCI Express Gigabit Ethernet controller (rev 02)\n```\n\nO adaptador deve ser reconhecido pelo módulo r8169. No entanto, com algumas revisões de chips, a conexão pode cair e voltar o tempo todo. A alternativa r8168AUR deve ser usada para uma conexão confiável neste caso. Basta adicionar à lista negra r8169, se r8168AUR não for carregado automaticamente pelo udev. Veja Módulos de kernel#Carregamento automático de módulos com systemd.\n\nOutra falha nos drivers para algumas revisões deste adaptador é um suporte fraco de IPv6. IPv6 (Português)#Desabilitar funcionalidade pode ser útil se você encontrar problemas como pendurar páginas da web e velocidades lentas.\n\n"
+    },
+    {
+      "title": "Placa-mãe Gigabyte com Realtek 8111/8168/8411",
+      "level": 3,
+      "content": "Com placas-mãe como o Gigabyte GA-990FXA-UD3, inicializar com IOMMU desligado (o que pode ser o padrão) fará com que a interface de rede não seja confiável, muitas vezes não conseguindo se conectar, ou até conectar mas não permitindo a transferência. Isso se aplicará à NIC on-board e para qualquer outra NIC pci na máquina porque a configuração IOMMU afeta toda a interface de rede na placa. Habilitar o IOMMU e inicializar com a mídia de instalação lançará as falhas da página AMD I-10/xhci por um segundo, mas depois inicializará normalmente, resultando em uma NIC onboard totalmente funcional (mesmo com o módulo r8169).\n\nAo configurar o processo de inicialização para sua instalação, adicione iommu=soft como um parâmetro do kernel para eliminar as mensagens de erro na inicialização e restaurar a funcionalidade USB3.0.\n\n"
+    }
+  ]
+}

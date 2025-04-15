@@ -1,0 +1,91 @@
+{
+  "title": "Polkit (日本語)",
+  "url": "https://wiki.archlinux.org/title/Polkit_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- セッション\n- Sudo\n- ユーザーとグループ\n\npolkit のホームページより:\n\nPolkit はシステム全体の権限を制御するために使われます。非特権プロセスが特権プロセスと通信するための体系化された手段を提供します。sudo などのシステムと対照的に、Polkit は1つのプロセス全体に root 権限を与えるようなことはせず、一元化されたシステムポリシーをより細かいレベルで制御することができます。\n\nPolkit は、個々のアクション (例: GParted の実行) で区切ったり、ユーザをグループ (例: wheel グループのメンバー) や名前で区切ったりすることで機能します。そして、パスワードの入力でグループのメンバーか確認するなど、ユーザーにアクションを許可する方法を定義します。\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール 1.1 認証エージェント\n- 2 設定 2.1 アクション 2.2 認可ルール 2.3 管理者の識別\n- 3 サンプル 3.1 特定のユーザーに org.freedesktop.timedate1.set-timezone アクションの使用を許可する 3.2 デバッグ・ログ出力 3.3 サスペンドとハイバネートの無効化 3.4 パスワードプロンプトの迂回 3.4.1 グローバル 3.4.2 特定のアクション 3.4.3 Udisks 3.5 通常ユーザーに個々の systemd ユニットの管理を許可\n- 4 参照\n\n- 1.1 認証エージェント\n\n- 2.1 アクション\n- 2.2 認可ルール\n- 2.3 管理者の識別\n\n- 3.1 特定のユーザーに org.freedesktop.timedate1.set-timezone アクションの使用を許可する\n- 3.2 デバッグ・ログ出力\n- 3.3 サスペンドとハイバネートの無効化\n- 3.4 パスワードプロンプトの迂回 3.4.1 グローバル 3.4.2 特定のアクション 3.4.3 Udisks\n- 3.5 通常ユーザーに個々の systemd ユニットの管理を許可\n\n- 3.4.1 グローバル\n- 3.4.2 特定のアクション\n- 3.4.3 Udisks\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "polkit パッケージをインストールしてください。\n\n"
+    },
+    {
+      "title": "認証エージェント",
+      "level": 3,
+      "content": "認証エージェントは、本当に本人であること、或いは管理ユーザであることをセッションのユーザに証明させるために使用されます (本人であることはユーザとして認証することによって、管理ユーザであることは管理者として認証することによって証明されます)。polkit パッケージには 'pkttyagent' という名前のテキスト形式の認証エージェントが含まれており、一般的なフォールバックとして使われます。\n\nグラフィカル環境を使っている場合、グラフィカルな認証エージェントをインストールし、(xinitrc を使うなどして) ログイン時に自動で実行されるようにしてください。\n\nCinnamon、Deepin、Hyprland、GNOME、GNOME Flashback、KDE、LXDE、LXQt、MATE、Xfce には初めから認証エージェントが入っています。 他のデスクトップ環境を使っているときは、以下の実装からどれか一つを選ぶ必要があります:\n\n- hyprpolkitagent-gitAUR: /usr/lib/hyprpolkitagent を提供\n- lxqt-policykit: /usr/bin/lxqt-policykit-agent を提供\n- lxsession または lxsession-gtk3: /usr/bin/lxpolkit を提供\n- mate-polkit: /usr/lib/mate-polkit/polkit-mate-authentication-agent-1 を提供\n- polkit-efl-gitAUR: /usr/bin/polkit-efl-authentication-agent-1 を提供\n- polkit-gnome: /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 を提供\n- polkit-kde-agent: /usr/lib/polkit-kde-authentication-agent-1 を提供\n- ts-polkitagentAUR: /usr/lib/ts-polkitagent を提供\n- xfce-polkitAUR または xfce-polkit-gitAUR: /usr/lib/xfce-polkit/xfce-polkit を提供\n- pantheon-polkit-agent: /usr/lib/policykit-1-pantheon/io.elementary.desktop.agent-polkit を提供\n\n"
+    },
+    {
+      "title": "設定",
+      "level": 2,
+      "content": "Polkit の定義は2種類に分けることができます:\n\n- アクション (Action) は /usr/share/polkit-1/actions 内に XML の .policy ファイルで定義されます。各アクションにはデフォルトのパーミッションがあります (例: GParted のアクションを使うには管理者として認証する必要があります)。デフォルトは上書きできますが、デフォルトのアクションファイルを編集するのは正しい方法ではありません。\n- 認可ルール (Authorization rule) は JavaScript の .rules ファイルで定義されます。このルールは2つの場所に置かれます: サードパーティのパッケージは /usr/share/polkit-1/rules.d を使用できます。 /etc/polkit-1/rules.d はローカル設定用です。\n\n- サードパーティのパッケージは /usr/share/polkit-1/rules.d を使用できます。\n- /etc/polkit-1/rules.d はローカル設定用です。\n\nPolkit は Linux にある既存のパーミッションシステム (グループメンバーシップ、アドミニストレータステータス) の上で動作し、それらを置き換えるものではありません。.rules ファイルはユーザーのサブセットを指定して、アクションファイルで指定されているアクションのどれか一つ (または複数) を参照して、そのユーザーによるアクションにどのような制限をかけるか決定します。例を上げると、rules ファイルを使うことにより、GParted を使用する際に全ユーザが管理者として認証するというデフォルトの要件を上書きし、一部の特定のユーザに対しては認証を不要にできます。また別の例として、特定のユーザの GParted の使用を一切禁止することができます。\n\n"
+    },
+    {
+      "title": "アクション",
+      "level": 3,
+      "content": "polkit によって利用できるアクションはインストールしたパッケージ次第です。複数のデスクトップ環境によって使われるアクションもあれば (org.freedesktop.*)、 DE 固有アクションもあり (org.gnome.*)、ある一つのプログラム固有だったりもします (org.gnome.gparted.policy)。pkaction コマンドはクイックリファレンスとして /usr/share/polkit-1/actions で定義されているアクションを全て表示します。\n\npolkit で何ができるのかということを理解するために、一般的に使われているアクションのグループを以下に示します:\n\n- systemd-logind (org.freedesktop.login1.policy) のアクションには、(他のユーザーがログインしている時を含む) システムの電源オフ・再起動・サスペンド・ハイバネートが含まれています。\n- udisks (org.freedesktop.udisks2.policy) のアクションには、ファイルシステムのマウントや暗号化デバイスのアンロックが含まれます。\n- NetworkManager (org.freedesktop.NetworkManager.policy) のアクションには、ネットワーク、wifi、モバイルブロードバンドのオン/オフが含まれています。\n\nそれぞれのアクションは .policy ファイルの <action> タグで定義されます。org.gnome.gparted.policy には単一のアクションが含まれており、以下のような見た目をしています:\n\n```\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE policyconfig PUBLIC\n \"-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN\"\n \"http://www.freedesktop.org/software/polkit/policyconfig-1.dtd\">\n<policyconfig>\n\n  <action id=\"org.gnome.gparted\">\n    <message>Authentication is required to run the GParted Partition Editor</message>\n    <icon_name>gparted</icon_name>\n    <defaults>\n      <allow_any>auth_admin</allow_any>\n      <allow_inactive>auth_admin</allow_inactive>\n      <allow_active>auth_admin</allow_active>\n    </defaults>\n    <annotate key=\"org.freedesktop.policykit.exec.path\">/usr/bin/gparted</annotate>\n    <annotate key=\"org.freedesktop.policykit.exec.allow_gui\">true</annotate>\n  </action>\n\n</policyconfig>\n```\n\nid 属性は実際に D-Bus に送信されるコマンド、message タグは認証が必要なときにユーザーに表示する説明、icon_name はその名の通りアイコンです。\n\ndefaults タグにはパーミッションのあるなしを記述します。次の3つの設定が含まれます: allow_any, allow_inactive, allow_active。inactive も active もここではローカルコンソールまたはローカルディスプレイのローカルセッションを指します。allow_any は、リモートセッション (SSH、VNV など) を含むその他全てに対して使用します。\n\nそれぞれの設定には以下のオプションを使うことができます:\n\n- no: ユーザはアクションを実行する権限を与えられません。したがって認証の必要もありません。\n- yes: ユーザは認証をすることなくアクションを実行することができます。\n- auth_self: 認証が必要ですが管理者ユーザである必要はありません。\n- auth_admin: 管理者ユーザーとしての認証が必須です。\n- auth_self_keep: auth_self と同じですが、sudo と同じように、認可の効力は数分間しか続きません。\n- auth_admin_keep: auth_admin と同じですが、sudo と同じように、認可の効力は数分間しか続きません。\n\n以上がデフォルト設定であり、後の設定で覆されないかぎり、全てのユーザに対して有効です。\n\nより詳しい説明は polkit(8) man ページを参照してください。\n\nGParted のアクションからわかるように、GParted を使用するには管理者としての認証を求められ、それはセッションがアクティブかそうでないかによりません。\n\n"
+    },
+    {
+      "title": "認可ルール",
+      "level": 3,
+      "content": "デフォルトの設定をオーバーライドする認可ルールは、(「設定」セクションの冒頭に書かれた) 上記のディレクトリ内に置かれます。単一システムの個人設定に関連する用途の場合は、/etc/polkit-1/rules.d のみを使用するべきです。\n\naddRule() メソッドは、アクションと動作主体の認可チェックが行われる時に呼ばれる関数を追加するために使用されます。関数は、追加された順番で呼ばれ、それらの関数のうち1つが値を返すまでその順に呼ばれ続けます。したがって、他のルールより先に処理される認可ルールを追加するには、そのルールを /etc/polkit-1/rules.d 内のファイルに置き、名前順で他のルールよりも前に来る名前を付けてください (例: 00-early-checks.rules)。\n\n.rules ファイルの構造は一目瞭然です:\n\n```\n/* admin グループ内のユーザが認証無しで GParted を実行できるようにする */\npolkit.addRule(function(action, subject) {\n    if (action.id == \"org.gnome.gparted\" &&\n        subject.isInGroup(\"admin\")) {\n        return polkit.Result.YES;\n    }\n});\n```\n\nこの関数内では、指定されたアクション ID (org.gnome.gparted) とユーザのグループ (admin) に対してチェックを行い、その後 \"yes\" の値を返します。\n\n"
+    },
+    {
+      "title": "管理者の識別",
+      "level": 3,
+      "content": "addAdminRule() メソッドは、管理者認証が要求された時に呼ばれる関数を追加するために使用されます。(追加する) 関数は、アクションや動作主体によって識別される認可チェックの管理者認証にどの識別子を使用するかを指定するために使用されます。追加された関数は、追加された順番で呼ばれ、それらの関数のうち1つが値を返すまでその順に呼ばれ続けます。\n\n管理者識別子のデフォルトの設定は、/usr/share/polkit-1/rules.d/50-default.rules ファイルに含まれています。なので、この設定に対する如何なる変更も、そのファイルを (例えば /etc/polkit-1/rules.d ディレクトリなどに) コピーし、コピー先のファイルを編集することによって行うべきです:\n\n```\n/etc/polkit-1/rules.d/50-default.rules\n```\n\n```\npolkit.addAdminRule(function(action, subject) {\n    return [\"unix-group:wheel\"];\n});\n```\n\n(コピー後に) 編集すべき部分は関数の return の配列だけです: 管理ユーザとしての認証を要求された時に、ユーザは誰として認証するべきでしょうか? 管理者として指定されたグループのメンバーである場合、ユーザはそのユーザ独自のパスワードを入力するだけで良いです。ある別のユーザ (例えば root) が唯一の管理者である場合、ユーザは root のパスワードを入力する必要があります。ユーザ ID の形式は、権限を指定する時に使用するものと同じです。\n\nArch のデフォルトでは、wheel グループの全メンバーを管理者にします。以下のようなルールは、管理者認証の際に対象ユーザのパスワードではなく root のパスワードを polkit に尋ねさせます。\n\n```\n/etc/polkit-1/rules.d/49-rootpw_global.rules\n```\n\n```\n/* 管理者を認証する際は常に root パスワードを要求する。\n * sudo における rootpw オプションに似ている。\n */\npolkit.addAdminRule(function(action, subject) {\n    return [\"unix-user:root\"];\n});\n```\n\n"
+    },
+    {
+      "title": "特定のユーザーに org.freedesktop.timedate1.set-timezone アクションの使用を許可する",
+      "level": 3,
+      "content": "archie という名前のユーザーに org.freedesktop.timedate1.set-timezone アクションの認証なしの使用を許可するには、以下の polkit ルールを root ユーザーを使って作成してください:\n\n```\n/etc/polkit-1/rules.d/49-allow-archie-set-timezone.rules\n```\n\n```\npolkit.addRule(function(action, subject) {\n    if (action.id == \"org.freedesktop.timedate1.set-timezone\" &&\n        subject.user == \"archie\") {\n        return polkit.Result.YES;\n    }\n});\n```\n\nこのルールファイルを保存したら、ポリシーが即座に有効になるはずです。timedatectl を使ってタイムゾーンを設定することでテストできます:\n\n```\n[archie]$ timedatectl set-timezone America/New_York\n```\n\n認証を求められずに操作が完了すれば、ルールが意図通りに機能していることを意味します。アクションが許可されていないような場合は、/etc/polkit-1/rules.d/ 内のより高い優先度を持つルール (より小さい番号のプレフィックスを持つファイル) と衝突していないか調べてください。\n\n"
+    },
+    {
+      "title": "デバッグ・ログ出力",
+      "level": 3,
+      "content": "polkit.log() 関数でのログを有効化するには、/usr/lib/systemd/system/polkit.service ファイルの ExecStart コマンドから --no-debug フラグを消してください。\n\n以下のルールは要求されたアクセスの詳しい情報をログ出力します:\n\n```\n/etc/polkit-1/rules.d/00-log-access.rules\n```\n\n```\npolkit.addRule(function(action, subject) {\n    polkit.log(\"action=\" + action);\n    polkit.log(\"subject=\" + subject);\n});\n```\n\nルールを手動でテストするには、pkcheck を使用してください[1]:\n\n```\n$ pkcheck -u -p $$ --enable-internal-agent -a action\n```\n\n"
+    },
+    {
+      "title": "サスペンドとハイバネートの無効化",
+      "level": 3,
+      "content": "Table content:\nこの記事またはセクションの正確性には問題があります。 理由: logind が利用できない場合、systemctl(8)[リンク切れ 2024-10-13] は代わりに suspend.target/hibernate.target を直接起動します。systemd-sleep を本当に無効化するには、電源管理/サスペンドとハイバネート#スリープを完全に無効化する に書かれてあるようにする必要があります。 (議論: トーク:Polkit#)\n\n以下のルールは全てのユーザーでサスペンドとハイバネートを無効化します。\n\n```\n/etc/polkit-1/rules.d/10-disable-suspend.rules\n```\n\n```\npolkit.addRule(function(action, subject) {\n    if (action.id == \"org.freedesktop.login1.suspend\" ||\n        action.id == \"org.freedesktop.login1.suspend-multiple-sessions\" ||\n        action.id == \"org.freedesktop.login1.hibernate\" ||\n        action.id == \"org.freedesktop.login1.hibernate-multiple-sessions\")\n    {\n        return polkit.Result.NO;\n    }\n});\n```\n\n"
+    },
+    {
+      "title": "パスワードプロンプトの迂回",
+      "level": 3,
+      "content": "sudo の NOPASSWD オプションのようにユーザー/グループだけに基づいて認可をしたい場合、/etc/polkit-1/rules.d/ にカスタムルールを作って下さい。特定のアクションまたはグローバルでのパスワード認証を上書きすることができます。ルールセットの例は [2] を見て下さい。\n\n"
+    },
+    {
+      "title": "グローバル",
+      "level": 4,
+      "content": "root として以下のファイルを作成:\n\n```\n/etc/polkit-1/rules.d/49-nopasswd_global.rules\n```\n\n```\n/* Allow members of the wheel group to execute any actions\n * without password authentication, similar to \"sudo NOPASSWD:\"\n */\npolkit.addRule(function(action, subject) {\n    if (subject.isInGroup(\"wheel\")) {\n        return polkit.Result.YES;\n    }\n});\n```\n\nwheel は別のグループに置き換えることができます。\n\n上記を設定すると Polkit によって管理者権限を要求するアクションがすべて自動的に認証されます。そのため、権限を与えるグループは注意して選ぶようにしてください。\n\nまた、認可を5分間キープできるようにする AUTH_ADMIN_KEEP もあります。しかし、認可はプロセス毎なので、新しいプロセスが5分以内に認可を要求してきた場合、その新しいプロセスはいずれにせよパスワードを要求してきます。特に、run0やpkexecはsudoのように認可をキープしません。しかし、それは将来可能になるかも知れません ( https://github.com/polkit-org/polkit/pull/533 ).\n\n"
+    },
+    {
+      "title": "特定のアクション",
+      "level": 4,
+      "content": "root として以下のファイルを作成:\n\n```\n/etc/polkit-1/rules.d/49-nopasswd_limited.rules\n```\n\n```\n/* Allow members of the wheel group to execute the defined actions \n * without password authentication, similar to \"sudo NOPASSWD:\"\n */\npolkit.addRule(function(action, subject) {\n    if ((action.id == \"org.gnome.gparted\" ||\n\t action.id == \"org.libvirt.unix.manage\") &&\n        subject.isInGroup(\"wheel\"))\n    {\n        return polkit.Result.YES;\n    }\n});\n```\n\n上記のファイルでは例として action.id が GParted と Libvirt の場合を載せていますが、パッケージに含まれているものや自分で作成したルールを自由に設定することができます。また、wheel 以外のグループを設定することも可能です。\n\n|| 演算子はアクションを区切る (論理 OR) ために使用されており、&& は論理 AND を意味し、最後の演算子として残して置かなければなりません。\n\n"
+    },
+    {
+      "title": "Udisks",
+      "level": 4,
+      "content": "ストレージデバイスをマウントするときにファイルマネージャがパスワードを要求することがあります。入力しないと Not authorized などのエラーが表示されます。詳しくは Udisks#設定 を見て下さい。\n\n"
+    },
+    {
+      "title": "通常ユーザーに個々の systemd ユニットの管理を許可",
+      "level": 3,
+      "content": "polkit のポリシーチェックに渡される値をチェックすることで、特定のユニットを管理する権限をユーザーやグループに与えることができます。例えば、標準ユーザーに wpa_supplicant を起動・停止する権限を与えたい場合:\n\n```\n/etc/polkit-1/rules.d/10-wifimanagement.rules\n```\n\n```\npolkit.addRule(function(action, subject) {\n    if (action.id == \"org.freedesktop.systemd1.manage-units\") {\n        if (action.lookup(\"unit\") == \"wpa_supplicant.service\") {\n            var verb = action.lookup(\"verb\");\n            if (verb == \"start\" || verb == \"stop\" || verb == \"restart\") {\n                return polkit.Result.YES;\n            }\n        }\n    }\n});\n```\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Polkit マニュアルページ\n- The Polkit authentication framework (openSUSE Leap Security guide)\n\n"
+    }
+  ]
+}

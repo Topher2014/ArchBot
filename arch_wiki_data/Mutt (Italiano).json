@@ -1,0 +1,341 @@
+{
+  "title": "Mutt (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Mutt_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- fdm\n- msmtp\n- OfflineIMAP\n- isync\n\nMutt is a text-based mail client renowned for its powerful features. Though over two decades old, Mutt remains the mail client of choice for a great number of power users.\n\nMutt focuses primarily on being a Mail User Agent (MUA), and was originally written to view mail. Later implementations (added for retrieval, sending, and filtering mail) are simplistic compared to other mail applications and, as such, users may wish to use external applications to extend Mutt's capabilities.\n\nNevertheless, the Arch Linux mutt package is compiled with IMAP, POP3 and SMTP support, removing the necessity for external applications.\n\nThis article covers using both native IMAP sending and retrieval, and a setup depending on OfflineIMAP or getmail (POP3) to retrieve mail, procmail to filter it in the case of POP3, and msmtp to send it.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mutt package. A popular fork with more features is neomutt.\n\nOptionally install external helper applications for an IMAP setup, such as isync or OfflineIMAP.\n\nOr (if using POP3) getmailAUR, mpop, fetchmail or fdm and procmailAUR.\n\n- If you just need the methods LOGIN and PLAIN, these are satisfied with the dependency libsasl\n- If you want to (or have to) use CRAM-MD5, GSSAPI or DIGEST-MD5, install the package cyrus-sasl-gssapi\n- If you are using Gmail as your SMTP server, you may need to install the package cyrus-sasl\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "This section covers #IMAP, #POP3, #Maildir and #SMTP configuration.\n\nMutt will, by default, search six locations for its configuration file; ~/.muttrc, ~/.mutt/muttrc, and $XDG_CONFIG_HOME/mutt/muttrc, first with -MUTT_VERSION appended, then without. Any of these locations will work. In case you decide to put the initialization file somewhere else, use $ mutt -F /path/to/.muttrc. You should also know some prerequisite for Mutt configuration. Its syntax is very close to the Bourne Shell. For example, you can get the content of another configuration file:\n\n```\nsource /path/to/other/config/file\n```\n\nYou can use variables and assign the result of shell commands to them.\n\n```\nset editor=`echo \\$EDITOR`\n```\n\nHere the $ gets escaped so that it does not get substituted by Mutt before being passed to the shell. Also note the use of the backquotes, as bash syntax $(...) does not work. Mutt has a lot of predefined variables, but you can also set your own. User variables must begin with \"my\"!\n\n```\nset my_name = \"John Doe\"\n```\n\n"
+    },
+    {
+      "title": "Native IMAP support",
+      "level": 4,
+      "content": "The mutt package is compiled with IMAP support. At the very least you need to have four lines in your muttrc file to be able to access your mail.\n\n```\nset imap_user=USERNAME\n```\n\n```\nset imap_user=your.username@gmail.com\n```\n\nIf unset, the password will be prompted for.\n\n```\nset imap_pass=SECRET\n```\n\nInstead of a local directory which contains all your mail (and directories), use your server (and the highest folder in the hierarchy, if needed).\n\n```\nset folder=imap[s]://imap.server.domain[:port]/[folder/]\n```\n\nYou do not have to use a folder, but it might be convenient if you have all your other folders inside your INBOX, for example. Whatever you set here as your folder can be accessed later in Mutt with just an equal sign (=) or a plus sign (+). Example:\n\n```\nset folder=imaps://imap.gmail.com/\n```\n\nIt should be noted that for several accounts, it is best practice to use different folders -- e.g. for account-hook. If you have several Gmail accounts, use\n\n```\nset folder=imaps://username@imap.gmail.com/\n```\n\ninstead, where your account is username@gmail.com. This way it will be possible to distinguish the different folders. Otherwise it would lead to authentication errors.\n\nThe spoolfile is the folder where your (unfiltered) e-mail arrives. Most e-mail services conventionally name it INBOX. You can now use '=' or '+' as a substitution for the full folder path that was configured above. For example:\n\n```\nset spoolfile=+INBOX\n```\n\nAny IMAP folders that should be checked regularly for new mail should be listed here:\n\n```\nmailboxes =INBOX =family\nmailboxes imaps://imap.gmail.com/INBOX imaps://imap.gmail.com/family\n```\n\nAlternatively, check for all subscribed IMAP folders (as if all were added with a mailboxes line):\n\n```\nset imap_check_subscribed\n```\n\nThese two versions are equivalent if you want to subscribe to all folders. So the second method is much more convenient, but the first one gives you more flexibility. Also, newer Mutt versions are configured by default to include a macro bound to the 'y' key which will allow you to change to any of the folders listed under mailboxes.\n\nIf you do not set this variable, the spoolfile will be used by default. This variable is also important for the #Sidebar.\n\nUsing these options, you will be able to start Mutt, enter your IMAP password, and start reading your mail. Here is a muttrc snippet (for Gmail) with some other lines you might consider adding for better IMAP support.\n\n```\nset folder      = imaps://imap.gmail.com/\nset imap_user   = your.username@gmail.com\nset imap_pass   = your-imap-password\nset spoolfile   = +INBOX\nmailboxes       = +INBOX\n\n# Store message headers locally to speed things up.\n# If hcache is a folder, Mutt will create sub cache folders for each account which may speeds things up even more.\nset header_cache = ~/.cache/mutt\n\n# Store messages locally to speed things up, like searching message bodies.\n# Can be the same folder as header_cache.\n# This will cost important disk usage according to your e-mail amount.\nset message_cachedir = \"~/.cache/mutt\"\n\n# Specify where to save and/or look for postponed messages.\nset postponed = +[Gmail]/Drafts\n\n# Allow Mutt to open a new IMAP connection automatically.\nunset imap_passive\n\n# Keep the IMAP connection alive by polling intermittently (time in seconds).\nset imap_keepalive = 300\n\n# How often to check for new mail (time in seconds).\nset mail_check = 120\n```\n\n"
+    },
+    {
+      "title": "External IMAP support",
+      "level": 4,
+      "content": "While IMAP support is built into Mutt, it does not download mail for offline use. It is possible to use an external application such as OfflineIMAP or isync to download your emails to a local folder which can then be processed by Mutt.\n\nConsider using applications such as spamassassin or imapfilterAUR to sort mail.\n\n"
+    },
+    {
+      "title": "POP3",
+      "level": 3,
+      "content": "The mutt package is compiled with POP3 support, which is configured via the pop_* variables as described in muttrc(5).\n\nAlternatively, it is possible to use external programs to fetch mail using POP3. One popular option is to use getmail for retrieving and procmail for filtering the mail.\n\n"
+    },
+    {
+      "title": "Maildir",
+      "level": 3,
+      "content": "Maildir is a generic and standardized format. Almost every MUA is able to handle Maildirs and Mutt's support is excellent. There are just a few simple things that you need to do to get Mutt to use them. Open your muttrc and add the following lines:\n\n```\nset mbox_type=Maildir\nset folder=~/mail\nset spoolfile=+/\nset header_cache=~/.cache/mutt\n```\n\nThis is a minimal Configuration that enables you to access your Maildir and checks for new local Mails in INBOX. This configuration also caches the headers of the eMails to speed up directory-listings. It might not be enabled in your build (but it sure is in the Arch-Package). Note that this does not affect OfflineIMAP in any way. It always syncs all of the directories on a Server. spoolfile tells Mutt which local directories to poll for new Mail. You might want to add more Spoolfiles (for example the Directories of Mailing-Lists) and maybe other things. But this is subject to the Mutt manual and beyond the scope of this document.\n\n"
+    },
+    {
+      "title": "SMTP",
+      "level": 3,
+      "content": "Whether you use POP or IMAP to receive mail you will probably still send mail using SMTP.\n\n"
+    },
+    {
+      "title": "Folders",
+      "level": 4,
+      "content": "There is basically only one important folder here: the one where all your sent e-mails will be saved.\n\n```\nset record = +Sent\n```\n\nGmail automatically saves sent e-mail to +[Gmail]/Sent, so we do not want duplicates.\n\n```\nunset record\n```\n\n"
+    },
+    {
+      "title": "Native SMTP support",
+      "level": 4,
+      "content": "The mutt package is compiled with SMTP support.\n\nHere are the common SMTP settings:\n\n```\nset realname = 'Your Real Name'\nset from = your-email-address\n\nset smtp_pass = $imap_pass\nset ssl_force_tls = yes\n```\n\nIf your SMTP server is STARTTLS-based, add the following:\n\n```\nset smtp_url=smtp://$imap_user@smtp.domain.tld:587\nset ssl_starttls = yes\n```\n\nIf your SMTP server is SMTPS-based, add the following instead:\n\n```\nset smtp_url=smtps://$my_user@smtp.domain.tld\n```\n\nIf your SMTP credentials are not the same as your IMAP credentials, then you must use the correct credentials instead of $imap_user and $imap_pass.\n\nIf you get an error like SSL routines:SSL23_GET_SERVER_HELLO:unknown protocol, then your server probably uses STARTTLS instead of SMTPS.\n\nIf your server uses the LOGIN authentication method you might need to specify this explicitly, despite the manual's claim that all methods are tried by default:\n\n```\nset smtp_authenticators = \"login\"\n```\n\nSee muttrc(5) for more information.\n\n"
+    },
+    {
+      "title": "External SMTP support",
+      "level": 4,
+      "content": "An external SMTP agent such as msmtp, sSMTP or opensmtpd can also be used.\n\nThe sendmail variable in your muttrc determines the program and arguments used to deliver mail in mutt. Any additional arguments must be interpreted by the program as recipient addresses.\n\nFor example, if using msmtp:\n\n```\nmuttrc\n```\n\n```\nset realname='Disgruntled Kangaroo'\n\nset sendmail=\"/usr/bin/msmtp\"\n\nset edit_headers=yes\nset folder=~/mail\nset mbox=+mbox\nset spoolfile=+inbox\nset record=+sent\nset postponed=+drafts\nset mbox_type=Maildir\n\nmailboxes +inbox +lovey-dovey +happy-kangaroos\n```\n\n"
+    },
+    {
+      "title": "Sending mails from Mutt",
+      "level": 4,
+      "content": "Now, startup mutt:\n\nYou should see all the mail in ~/mail/inbox. Press m to compose mail; it will use the editor defined by your EDITOR environment variable. If this variable is not set, you can fix it before starting Mutt:\n\n```\n$ export EDITOR=your-favorite-editor\n$ mutt\n```\n\nYou should store the EDITOR value into your shell resource configuration file (such as bashrc). You can also set the editor from Mutt's configuration file:\n\n```\n.muttrc\n```\n\n```\nset editor=your-favorite-editor\n```\n\nFor testing purposes, address the letter to yourself. After you have written the letter, save and exit the editor. You will return to Mutt, which will now show information about your e-mail. Press y to send it.\n\n"
+    },
+    {
+      "title": "Multiple accounts",
+      "level": 3,
+      "content": "Now you should have a working configuration for one account at least. You might wonder how to use several accounts, since we put everything into a single file.\n\nWell all you need is to write account-specific parameters to their respective files and source them. All the IMAP/POP3/SMTP configuration for each account should go to its respective folder.\n\nNote: **must unset** \n\nMutt can handle this thanks to one of its most powerful features: hooks. Basically a hook is a command that gets executed before a specific action. There are several hooks available. For multiple accounts, you must use account-hooks and folder-hooks.\n\n- Folder-hooks will run a command before switching folders. This is mostly useful to set the appropriate SMTP parameters when you are in a specific folder. For instance when you are in your work mailbox and you send a e-mail, it will automatically use your work account as sender.\n- Account-hooks will run a command every time Mutt calls a function related to an account, like IMAP syncing. It does not require you to switch to any folder.\n\nHooks take two parameters:\n\n```\naccount-hook [!]regex command\nfolder-hook [!]regex command\n```\n\nThe regex is the folder to be matched (or not if preceded by the !). The command tells what to do.\n\nLet us give a full example:\n\n```\n.muttrc\n```\n\n```\n## General options\nset header_cache = \"~/.cache/mutt\"\nset imap_check_subscribed\nset imap_keepalive = 300\nunset imap_passive\nset mail_check = 60\nset mbox_type=Maildir\n\n## ACCOUNT1\nsource \"~/.mutt/work\"\n# Here we use the $folder variable that has just been set in the sourced file.\n# We must set it right now otherwise the 'folder' variable will change in the next sourced file.\nfolder-hook $folder 'source ~/.mutt/work'\n\n## ACCOUNT2\nsource \"~/.mutt/personal\"\nfolder-hook *user@gmail.com/ 'source ~/.mutt/personal'\nfolder-hook *user@gmail.com/Family 'set realname=\"Bob\"'\n```\n\n```\n.mutt/work\n```\n\n```\n## Receive options.\nset imap_user=user@gmail.com\nset imap_pass=****\nset folder = imaps://user@imap.gmail.com/\nset spoolfile = +INBOX\nset postponed = +Drafts\nset record = +Sent\n\n## Send options.\nset smtp_url=smtps://user:****@smtp.gmail.com\nset realname='User X'\nset from=user@gmail.com\nset hostname=\"gmail.com\"\nset signature=\"John Doe\"\n# Connection options\nset ssl_force_tls = yes\nunset ssl_starttls\n\n## Hook -- IMPORTANT!\naccount-hook $folder \"set imap_user=user@gmail.com imap_pass=****\"\n```\n\nFinally .mutt/personal should be similar to .mutt/work.\n\nNow all your accounts are set, start Mutt. To switch from one account to another, just change the folder (c key). Alternatively you can use the sidebar.\n\nTo change folder for different mailboxes you have to type the complete address -- for IMAP/POP3 folders, this may be quite inconvenient -- let us bind some key to it.\n\n```\n## Shortcuts\nmacro index,pager <f2> '<sync-mailbox><enter-command>source ~/.mutt/personal<enter><change-folder>!<enter>'\nmacro index,pager <f3> '<sync-mailbox><enter-command>source ~/.mutt/work<enter><change-folder>!<enter>'\n```\n\nWith the above shortcuts (or with the sidebar) you will find that changing folders (with c by default) is not contextual, i.e. it will not list the folders of the current mailbox, but of the one used the last time you changed folders. To make the behaviour more contextual, the trick is to press = or + for current mailbox. You can automate this with the following macro:\n\n```\nmacro index 'c' '<change-folder>?<change-dir><home>^K=<enter>'\n```\n\n"
+    },
+    {
+      "title": "Alternative way",
+      "level": 4,
+      "content": "Another method to use mutt with multiple accounts is to run multiple mutt instances. You can have common settings in .muttrc and account specific settings in their respective files. Now you can source .muttrc from account specific config file. Advantage of this method is folder switching is not required to access different accounts, which improves workflow and saves time. For example,\n\n```\n.muttrc\n```\n\n```\n## General options\nset header_cache = \"~/.cache/mutt\"\nset imap_check_subscribed\nset imap_keepalive = 300\nunset imap_passive\nset mail_check = 60\nset mbox_type=Maildir\n```\n\n```\n.mutt/work\n```\n\n```\nsource .muttrc\n\n## Receive options.\nset imap_user=user@gmail.com\nset imap_pass=****\nset folder = imaps://user@imap.gmail.com/\nset spoolfile = +INBOX\nset postponed = +Drafts\nset record = +Sent\n\n## Send options.\nset smtp_url=smtps://user:****@smtp.gmail.com\nset realname='User X'\nset from=user@gmail.com\nset hostname=\"gmail.com\"\nset signature=\"John Doe\"\n# Connection options\nset ssl_force_tls = yes\nunset ssl_starttls\n```\n\nFinally .mutt/personal should be similar to .mutt/work. Now you can run mutt with\n\n```\nmutt -F .mutt/work\nmutt -F .mutt/personal\n```\n\nor create alias mutt_work in your .bashrc\n\n```\nalias mutt_work=\"mutt -F .mutt/work\"\nalias mutt_personal=\"mutt -F .mutt/personal\"\n```\n\nor write a script to start all mutt instances in one go,\n\n```\n#!/bin/sh\nlxterminal -e mutt -F .mutt/work\nlxterminal -e mutt -F .mutt/personal\n```\n\n"
+    },
+    {
+      "title": "Passwords management",
+      "level": 3,
+      "content": "Keep in mind that writing your password in .muttrc is a security risk. One solution is to always enter the password manually, but this becomes cumbersome.\n\n"
+    },
+    {
+      "title": "GPG",
+      "level": 4,
+      "content": "An alternative solution is to encrypt your password with GnuPG in an encrypted file. Setup your own keypair if you have not done so already. Create a file in a tmpfs with the following contents:\n\n```\nset my_pass = \"password\"\n```\n\nNote: **must** \n\nThen encrypt this file, setting yourself as the recipient and move it into an accessible location. In this example the encrypted file resides at $HOME/.my-pwds.gpg.\n\nIn your mutt configuration file add the following before any account:\n\n```\nsource \"gpg -dq $HOME/.my-pwds.gpg |\"\n```\n\nThis decrypts the file quietly and sets the variable my_pass in this example. This can be used in any variable after it has been sourced. For example:\n\n```\nset imap_pass=$my_pass\n```\n\nIf you use external tools like OfflineIMAP and msmtp, you need to set up an agent (e.g. gpg-agent, see GnuPG#gpg-agent) to keep the passphrase into cache and thus avoiding those tools always prompting for it.\n\n"
+    },
+    {
+      "title": "Pass",
+      "level": 4,
+      "content": "You can also use pass to encrypt your passwords easily. Just add the passwords to the given passwords as follows:\n\n```\npass add user@domain.tld\n```\n\nAfter that, just add the command pass show user@domain.tld in your muttrc, for instance:\n\n```\nset imap_pass=\"`pass show user@domain.tld`\"\n```\n\nNote the use of both backquotes and regular quotes to prevent the output of the backquotes from being parsed[1].\n\n"
+    },
+    {
+      "title": "Security concern",
+      "level": 4,
+      "content": "If enter-command is available from the UI, it is possible to see the password unencrypted, which may be undesired if anybody else than you has access to your session while Mutt is running. You may want to disable it for this reason. As a consequence, every command that the user intends to use must be bound to a key in advance, otherwise it will never be accessible.\n\n```\n.muttrc\n```\n\n```\nbind generic,alias,attach,browser,editor,index,compose,pager,pgp,postpone ':' noop\n```\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "Guides to get you started with using and customizing Mutt:\n\n- My first Mutt (maintained by Bruno Postle)\n- The Woodnotes Guide to the Mutt Email Client (maintained by Randall Wood)\n- The Homely Mutt (by Steve Losh)\n- Everything You Need To Know To Start Using GnuPG with Mutt (by Justin R. Miller)\n- A List of useful programs that often are used in combination with Neomutt\n\nIf you have any Mutt specific questions, feel free to ask in the Arch IRC channels.\n\n"
+    },
+    {
+      "title": "Key bindings",
+      "level": 3,
+      "content": "The default key bindings are quite far from the more common Emacs-like or Vi-like bindings. You can customize them to your preference. Mutt has a different set of bindings for the pager, the index, the attachment view, etc. Thus you need to specify which map you want to modify when you bind a key. You can review the list of commands and key bindings from Mutt's help page (default key: ?). Example of Vi-like bindings:\n\n```\nmuttrc\n```\n\n```\n## h to exit in every menu, l to go deeper, j and k for up and down, g and G for top and bottom\nbind pager,browser\t\t\th\t\t\texit\nbind attach,alias\t\t\th\t\t\texit\nbind pager\t\t\t\tl\t\t\tview-attachments\nbind pager \t\t\t\tk \t\t\tprevious-line\nbind pager \t\t\t\tj \t\t\tnext-line\nbind pager\t\t\t\tg\t\t\ttop\nbind pager\t\t\t\tG\t\t\tbottom\nbind index\t\t\t\tj\t\t\tnext-entry\nbind index\t\t\t\tk\t\t\tprevious-entry\nbind attach,index \t\t\tg \t\t\tfirst-entry\nbind attach,index \t\t\tG \t\t\tlast-entry\nbind index\t\t\t\tl\t\t\tdisplay-message\nbind attach\t\t\t\tl\t\t\tview-attach\nbind browser,alias\t\t\tl\t\t\tselect-entry\nbind index\t\t\t\t/\t\t\tsearch\n## default binding for limit is l\nbind index\t\t\t\t?\t\t\tlimit\n## default binding for help is ?\nbind index,pager,attach\t\t\t<F1>\t\t\thelp\n## default binding for header view (toggle-weed) is h\nbind pager\t\t\t\tH\t\t\tdisplay-toggle-weed\nbind attach,index,pager \t\t\\CD \t\t\tnext-page\nbind attach,index,pager \t\t\\CU \t\t\tprevious-page\n```\n\n"
+    },
+    {
+      "title": "Encrypt and sign mail (GnuPG)",
+      "level": 4,
+      "content": "To start encrypting mail in mutt using GnuPG copy /usr/share/doc/mutt/samples/gpg.rc to your mutt configuration folder (e.g. to ~/.mutt/gpg.rc). Then append the following to your mutt configuration file (e.g. ~/.mutt/muttrc):\n\n```\nsource ~/.mutt/gpg.rc\n```\n\nMost encryption options are then available by pressing p in the compose view.\n\nSee the pgp_* and crypt_* options in muttrc(5).\n\n"
+    },
+    {
+      "title": "E-mail character encoding",
+      "level": 4,
+      "content": "When using Mutt there are two levels where the character sets that must be specified:\n\n- The text editor used to write the e-mail must save it in the desired encoding.\n- Mutt will then check the e-mail and determine which encoding is the more appropriate according to the priority you specified in the send_charset variable. Default: \"us-ascii:iso-8859-1:utf-8\".\n\nSo if you write an e-mail with characters allowed in ISO-8859-1 (like 'résumé'), but without characters specific to Unicode, then Mutt will set the encoding to ISO-8859-1.\n\nTo avoid this behaviour, set the variable in your muttrc:\n\n```\nset send_charset=\"us-ascii:utf-8\"\n```\n\nor even\n\n```\nset send_charset=\"utf-8\"\n```\n\nThe first compatible charset starting from the left will be used. Since UTF-8 is a superset of US-ASCII it does not harm to leave it in front of UTF-8, it may ensure old MUA will not get confused when seeing the charset in the e-mail header.\n\n"
+    },
+    {
+      "title": "Custom mail headers",
+      "level": 4,
+      "content": "One of the greatest thing in Mutt is that you can have full control over your mail header.\n\nFirst, make your headers editable when you write e-mails:\n\n```\nset edit_headers=yes\n```\n\nMutt also features a special function my_hdr for customizing your header. Yes, it is named just like a variable, but in fact it is a function.\n\nYou can clear it completely, which you should do when switching accounts with different headers, otherwise they will overlap:\n\n```\nunmy_hdr *\n```\n\nOther variables have also an impact on the headers, so it is wise to clear them before using my_hdr:\n\n```\nunset use_from\nunset use_domain\nunset user_agent\n```\n\nNow, you can add any field you want -- even non-standard one -- to your header using the following syntax:\n\n```\nmy_hdr <FIELD>: <VALUE>\n```\n\nNote that <VALUE> can be the result of a command.\n\nExample:\n\n```\n## Extra info.\nmy_hdr X-Info: Keep It Simple, Stupid.\n\n## OS Info.\nmy_hdr X-Operating-System: `uname -s`, kernel `uname -r`\n\n## This header only appears to MS Outlook users\nmy_hdr X-Message-Flag: WARNING!! Outlook sucks\n\n## Custom Mail-User-Agent ID.\nmy_hdr User-Agent: Every email client sucks, this one just sucks less.\n\n## Receive copy of sent mail in your inbox\nmy_hdr Cc: $imap_user\n```\n\n"
+    },
+    {
+      "title": "Signature block",
+      "level": 4,
+      "content": "Create a .signature in your home directory. Your signature will be appended at the end of your email. Alternatively you can specify a file in your Mutt configuration:\n\n```\nset signature=\"path/to/sig/file\"\n```\n\nYou can use fortune (package fortune-mod) to add a random signature to Mutt.\n\nCreate a fortune file and then add the following line to your .muttrc:\n\n```\nset signature=\"fortune pathtofortunefile|\"\n```\n\nNote the pipe at the end. It tells Mutt that the specified string is not a file, but a command.\n\n"
+    },
+    {
+      "title": "Compose and send from command line",
+      "level": 4,
+      "content": "Man pages will show all available commands and how to use them, but here are a couple of examples. You could use Mutt to send alerts, logs or some other system information, triggered by login through .bash_profile, or as a regular cron job.\n\nSend a message:\n\n```\nmutt -s \"Subject\" somejoeorjane@someserver.com < /var/log/somelog\n```\n\nSend a message with attachment:\n\n```\nmutt -s \"Subject\" somejoeorjane@someserver.com -a somefile < /tmp/sometext.txt\n```\n\n"
+    },
+    {
+      "title": "Compose HTML e-mails",
+      "level": 4,
+      "content": "Since Mutt has nothing of a WYSIWIG client, HTML is quite straightforward, and you can do much more than with all WYSIWIG mail clients around since you edit the source code directly. Simply write your mail using HTML syntax. For example:\n\n```\nThis is normal text<br>\n<b>This is bold text</b>\n```\n\nNow before sending the mail, use the edit-type command (default shortcut Ctrl+t), and replace text/plain by text/html.\n\n"
+    },
+    {
+      "title": "Display another email while composing",
+      "level": 4,
+      "content": "A common complaint with Mutt is that when composing a new mail (or reply), you cannot open another mail (i.e. for checking with another correspondent) without closing the current mail (postponing). The following describes a solution:\n\nFirst, fire up Mutt as usual. Then, launch another terminal window. Now start a new Mutt with\n\n```\nmutt -R\n```\n\nThis starts Mutt in read-only mode, and you can browse other emails at your convenience. It is strongly recommended to always launch a second Mutt in read-only mode, as conflicts will easily arise otherwise.\n\n```\n$TERMINAL -e mutt -R\n```\n\n"
+    },
+    {
+      "title": "Printing",
+      "level": 3,
+      "content": "You can install muttprintAUR for fancier printing quality. In your muttrc file, insert:\n\n```\nset print_command=\"/usr/bin/muttprint %s -p {PrinterName}\"\n```\n\n"
+    },
+    {
+      "title": "Viewing URLs in a web browser",
+      "level": 4,
+      "content": "This can be done using urlscan, urlviewAUR or extract_urlAUR. To use urlscan, install urlscan and insert below in the mutt config file.\n\n```\nmacro index,pager \\cb \"<pipe-message> urlscan<Enter>\" \"call urlscan to extract URLs out of a message\"\n macro attach,compose \\cb \"<pipe-entry> urlscan<Enter>\" \"call urlscan to extract URLs out of a message\"\n```\n\nHitting ctrl+b will list all the urls from the email. The BROWSER environment variable can be used to select default web browser.\n\nDefault keybindings can be listed with F1 key. There is no need to create config file for urlscan unless additional keybindings or color-schemes are required. If desired default config file at ˜/.config/urlscan/config.json can be created using below command.\n\n```\nurlscan -g\n```\n\nTo use urlview inplace of urlscan, install the urlviewAUR package and add the following lines in mutt config file.\n\n```\nmacro index,pager \\cb \"<pipe-message> urlview<Enter>\" \"call urlview to extract URLs out of a message\"\n macro attach,compose \\cb \"<pipe-entry> urlview<Enter>\" \"call urlview to extract URLs out of a message\"\n```\n\nCreate a .urlview in $HOME and insert the following:\n\n```\nREGEXP (((http|https|ftp|gopher)|mailto)[.:][^ >\"\\t]*|www\\.[-a-z0-9.]+)[^ .,;\\t>\">\\):]\nCOMMAND <your-browser> %s\n```\n\nHitting ctrl+b while using mutt will list all the urls from the email. Navigate up or down with arrow keys and hit enter on the desired url. Your browser will start and go to the selected site.\n\nSome browser will require additional arguments to work properly. For example, Luakit will close on Mutt exit. You need to fork it to background, using the -n parameter:\n\n```\nCOMMAND luakit -n %s 2>/dev/null\n```\n\nThe 2>/dev/null is to make it quiet, i.e. to prevent useless message printing where you do not want them to.\n\n"
+    },
+    {
+      "title": "Viewing HTML",
+      "level": 4,
+      "content": "It is possible to pass the HTML body to an external HTML program and then dump it, keeping email viewing uniform and unobtrusive. Three programs are described here: lynx, w3m and elinks (make sure the selected package is installed).\n\nIf ~/.mutt/mailcap does not exist you will need to create it and save the following to it.\n\n```\ntext/html; lynx -assume_charset=%{charset} -display_charset=utf-8 -collapse_br_tags -dump %s; nametemplate=%s.html; copiousoutput\n```\n\nor, in case of w3m,\n\n```\ntext/html; w3m -I %{charset} -T text/html; copiousoutput;\n```\n\nor, in case of elinks,\n\n```\ntext/html; elinks -dump; copiousoutput;\n```\n\nor, in case of elinks (with color support),\n\n```\ntext/html; elinks -dump -dump-color-mode 1; copiousoutput;\n```\n\nEdit ~/.muttrc and add the following,\n\n```\nset mailcap_path   = ~/.mutt/mailcap\n```\n\nTo automatically open HTML messages in lynx, w3m or elinks add this additional line to the muttrc:\n\n```\nauto_view text/html\n```\n\nThe beauty of this is, instead of seeing an HTML body as source or being opened by a separate program, in this case lynx, you see the formatted content directly, and any URL links within the email can be displayed with Ctrl+b, assuming you have urlscan installed and configured as above.\n\nIf you receive many emails with multiple or alternate encodings, Mutt may default to treating every email as HTML. To avoid this, add the following variable to your ~/.muttrc to have Mutt default to text when available and use w3m/lynx only when no text version is available in the email:\n\n```\nalternative_order text/plain text/html\n```\n\nSome HTML mails may not display correctly in a text-based web browser. As a fallback solution, you can bind a key to open a graphical browser in such cases. The following macro will open the HTML mail selected from the attachment view in the web browser defined in the environment. (Feel free to adapt the ~/.cache/mutt/ folder).\n\n```\nmacro attach 'V' \"<pipe-entry>iconv -c --to-code=UTF8 > ~/.cache/mutt/mail.html<enter><shell-escape>$BROWSER ~/.cache/mutt/mail.html<enter>\"\n```\n\nIf $BROWSER is firefox, then set intl.charset.fallback.utf8_for_file to true in about:config as described in [2] to ensure non-ASCII characters in the HTML page are displayed correctly.\n\nTo convert HTML emails to sanitised markdown and view the resulting output using mutt's internal pager, install python-html2text and use the following mailcap entry:\n\n```\ntext/html; html2text --images-to-alt --ignore-tables --decode-errors=ignore %s; copiousoutput\n```\n\n"
+    },
+    {
+      "title": "Viewing pdf files",
+      "level": 4,
+      "content": "You also can view attached pdf files with similar configuration to the mailcap HTML view.\n\nFor example, to open with zathura, add the following line to the mailcap file:\n\n```\napplication/pdf; zathura %s;\n```\n\nThen in the attachment section type ENTER on the pdf file and a instance of zathura will open the file.\n\nThis could be done with other pdf viewers.\n\n"
+    },
+    {
+      "title": "Filtering the message view",
+      "level": 4,
+      "content": "You can restrict the view to e-mails matching a pattern and specific properties with the limit command (default shortcut: l).\n\nTo view all e-mails containing \"foo\" in the header, simply write \"foo\" and you are done. To remove the filter, use the \"all\" keyword.\n\nTo view all flagged messages, use\n\n```\n~F\n```\n\nTo view all unread messages that are either of size ≥1MB or from johndoe, use\n\n```\n~U (~z 1M- | ~f johndoe)\n```\n\nAll possible patterns are listed in the official manual.\n\n"
+    },
+    {
+      "title": "Conversation grouping",
+      "level": 4,
+      "content": "The default sort order is by date. Use the sort-mailbox command (default key: o) to change the sorting option. You can group e-mails by conversation/thread, in which case you can define how to sort threads and how to sort within a thread.\n\nIn the following example, threads are sorted according to the date of their last e-mail.\n\n```\nmuttrc\n```\n\n```\nset sort=threads\nset sort_aux=last-date-received\n```\n\n"
+    },
+    {
+      "title": "vim",
+      "level": 4,
+      "content": "- To limit the width of text to 72 characters, edit your .vimrc file and add:\n\n```\nau BufRead /tmp/mutt-* set tw=72\n```\n\n- Another choice is to use Vim's mail filetype plugin to enable other mail-centric options besides 72 character width. Edit ~/.vim/filetype.vim, creating it if unpresent, and add:\n\n```\naugroup filetypedetect\n  \" Mail\n  autocmd BufRead,BufNewFile *mutt-*              setfiletype mail\naugroup END\n```\n\n- To set a different tmp directory, e.g. ~/.tmp, add a line to your muttrc as follows:\n\n```\nset tmpdir=\"~/.tmp\"\n```\n\n- To reformat a modified text see the Vim context help\n\n```\n:h 10.7\n```\n\n"
+    },
+    {
+      "title": "GNU nano",
+      "level": 4,
+      "content": "nano is another nice console editor to use with Mutt.\n\nTo limit the width of text to 72 characters, edit your .nanorc file and add:\n\n```\nset fill 72\n set breaklonglines\n```\n\nIf you do not want to limit the width of text globally, you can pass the column number as an argument to the hard-wrap option in your muttrc file, e.g.:\n\n```\nset editor=\"nano -r 72 -b\"\n```\n\nAlso, in muttrc file, you can specify the line to start editing so that you will skip the mail header:\n\n```\nset editor=\"nano +7\"\n```\n\n"
+    },
+    {
+      "title": "Emacs",
+      "level": 4,
+      "content": "Emacs has a mail and a message major mode. To switch to mail-mode automatically when Emacs is called from Mutt, you can add the following to your .emacs:\n\n```\n.emacs\n```\n\n```\n;; Mutt support.\n(add-to-list 'auto-mode-alist '(\"/tmp/mutt.*\" . mail-mode))\n;; Neomutt support.\n(add-to-list 'auto-mode-alist '(\"/tmp/neomutt-\" . mail-mode))\n```\n\nIf you usually run Emacs daemon, you may want Mutt to connect to it. Add this to your .muttrc:\n\n```\n.muttrc\n```\n\n```\nset editor=\"emacsclient -a \\\"\\\" -t\"\n```\n\n"
+    },
+    {
+      "title": "Colors",
+      "level": 4,
+      "content": "Append the contents of /usr/share/doc/mutt/samples/colors.linux to your .muttrc file, or copy and source it. Then adjust to your liking.\n\nThe actual color each of these settings will produce depends on the colors set in your ~/.Xresources file.\n\nAlternatively, you can source any file you want containing colors (and thus act as a theme file). See [3] for a theme example.\n\n"
+    },
+    {
+      "title": "Index Format",
+      "level": 4,
+      "content": "Here follows a quick example to put in your .muttrc to customize the Index Format, i.e. the columns displayed in the folder view.\n\n```\nset date_format=\"%y-%m-%d %T\"\nset index_format=\"%2C | %Z [%d] %-30.30F (%-4.4c) %s\"\n```\n\nSee the Mutt Reference, strftime(3) and printf(3) for more details.\n\n"
+    },
+    {
+      "title": "Display recipient instead of sender in \"Sent\" folder view",
+      "level": 4,
+      "content": "By default Mutt uses the %L format string in the index_format variable, which will display:\n\n- \"To <list-name>\", if an address in the \"To:\" or \"Cc:\" header field matches an address defined by the user's subscribe command.\n- Otherwise it displays the author name, or recipient name if the message is from you.\n\nIf you use multiple email addresses in the same mailbox, make sure to configure the alternates variable, so that Mutt knows which messages were from you.\n\n```\nmuttrc\n```\n\n```\nalternates    ^me@example.COM$ ^me@example.NET$ ^example@archlinux.ORG$\n```\n\n"
+    },
+    {
+      "title": "Variable column width",
+      "level": 4,
+      "content": "If you resize the window, the subject might get truncated while there is still unused space left for some fields, like for the sender. You can get the maximum number of columns supported by your terminal (i.e. the width) using a shell call to tput cols. With this value, you can set a percentage of the width to fields like Sender and Subject.\n\nExample using the above folder-hook and a sidebar width of 24:\n\n```\nmuttrc\n```\n\n```\n## From field gets 30% of remaining space, Subject gets 70%.\n## Remaining space is the total width minus the other fields (35), minus the sidebar (24)\nset my_index_format_pre='set my_col_from = `echo $((30 * ($(tput cols)-35-24) / 100))`; set my_col_subject = `echo $((70 * ($(tput cols)-35-24) / 100))`; set index_format=\"%2C | %Z [%d] %-$my_col_from.${my_col_from}'\nset my_index_format_post=' (%-4.4c) %?M?<%M> ?%-$my_col_subject.${my_col_subject}s\"'\n\nfolder-hook .*[sS]ent.* \"$my_index_format_pre\"t\"$my_index_format_post\"\nfolder-hook ! .*[sS]ent.* \"$my_index_format_pre\"F\"$my_index_format_post\"\n```\n\nWe must set the variables my_col_from and my_col_from from within the hooks. Otherwise, the column values will not get re-computed.\n\nWe can add a binding to force re-computing the index format without changing folder:\n\n```\nmuttrc\n```\n\n```\nmacro index,pager \\CL \"<enter-command>$my_index_format_pre\"F\"$my_index_format_post<enter><redraw-screen>\"\n```\n\n"
+    },
+    {
+      "title": "Sidebar",
+      "level": 4,
+      "content": "Example settings for a sidebar are in /usr/share/doc/mutt/samples/sample.muttrc-sidebar, including keybindings. Copy, edit, and source that file in your mutt configuration file. Be sure to change set sidebar_visible = yes.\n\nAppend the following in order to toggle the sidebar visibility:\n\n```\nbind index,pager B sidebar-toggle-visible\n```\n\nNote that with the mailboxes option, folders appear in the order they were set to mailboxes if you do not use the sidebar_sort_method option.\n\n```\nmailboxes \"+-- My mailbox -----------\"\n```\n\n"
+    },
+    {
+      "title": "Display the index above the pager view",
+      "level": 4,
+      "content": "Set the following variable in your muttrc:\n\n```\nset pager_index_lines=10\n```\n\n"
+    },
+    {
+      "title": "Address aliases",
+      "level": 4,
+      "content": "Aliases is the way Mutt manages contacts. An alias is nickname [longname] <address>.\n\n- The nickname is what you will type in Mutt to get your contact address. One word only, and should be easy to remember.\n- The longname is optional. It may be several words.\n- An <address> must be in a valid form (i.e. with an @).\n\nIt is quite simple indeed. Add this to .muttrc:\n\n```\nset alias_file = \"~/.mutt/aliases\"\nset sort_alias = alias\nset reverse_alias = yes\nsource $alias_file\n```\n\nExplanation:\n\n- alias_file is the file where the information is getting stored when you add an alias from within Mutt.\n- sort_alias specifies which field to use to sort the alias list when displayed in Mutt. Possible values: alias, address.\n- reverse_alias if set to yes mutt will display the \"personal\" name from your aliases in the index menu if it finds an alias that matches the message's sender.\n- source $alias_file tells Mutt to read aliases on startup. Needed for auto-completion.\n\nNow all you have to do when prompted To: is writing the alias instead of the full address. The beauty of it is that you can auto-complete the alias using Tab. Autocompleting a wrong or an empty string will display the full list. You can select the alias as usual, or by typing its index number.\n\nThere are two ways to create aliases:\n\n- From Mutt, press a when an e-mail of the targetted person if selected.\n- Edit the alias_file manually. The syntax is really simple:\n\n```\nalias nickname Long Name <my-friend@domain.tld>\n```\n\n"
+    },
+    {
+      "title": "Abook",
+      "level": 4,
+      "content": "abookAUR is a stand-alone program dedicated to contact management. It uses a very simple text-based interface and contacts are stored in a plain text, human-readable database. Besides the desired contact properties are extensible (birthday, address, fax, and so on).\n\nAbook is specifically designed to be interfaced with Mutt, so that it can serve as a full, more featured replacement of Mutt internal aliases. If you want to use Abook instead of aliases, remove the aliases configuration in .muttrc and add this:\n\n```\nmuttrc\n```\n\n```\n## Abook\nset query_command= \"abook --mutt-query '%s'\"\nmacro index,pager  a \"<pipe-message>abook --add-email-quiet<return>\" \"Add this sender to Abook\"\nbind editor        <Tab> complete-query\n```\n\nSee abook(1) and abookrc(5) for more details and a full configuration sample.\n\n"
+    },
+    {
+      "title": "Goobook",
+      "level": 4,
+      "content": "Goobook allows you to search your Google contacts from the command line or from within Mutt and can be installed with the goobookAUR or goobook-gitAUR packages.\n\nBefore using goobook you must configure ~/.goobookrc. To generate the default template:\n\n```\n$ goobook config-template > ~/.goobookrc\n```\n\nSee ~/.goobookrc for configuration options. At a minimum, you will need to enter your email and password.\n\nIn order to authenticate with Google, you must generate a Client ID and Client secret. See [4] for details.\n\nIf you want to use Goobook instead of aliases, remove any alias configuration in .muttrc and add:\n\n```\nmuttrc\n```\n\n```\n## GooBook\nset query_command=\"goobook query '%s'\"\nmacro index,pager a \"<pipe-message>goobook add<return>\" \"add sender to google contacts\"\nbind editor <Tab> complete-query\n```\n\nWhen composing an email message within mutt, Tab will now search your Google contacts. While viewing messages a will add the sender to Google contacts.\n\n"
+    },
+    {
+      "title": "Khard",
+      "level": 4,
+      "content": "khard is a command-line addressbook that uses locally-stored carddav address book entries. You can use vdirsyncer to sync those with CardDAV servers.\n\nThe integration in mutt is similar to abook, see khard documentation.\n\n"
+    },
+    {
+      "title": "Manage multiple sender accounts",
+      "level": 3,
+      "content": "If you use multiple sender accounts, you can automatically associate a specific sender account with a recipient. mutt-vidAUR scans sent emails for the most recent \"From\" details associated with specific recipients, saving these in a file for mutt to source. The next time you email this recipient, mutt will automatically invoke a send-hook with the same email address and real name that you used previously. See mutt-vid's homepage for more details.\n\n"
+    },
+    {
+      "title": "Request IMAP mail retrieval manually",
+      "level": 3,
+      "content": "If you do not want to wait for the next automatic IMAP fetching (or if you did not enable it), you might want to fetch mails manually. There is a mutt command imap-fetch-mail for that. Alternatively, you could bind it to a key:\n\n```\nbind index \"^\" imap-fetch-mail\n```\n\n"
+    },
+    {
+      "title": "Avoiding slow index on large (IMAP) folders due to coloring",
+      "level": 3,
+      "content": "Index highlighting by regex is nice, but can lead to slow folder viewing if your regex checks the body of the message.\n\nUse folder-hook for only highlighting in, for example, the inbox (if you manage to empty your mailbox efficiently):\n\n```\nfolder-hook . 'uncolor index \"~b \\\"Hi Joe\\\" ~R !~T !~F !~p !~P\"'\nfolder-hook \"\"!\"\" 'color index brightyellow black \"~b \\\"Hi Joe\\\" ~N !~T !~F !~p !~P\"'\n```\n\n"
+    },
+    {
+      "title": "Speed up folders switch",
+      "level": 3,
+      "content": "Add this to your .muttrc:\n\n```\nset sleep_time = 0\n```\n\n"
+    },
+    {
+      "title": "Archive treated e-mails",
+      "level": 3,
+      "content": "When you read an e-mail, you have four choices: Answer it, Flag it, Archive it or Delete it. If you have this in mind, you can keep your inbox slim and fit with this macro (set up for Gmail):\n\n```\nmacro index \\' \"<tag-pattern>~R !~D !~F<enter>\\\n<tag-prefix><save-message>+[Gmail]/All <enter>\" \\\n\"Archive\"\n```\n\n"
+    },
+    {
+      "title": "Migrating mails from one computer to another",
+      "level": 3,
+      "content": "In case you are transfering your mails to a new machine (copy&paste), you probably need to delete the header cache (a file or folder like ~/.cache/mutt if you followed the above configuration) to make Mutt able to read your migrated E-Mails. Otherwise Mutt may freeze.\n\nNote that if you had a folder created for you header cache, all mailboxes will have their own cache file, so you can delete caches individually without having to remove everything.\n\n"
+    },
+    {
+      "title": "Default folder for saving attachments",
+      "level": 3,
+      "content": "By default Mutt will save attachments to the folder it was started from. If you want to always set the default destination to ~/attachments, you can create the following alias, which launches Mutt in this folder:\n\n```\nalias mutt='cd ~/attachments && mutt'\n```\n\nIf you are using bash, you can use pushd and popd to restore the directory state after mutt exits.\n\n```\nalias mutt='pushd ~/attachments; mutt; popd'\n```\n\n"
+    },
+    {
+      "title": "Pager behavior",
+      "level": 3,
+      "content": "Show context lines when going to next page:\n\n```\nset pager_context=3\n```\n\nStop at the end instead of displaying next mail:\n\n```\nset pager_stop=yes\n```\n\n"
+    },
+    {
+      "title": "Fast reply",
+      "level": 3,
+      "content": "By default Mutt will ask to confirm the recipient and the subject when you reply to an e-mail. It will also ask if you want to include the original mail in your answer. If you assume you will always stick to the default values, you can set up Mutt to skip these questions:\n\n```\nmuttrc\n```\n\n```\nset fast_reply=yes\nset include=yes\n```\n\nYou can still edit the recipient and the subject before sending.\n\n"
+    },
+    {
+      "title": "Ignore own e-mail addresses from group-reply",
+      "level": 3,
+      "content": "Mutt will include your e-mail address(es) in the recipient list when you group-reply to a mail you were CC'ed. You can ask Mutt to ignore some addresses with:\n\n```\nalternates mail1@server1|mail2@server2|...\n```\n\n"
+    },
+    {
+      "title": "IMAP message cache",
+      "level": 3,
+      "content": "When using the built-in IMAP support, e-mails are fetched in memory by default. Retrieving a big e-mail several times will download it from your IMAP server that many times.\n\nAlternatively, you can ask Mutt to store all fetched messages on disk:\n\n```\nmuttrc\n```\n\n```\nset message_cachedir=~/.cache/mutt/messages\n```\n\n(The folder must exist.) This will make any future retrieval instantaneous, even with big attachments.\n\nIf you want to purge the cache from its oldest e-mails exceeding a limit of, say, 50MB, you can use a script like the following:\n\n```\n~/.mutt/purgecache.sh\n```\n\n```\n#!/bin/sh\n\n## In KB.\nCACHE_LIMIT=51200\n\ncd \"$1\" 2>/dev/null\n[ $? -ne 0 ] && exit\n\n[ $(du -s . | cut -f1 -d'\t') -lt $CACHE_LIMIT ] && exit\nwhile IFS= read -r i; do\n\trm \"$i\"\n\t[ $(du -s . | cut -f1 -d'\t') -lt $CACHE_LIMIT ] && exit\ndone <<EOF\n$(find . -type f -exec ls -rt1 {} +)\nEOF\n```\n\nand call it on startup:\n\n```\nmuttrc\n```\n\n```\nset message_cachedir=~/.cache/mutt/messages\nsource \"~/.mutt/purgecache.sh '$message_cachedir'|\"\n```\n\n"
+    },
+    {
+      "title": "Open attachments or view HTML email in the background",
+      "level": 3,
+      "content": "By default, opening the attachments in the mutt will block mutt. You can edit ~/.mutt/mailcap to append an & so mutt will launch one of the Default applications in the backgroud. Take xdg-open as an example,\n\n```\ntext/html; xdg-open %s &> /dev/null &; nametemplate=%s.html\napplication/*; xdg-open %s &> /dev/null &; \nimage/*; xdg-open %s &> /dev/null &;\n```\n\n&> /dev/null is used to prevent any error or message from cluttering the mutt terminal window. And nametemplate=%s.html is used because chromium refuse to render local files without .html extension as HTML.\n\n"
+    },
+    {
+      "title": "Backspace does not work in Mutt",
+      "level": 3,
+      "content": "This is a common problem with some xterm-like terminals. Two solutions:\n\n- Either rebind the key in .muttrc\n\n```\nbind index,pager ^? previous-line\n```\n\nNote that ^? is one single character representing backspace in caret notation. To type in Emacs, use Ctrl+q Backspace, in Vim Ctrl+v Backspace.\n\n- Or fix your terminal:\n\n```\n$ infocmp > termbs.src\n```\n\nEdit termbs.src and change kbs=^H to kbs=\\177, then:\n\n```\n$ tic -x termbs.src\n```\n\n"
+    },
+    {
+      "title": "The change-folder function always prompt for the same mailbox",
+      "level": 3,
+      "content": "This is not a bug, this is actually an intended behaviour. See the multiple accounts section for a workaround.\n\n"
+    },
+    {
+      "title": "I cannot change folder when using Mutt read-only (Mutt -R)",
+      "level": 3,
+      "content": "This is certainly because you are using macros like this one:\n\n```\nmacro index,pager <f2> '<sync-mailbox><enter-command>source ~/.mutt/personal<enter><change-folder>!<enter>'\n```\n\nThis macro tells Mutt to sync (which is a write operation) before switching.\n\nEither use the sidebar or set another macro:\n\n```\nmacro index,pager <f3> '<enter-command>source ~/.mutt/personal<enter><change-folder>!<enter>'\n```\n\n"
+    },
+    {
+      "title": "Error sending message, child exited 127 (Exec error.).",
+      "level": 3,
+      "content": "This is an SMTP error. It means that mutt does not know how to send the message. You can either try installing sendmail and see if that solves your issue, or you can set the smtp_url variable. If you use gmail, you can add the following to your muttrc to tell mutt to use gmails smtp server.\n\n```\nset smtp_url=smtps://$imap_user:$imap_pass@smtp.gmail.com\n```\n\nTake note of the smtps protocol, it is important. This should solve the problem.\n\n"
+    },
+    {
+      "title": "Character encoding problems",
+      "level": 3,
+      "content": "If you are having problems with character encoding, first read this section in the Mutt wiki.\n\nIf Chinese text is still garbled, it may help to decode with GBK even when GB2312 is specified in the header. You can do this with iconv by adding the following to your mailcap file:\n\n```\ntext/plain; iconv -f gbk -t utf-8 %s; test=echo \"%{charset}\" | grep -ic \"gb2312\"; copiousoutput;\n```\n\nand enabling it by adding a line to your .muttrc:\n\n```\nauto_view text/plain\n```\n\nFor HTML emails, you can edit the relevant line of your mailcap by replacing %{charset} with $(echo %{charset} | sed s/gb2312/gbk/I), for example:\n\n```\ntext/html; w3m -dump -I $(echo %{charset} | sed s/gb2312/gbk/I) %s; nametemplate=%s.html; copiousoutput\n```\n\n"
+    },
+    {
+      "title": "Unable to login with GMail",
+      "level": 3,
+      "content": "Gmail disables access from applications it considers less secure, including mutt. You can enable access by following the instructions here\n\n"
+    },
+    {
+      "title": "Not possible to open too long URLs with urlview",
+      "level": 3,
+      "content": "Too long URLs are not parsed correctly, because urlview does not decode text (see [5]). You can let mutt decode the e-mails instead. Replace the line for opening urlview with the following code:\n\n```\nmacro index \\cb \"\\\n:set my_tmp_pipe_decode=\\$pipe_decode\\n\\\n:set pipe_decode\\n\\\n|urlview\\n\\\n:set pipe_decode=\\$my_tmp_pipe_decode\\n\\\n:unset my_tmp_pipe_decode\\n\" \\\n'call urlview to extract URLs out of a message'\n```\n\nAnother option is to use urlscan instead, which gives a text user interface to select the URL and can deal with much stranger text formats.\n\n"
+    },
+    {
+      "title": "Documentation",
+      "level": 2,
+      "content": "Newcomers may find it quite hard to find help for Mutt. Actually most of the topics are covered in the official documentation. We urge you to read it.\n\n- The official manual. The stock mutt package for Arch Linux also installs the HTML and plain text manual at /usr/share/doc/mutt/.\n- The mutt and muttrc man pages.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The official Mutt website\n- Official Manual\n- The Mutt wiki\n- Brisbin's great guide on how to setup different IMAP accounts with Mutt, offlineimap, msmtp\n- A Quick Guide to Mutt\n- Steve Losh on Mutt, offlineimap, msmtp, notmuch (focused on Gmail)\n\n"
+    }
+  ]
+}

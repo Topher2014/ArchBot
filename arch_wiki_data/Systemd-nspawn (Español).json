@@ -1,0 +1,46 @@
+{
+  "title": "Systemd-nspawn (Español)",
+  "url": "https://wiki.archlinux.org/title/Systemd-nspawn_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-01-04** \n\nArtículos relacionados\n\n- systemd (Español)\n- Linux Containers\n- systemd-networkd (Español)\n- Docker\n\nsystemd-nspawn es parecido al comando chroot, pero es un chroot en esteroides.\n\nsystemd-nspawn puede ser usado para ejecutar un comando o un sistema operativo en contenedor de namespace muy ligero. Es mas poderoso que chroot ya que virtualiza toda estructura del sistema de archivos, así como el árbol de procesos, los sub sistemas IPC y los nombres de dominio y del servidor.\n\nsystemd-nspawn limita el acceso a varias interfaces del kernel como /sys, /proc/sys o /sys/fs/selinux en modo de lectura unicamente. Interfaces de red y el tiempo del sistema no se pueden modificar desde el contenedor. Nodos de dispositivos no se pueden crear. El sistema anfitrión no se puede reiniciar y módulos del kernel no se pueden montar desde el contenedor.\n\nEste mecanismo difiere de LXC o Libvirt, ya que es una herramienta mucho mas fácil de configurar.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "systemd-nspawn es parte y viene empaquetado con systemd.\n\n"
+    },
+    {
+      "title": "Crear e iniciar Arch Linux en un contenedor",
+      "level": 3,
+      "content": "En primer lugar instale arch-install-scripts.\n\nCree un directorio para mantener el contenedor. En este ejemplo se usará ~/MyContainer.\n\nUse pacstrap para instalar un sistema básico de arch dentro del contenedor. Como mínimo es necesario instalar el grupo de paquetes base.\n\n```\n# pacstrap -i -c -d ~/MyContainer base [pkgs/grupos adicionales]\n```\n\nNote: **omitira** \n\nCuando la instalación ha finalizado, arranque el contenedor ejecutando:\n\n```\n# systemd-nspawn -b -D ~/MyContainer\n```\n\nEl parámetro -b arranca el contenedor (v.g. ejecuta systemd como PID=1), en lugar de simplemente iniciar una shell, y el parámetro -D especifica el directorio que se usara como directorio raíz del contenedor.\n\nDespués que el contenedor arranque, inicie sesión con el usuario \"root\" sin contraseña.\n\nEl contenedor se puede apagar ejecutando poweroff desde dentro del contenedor. Desde el sistema anfitrión, los contenedores se pueden controlar con la herramienta machinectl.\n\n"
+    },
+    {
+      "title": "Crear un Arch Linux i686 dentro de un anfitrión x86_64",
+      "level": 4,
+      "content": "Es posible instalar un sistema mínimo de Arch Linux i686 dentro de un directorio y usarlo como un contenedor de systemd-nspawn en lugar de usar chroot o virtualización. Esto es útil para examinar la compilación de PKGBUILD en un sistema de i686. Este seguro de usar pacman.conf sin el repositorio multilib.\n\n```\n# pacman_conf=/tmp/pacman.conf # este es pacman.conf sin multilib\n # mkdir /mnt/i686-archlinux\n # linux32 pacstrap -C \"$pacman_conf\" -di /mnt/i686-archlinux base base-devel\n```\n\nSe puede dejar el paquete linux fuera del grupo base, ya que el sistema creado no pretende ser encendido en hardware real o virtual.\n\nPara arrancar el sistema i686 resultante como una instancia de systemd-nspawn, ejecute:\n\n```\n# linux32 systemd-nspawn -D /mnt/i686-archlinux\n```\n\n"
+    },
+    {
+      "title": "Crear un ambiente Debian o Ubuntu",
+      "level": 3,
+      "content": "Instale debootstrap, gnupg1AUR, y uno de estos paquetes: debian-archive-keyring o ubuntu-keyring (obviamente instale el llavero del distro que quiere).\n\nDesde este punto es relativamente trivial crear un ambiente con Debian o Ubuntu:\n\n```\n# cd /var/lib/machines\n# debootstrap <nombrecodigo> myContainer <url-repositorio>\n```\n\nPara Debian nombres código validos son \"stable\" o \"testing\", también nombres de publicaciones \"stretch\" and \"sid\". Para Ubuntu el nombre código puede ser \"xenial\" o \"zesty\". Una lista completa de nombres codigo esta en /usr/share/debootstrap/scripts.\n\nEn caso de una imagen de Debian la \"url-repositorio\" puede ser https://deb.debian.org/debian/. Para Ubuntu la \"url-repositorio\" puede ser https://archive.ubuntu.com/ubuntu/.\n\nA diferencia de Arch, Debian y Ubuntu no dejaran iniciar sesión sin una contraseña. Para establecer la contraseña de root inicie sesión con el parámetro -b y cambie la contraseña:\n\n```\n# systemd-nspawn -D myContainer\n# passwd\n# logout\n```\n\nSi los comandos de arriba no funcionaron, es posible arrancar el contenedor y ejecutar estos comandos:\n\n```\n# systemd-nspawn -b -D myContainer  # Arranca el contenedor\n# machinectl shell root@myContainer /bin/bash  # Obtenga una shell con root\n# passwd\n# logout\n```\n\n"
+    },
+    {
+      "title": "Activar inicio automático de los contenedores",
+      "level": 3,
+      "content": "Al usar un contenedor frecuentemente, seria deseable iniciarlo al arrancar el sistema anfitrión.\n\nActive el target machines.target, después ejecute systemd-nspawn@myContainer.service, donde myContainer es un contenedor de nspawn ubicado en /var/lib/machines.\n\n"
+    },
+    {
+      "title": "machinectl",
+      "level": 3,
+      "content": "El manejo de contenedores es efectuado principalmente con el comando machinectl. Vea machinectl(1) para más detalles.\n\nEjemplos:\n\nInicie una shell dentro de un contenedor que ya ha iniciado:\n\n```\n$ machinectl login MyContainer\n```\n\nMostrar informacion detallada sobre un contenedor:\n\n```\n$ machinectl status MyContainer\n```\n\nReinicie un contenedor:\n\n```\n$ machinectl reboot MyContainer\n```\n\nApague un contenedor:\n\n```\n$ machinectl poweroff MyContainer\n```\n\nDescargar una imagen:\n\n```\n# machinectl pull-tar URL name\n```\n\n"
+    },
+    {
+      "title": "Utilidades de systemd",
+      "level": 3,
+      "content": "Bastantes de las utilidades de systemd han sido actualizadas para que funcionen con contenedores. Herramientas que generalmente proporcionan un parámetro -M, --machine= tomaran el nombre del contenedor como argumento.\n\nEjemplos.\n\nVer el histórico de una maquina especifica:\n\n```\n# journalctl -M MyContainer\n```\n\nMostrar el contenido del grupo de control:\n\n```\n$ systemd-cgls -M MyContainer\n```\n\nMostrar el tiempo de arranque del contenedor:\n\n```\n$ systemd-analyze -M MyContainer\n```\n\nPara una perspectiva de los recursos usados:\n\n```\n$ systemd-cgtop\n```\n\n"
+    }
+  ]
+}

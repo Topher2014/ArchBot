@@ -1,0 +1,121 @@
+{
+  "title": "安装网络摄像机",
+  "url": "https://wiki.archlinux.org/title/%E5%AE%89%E8%A3%85%E7%BD%91%E7%BB%9C%E6%91%84%E5%83%8F%E6%9C%BA",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This is a guide to setting up your webcam.\n\nMost probably your webcam will work out of the box. Permissions to access video devices (e.g. /dev/video0) are handled by udev, there is no configuration necessary.\n\n"
+    },
+    {
+      "title": "Loading",
+      "level": 2,
+      "content": "Most recent webcams are UVC (USB Video Class) compliant and are supported by the generic uvcvideo kernel driver module. To check that your webcam is recognized, see the journal just after you plug the webcam in. You should see something like this:\n\n```\nkernel: sn9c102: V4L2 driver for SN9C10x PC Camera Controllers v1:1.24a\nusb 1-1: SN9C10[12] PC Camera Controller detected (vid/pid 0x0C45/0x600D)\nusb 1-1: PAS106B image sensor detected\nusb 1-1: Initialization succeeded\nusb 1-1: V4L2 device registered as /dev/video0\nusb 1-1: Optional device control through 'sysfs' interface ready\nusbcore: registered new driver sn9c102\n```\n\nSome pre-UVC webcams are also supported via the gspca kernel driver module. See the gspca cards list for a non-exhaustive list of supported devices under this framework.\n\nOtherwise, if your webcam is not supported by the kernel's drivers, an external driver is necessary. The first step is to identify the name of the webcam, using for example lsusb. Then you can check webcam devices for information and resources about webcams. Once you find a driver compatible with the webcam, you can load the module at boot.\n\nNote: **v4l2** \n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "If you want to configure brightness, color and other webcam parameters (e.g. in the case when out-of-the-box colors are too bluish/reddish/greenish) you may use a variety of applications. Some specific webcams such as the Logitech Brio or the Razer Kiyo Pro might require a specific application for some of their specific options such as HDR. Changing any settings in an application that configures V4L settings will generally change those settings for all applications using those cameras unless they override those settings themselves.\n\n"
+    },
+    {
+      "title": "Command line",
+      "level": 3,
+      "content": "v4l-utils installs a command line tool, v4l2-ctl. To list all video devices:\n\n```\n$ v4l2-ctl --list-devices\n```\n\nTo list the configurable settings of a video device:\n\n```\n$ v4l2-ctl -d /dev/video0 --list-ctrls\n```\n\nYou can change the settings of the video device by doing the following:\n\n```\n$ v4l2-ctl -c brightness=128\n```\n\nAlternatively, you can use cameractrls:\n\n```\n$ cameractrls -c brightness=128\n```\n\n"
+    },
+    {
+      "title": "Graphical",
+      "level": 3,
+      "content": "For generic graphical webcam configuration tools you can use either qv4l2 from v4l-utils or guvcview. In addition to this, cameractrls contains cameractrlsgtk4 which allows you to configure some camera-specific features for the Logitech Brio as well as the Razer Kiyo Pro on top of supporting all the other v4l options.\n\n"
+    },
+    {
+      "title": "Persisting configuration changes",
+      "level": 3,
+      "content": "Configuration made via V4L2 does not persist after the webcam is disconnected and reconnected. It is possible to use v4l2-ctl with Udev rules in order to set some configuration each time a particular camera is connected.\n\nFor example, to set a default zoom setting on a particular Logitech webcam each time it is connected, add a udev rule like this:\n\n```\n/etc/udev/rules.d/99-logitech-default-zoom.rules\n```\n\n```\nSUBSYSTEM==\"video4linux\", KERNEL==\"video[0-9]*\", ATTR{index}==\"0\", ATTRS{idVendor}==\"046d\", ATTRS{idProduct}==\"0892\", RUN+=\"/usr/bin/v4l2-ctl -d $devnode --set-ctrl=zoom_absolute=170\"\n```\n\nThe above rule is valid for the Logitech C920 HD Pro Webcam - hardware ID 046d:0892.\n\nThe device's vendor id and product id can be found using lsusb. These are unique per product and do not change unless the product gets a new hardware revision.\n\nTo find udev attributes like the product name and serial, see Udev#List the attributes of a device. It is also possible to set a static name for a video device).\n\n"
+    },
+    {
+      "title": "Disable internal laptop webcam",
+      "level": 3,
+      "content": "Sometimes we might want to disable a laptop's internal webcam so that only the one attached via USB is showing. This can be done with a udev rule. First we will need the device's vendor id and the product id:\n\n```\n$ lsusb\n```\n\n```\nBus 001 Device 008: ID 1bcf:28c1 Sunplus Innovation Technology Inc. Integrated_Webcam_HD\n```\n\nThen we add new udev rule to remove the device as soon as it is detected:\n\n```\n/etc/udev/rules.d/40-disable-internal-webcam.rules\n```\n\n```\nACTION==\"add\", ATTR{idVendor}==\"1bcf\", ATTR{idProduct}==\"28c1\", RUN=\"/bin/sh -c 'echo 1 >/sys/\\$devpath/remove'\"\n```\n\n"
+    },
+    {
+      "title": "Disable webcam completely",
+      "level": 3,
+      "content": "To disable webcam completely, you can blacklist the uvcvideo kernel module. For example:\n\n```\n/etc/modprobe.d/nowebcam.conf\n```\n\n```\nblacklist uvcvideo\n```\n\n"
+    },
+    {
+      "title": "Applications",
+      "level": 2,
+      "content": "See also List of applications/Multimedia#Webcam.\n\n"
+    },
+    {
+      "title": "xawtv",
+      "level": 3,
+      "content": "This is a basic Video4Linux2 device viewer, and although it is intended for use with TV tuner cards, it works well with webcams. It will display what your webcam sees in a window.\n\nInstall xawtvAUR and run it with:\n\n```\n$ xawtv -c /dev/video0\n```\n\nIn case of error see #xawtv with NVIDIA card.\n\n"
+    },
+    {
+      "title": "VLC",
+      "level": 3,
+      "content": "VLC can also be used to view and record your webcam. In VLC's Media menu, open the Capture Device... dialog and enter the video and audio device files. Or from the command line, for example:\n\n```\n$ vlc v4l2://:input-slave=alsa://:v4l-vdev=\"/dev/video0\"\n```\n\nThis will make VLC mirror your webcam.\n\n- To take stills, simply choose Snapshot in the Video menu.\n- To record the stream, add a --sout argument to the command line, e.g.\n\n```\n$ vlc v4l://:v4l-vdev=\"/dev/video0\":v4l-adev=\"/dev/audio2\" --sout \"#transcode{vcodec=mp1v,vb=1024,scale=1,acodec=mpga,ab=192,channels=2}:duplicate{dst=std{access=file,mux=mpeg1,dst=/tmp/test.mpg}}\"\n```\n\nNote that by default this will not display the video. In order to see what you are recording, you need to add the display as a destination to the argument (which will slow down the operation):\n\n```\n... :duplicate{dst=display,dst=std{access= ....\n```\n\n"
+    },
+    {
+      "title": "MPlayer",
+      "level": 3,
+      "content": "To use MPlayer to take snapshots from your webcam run this command from the terminal:\n\n```\n$ mplayer tv:// -tv driver=v4l2:width=640:height=480:device=/dev/video0 -fps 15 -vf screenshot\n```\n\nFrom here you have to press s to take the snapshot. The snapshot will be saved in the current folder as shotXXXX.png. If you want to record video continuous:\n\n```\n$ mencoder tv:// -tv driver=v4l2:width=640:height=480:device=/dev/video0:forceaudio:adevice=/dev/dsp -ovc lavc -oac mp3lame -lameopts cbr:br=64:mode=3 -o filename.avi\n```\n\nPress Ctrl+c to end the recording.\n\nTo play video with MPlayer using MJPEG as the pixelformat instead of the default, which in most cases is YUYV, you can run the following:\n\n```\n$ mplayer tv:// -tv driver=v4l2:width=640:height=480:device=/dev/video0:outfmt=mjpeg -fps 15\n```\n\n"
+    },
+    {
+      "title": "mpv",
+      "level": 3,
+      "content": "To use mpv to take snapshots from your webcam, run this command from the terminal:\n\n```\n$ mpv av://v4l2:/dev/video0 --profile=low-latency --untimed\n```\n\nFrom here you have to press s to take the snapshot. The snapshot will be saved in your current folder as mpv-shotNNNN.jpg.\n\nTo use MJPEG as the pixelformat instead of the default, which in most cases is YUYV, you can run the following instead:\n\n```\n$ mpv --demuxer-lavf-format=video4linux2 --demuxer-lavf-o-set=input_format=mjpeg av://v4l2:/dev/video0\n```\n\nIn some cases this can lead to drastic improvements in quality and performance (5FPS -> 30FPS for example).\n\nTo adjust webcam settings, including the resolution, see the mpv documentation.\n\n"
+    },
+    {
+      "title": "FFmpeg",
+      "level": 3,
+      "content": "See v4l2loopback#Use cases for various examples, where FFmpeg is used to output video to a v4l2 device, which can be used as a webcam.\n\nFor laptops without a webcam, an IP camera can be used as an alternative to droidcam which does not keep the extra webcam device hanging around. For android, something like IP webcam can be hosted on the phone, then use the IP camera as a video input for the laptop. First, install linux-headers and v4l2loopback-dkms, then connect to the video source as /dev/video0 using v4l2loopback with 192.168.1.xxx being the IP address of the phone:\n\n```\n# modprobe v4l2loopback exclusive_caps=1\n$ ffmpeg -i http://192.168.1.xxx:8080/video -vf format=yuv420p -f v4l2 /dev/video0\n```\n\n"
+    },
+    {
+      "title": "V4L1 support",
+      "level": 3,
+      "content": "Version 2.6.27 of the Linux kernel dropped support for the legacy Video4Linux (1) API. Pixel format decoding has been pushed to user space, since Video4Linux version 2 does not support kernel space decoding. The libv4l library provides userland applications with pixel decoding services and will be used by most programs. Other compatibility layers are also available.\n\nIf your device is created but your image looks strange (e.g. nearly completely green), you probably need this.\n\nIf the application has V4L2 support but no pixelformat support then use the following command:\n\n```\nLD_PRELOAD=/usr/lib/libv4l/v4l2convert.so application\n```\n\nIf the application only supports the older version of V4L, use this command:\n\n```\nLD_PRELOAD=/usr/lib/libv4l/v4l1compat.so application\n```\n\nFor 32-bit multilib applications, install the lib32-v4l-utils package and replace /usr/lib/libv4l/ by /usr/lib32/libv4l/ in the above commands.\n\n"
+    },
+    {
+      "title": "xawtv with NVIDIA card",
+      "level": 3,
+      "content": "If you are using an NVIDIA graphics card, and get an error like:\n\n```\nX Error of failed request:  XF86DGANoDirectVideoMode\n Major opcode of failed request:  139 (XFree86-DGA)\n Minor opcode of failed request:  1 (XF86DGAGetVideoLL)\n Serial number of failed request:  69\n Current serial number in output stream:  69\n```\n\nyou should instead run it as xawtv -nodga.\n\n"
+    },
+    {
+      "title": "Microsoft Lifecam Studio/Cinema",
+      "level": 3,
+      "content": "Under certain configurations, the Microsoft lifecam studio/cinema may request too much usb bandwidth and fail see Uvcvideo FAQ. In this case, change the buffering by loading the uvcvideo driver with quirks=0x80. Add it to /etc/modprobe.d/uvcvideo.conf :\n\n```\n/etc/modprobe.d/uvcvideo.conf\n```\n\n```\n## fix bandwidth issue for lifecam studio/cinema\noptions uvcvideo quirks=0x80\n```\n\n"
+    },
+    {
+      "title": "Skype",
+      "level": 3,
+      "content": "When testing the webcam, note the following:\n\n- The echobot does not support videochat. Do not use it for testing your webcam.\n- Skype might recognize different video/camera devices (/dev/video*). These will be listed as something like integrated camera... in a dropdown menu in the camera settings. Try each camera and wait a few seconds, because it takes time to switch to a different camera.\n\n"
+    },
+    {
+      "title": "Check bandwidth used by USB webcams",
+      "level": 3,
+      "content": "When running multiple webcams on a single USB bus, they may saturate the bandwidth of the USB bus and not work properly. You can diagnose this with the usbtop tool from the usbtopAUR package.\n\n"
+    },
+    {
+      "title": "Invert the video stream",
+      "level": 3,
+      "content": "If your video stream is inverted, you can make a new virtual video camera which inverts the inverted video. You need to install v4l-utils and also v4l2loopback-dkms. Create the virtual video camera:\n\n```\n# modprobe v4l2loopback\n```\n\nCheck the name of the newly created camera:\n\n```\n$ v4l2-ctl --list-devices\nDummy video device (0x0000) (platform:v4l2loopback-000):\n   \t/dev/video1\n```\n\nThen you can run ffmpeg to read from your actual webcam (here /dev/video0) and invert it and feed it to the virtual camera:\n\n```\n$ ffmpeg -f v4l2 -i /dev/video0 -vf \"vflip\" -f v4l2 /dev/video1\n```\n\nHere vflip inverts the video stream vertically. Use hflip to invert it horizontally.\n\nNote that the format argument yuv420p might be needed to avoid an error, otherwise there might not be any video stream and a black screen will be shown [2]. In other words:\n\n```\n$ ffmpeg -f v4l2 -i /dev/video0 -vf \"hflip,format=yuv420p\" -f v4l2 /dev/video1\n```\n\nYou can then use the \"Dummy\" camera in your applications instead of the \"Integrated\" camera.\n\n"
+    },
+    {
+      "title": "Bad image quality",
+      "level": 3,
+      "content": "If you experience images being too bright, too dark, too exposed or any other, you can install v4l2ucpAUR to tweak your image output.\n\n"
+    },
+    {
+      "title": "Logitech Quickcam Pro 9000",
+      "level": 3,
+      "content": "Install libwebcam-gitAUR to enable autofocus control. After the installation, disconnect and reconnect your camera to trigger the newly added udev rules.\n\n"
+    },
+    {
+      "title": "Creality Webcam",
+      "level": 3,
+      "content": "Creality webcam is based on the Fullhan FH8852 chip used in many cheap 2MP cameras (USB ID 1d6c:0103), but its firmware requires a special sequence to enable it, otherwise you'll get a black screen. Trying to grab a frame using FFmpeg seems to properly initialize the device, making it work on other apps. You might have to try the following on both /dev/video0 and /dev/video2, and see which one produces a correct /tmp/test_img.jpg image:\n\n```\n$ ffmpeg -i /dev/video0 /tmp/test_img.jpg\n```\n\nOnce done, the camera should work on web browser, applications like Cheese, etc.\n\n"
+    }
+  ]
+}

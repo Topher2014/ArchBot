@@ -1,0 +1,66 @@
+{
+  "title": "Getty (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Getty_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Display manager\n\nA getty is the generic name for a program which manages a terminal line and its connected terminal. Its purpose is to protect the system from unauthorized access. Generally, each getty process is started by systemd and manages a single terminal line.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "agetty is the default getty in Arch Linux, as part of the util-linux package.\n\nAn alternative is:\n\n- mingetty — A minimal getty which allows automatic logins.\n\n"
+    },
+    {
+      "title": "Staircase effect",
+      "level": 3,
+      "content": "agetty modifies the TTY settings while waiting for a login so that the newlines are not translated to CR-LFs. This tends to cause a \"staircase effect\" for messages printed to the console.\n\nIt is entirely harmless, but in the event it persists once logged, you can fix this behavior with:\n\n```\n$ stty onlcr\n```\n\nSee this forums discussion on the subject.\n\n"
+    },
+    {
+      "title": "Add additional virtual consoles",
+      "level": 3,
+      "content": "Agetty manages virtual consoles and six of these virtual consoles are provided by default in Arch Linux. They are usually accessible by pressing Ctrl+Alt+F1 through Ctrl+Alt+F6.\n\nOpen the file /etc/systemd/logind.conf and set the option NAutoVTs=6 to the number of virtual terminals that you want at boot.\n\nIf needed, it is possible to temporarily start a getty@ttyN.service service directly.\n\n"
+    },
+    {
+      "title": "Automatic login to virtual console",
+      "level": 3,
+      "content": "Configuration relies on systemd unit drop-in files to override the default parameters passed to agetty.\n\nConfiguration differs for virtual versus serial consoles. In most cases, you want to set up automatic login on a virtual console, (whose device name is ttyN, where N is a number). The configuration of automatic login for serial consoles will be slightly different. Device names of the serial consoles look like ttySN, where N is a number.\n\n"
+    },
+    {
+      "title": "Virtual console",
+      "level": 4,
+      "content": "Create a drop-in file for getty@tty1.service with the following contents:\n\n```\n/etc/systemd/system/getty@tty1.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin username %I $TERM\n```\n\n- The option Type=idle found in the default getty@.service will delay the service startup until all jobs (state change requests to units) are completed in order to avoid polluting the login prompt with boot-up messages. When starting X automatically, it may be useful to start getty@tty1.service immediately by adding Type=simple into the drop-in file. Both the init system and startx can be silenced to avoid the interleaving of their messages during boot-up.\n- See Silent boot#agetty for an example virtual console drop-in file which hides the login prompt completely.\n- The above snippet will cause the loginctl session type to be set to tty. If desirable (for example if starting X automatically), it is possible to manually set the session type to wayland or x11 by adding Environment=XDG_SESSION_TYPE=x11 or Environment=XDG_SESSION_TYPE=wayland into this file.\n\nIf you do not want full automatic login, but also do not want to type your username, see #Prompt only the password for a default user in virtual console login.\n\nIf you want to use a tty other than tty1, see systemd/FAQ#How do I change the default number of gettys?.\n\n"
+    },
+    {
+      "title": "Serial console",
+      "level": 4,
+      "content": "Create a drop-in file:\n\n```\n/etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --keep-baud --autologin username 115200,57600,38400,9600 - $TERM\n```\n\n"
+    },
+    {
+      "title": "Nspawn console",
+      "level": 4,
+      "content": "To configure auto-login for a systemd-nspawn container, override console-getty.service by creating a drop-in file:\n\n```\n/etc/systemd/system/console-getty.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --keep-baud --autologin username - 115200,38400,9600 $TERM\n```\n\nIf machinectl login my-container method is used to access the container, also adjust the container-getty@.service template that manages pts/[0-9] pseudo ttys:\n\n```\n/etc/systemd/system/container-getty@.service.d/autologin.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --keep-baud --autologin username - 115200,38400,9600 $TERM\n```\n\n"
+    },
+    {
+      "title": "Prompt only the password for a default user in virtual console login",
+      "level": 3,
+      "content": "Getty can be used to login from a virtual console with a default user, typing the password but without needing to insert the username. For instance, to prompt the password for username on tty1:\n\n```\n/etc/systemd/system/getty@tty1.service.d/skip-username.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '-p -- username' --noclear --skip-login - $TERM\n```\n\n"
+    },
+    {
+      "title": "Have boot messages stay on tty1",
+      "level": 3,
+      "content": "By default, Arch has the getty@tty1 service enabled. The service file already passes --noclear, which stops agetty from clearing the screen. However systemd clears the screen before starting it. To disable this behavior, create a drop-in file:\n\n```\n/etc/systemd/system/getty@tty1.service.d/noclear.conf\n```\n\n```\n[Service]\nTTYVTDisallocate=no\n```\n\n- Make sure to remove quiet from the kernel parameters.\n- Late KMS starting may cause the first few boot messages to clear. See NVIDIA#Early loading.\n\n"
+    },
+    {
+      "title": "Turn off display after timeout",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Display Power Management Signaling#Linux console.** This article or section is a candidate for merging with Display Power Management Signaling#Linux console.\n\nThis article or section is a candidate for merging with Display Power Management Signaling#Linux console.\n\nWhen the system is used as a server but has a display connected, the display will be turned on forever. To turn off display after 5 minutes create a drop-in file. On any key press, display will turn back on.\n\n```\n/etc/systemd/system/getty@tty1.service.d/blankscreen.conf\n```\n\n```\n[Service]\nExecStartPost=-/usr/bin/setterm --blank 5\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- systemd#Change default target to boot into\n- The TTY demystified\n- Wikipedia:tty (unix)\n\n"
+    }
+  ]
+}

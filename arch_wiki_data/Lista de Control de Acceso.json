@@ -1,0 +1,51 @@
+{
+  "title": "Lista de Control de Acceso",
+  "url": "https://wiki.archlinux.org/title/Lista_de_Control_de_Acceso",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2017-07-22** \n\nProporciona un mecanismo de permisos adicionales más flexibles para los sistemas de archivos. Está diseñado para ayudar con los permiso de archivos en UNIX. ACL permite dar permisos para cualquier usuario o grupo a cualquier recurso del disco.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "El paquete acl es una dependencia de systemd que debería estar instalado.\n\n"
+    },
+    {
+      "title": "Habilitando ACL",
+      "level": 3,
+      "content": "Para habilitar ACL los sistema de archivos se deben haber montado con la opción acl, puede usar fstab para hacer el montaje con acl permanente en su sistema.\n\nEs posible que la opción acl estés activada por defecto como opción de montaje en el sistema de archivos; en Btrfs y ext* también. Use el siguiente comando para verificar las particiones formateadas con ext* con la opción:\n\n```\n# tune2fs -l /dev/sdXY | grep \"Default mount options:\"\n```\n\n```\nDefault mount options:    user_xattr acl\n```\n\nTambién puede verificar que el punto de montaje por defecto no está anulado, en tal caso vería noacl en /proc/mounts.\n\nPuede configurar las opciones de montajes predeterminadas de un sistema de archivos utilizando el comando tune2fs -o opción partición por ejemplo:\n\n```\n# tune2fs -o acl /dev/sdXY\n```\n\nUtilizar las opciones de montaje por defecto en lugar de las entradas en /etc/fstab es muy útil para unidades externa, tales particiones serán montadas con la opción acl en otras máquinas GNU/Linux; sin necesidad de editar /etc/fstab en cada máquina.\n\n- acl se especifica por defecto cuando se crean sistemas de archivos ext2/3/4 y se configura en /etc/mke2fs.conf.\n- Por defecto las opciones de montaje no están en la lista de /proc/mounts.\n\n"
+    },
+    {
+      "title": "Establecer ACL",
+      "level": 3,
+      "content": "ACL puede ser modificado usando el comando ‘’’setfacl’’’\n\nPara agregar permiso a un usuario (user es el nombre del usuario o el ID):\n\n```\n# setfacl -m \"u:user:permissions\" <file/dir>\n```\n\nAgregar permisos para un grupo (group es el nombre del grupo o el ID del grupo):\n\n```\n# setfacl -m \"g:group:permissions\" <file/dir>\n```\n\nPara permitir que todos los archivos o directorios hereden las entradas de ACL desde el directorio con:\n\n```\n# setfacl -dm \"entry\" <dir>\n```\n\nPara eliminar un entrada específica:\n\n```\n# setfacl -x \"entry\" <file/dir>\n```\n\nPara remover todas las entradas:\n\n```\n# setfacl -b <file/dir>\n```\n\n"
+    },
+    {
+      "title": "Mostrar ACL",
+      "level": 3,
+      "content": "Para mostrar los permisos use:\n\n```\n# getfacl <nombre archivo>\n```\n\n"
+    },
+    {
+      "title": "Ejemplos",
+      "level": 2,
+      "content": "Establecer todos lo permisos para el usuario johnny en el archivo con nombre “abc”:\n\n```\n# setfacl -m \"u:johnny:rwx\" abc\n```\n\nCheck permissions\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: someone\n# group: someone\nuser::rw-\nuser:johnny:rwx\ngroup::r--\nmask::rwx\nother::r--\n```\n\nListar los permisos\n\n```\n# setfacl -m \"u:johnny:r-x\" abc\n```\n\nCheck permissions\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: someone\n# group: someone\nuser::rw-\nuser:johnny:r-x\ngroup::r--\nmask::r-x\nother::r--\n```\n\nEliminar todas las entradas ACL extendidas:\n\n```\n# setfacl -b abc\n```\n\nCheck permissions\n\n```\n# getfacl abc\n```\n\n```\n# file: abc\n# owner: someone\n# group: someone\nuser::rw-\ngroup::r--\nother::r--\n```\n\n"
+    },
+    {
+      "title": "Salida del comando ls",
+      "level": 3,
+      "content": "Notará que hay un ACL para un archivo dado porque se mostrará un + (signo más) después del permiso Unix en la salida de ls -l.\n\n```\n$ ls -l /dev/audio\n```\n\n```\ncrw-rw----+ 1 root audio 14, 4 nov.   9 12:49 /dev/audio\n```\n\n```\n$ getfacl /dev/audio\n```\n\n```\ngetfacl: Removing leading '/' from absolute path names\n# file: dev/audio\n# owner: root\n# group: audio\nuser::rw-\nuser:solstice:rw-\ngroup::rw-\nmask::rw-\nother::---\n```\n\n"
+    },
+    {
+      "title": "Conceder permisos de ejecución para archivos privados a un servidor Web",
+      "level": 3,
+      "content": "La siguiente técnica describe de cómo un proceso de un servidor web puede tener acceso a los archivos que residen en el directorio personal de un usuario sin comprometer la seguridad dando acceso a todo el mundo.\n\nSupongamos que el servidor web se ejecuta como webserver del usuario y le concede acceso al directorio personal del usuario geoffrey que es /home/geoffrey\n\nEl primer paso es otorgar permiso de ejecución a webserver para que pueda acceder a directorio personal de geoffrey:\n\n```\n# setfacl -m \"u:webserver:--x\" /home/geoffrey\n```\n\nRecuerda: Los permisos de ejecución en un directorio son necesarios para que un proceso enumere el contenido del directorio.\n\nAhora webserver puede acceder a los archivos en /home/geoffrey y otros no necesitan acceso por lo tanto se puede remover de forma segura.\n\n```\n# chmod o-rx /home/geoffrey\n```\n\nEl comando getfacl puede ser usado para verificar los cambios.\n\n```\n$ getfacl /home/geoffrey\ngetfacl: Removing leading '/' from absolute path names\n# file: home/geoffrey\n# owner: geoffrey\n# group: geoffrey\nuser::rwx\nuser:webserver:--x\ngroup::r-x\nmask::r-x\notros::---\n```\n\nComo se muestra en la salida anterior ya no tiene permisos pero webserver todavía puede acceder a los archivos, por lo tanto la seguridad se ha incrementado.\n\n"
+    },
+    {
+      "title": "También puede ver",
+      "level": 2,
+      "content": "- getfacl(1)\n- setfacl(1)\n- Un antiguo, exhaustivo y relevante recurso guia de ACL\n- How to set default file permissions for all folders/files in a directory?\n\n"
+    }
+  ]
+}

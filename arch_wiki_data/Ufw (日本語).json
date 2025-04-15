@@ -1,0 +1,81 @@
+{
+  "title": "Ufw (日本語)",
+  "url": "https://wiki.archlinux.org/title/Ufw_(%E6%97%A5%E6%9C%AC%E8%AA%9E)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "関連記事\n\n- iptables\n- sshguard\n\nプロジェクトのホームページより:\n\n"
+    },
+    {
+      "title": "目次",
+      "level": 2,
+      "content": "- 1 インストール\n- 2 基本設定\n- 3 Forward ポリシー\n- 4 他のアプリケーションの追加\n- 5 アプリケーションの削除\n- 6 IP アドレスのブロック\n- 7 ufw によるレート制限\n- 8 ユーザールール\n- 9 ヒントとテクニック 9.1 リモート ping を無効化 9.2 UFW のログ出力を無効化 9.3 UFW と Docker\n- 10 GUI フロントエンド 10.1 Gufw\n- 11 参照\n\n- 9.1 リモート ping を無効化\n- 9.2 UFW のログ出力を無効化\n- 9.3 UFW と Docker\n\n- 10.1 Gufw\n\n"
+    },
+    {
+      "title": "インストール",
+      "level": 2,
+      "content": "ufw パッケージをインストールしてください。\n\n起動時に有効化させるには ufw を起動・有効化してください。なお、iptables.service や ip6tables.service も有効にされていると動作しません。\n\n"
+    },
+    {
+      "title": "基本設定",
+      "level": 2,
+      "content": "デフォルトで全てを拒否して、192.168.0.1-192.168.0.255 LAN のプロトコルを許可し、どこからでも Deluge と SSH の通信ができ、SSH にレート制限を設けるシンプルな設定:\n\n```\n# ufw default deny\n# ufw allow from 192.168.0.0/24\n# ufw allow Deluge\n# ufw limit ssh\n```\n\nパッケージを最初にインストールしたときは次を実行する必要があります:\n\n```\n# ufw enable\n```\n\n最後に、status コマンドで適用されているルールを確認します:\n\n```\n# ufw status\n```\n\n```\nStatus: active\nTo                         Action      From\n--                         ------      ----\nAnywhere                   ALLOW       192.168.0.0/24\nDeluge                     ALLOW       Anywhere\nSSH                        LIMIT       Anywhere\n```\n\nstatus レポートはユーザーによって追加されたルールを示します。ほとんどの場合これで十分ですが、始めから入っているルールが存在していることに気をつけることは悪いことではありません。UPNP, AVAHI, DHCP を許可するフィルターが含まれています。全てのルールを表示するには:\n\n```\n# ufw show raw\n```\n\nレポートではトラフィックも手短に示されますが、読むのが難しいと感じるかもしれません。承認されたトラフィックの確認をする別の方法:\n\n```\n# iptables -S | grep ACCEPT\n```\n\nレポートとしては動作しますが、iptables を管理するのに ufw を使っている間は iptables サービスは有効化しないようにしてください。\n\n"
+    },
+    {
+      "title": "Forward ポリシー",
+      "level": 2,
+      "content": "OpenVPN や WireGuard などの VPN を実行する必要のあるユーザは、/etc/default/ufw 内の DEFAULT_FORWARD_POLICY 変数の値を \"DROP\" から \"ACCEPT\" に変更することで、ユーザインターフェイスの設定に関わらずすべてのパケットを転送することができます。以下の行を *filter ブロック内に追加することで、wg0 のような特定のインターフェイスで転送することができます:\n\n```\n/etc/ufw/before.rules\n```\n\n```\n# End required lines \n\n-A ufw-before-forward -i wg0 -j ACCEPT\n-A ufw-before-forward -o wg0 -j ACCEPT\n```\n\nまた、場合によっては以下をアンコメントする必要があります:\n\n```\n/etc/ufw/sysctl.conf\n```\n\n```\nnet/ipv4/ip_forward=1\nnet/ipv6/conf/default/forwarding=1\nnet/ipv6/conf/all/forwarding=1\n```\n\n"
+    },
+    {
+      "title": "他のアプリケーションの追加",
+      "level": 2,
+      "content": "パッケージには多数のデーモンやプログラムのデフォルトのポートに基づいてデフォルトの設定が付いています。/etc/ufw/applications.d ディレクトリを見たりプログラムを使ってリストアップすることでオプションを確認できます:\n\n```\n# ufw app list\n```\n\n標準のポートを使わないアプリケーションを実行している場合、デフォルトを見ながら /etc/ufw/applications.d/custom に必要なデータを記述するのを推奨します。\n\n例えば、tcp ポートが 20202-20205 の範囲にカスタマイズされた deluge の場合:\n\n```\n[Deluge-my]\ntitle=Deluge\ndescription=Deluge BitTorrent client\nports=20202:20205/tcp\n```\n\n同じアプリケーションで tcp と udp ポートを両方定義する場合、以下のようにパイプで区切って下さい。tcp ポート 10000-10002 と udp ポート 10003 を開く例:\n\n```\nports=10000:10002/tcp|10003/udp\n```\n\n範囲を指定するかわりに、カンマを使って複数のポートを指定することもできます。tcp ポート 10000-10002 (inclusive) と udp ポート 10003 と 10009 を開く例:\n\n```\nports=10000:10002/tcp|10003,10009/udp\n```\n\n"
+    },
+    {
+      "title": "アプリケーションの削除",
+      "level": 2,
+      "content": "上の Deluge の例を利用するときは、以下のコマンドで標準の Deluge のルールを削除して上の例にあるルールで置き換えます:\n\n```\n# ufw delete allow Deluge\n# ufw allow Deluge-my\n```\n\nstatus コマンドで結果を確認します:\n\n```\n# ufw status\n```\n\n```\nStatus: active\nTo                         Action      From\n--                         ------      ----\nAnywhere                   ALLOW       192.168.0.0/24\nSSH                        ALLOW       Anywhere\nDeluge-my                  ALLOW       Anywhere\n```\n\n"
+    },
+    {
+      "title": "IP アドレスのブロック",
+      "level": 2,
+      "content": "特定の IP アドレスをブロックするには、/etc/ufw/before.rules において COMMIT よりも手前に iptables DROP 行を書き加えます。\n\n```\n/etc/ufw/before.rules\n```\n\n```\n...\n## blacklist section\n\n# block just 199.115.117.99\n-A ufw-before-input -s 199.115.117.99 -j DROP\n# block 184.105.*.*\n-A ufw-before-input -s 184.105.0.0/16 -j DROP\n\n# don't delete the 'COMMIT' line or these rules won't be processed\nCOMMIT\n```\n\n"
+    },
+    {
+      "title": "ufw によるレート制限",
+      "level": 2,
+      "content": "ufw には30秒間の間に6回以上接続を試みた IP アドレスを拒否する機能があります。このオプションは SSH などのサービスに使うと良いでしょう。\n\n上記の基本設定を使って、レート制限を有効にするには、allow パラメータを limit パラメータで置き換えます。新しいルールは以前のルールを置き換えます。\n\n```\n# ufw limit SSH\n```\n\n```\nRule updated\n```\n\n```\n# ufw status\n```\n\n```\nStatus: active\nTo                         Action      From\n--                         ------      ----\nAnywhere                   ALLOW       192.168.0.0/24\nSSH                        LIMIT       Anywhere\nDeluge-my                  ALLOW       Anywhere\n```\n\n"
+    },
+    {
+      "title": "ユーザールール",
+      "level": 2,
+      "content": "全てのユーザールールは /etc/ufw/user.rules (IPv4) と /etc/ufw/user6.rules (IPv6) に保存されます。\n\npacman によるアップグレード時にも表示されますが、バージョン 0.34 以前では置き場所が /usr/lib/ufw/user.rules と /usr/lib/ufw/user6.rules でした。バージョン 0.35 にアップグレードしたときに、ルールを新しい置き場所にコピーしてください。\n\n"
+    },
+    {
+      "title": "リモート ping を無効化",
+      "level": 3,
+      "content": "以下の行の ACCEPT を DROP に変更してください:\n\n```\n/etc/ufw/before.rules\n```\n\n```\n# ok icmp codes\n-A ufw-before-input -p icmp --icmp-type destination-unreachable -j ACCEPT\n-A ufw-before-input -p icmp --icmp-type source-quench -j ACCEPT\n-A ufw-before-input -p icmp --icmp-type time-exceeded -j ACCEPT\n-A ufw-before-input -p icmp --icmp-type parameter-problem -j ACCEPT\n-A ufw-before-input -p icmp --icmp-type echo-request -j ACCEPT\n```\n\nIPv6 を使っている場合、同じルールが /etc/ufw/before6.rules に存在します。\n\n"
+    },
+    {
+      "title": "UFW のログ出力を無効化",
+      "level": 3,
+      "content": "ログ出力を無効化することで UFW によってメッセージログ (dmesg) が埋まってしまうのを防ぐことができます:\n\n```\n# ufw logging off\n```\n\n"
+    },
+    {
+      "title": "UFW と Docker",
+      "level": 3,
+      "content": "標準モードの Docker は独自の iptables ルールを書き込み、ufw のルールを無視します。これによりセキュリティの問題が発生する可能性があります。解決策は https://github.com/chaifeng/ufw-docker で見つけることができます。\n\n"
+    },
+    {
+      "title": "Gufw",
+      "level": 3,
+      "content": "gufw は Ufw の GTK であり、できるかぎり簡単に Linux のファイアウォールを管理できるように作られています。一般的なポートや p2p アプリケーションのプリセットが存在します。python と ufw、そして GTK のサポートが必要です。\n\n"
+    },
+    {
+      "title": "参照",
+      "level": 2,
+      "content": "- Ubuntu UFW ドキュメント\n- ufw(8) UFW マニュアル\n- ipset を使用して ufw にブロックリストを追加する: https://github.com/poddmo/ufw-blocklist\n\n"
+    }
+  ]
+}

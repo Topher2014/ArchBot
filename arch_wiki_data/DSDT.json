@@ -1,0 +1,71 @@
+{
+  "title": "DSDT",
+  "url": "https://wiki.archlinux.org/title/DSDT",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- ACPI modules\n- acpid\n\nDSDT (Differentiated System Description Table) is a part of the ACPI specification. It supplies information about supported power events in a given system. ACPI tables are provided in firmware from the manufacturer. A common Linux problem is missing ACPI functionality, such as: fans not running, screens not turning off when the lid is closed, etc. This can stem from DSDTs made with Windows specifically in mind, which can be patched after installation. The goal of this article is to analyze and rebuild a faulty DSDT, so that the kernel can override the default one.\n\nBasically a DSDT table is the code run on ACPI (Power Management) events.\n\n"
+    },
+    {
+      "title": "Before you start",
+      "level": 2,
+      "content": "It is possible that the hardware manufacturer has released an updated firmware which fixes ACPI related problems. Installing an updated firmware is often preferred over this method because it would avoid duplication of effort.\n\nThis process does tamper with some fairly fundamental code on your installation. You will want to be absolutely sure of the changes you make. You might also wish to clone your disk beforehand.\n\nEven before attempting to fix your DSDT yourself, you can attempt a couple of different shortcuts:\n\n"
+    },
+    {
+      "title": "Tell the kernel to report a version of Windows",
+      "level": 3,
+      "content": "Use the variable acpi_os_name as a kernel parameter. For example:\n\n```\nacpi_os_name=\"Microsoft Windows NT\"\n```\n\nTo add a recognized OS interface, use the variable acpi_osi.\n\n```\nacpi_osi=\"Linux\"\n```\n\nTo use only one OS interface, add acpi_osi=!. This tells the firmware that there is only one supported operating system, so this is often the recommended solution.\n\n```\nacpi_osi=! acpi_osi=\"Windows 2022\"\n```\n\nTo remove an interface, use a an exclamation point in the beginning of the string.\n\n```\nacpi_osi=\"!Windows 2012\"\n```\n\nOther strings to test:\n\n- \"Microsoft Windows XP\"\n- \"Microsoft Windows 2000\"\n- \"Microsoft Windows 2000.1\"\n- \"Microsoft Windows ME: Millennium Edition\"\n- \"Microsoft WindowsME: Millennium Edition\"\n- \"Windows 2001\"\n- \"Windows 2006\"\n- \"Windows 2009\"\n- \"Windows 2012\"\n- \"Windows 2015\"\n- \"Windows 2020\"\n\nOut of curiousity, you can follow the steps below to extract your DSDT and search the .dsl file. Just grep for \"Windows\" and see what pops up.\n\n"
+    },
+    {
+      "title": "Find a fixed DSDT",
+      "level": 3,
+      "content": "A DSDT file is originally written in ACPI Source language (an .asl/.dsl file). Using a compiler this can produce an 'ACPI Machine Language' file (.aml) or a hex table (.hex). To incorporate the file in your Arch install, you will need to get hold of a compiled .aml file — whether this means compiling it yourself or trusting some stranger on the Internet is at your discretion. If you do download a file from the world wide web, it will most likely be a compressed .asl file. So you will need to unzip it and compile it. The upside to this is that you will not have to research specific code fixes yourself.\n\nArch users with the same laptop as you are: a minority of a minority of a minority. Try browsing other distributions/Linux forums for talk about the same model. It is likely they have the same problems and either because there is a lot of them, or because they are tech savvy — someone there has produced a working DSDT and may even provide a precompiled version (again, use at your own risk). Search engines are your best tools. Try keeping it short: 'model name' + 'dsdt' will probably produce results.\n\n"
+    },
+    {
+      "title": "Recompiling it yourself",
+      "level": 2,
+      "content": "Your best resources in this endeavor are going to be ACPI Spec homepage, and Linux ACPI Project[dead link 2023-09-16 ⓘ] which supercedes the activity that occurred at acpi.sourceforge.net. In a nutshell, you can use Intel's ASL compiler to turn your systems DSDT table into source code, locate/fix the errors, and recompile.\n\nYou will need to install acpica to modify code.\n\nWhat compiled the original code? Check if your system's DSDT was compiled using Intel or Microsoft compiler:\n\n```\n# dmesg | grep DSDT\n```\n\n```\nACPI: DSDT 00000000bf7e5000 0A35F (v02 Intel  CALPELLA 06040000 INTL 20060912)\nACPI: EC: Look up EC in DSDT\n```\n\nIn case Microsoft's compiler had been used, abbreviation INTL would instead be MSFT. In the example, there were 5 errors on decompiling/recompiling the DSDT. Two of them were easy to fix after a bit of googling and delving into the ACPI specification. Three of them were due to different versions of compiler used and are, as later discovered, handled by the ACPICA at boot-time. The ACPICA component of the kernel can handle most of the trivial errors you get while compiling the DSDT. So do not fret yourself over compile errors if your system is working the way it should.\n\nExtract the binary ACPI tables:\n\n```\n# cat /sys/firmware/acpi/tables/DSDT > dsdt.dat\n```\n\nDisassemble the ACPI tables to a .dsl file:\n\n```\n$ iasl -d dsdt.dat\n```\n\nAttempt to create a hex AML table (in C) from the .dsl file:\n\n```\n$ iasl -tc dsdt.dsl\n```\n\nExamine any errors outputted from creating the hex AML table and fix them. For example:\n\n```\ndsdt.dsl   6727:                         Name (_PLD, Buffer (0x10)  \nError    4105 -          Invalid object type for reserved name ^  (found BUFFER, requires Package)\n```\n\nAmend the file at line 6727 where the error occurred:\n\n```\n(_PLD, Package(1) {Buffer (0x10)\n{\n    ...\n}})\n```\n\nIncrease the OEM version. Otherwise, the kernel will not apply the modified ACPI table. For example, before increasing the OEM version:\n\n```\nDefinitionBlock (\"DSDT.aml\", \"DSDT\", 2, \"INTEL \", \"TEMPLATE\", 0x00000000)\n```\n\nAfter increasing the OEM version:\n\n```\nDefinitionBlock (\"DSDT.aml\", \"DSDT\", 2, \"INTEL \", \"TEMPLATE\", 0x00000001)\n```\n\nCreate the hex AML table again after fixing all errors and increasing the OEM version:\n\n```\n$ iasl -tc dsdt.dsl\n```\n\nYou might want to try the option -ic for C include file to insert into kernel source. If no errors and no warnings are raised, you should be good to go.\n\n"
+    },
+    {
+      "title": "Using modified code",
+      "level": 2,
+      "content": "There are at least two ways to use a custom DSDT:\n\n- creating a uncompressed CPIO archive that is loaded by the kernel very early during boot,\n- compiling it into the kernel.\n\n"
+    },
+    {
+      "title": "Using mkinitcpio's acpi_override hook",
+      "level": 3,
+      "content": "mkinitcpio provides an acpi_override hook which takes all .aml files found in /usr/initcpio/acpi_override/ and /etc/initcpio/acpi_override/ and places them in an early uncompressed CPIO archive inside /kernel/firmware/acpi/. This avoids the need to manually create a separate CPIO archive or to change the boot loader configuration since mkinitcpio packs the uncompressed CPIO archive together with the main initramfs image into one file.\n\nFirst, create the /etc/initcpio/acpi_override directory and copy all needed .aml files to it. E.g.:\n\n```\n# mkdir /etc/initcpio/acpi_override\n# cp dsdt.aml /etc/initcpio/acpi_override/\n```\n\nAdd acpi_override to the HOOKS array in /etc/mkinitcpio.conf:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nHOOKS=(... acpi_override)\n```\n\nFinally, regenerate the initramfs and reboot.\n\n"
+    },
+    {
+      "title": "Using a CPIO archive",
+      "level": 3,
+      "content": "This method has the advantage that you do not need to recompile your kernel, and updating the kernel will not make it necessary to repeat these steps.\n\nThis method requires the ACPI_TABLE_UPGRADE=y kernel configuration to be enabled (true for the linux package). See [1] for details.\n\nFirst, create the following folder structure:\n\n```\n$ mkdir -p kernel/firmware/acpi\n```\n\nCopy the fixed ACPI tables into the just created kernel/firmware/acpi folder, for example:\n\n```\n$ cp dsdt.aml ssdt1.aml kernel/firmware/acpi\n```\n\nWithin the same folder where the newly created kernel/ folder resides, run:\n\n```\n$ find kernel | cpio -H newc --create > acpi_override\n```\n\nThis creates the CPIO archive containing the fixed ACPI tables. Copy the archive to the boot directory.\n\n```\n# cp acpi_override /boot\n```\n\nLastly, configure the boot loader to load your CPIO archive. For example, using Systemd-boot, /boot/loader/entries/arch.conf might look like this:\n\n```\ntitle\t Arch Linux\nlinux\t /vmlinuz-linux\ninitrd   /acpi_override\ninitrd\t /initramfs-linux.img\noptions  root=PARTUUID=ec9d5998-a9db-4bd8-8ea0-35a45df04701 resume=PARTUUID=58d0aa86-d39b-4fe1-81cf-45e7add275a0 ...\n```\n\nNow all that is left to do is to reboot and to verify the result.\n\n"
+    },
+    {
+      "title": "Compiling into the kernel",
+      "level": 3,
+      "content": "You will want to be familiar with compiling your own kernel. The most straightforward way is with the \"traditional\" approach. After compiling DSDT, iasl produce two files: dsdt.hex and dsdt.aml.\n\nUsing menuconfig:\n\n- Disable \"Select only drivers that do not need compile-time external firmware\". Located in \"Device Drivers -> Generic Driver Options\".\n- Enable \"Include Custom DSDT\" and specify the absolute path of your fixed DSDT file (dsdt.hex, not dsdt.aml). Located in \"Power management and ACPI options -> ACPI (Advanced Configuration and Power Interface) Support\".\n\n"
+    },
+    {
+      "title": "Using the AML with GRUB",
+      "level": 3,
+      "content": "If you use GRUB you can use an even easier method. Copy the above created .aml file to your boot partition:\n\n```\n# cp dsdt_patch.aml /boot\n```\n\nThen add the following line to your GRUB config:\n\n```\nacpi /dsdt_patch.aml\n```\n\nYou can e.g. add this to /etc/grub.d/40_custom, don't forget to generate your GRUB config afterwards.\n\n"
+    },
+    {
+      "title": "Using the AML with dracut",
+      "level": 3,
+      "content": "If you use Dracut, you can simply copy the above created .aml file to a defined location. An according configuration file /etc/dracut.conf.d/acpi-fix.conf must be created:\n\n```\nacpi_override=\"yes\"\nacpi_table_dir=\"/usr/local/lib/firmware/acpi\"\n```\n\n"
+    },
+    {
+      "title": "Verify successful override",
+      "level": 2,
+      "content": "Look for messages that confirm the override, for example:\n\n```\n# dmesg | grep ACPI\n```\n\n```\n[    0.000000] ACPI: Override [DSDT-   A M I], this is unsafe: tainting kernel\n[    0.000000] ACPI: DSDT 00000000be9b1190 Logical table override, new table: ffffffff81865af0\n[    0.000000] ACPI: DSDT ffffffff81865af0 0BBA3 (v02 ALASKA    A M I 000000F3 INTL 20130517)\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Upgrading ACPI tables via initrd\n- How to Identify the Windows Version in ACPI by Using _OSI\n- How to override ACPI tables with dracut\n\n"
+    }
+  ]
+}

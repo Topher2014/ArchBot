@@ -1,0 +1,51 @@
+{
+  "title": "Full system backup with tar (Español)",
+  "url": "https://wiki.archlinux.org/title/Full_system_backup_with_tar_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2019-11-15** \n\nArtículos relacionados\n\n- Full system backup with SquashFS (Español)\n\nEste artículo le enseñará como hacer una copia de seguridad de todo el sistema con tar.\n\n"
+    },
+    {
+      "title": "Descripción",
+      "level": 2,
+      "content": "Crear una copia de seguridad con tar tiene la ventaja de usar compresión que puede ayudar a guardar espacio en disco, y aportar simplicidad. El proceso solo requiere varios pasos, que son:\n\n1. Arrancar desde un LiveCD.\n1. Pasar al entorno enjaulado de la instalación Linux.\n1. Montar (si hubiesen) otras particiones/discos.\n1. Añadir exclusiones.\n1. Utilizar el script de respaldo para hacer la copia de seguridad\n\nPara reducir al mínimo la inactividad la copia de seguridad puede alternativamente realizarse en un sistema en ejecución usando instantáneas LVM, si todos los sistemas de archivos están montados en volúmenes LVM.\n\n"
+    },
+    {
+      "title": "Arrancar con LiveCD",
+      "level": 2,
+      "content": "Muchos LiveCD, USB... tienen la capacidad de dejarle cambiar al entorno enjaulado de su instalación. Aunque no es requisito montar una jaula para hacer la copia de seguridad, esto proporciona la capacidad para ejecutar el script sin tener que pasarlo a un dispositivo de almacenamiento temporal o tener que ubicarlo en el sistema de archivos. El medio vivo debe compartir con la instalación linux la misma arquitectura (es decir, i686 o x86_64).\n\n"
+    },
+    {
+      "title": "Cambiar a un entorno enjaulado",
+      "level": 2,
+      "content": "Lo primero que debería tener es un entorno de para ejecutar scripts («scripting») en su instalación Linux. Si no sabe lo que es, significa que puede ejecutar cualquier script que pueda tener como si fuera un programa normal. Si no pudiese, vea este artículo para saber como hacerlo. Lo siguiente que necesita es pasar al entorno enjaulado, para aprender más sobre este proceso, lea esto. Dentro de una jaula, no necesita ningún sistema de archivos temporal (/proc, /sys y /dev). Estos sistemas de archivos se inicializan durante el arranque y en verdad no debe hacer una copia de ellos, ya que pueden interferir con la correcta (y necesaria) inicialización del sistema, que puede cambiar con cualquier actualización. Para cambiar al entorno enjaulado, tiene que montar la partición raíz de su instalación Linux. Por ejemplo:\n\n```\nmkdir /mnt/arch\nmount /dev/<su partición o disco>\n```\n\nUse fdisk -l para descubrir sus particiones y discos. Una vez lo sepa, ejecute chroot:\n\n```\ncd /mnt/arch\nchroot . /bin/bash\n```\n\nEste ejemplo claramente usa bash pero puede utilizar otros intérpretes de órdenes si están disponibles. Ahora se encontrará en su entorno de scripting (esto es proporcionado si se haya cargado el archivo de configuración ~/.bashrc al entrar en la jaula):\n\n```\ncat ~/.bash_profile\n# Si usa bash, carga la configuración del archivo local .bashrc\nsource ~/.bashrc\n```\n\n"
+    },
+    {
+      "title": "Montar otras particiones",
+      "level": 2,
+      "content": "Otras particiones que use tendrán que ser montadas en su ubicaciones correspondientes (por ejemplo, si tiene una partición /home separada).\n\n"
+    },
+    {
+      "title": "Excluir archivos",
+      "level": 2,
+      "content": "tar tiene la capacidad de ignorar ciertos archivos y carpetas. La sintaxis requiere colocar cada archivo o carpeta a ignorar en una línea distinta. tar también tiene la capacidad de entender expresiones regulares (regexps). Por ejemplo:\n\n```\n# No copias antiguas                                                               \n/opt/backup/arch-full*                                                                   \n                                                                                \n# No archivos temporales                                                           \n/tmp/*\n\n# No a la caché de pacman\n/var/cache/pacman/pkg/\n...\n```\n\n"
+    },
+    {
+      "title": "Script para realizar la copia de seguridad",
+      "level": 2,
+      "content": "Respaldar con tar es un proceso directo. Aquí tiene un script básico que puede hacerlo y que hace además unas cuantas comprobaciones. Tendrá que modificar este script definiendo la ubicación donde poner la copia, los archivos a excluir (si tiene alguno), y ejecutarlo una vez haya pasado al entorno chroot y montado todas las particiones.\n\n```\n#!/bin/bash\n# Copia completa del sistema\n\n# Destino de la copia\nbackdest=/opt/backup\n\n# Etiquetas para la copia\n#PC=${HOSTNAME}\npc=pavilion\ndistro=arch\ntype=full\ndate=$(date \"+%F\")\nbackupfile=\"$backdest/$distro-$type-$date.tar.gz\"\n\n# Exclusión de ubicación de archivo\nprog=${0##*/} # Nombre de programa según el nombre del archivo\nexcdir=\"/home/<user>/.bin/root/backup\"\nexclude_file=\"$excdir/$prog-exc.txt\"\n\n# Comprobación de jaula\necho -n \"Recuerde hacer chroot desde un LiveCD. ¿Ejecutar la copia de seguridad? (s/n): \"\nread executeback\n\n# Comprobar si el archivo de exclusión existe\nif [ ! -f $exclude_file ]; then\n  echo -n \"No existen ningún archivo excluido, ¿continuar? (s/n): \"\n  read continue\n  if [ $continue == \"n\" ]; then exit; fi\nfi\n\nif [ $executeback = \"s\" ]; then\n  # -p y --xattrs almacenan todos los permisos y atributos extendidos.\n  # Sin ambos, muchos programas dejarán de funcionar.\n  # Es seguro eliminar el indicador detallado (-v). Si estás usando un\n  # terminal lenta, esto puede acelerar el proceso de copia de seguridad.\n  tar --exclude-from=$exclude_file --xattrs -czpvf $backupfile /\nfi\n```\n\n"
+    },
+    {
+      "title": "Restaurar",
+      "level": 2,
+      "content": "Para restaurar desde una copia de seguridad anterior, monte todas las particiones relevantes, cambie el directorio de trabajo actual al directorio raíz y ejecute:\n\n```\nbsdtar --xattrs -xpf $backupfile\n```\n\nreemplazando $backupfile con el archivo de respaldo. La eliminación de todos los archivos que se agregaron desde que se realizó la copia de seguridad debe realizarse manualmente. Recreando los sistemas de archivos es una manera fácil de hacer esto.\n\n"
+    },
+    {
+      "title": "Realizar copia de seguridad con compresión parallel",
+      "level": 2,
+      "content": "Para realizar una copia de seguridad con compresión parallel (SMP), utilice pbzip2 (Parallel bzip2).\n\nPrimero haga una copia de seguridad de los archivos en un archivo tarball simple sin compresión:\n\n```\n# tar -cvf /ruta_de_destino/etc-backup.tar /etc\n```\n\nLuego utilice pbzip2 para comprimirlo con parallel:\n\n```\n$ pbzip2 /ruta/a/directorio/elegid/etc-backup.tar.bz2\n```\n\nAlmacene etc-backup.tar.bz2 en uno o más medios sin conexión, como una memoria USB, disco duro externo o CD-R. Ocasionalmente verifique la integridad del proceso de copia de seguridad comparando los archivos y directorios originales con sus copias de seguridad. Posiblemente mantenga una lista de «hashes» de los archivos respaldados para hacer la comparación más rápida.\n\nRestaure los archivos corruptos de /etc extrayendo el archivo etc-backup.tar.bz2 en un directorio de trabajo temporal y copiando archivos y directorios individuales según sea necesario. Para restaurar todo el directorio /etc con todo su contenido, ejecute la siguiente orden como root:\n\n```\ntar -xvjf etc-backup.tar.bz2 -C /\n```\n\n"
+    }
+  ]
+}

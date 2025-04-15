@@ -1,0 +1,91 @@
+{
+  "title": "Rxvt-unicode/Советы и приёмы",
+  "url": "https://wiki.archlinux.org/title/Rxvt-unicode/%D0%A1%D0%BE%D0%B2%D0%B5%D1%82%D1%8B_%D0%B8_%D0%BF%D1%80%D0%B8%D1%91%D0%BC%D1%8B",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Смотрите главную статью rxvt-unicode.\n\n"
+    },
+    {
+      "title": "Улучшенное поведение как в Kuake, Openbox",
+      "level": 2,
+      "content": "Это первоначально разместил Xyne, на форуме [1], и опирается на xdotool найденный в официальных репозиториях.\n\n"
+    },
+    {
+      "title": "Скриплеты",
+      "level": 3,
+      "content": "Сохраните этот скриплет для urxvtc где-то на вашей системе как urxvtc (например в ~/.config/openbox):\n\n```\n#!/bin/sh\n\nurxvtc \"$@\"\nif [ $? -eq 2 ]; then\n   urxvtd -q -o -f\n   urxvtc \"$@\"\nfi\n```\n\nи сохраните этот скриплет как urxvtq:\n\n```\n#!/bin/bash\n\nwid=$(xdotool search --classname urxvtq)\nif [ -z \"$wid\" ]; then\n  /path/to/urxvtc -name urxvtq -geometry 80x28\n  wid=$(xdotool search --classname urxvtq | head -1)\n  xdotool windowfocus \"$wid\"\n  xdotool key Control_L+l\nelse\n  if [ -z \"$(xdotool search --onlyvisible --classname urxvtq 2>/dev/null)\" ]; then\n    xdotool windowmap \"$wid\"\n    xdotool windowfocus \"$wid\"\n  else\n    xdotool windowunmap \"$wid\"\n  fi\nfi\n```\n\nПредыдущая версия xdotool выдавала ошибку, которая отключала признание видимых окон и, таким образом, привела некоторых пользователей к использованию следующего скриптлета на месте предыдущего. В этом больше нет необходимости, как и в xdotool >= 1.20100416.2809, но он был оставлен здесь для дальнейшего использования.'\n\n```\n#!/bin/bash\n\nwid=$(xprop -name urxvtq | grep 'WM_COMMAND' | awk -F ',' '{print $3}' | awk -F '\"' '{print $2}')\nif [ -z \"$wid\" ]; then\n  /path/to/urxvtc -name urxvtq -geometry 200x28\n  wid=$(xprop -name urxvtq | grep 'WM_COMMAND' | awk -F ',' '{print $3}' | awk -F '\"' '{print $2}')\n  xdotool windowfocus \"$wid\"\n  xdotool key Control_L+l\nelse\n  if [ -z \"$(xprop -id \"$wid\" | grep 'window state: Normal' 2>/dev/null)\" ]; then\n    xdotool windowmap \"$wid\"\n    xdotool windowfocus \"$wid\"\n  else\n    xdotool windowunmap \"$wid\"\n  fi\nfi\n```\n\nУбедитесь, что вы измените /путь/к/urxvtc к фактическому путю скриптлета urxvtc, что вы сохранили выше. Мы будем использовать urxvtc чтобы запустить как обычные экземпляры urxvt и экземпляр как kuake.\n\n"
+    },
+    {
+      "title": "urxvtq с табуляцией",
+      "level": 3,
+      "content": "Если вы хотите, чтобы вкладки были как в kuake urxvtc (здесь называется urxvtq) просто замените третью строчку в urxvtq:\n\n```\nwid=$(xdotool search --name urxvtq)\n```\n\nна:\n\n```\nwid=$(xdotool search --name urxvtq | grep -m 1 \"\" )\n```\n\nДля активации поддержки вкладок, вы можете либо заменить пятую строку вашего urxvtq:\n\n```\n/path/to/urxvtc -name urxvtq -geometry 80x28\n```\n\nна:\n\n```\n/path/to/urxvtc -name urxvtq -pe tabbed -geometry 80x28\n```\n\nили заменить эту строку вашего файла ~/.Xresources:\n\n```\nURxvt.perl-ext-common: default,matcher\n```\n\nна\n\n```\nURxvt.perl-ext-common: default,matcher,tabbed\n```\n\n"
+    },
+    {
+      "title": "Управление Tab",
+      "level": 4,
+      "content": "Table content:\nГорячие клавиши | Описание\nShift+Left | Переход на вкладку слева от текущей\nShift+Right | Переход на вкладку справа от текущей\nShift+Down | Создать новую вкладку\n\nВы также можете использовать мышь для переключения вкладок щелкая по желаемой, и создавать новую вкладку, нажав на [NEW].\\\\\n\nЧтобы закрыть вкладку, введите exit как будто вы нормально закрыли терминал.\n\n"
+    },
+    {
+      "title": "Настройка Openbox",
+      "level": 3,
+      "content": "Теперь добавьте следующие строки в раздел <applications> файла ~/.config/openbox/rc.xml:\n\n```\n<application name=\"urxvtq\">\n   <decor>no</decor>\n   <position force=\"yes\">\n     <x>center</x>\n     <y>0</y>\n   </position>\n   <desktop>all</desktop>\n   <layer>above</layer>\n   <skip_pager>yes</skip_pager>\n   <skip_taskbar>yes</skip_taskbar>\n   <maximized>Horizontal</maximized>\n</application>\n```\n\nи добавьте эти строки в разделе <keyboard>:\n\n```\n<keybind key=\"W-t\">\n  <action name=\"Execute\">\n    <command>/path/to/urxvtc</command>\n  </action>\n</keybind>\n<keybind key=\"W-grave\">\n  <action name=\"Execute\">\n    <execute>/path/to/urxvtq</execute>\n  </action>\n</keybind>\n```\n\nЗдесь тоже необходимо изменить строку /path/to/* (/путь/к/*) чтобы указать на сценарии, которые вы сохранили ранее. Сохраните файл, а затем перенастройте Openbox. Теперь вы можете запускать urxvt с Super+T, и переключать как консоль kuake с Super+` (ковычка на клавише \"ё\").\n\n"
+    },
+    {
+      "title": "Дальнейшая настройка",
+      "level": 3,
+      "content": "Преимущество этой настройки через скрипт Perl urxvt kuake, в том что Openbox предоставляет больше возможностей, привязки клавиш-модификаторов. Сценарий kuake захватывает все физические клавиши, независимо от любой комбинации модификаторов. Для полного диапазона возможностей прочтите Openbox bindings documentation[устаревшая ссылка 2024-10-12 ⓘ].\n\nOpenbox per-app settings[устаревшая ссылка 2024-10-12 ⓘ] могут быть использованы для дальнейшей настройки поведения как консоль kuake (например, положение экрана, слой и т.д.). Вам возможно потребуется изменить параметр \"geometry\" в скриплете urxvtq для регулировки высоты консоли.\n\n"
+    },
+    {
+      "title": "Связанные сценарии",
+      "level": 3,
+      "content": "- hbekel опубликовал обобщенную версию из urxvtq here которая может быть использована для переключения любого приложения, используя xdotool.\n- http://www.jukie.net/~bart/blog/20070503013555 - Сценарий для открытия URL-адреса с помощью клавиатуры, а не мыши.\n\n"
+    },
+    {
+      "title": "Повышение производительности",
+      "level": 2,
+      "content": "- Избегайте использования XFT шрифтов. Если есть необходимость в использовании XFT шрифтов, задайте занчени добавив :antialias=false.[2]\n- Соберите rxvt-unicode с отключением ненужных функций, --disable-xft и в частности --disable-unicode3.[3]\n- Ограничьте количество saveLines (опция -sl)в буфере прокрутки, чтобы уменьшить использование памяти. [4] Используйте tmux для прокрутки буфера и установит saveLines в 0\n- Отключите Perl\n- Пользуйтесь демоном urxvtd запуская клиенты urxvtc.\n\n- Используйте tmux для прокрутки буфера и установит saveLines в 0\n\n"
+    },
+    {
+      "title": "Xinitrc",
+      "level": 4,
+      "content": "Смотрите раздел Примеры в urxvtd(1). Это предпочтительный вариант.\n\nNote: Перед строкой запуска вашего Окружения рабочего стола/Оконного менеджера. Перезапустите Х сервер.\n\n```\nurxvtd -q -f -o &\n```\n\nПеред строкой запуска вашего Окружения рабочего стола/Оконного менеджера. Перезапустите Х сервер.\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 4,
+      "content": "Системная служба:\n\n```\n/etc/systemd/system/urxvtd@.service\n```\n\n```\n[Unit]\nDescription=RXVT-Unicode Daemon\n\n[Service]\nUser=%i\nExecStart=/usr/bin/urxvtd -q -o\n\n[Install]\nWantedBy=multi-user.target\n```\n\nПередайте имя пользователя запустив службу:\n\n```\nurxvtd@username.service\n```\n\nДля службы пользователя, поместите следующие файлы секций, в ~/.config/systemd/user:\n\n```\nurxvtd.service\n```\n\n```\n[Unit]\nDescription=Urxvt Terminal Daemon\nRequires=urxvtd.socket\n\n[Service]\nExecStart=/usr/bin/urxvtd -o -q\nEnvironment=RXVT_SOCKET=%t/urxvtd-%H\n\n[Install]\nWantedBy=MyTarget.target\n```\n\n```\nurxvtd.socket\n```\n\n```\n[Unit]\nDescription=urxvt daemon (socket activation)\nDocumentation=man:urxvtd(1) man:urxvt(1)\n\n[Socket]\nListenStream=%t/urxvtd-%H\n\n[Install]\nWantedBy=sockets.target\n```\n\n"
+    },
+    {
+      "title": "Расширенное управление вкладками",
+      "level": 2,
+      "content": "Установите пакет urxvt-tabbedexAUR, затем добавьте tabbedex значение в URxvt.perl-ext-common X resource в вашем ~/.Xresources:\n\n```\nURxvt.perl-ext-common: ...,tabbedex,...\n```\n\nПо умолчанию, кнопка \"[NEW]\" (которая редко используется и используется только с помощью мыши) отключена при tabbedex. Вы можете снова включить эту функцию, задав new-button:\n\n```\nURxvt.tabbed.new-button: true\n```\n\nВкладки можно назвать с помощью Shift+ ↑ (чтобы подтвердить Enter, и Escape для отмены).\n\nЧтобы автоматически скрывать панель вкладок, когда присутствует только одна вкладка, включите следующий ресурс:\n\n```\nURxvt.tabbed.autohide: true\n```\n\nДля предотвращения закрытия последней вкладки Urxvt, включите следующий ресурс:\n\n```\nURxvt.tabbed.reopen-on-close: yes\n```\n\nЧтобы начать новую вкладку или цикл с помощью вкладок, используйте следующие команды пользователя: tabbedex:(new|next|prev)_tab. Пример отображения:\n\n```\nURxvt.keysym.Control-t: perl:tabbedex:new_tab\nURxvt.keysym.Control-Tab: perl:tabbedex:next_tab\nURxvt.keysym.Control-Shift-Tab: perl:tabbedex:prev_tab\n```\n\nЧтобы определить свои собственные горячие клавиши для переименования вкладки или перемещения вкладки вправо или влево, используйте следующие команды: tabbedex:move_tab_(left|right) и tabbedex:rename_tab. Пример отображения:\n\n```\nURxvt.keysym.Control-Shift-Left: perl:tabbedex:move_tab_left\nURxvt.keysym.Control-Shift-Right: perl:tabbedex:move_tab_right\nURxvt.keysym.Control-Shift-R: perl:tabbedex:rename_tab\n```\n\n```\nURxvt.tabbed.no-tabbedex-keys: true\n```\n\n"
+    },
+    {
+      "title": "Настоящая прозрачность",
+      "level": 3,
+      "content": "Чтобы использовать настоящую прозрачность, вы должны использовать оконный менеджер с поддержкой композитинга, или отдельное приложение для композитинга.\n\nИз командной строки:\n\n```\n$ urxvt -depth 32 -bg rgba:3f00/3f00/3f00/dddd\n```\n\nИспользуя файл настроек:\n\n```\n~/.Xresources\n```\n\n```\nURxvt.depth: 32\nURxvt.background: rgba:1111/1111/1111/dddd\n```\n\nили\n\n```\n~/.Xresources\n```\n\n```\nURxvt.depth: 32\nURxvt.background: [95]#000000\n```\n\nгде '95' является уровень непрозрачности в процентах и '#000000' цвет фона.\n\nЧтобы использовать цвет #302351 т.е. с rgba:rrrr/gggg/bbbb/aaaa синтаксисом это будет rgba:3000/2300/5100/ee00. \"ee00\" (значение альфа) ятобы сделать его красиво прозрачным.\n\n"
+    },
+    {
+      "title": "Родная прозрачность",
+      "level": 3,
+      "content": "Если нет необходимости в настоящей прозрачности, или если композитинг использует слишком много ресурсов на вашей системе, вы можете получить прозрачность следующим образом:\n\n```\n~/.Xresources\n```\n\n```\n! Xresources file\n\nURxvt*.transparent: true\n! URxvt*.shading: 0 to 99 darkens, 101 to 200 lightens\nURxvt*.shading: 110\n```\n\nИспользование установки URxvt*background подтверждает пример выше, URxvt*.shading также будет работать.\n\n"
+    },
+    {
+      "title": "Набор иконок",
+      "level": 2,
+      "content": "По умолчанию URxvt не имеет значка на панели задач. Тем не менее, это можно легко изменить путем добавления строки, указывающей на нужную иконку, в файл ~/.Xresources:\n\n```\nURxvt.iconFile:    /usr/share/icons/Clarity/scalable/apps/terminal.svg\n```\n\n"
+    },
+    {
+      "title": "Используйте urxvt для запуска приложений",
+      "level": 2,
+      "content": "urxvt может быть использован в качестве легкой альтернативы для запуска приложений, таких как gmrunAUR. Запустите urxvt со следующей опцией вида и поведения запуска приложения, или назначьте команду в псевдониме:\n\n```\n$ urxvt -geometry 80x3 -name 'bashrun' -e sh -c \"/bin/bash -i -t\"\n```\n\n"
+    },
+    {
+      "title": "Xterm escape sequences",
+      "level": 2,
+      "content": "It is possible for rxvt-unicode to mimic the Xterm escape sequences. These can be found for arbitrary key combinations by running cat -v inside xterm, then bound in urxvt using keysyms.\n\nTake this word by word movement binding as an example:\n\n```\n~/.Xresources\n```\n\n```\n!Xterm escapes, word by word movement\nURxvt.keysym.Control-Left:    \\033[1;5D\nURxvt.keysym.Control-Right:    \\033[1;5C\n```\n\nFor more information, see ascii(7) and the keysym section of the urxvt(1) man page.\n\n"
+    }
+  ]
+}

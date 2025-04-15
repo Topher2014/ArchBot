@@ -1,0 +1,106 @@
+{
+  "title": "Pacman (Français)/Package signing (Français)",
+  "url": "https://wiki.archlinux.org/title/Pacman_(Fran%C3%A7ais)/Package_signing_(Fran%C3%A7ais)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- GnuPG\n- DeveloperWiki:Package signing\n\nPour déterminer si les paquets sont authentiques, pacman utilise les clés GnuPG dans un modèle de toile de confiance («web of trust»). Les clés de signature principales actuelles se trouvent ici. Au moins trois de ces clés de signature principales sont utilisées pour signer les clés du développeur et de l'utilisateur de confiance. Elles sont ensuite utilisées pour signer leurs paquets. Chaque utilisateur possède également une clé PGP unique, qui est générée lorsque vous configurez pacman-key. C'est ce réseau de confiance qui relie la clé de l'utilisateur aux clés maîtresses.\n\nExemples de réseaux de confiance :\n\n- Paquets personnalisés : Paquets créés et signés avec une clé locale.\n- Paquets non officiels : Paquets faits et signés par un développeur. Ensuite, une clé locale était utilisée pour signer la clé du développeur.\n- Paquets officiels : paquets réalisés et signés par un développeur. La clé du développeur a été signée par les clés maîtresses d'Arch Linux. Vous avez utilisé votre clé pour signer les clés maîtresses, et vous leur faites confiance pour se porter garant des développeurs.\n\n"
+    },
+    {
+      "title": "Configuration de pacman",
+      "level": 3,
+      "content": "L'option SigLevel dans /etc/pacman.conf détermine le niveau de confiance requis pour installer un paquet avec pacman -S. Pour une explication détaillée de SigLevel, consultez pacman.conf(5) § PACKAGE AND DATABASE SIGNATURE CHECKING, et les commentaires du fichier. On peut définir la vérification des signatures globalement ou par dépôt. Si SigLevel est défini globalement dans la section [options], tous les paquets installés avec pacman -S devront être signés. Avec le paramètre LocalFileSigLevel du fichier par défaut pacman.conf, tous les paquets que vous construisez et installez avec pacman -U, n'auront pas besoin d'être signés avec makepkg.\n\nPour les paquets distants, la configuration par défaut ne prendra en charge que l'installation de paquets signés par des clés de confiance :\n\n```\n/etc/pacman.conf\n```\n\n```\nSigLevel = Required DatabaseOptional\n```\n\nTrustedOnly est un paramètre compilé par défaut dans pacman. La configuration par défaut est identique à l'utilisation de l'option globale de :\n\n```\nSigLevel = Required DatabaseOptional TrustedOnly\n```\n\nCe qui précède peut également être réalisé au niveau du dépôt, plus bas dans la configuration, par exemple :\n\n```\n[core]\nSigLevel = PackageRequired\nInclude = /etc/pacman.d/mirrorlist\n```\n\najoute explicitement la vérification de la signature pour les paquets du dépôt, mais n'exige pas que la base de données soit signée. Optional ici désactiverait un Required global pour ce dépôt.\n\n"
+    },
+    {
+      "title": "Initialisation du trousseau de clés",
+      "level": 3,
+      "content": "Pour initialiser le trousseau de clés de pacman, exécutez :\n\n```\n# pacman-key --init\n```\n\nL'initialisation du porte-clés nécessite de l'entropie. Pour générer de l'entropie, déplacez votre souris, tapez des caractères aléatoires sur le clavier ou lancez une activité sur disque (par exemple dans une autre console en exécutant ls -R / ou find / -name foo ou dd if=/dev/sda8 of=/dev/tty7). Si votre système ne dispose pas déjà d'une entropie suffisante, cette étape peut prendre des heures ; si vous générez activement de l'entropie, elle se terminera beaucoup plus rapidement.\n\nLe caractère aléatoire créé est utilisé pour initialiser le trousseau de clés (/etc/pacman.d/gnupg) et la clé de signature GPG de votre système.\n\n"
+    },
+    {
+      "title": "Vérification des clés maîtresses",
+      "level": 3,
+      "content": "La configuration initiale des clés est réalisée en utilisant :\n\n```\n# pacman-key --populate\n```\n\nPrenez le temps de vérifier les Clés de signature maîtresses lorsque vous y êtes invité car elles sont utilisées pour co-signer (et donc faire confiance) aux clés de tous les autres paquets.\n\nLes clés PGP sont trop grandes (2048 bits ou plus) pour que les humains puissent travailler avec, elles sont donc généralement hachées pour créer une empreinte digitale de 40 chiffres hexadécimaux qui peut être utilisée pour vérifier à la main que deux clés sont identiques. Les huit derniers chiffres de l'empreinte digitale servent de nom à la clé, appelé \" ID de clé (court) \" (les seize derniers chiffres de l'empreinte digitale seraient l'\" ID de clé long \").\n\n"
+    },
+    {
+      "title": "Ajout de clés de développeur",
+      "level": 3,
+      "content": "Les clés officielles de développeur et de Trusted Users (TU) sont signées par les clés maîtresses, vous n'avez donc pas besoin d'utiliser pacman-key pour les signer vous-même. Lorsque pacman rencontre une clé qu'il ne reconnaît pas, il vous demandera de la télécharger depuis un keyserver configuré dans /etc/pacman.d/gnupg/gpg.conf. (ou en utilisant l'option --keyserver sur la ligne de commande). Wikipedia maintient une liste de serveurs de clés.\n\nUne fois que vous avez téléchargé une clé de développeur, vous n'aurez pas à la télécharger à nouveau, et elle peut être utilisée pour vérifier tout autre paquet signé par ce développeur.\n\n"
+    },
+    {
+      "title": "Ajout de clés non officielles",
+      "level": 3,
+      "content": "Cette méthode peut être utilisée pour ajouter une clé au trousseau de clés pacman, ou pour activer des dépôts signés dépôts d'utilisateurs non officiels.\n\nTout d'abord, obtenez l'ID de la clé. (keyid) de son propriétaire. Ensuite, ajoutez-la au trousseau en utilisant l'une des deux méthodes suivantes :\n\n1. Si la clé est trouvée sur un serveur de clés, importez-la avec : # pacman-key --recv-keys keyid\n1. Si un lien vers un fichier de clé est fourni, téléchargez-le et exécutez : # pacman-key --add /path/to/downloaded/keyfile\n\n```\n# pacman-key --recv-keys keyid\n```\n\n```\n# pacman-key --add /path/to/downloaded/keyfile\n```\n\nIl est recommandé de vérifier l'empreinte digitale, comme pour toute clé principale ou toute autre clé que vous allez signer :\n\n```\n$ pacman-key --finger keyid\n```\n\nEnfin, vous devez signer localement la clé importée :\n\n```\n# pacman-key --lsign-key keyid\n```\n\nVous avez maintenant confiance en cette clé pour signer les paquets.\n\n"
+    },
+    {
+      "title": "Débogage avec gpg",
+      "level": 3,
+      "content": "Pour des raisons de débogage, vous pouvez accéder au trousseau de clés de pacman directement avec gpg, par exemple :\n\n```\n# gpg --homedir /etc/pacman.d/gnupg --list-keys\n```\n\n"
+    },
+    {
+      "title": "Mettre le système à jour régulièrement",
+      "level": 3,
+      "content": "La mise à jour régulière du système via Pacman (Français)#Mise à jour des paquets permet d'éviter la plupart des erreurs de signature. Si un retard est inévitable et que la mise à jour du système est retardée pendant une période prolongée, synchronisez manuellement la base de données des paquets et mettez à jour le paquet archlinux-keyring avant la mise à jour du système :\n\n```\n# pacman -Sy archlinux-keyring && pacman -Su\n```\n\nCette commande n'est pas considérée comme entraînant des mises à jour partielles puisqu'elle synchronise la base de données des paquets et met à jour le paquet keyring en premier. Les deux doivent être traités juste avant de commencer la mise à jour du système pour s'assurer que les signatures de tous les paquets mis à jour peuvent être correctement vérifiées.\n\n"
+    },
+    {
+      "title": "Mise à jour régulière de l'heure du système",
+      "level": 3,
+      "content": "Lorsque l'heure du système est défectueuse, les clés de signature peuvent être considérées comme expirées (ou invalides) et la vérification des signatures des paquets échouera. Synchronisez régulièrement l'horloge du système en utilisant le daemon Network Time Protocol.\n\n"
+    },
+    {
+      "title": "Erreurs de signature invalide",
+      "level": 3,
+      "content": "pacman-key dépend de l'heure du système. Si l'horloge de votre système n'est pas synchronisée, l'installation/mise à jour du système peut échouer avec :\n\n```\nerror: PackageName: signature from \"User <email@archlinux.org>\" is invalid\nerror: failed to commit transaction (invalid or corrupted package (PGP signature))\nErrors occurred, no packages were upgraded.\n```\n\nSi vous utilisez ntpd, corrigez l'heure du système (en tant que root) avec ntpd -qg suivi de hwclock -w.\n\nD'autres clients NTP peuvent être utilisés. Consultez synchronisation du temps.\n\nSi la correction de l'horloge système ne résout pas le problème, essayez l'une des approches suivantes :\n\n"
+    },
+    {
+      "title": "Suppression de paquets du cache",
+      "level": 4,
+      "content": "Certains paquets peuvent être corrompus ou non signés, ce qui provoque l'échec. Supprimez chaque paquet incriminé du cache système rm /var/cache/pacman/pkg/pkgname afin qu'il soit fraîchement téléchargé, ou nettoyez tout le cache.\n\n"
+    },
+    {
+      "title": "Réinitialisation de toutes les clés",
+      "level": 4,
+      "content": "Supprimez ou réinitialisez toutes les clés installées sur votre système en supprimant le répertoire /etc/pacman.d/gnupg (en tant que root) et en réexécutant pacman-key --init suivi de pacman-key --populate pour réinstaller les clés par défaut.\n\n"
+    },
+    {
+      "title": "Désactiver la vérification des signatures",
+      "level": 4,
+      "content": "Si vous n'êtes pas concerné par la signature des paquets, vous pouvez désactiver complètement la vérification des signatures PGP. Éditez /etc/pacman.conf et pour obtenir les lignes suivante sous [options] :\n\n```\nSigLevel = Never\n#LocalFileSigLevel = Optional\n#RemoteFileSigLevel = Required\n```\n\nVous devez commenter tous les paramètres SigLevel spécifiques au dépôt car ils remplacent les paramètres globaux. Il n'y aura pas de vérification de signature, ce qui était le comportement avant pacman 4. Si vous faites cela, vous n'avez pas besoin de configurer un trousseau de clés avec pacman-key. Vous pouvez changer ces options plus tard si vous décidez d'activer la vérification des paquets.\n\n"
+    },
+    {
+      "title": "Impossible d'importer des clés",
+      "level": 3,
+      "content": "Il y a plusieurs sources possibles de ce problème :\n\n- Un paquet archlinux-keyring périmé.\n- Une date incorrecte.\n- Votre FAI a bloqué le port utilisé pour importer les clés PGP.\n- Votre cache pacman contient des copies de paquets non signés provenant de tentatives précédentes.\n- dirmngr n'est pas correctement configuré\n- Vous n'avez pas effectué de mise à jour depuis longtemps et gpg/pacman ne le gère pas bien.\n\nVous pouvez être bloqué à cause d'un paquet archlinux-keyring périmé lors d'une synchronisation de mise à jour.\n\nVous trouverez ci-dessous quelques solutions qui pourraient fonctionner selon votre cas.\n\n"
+    },
+    {
+      "title": "Mettre à jour le système",
+      "level": 4,
+      "content": "Vérifiez si une mise à jour du système peut résoudre le problème en premier.\n\n"
+    },
+    {
+      "title": "Changer le serveur de clés",
+      "level": 4,
+      "content": "Si vous pensez que quelque chose ne fonctionne pas correctement avec le serveur de clés, vous pouvez essayer de passer au serveur de clés d'Ubuntu. Pour cela, éditez /etc/pacman.d/gnupg/gpg.conf et changez la ligne keyserver en :\n\n```\nkeyserver hkp://keyserver.ubuntu.com\n```\n\n"
+    },
+    {
+      "title": "Nettoyer les paquets mis en cache",
+      "level": 4,
+      "content": "Si vous pensez que votre cache de pacman à /var/cache/pacman/pkg/ contient des paquets non signés, essayez de nettoyer le cache manuellement ou exécutez :\n\n```\n# pacman -Sc\n```\n\nqui supprime tous les paquets en cache qui n'ont pas été installés.\n\n"
+    },
+    {
+      "title": "La signature est de confiance inconnue",
+      "level": 3,
+      "content": "Parfois, en exécutant pacman -Syu, vous pouvez rencontrer cette erreur :\n\n```\nerror: package-name: signature from \"packager\" is unknown trust\n```\n\nCela se produit parce que la clé du packager utilisée dans le paquet package-name n'est pas présente et/ou n'est pas fiable dans la base de données gpg locale pacman-key. Pacman ne semble pas toujours être capable de vérifier si la clé a été reçue et marquée comme fiable avant de continuer. Cela peut également être dû au fait qu'une clé a expiré depuis qu'elle a été ajoutée à votre trousseau de clés.\n\nCompensez en :\n\n- Mettant à jour manuellement le paquet archlinux-keyring avant la mise à jour du système, ou\n- Rafraîchissant vos clés avec pacman-key --refresh-keys, ou\n- réinitialisant toutes les clés, ou\n- signant manuellement la clé non fiable localement (non recommandé), ou\n- Définissant temporairement SigLevel à TrustAll (non recommandé).\n\nLes deux dernières options ci-dessus brisent la chaîne de confiance, et doivent être utilisées avec précaution.\n\n"
+    },
+    {
+      "title": "Mise à jour des clés via un proxy",
+      "level": 3,
+      "content": "Afin d'utiliser un proxy lors de la mise à jour des clés, l'option honor-http-proxy doit être définie à la fois dans /etc/gnupg/dirmngr.conf et /etc/pacman.d/gnupg/dirmngr.conf. Consultez GnuPG#Use a keyserver pour plus d'informations.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Proposition de signature de paquet pour Pacman sur le wiki des développeurs (en anglais).\n- Signature des paquets Pacman - 1 : Makepkg et Repo-add\n- Signature des paquets Pacman - 2 : Pacman-key\n- Signature du paquet Pacman - 3 : Pacman\n- Signature de paquet Pacman - 4 : Arch Linux\n\n"
+    }
+  ]
+}

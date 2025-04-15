@@ -1,0 +1,66 @@
+{
+  "title": "Keyboard configuration in console (Español)",
+  "url": "https://wiki.archlinux.org/title/Keyboard_configuration_in_console_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-03** \n\nArtículos relacionados\n\n- Xorg/Configuración de teclado\n- Keyboard input\n- Consola de Linux#Tipografías\n\nLos mapas de teclas (keymaps) para la consola virtual, las tipografías de consola y los mapas de consola son proporcionados por el paquete kbd (una dependencia de systemd), que también proporciona muchas herramientas de bajo nivel para administrar la consola virtual. Además, systemd también proporciona la herramienta localectl, que puede controlar tanto el sistema locale como la configuración de diseño del teclado tanto para la consola virtual como para Xorg.\n\n"
+    },
+    {
+      "title": "Ver la configuración del teclado",
+      "level": 2,
+      "content": "Utilice localectl status para ver las configuraciones actuales del teclado.\n\n"
+    },
+    {
+      "title": "Mapas de teclado",
+      "level": 2,
+      "content": "Los archivos de mapa de teclas se almacenan en el árbol de directorio /usr/share/kbd/keymaps/. Por lo general, un archivo de mapa de teclas corresponde a una distribución de teclado (la instrucción include se puede utilizar para compartir partes comunes y un archivo de mapa de teclas puede contener múltiples diseños con alguna combinación de teclas utilizada para cambiarlas). Para más detalles véase keymaps(5).\n\n"
+    },
+    {
+      "title": "Listar mapas de teclado",
+      "level": 3,
+      "content": "Las convenciones de nomenclatura de los mapas de teclado de la consola son algo arbitrarias, pero generalmente se basan en:\n\n- Códigos de idioma: donde el código de idioma es el mismo que el código de país (p.e. es para Español, o fr para Francés).\n- Códigos de pais: donde se utilizan variaciones del mismo idioma en diferentes países (p.e.uk para el inglés del Reino Unido, o us para el inglés de los Estados Unidos); También se puede encontrar una lista de códigos de país en wikipedia:es:ISO 3166-1#Códigos oficialmente asignados.\n- Distribución de teclado: donde la distribución no está relacionada con un país o idioma en particular (p.e. dvorak para la distribución de teclado Dvorak).\n\nPara obtener una lista de todos los mapas de teclados disponibles, utilice el comando:\n\n```\n$ localectl list-keymaps\n```\n\nPara buscar un mapa de teclas, utilice la orden siguiente, reemplazando término_de_búsqueda con el código de su idioma, país o diseño:\n\n```\n$ localectl list-keymaps | grep -i término_de_búsqueda\n```\n\nAlternativamente, utilizando find:\n\n```\n$ find /usr/share/kbd/keymaps/ -type f\n```\n\n"
+    },
+    {
+      "title": "Loadkeys",
+      "level": 3,
+      "content": "Es posible establecer un mapa de teclas solo para la sesión actual. Esto es útil para probar diferentes mapas de teclado, resolver problemas, etc.\n\nLa herramienta loadkeys se utiliza para este fin, es utilizado internamente por systemd al cargar el mapa de teclas configurado en /etc/vconsole.conf. Se puede utilizar de manera muy simple para este propósito:\n\n```\n# loadkeys mapa_de_teclado\n```\n\nVéase loadkeys(1) para más detalles.\n\n"
+    },
+    {
+      "title": "Configuración persistente",
+      "level": 3,
+      "content": "Se puede establecer un mapa de teclas persistente en /etc/vconsole.conf, que systemd lee al inicio. La variable KEYMAP se utiliza para especificar el mapa de teclas. Si la variable está vacía o no está establecida, se utiliza como valor predeterminado el mapa de teclas us. Véase vconsole.conf(5) para todas las opciones. Por ejemplo:\n\n```\n/etc/vconsole.conf\n```\n\n```\nKEYMAP=es\n...\n```\n\nPor conveniencia, localectl puede utilizarse para configurar el mapa de teclas de la consola. Cambiará la variable KEYMAP en /etc/vconsole.conf y también establecerá el mapa de teclas para la sesión actual:\n\n```\n$ localectl set-keymap --no-convert mapa_de_teclado\n```\n\nLa opción --no-convert puede utilizarse para evitar que localectl cambie automáticamente el mapa de teclas de Xorg a la coincidencia más cercana. Véase localectl(1) para obtener más información.\n\nSi es necesario, el mapa de teclas de /etc/vconsole.conf se puede cargar durante el espacio de usuario temprano mediante el hook mkinitcpio keymap.\n\n"
+    },
+    {
+      "title": "Crear un mapa de teclas personalizado",
+      "level": 3,
+      "content": "Al utilizar la consola, puede usar teclas de acceso rápido para imprimir un carácter específico. Además, también podemos imprimir una secuencia de caracteres y algunas secuencias de escape. Por lo tanto, si imprimimos la secuencia de caracteres que constituyen una orden y luego un carácter de escape para una nueva línea, esa orden se ejecutará.\n\nUn método para hacerlo es editar el archivo del mapa de teclas. Sin embargo, dado que se reescribirá cada vez que se actualice el paquete al que pertenece, no se recomienda editar este archivo. Es mejor integrar el mapa de teclas existente con un mapa de teclas personal. La utilidad loadkeys puede hacer esto.\n\nPrimero, cree un archivo de mapa de teclas. Este archivo de mapa de teclas puede estar en cualquier lugar, pero un método es imitar la jerarquía de directorios en /usr/local:\n\n```\n# mkdir -p /usr/local/share/kbd/keymaps\n# vim /usr/local/share/kbd/keymaps/personal.map\n```\n\nComo nota al margen, vale la pena señalar que dicho mapa de teclas personal también es útil para redefinir el comportamiento de las teclas ya tratadas por el mapa de teclas predeterminado: cuando se cargan con loadkeys, las directivas en el mapa de teclas predeterminado serán reemplazadas cuando entran en conflicto con las nuevas directivas y se conservan en caso contrario. De esta manera, solo los cambios en el mapa de teclas deben especificarse en el mapa de teclas personal.\n\n"
+    },
+    {
+      "title": "Añadir directivas",
+      "level": 4,
+      "content": "Se requieren dos tipos de directivas en este mapa de teclas personal. En primer lugar, las directivas keycode, que coincide con el formato que se ve en los mapas de teclas predeterminados. Estas directivas asocian un keycode con un keyym. Los keysyms representan acciones del teclado. Las acciones disponibles incluyen salida de códigos de caracteres o secuencias de caracteres, cambio de consolas o mapas de teclas, arranque de la máquina y muchas otras. El mapa de teclas completo actualmente activo se puede obtener con\n\n```\n# dumpkeys -l\n```\n\nLa mayoría de los keyyms son intuitivos. Por ejemplo, para configurar la tecla 112 para que emita una 'e', ​​la directiva será:\n\n```\nkeycode 112  = e\n```\n\nPara configurar la tecla 112 para que emita un símbolo del euro, la directiva será:\n\n```\nkeycode 112 = euro\n```\n\nAlgunas teclas no están conectadas inmediatamente a las acciones de un teclado. En particular, los keyyms prefijados por una F mayúscula y de uno a tres dígitos (F1-F246) que constituyen un número mayor que 30 están siempre libres. Esto es útil al dirigir una tecla de acceso rápido para generar una secuencia de caracteres y otras acciones:\n\n```\nkeycode 112 = F70\n```\n\nEntonces, F70 puede vincularse para generar una cadena específica:\n\n```\nstring F70 = \"Hello\"\n```\n\nCuando se presiona la tecla 112, generará el contenido de F70. Para ejecutar una orden impresa en una terminal, se debe añadir un carácter de escape de nueva línea al final de la cadena de la orden. Por ejemplo, para entrar un sistema en hibernación, se añade el siguiente mapa de teclas:\n\n```\nstring F70 = \"sudo /usr/sbin/hibernate\\n\"\n```\n\n"
+    },
+    {
+      "title": "Otros ejemplos",
+      "level": 4,
+      "content": "- Para hacer que la tecla Alt derecha sea igual a la tecla Alt izquierda (para Emacs), utilice la siguiente línea en su mapa de teclas. Incluirá el archivo /usr/share/kbd/keymaps/i386/include/linux-with-two-alt-keys.inc, consúltelo para obtener más detalles.\n\n```\ninclude \"linux-with-two-alt-keys\"\n```\n\n- Para intercambiar Bloq Mayús (Caps_Lock) con Escape (para Vim), vuelva a asignar los respectivos keycodes:\n\n```\nkeycode 1 = Caps_Lock\nkeycode 58 = Escape\n```\n\n- Para hacer que Bloq Mayús sea otra tecla de control, vuelva a asignar el respectivo keycode:\n\n```\nkeycode 58 = Control\n```\n\n- Para intercambiar Bloq Mayús con la tecla de control izquierda, vuelva a asignar los respectivos keycodes:\n\n```\nkeycode 29 = Caps_Lock\nkeycode 58 = Control\n```\n\n"
+    },
+    {
+      "title": "Guardar los cambios",
+      "level": 4,
+      "content": "Para utilizar el mapa de teclas personal, debe cargarse con loadkeys:\n\n```\n# loadkeys /usr/local/share/kbd/keymaps/personal.map\n```\n\nSin embargo, este mapa de teclas solo está activo para la sesión actual. Para cargar el mapa de teclas en el arranque, especifique la ruta completa al archivo en la variable KEYMAP en /etc/vconsole.conf. El archivo no tiene que estar comprimido como los mapas de teclas oficiales proporcionados por kbd.\n\n"
+    },
+    {
+      "title": "Ajustar el retraso y la velocidad tipográfica",
+      "level": 2,
+      "content": "El retraso tipográfico indica la cantidad de tiempo (generalmente en milisegundos) que una tecla debe presionarse y mantenerse para que comience el proceso de repetición. Después de que se haya activado el proceso de repetición, el carácter se repetirá con una cierta frecuencia (dada generalmente en Hz) especificada por la velocidad tipográfica. Estos valores se pueden cambiar utilizando la orden kbdrate. Tenga en cuenta que estos ajustes se configuran por separado para la consola virtual y para Xorg.\n\n```\n# kbdrate [-d retardo] [-r velocidad]\n```\n\nPor ejemplo, para establecer un retraso tipográfico a 200ms y una velocidad tipográfica a 30Hz, utilice la siguiente orden:\n\n```\n# kbdrate -d 200 -r 30\n```\n\nLa emisión de la orden sin especificar el retraso y la velocidad restablecerá los valores tipográficos a sus valores predeterminados respectivos; un retraso de 250ms y una velocidad de 11Hz:\n\n```\n# kbdrate\n```\n\n"
+    },
+    {
+      "title": "Servicio systemd",
+      "level": 3,
+      "content": "Se puede utilizar un servicio systemd para establecer la velocidad del teclado. Por ejemplo:\n\n```\n/etc/systemd/system/kbdrate.service\n```\n\n```\n[Unit]\nDescription=Velocidad de repetición del teclado en tty.\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nStandardInput=tty\nStandardOutput=tty\nExecStart=/usr/bin/kbdrate -s -d 450 -r 60\n \n[Install]\nWantedBy=multi-user.target\n```\n\nEntonces inicie/active el servicio de systemd kbdrate.service.\n\n"
+    }
+  ]
+}

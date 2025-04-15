@@ -1,0 +1,116 @@
+{
+  "title": "Subversion (Español)",
+  "url": "https://wiki.archlinux.org/title/Subversion_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2018-11-22** \n\nApache Subversion es «un completo sistema de control de versiones originalmente diseñado para ser un mejor CVS. Desde entonces, Subversion se ha expandido más allá de su objetivo original de reemplazar CVS, pero su modelo básico, diseño e interfaz siguen siendo fuertemente influenciados por ese objetivo».\n\nEste artículo trata sobre la configuración de un servidor svn en su máquina. Hay dos servidores svn populares, el vnserve incorporado y la opción más avanzada, Apache HTTP Server con complementos svn.\n\n"
+    },
+    {
+      "title": "Objetivos",
+      "level": 3,
+      "content": "El objetivo de este ejemplo es configurar Subversion, con Apache. ¿Por qué usar Apache para Subversion? Bueno, sencillamente, proporciona características que el svnserve independiente no tiene...\n\n- Soporte HTTPS. Esto es más seguro que la autenticación MD5 utilizada por svnserve.\n- Controles de acceso de grano fino. Puede utilizar la autenticación de Apache para limitar los permisos por directorio. Esto significa que puede otorgar acceso de lectura a todo, pero solo puede confirmar el acceso al troncal, mientras que otro grupo tiene acceso de confirmación a etiquetas o sucursales.\n- Un visor de repositorio gratuito.\n- El equipo de Subversion está trabajando en la integración perfecta de WebDAV. En algún momento, debería poder utilizar cualquier interfaz WebDAV para actualizar los archivos en el repositorio.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale Apache HTTP Server como se describe en su artículo.\n\nAdemás de Apache, solo necesitará instalar el paquete subversion.\n\n"
+    },
+    {
+      "title": "Configuración de Subversion",
+      "level": 3,
+      "content": "Cree un directorio para sus repositorios:\n\n```\n# mkdir -p /home/svn/repositories\n```\n\n"
+    },
+    {
+      "title": "Editar /etc/httpd/conf/httpd.conf",
+      "level": 4,
+      "content": "Asegúrese que lo siguiente esté listado... Si no, agréguelos (normalmente tendrá que agregar solo los dos últimos), deben estar en este orden:\n\n```\nLoadModule dav_module           modules/mod_dav.so\nLoadModule dav_fs_module        modules/mod_dav_fs.so\nLoadModule dav_svn_module       modules/mod_dav_svn.so\nLoadModule authz_svn_module     modules/mod_authz_svn.so\n```\n\n"
+    },
+    {
+      "title": "¿SSL o no SSL?",
+      "level": 4,
+      "content": "SSL para el acceso SVN tiene algunos beneficios, por ejemplo, le permite usar el Autotipo Básico de Apache, con poco temor a que alguien esté buscando contraseñas.\n\nGenere el certificado:\n\n```\n# cd /etc/httpd/conf/\n# openssl req -new -x509 -keyout server.key -out server.crt -days 365 -nodes\n```\n\nAgregue lo siguiente a /etc/httpd/conf/extra/httpd-ssl.conf (o a /etc/httpd/conf/extra/httpd-vhosts.conf Si no está utilizando ssl). Incluya lo siguiente dentro de una directiva de host virtual:\n\n```\n<Location /svn>\n   DAV svn\n   SVNParentPath /home/svn/repositories\n   AuthzSVNAccessFile /home/svn/.svn-policy-file\n   AuthName \"SVN Repositories\"\n   AuthType Basic\n   AuthUserFile /home/svn/.svn-auth-file\n   Require valid-user\n</Location>\n```\n\nPara asegurarse de que la configuración de SSL se cargue, elimine el comentario de la línea de configuración de SSL en /etc/httpd/conf/httpd.conf para que se vea así:\n\n```\nLoadModule ssl_module modules/mod_ssl.so\nLoadModule socache_shmcb_module modules/mod_socache_shmcb.so\nInclude /etc/httpd/conf/extra/httpd-ssl.conf\n```\n\n"
+    },
+    {
+      "title": "Crear /home/svn/.svn-policy-file",
+      "level": 4,
+      "content": "```\n[/]\n* = r\n\n[REPO_NAME:/]\nUSER_NAME = rw\n```\n\nEl * en la sección / coincide con los usuarios anónimos. Cualquier acceso por encima y más allá de solo lectura se le pedirá un usuario/contraseña por apache AuthType Basic. La sección REPO_NAME:/ hereda los permisos de los anteriores, por lo que los usuarios no tienen permiso de solo lectura. El último bit otorga permiso de lectura/escritura del repositorio REPO_NAME al usuario USER_NAME.\n\n"
+    },
+    {
+      "title": "Crear /home/svn/.svn-auth-file",
+      "level": 4,
+      "content": "Esto es un archivo htpasswd o htdigest. Utilice htpasswd. Nuevamente, debido a SSL, no debe preocuparse tanto por el rastreo de contraseñas. htdigest proporcionaría aún más seguridad en comparación con la inhalación, pero en este momento no lo necesita. Ejecute la siguiente orden.\n\n```\n# htpasswd -cs /home/svn/.svn-auth-file USER_NAME\n```\n\nLo anterior crea el archivo (-c) y usa SHA-1 para almacenar la contraseña (-s). Se crea el usuario USER_NAME.\n\nPara agregar usuarios adicionales, omita la marca (-c).\n\n```\n# htpasswd -s /home/svn/.svn-auth-file OTHER_USER_NAME\n```\n\n"
+    },
+    {
+      "title": "Crear un repositorio",
+      "level": 4,
+      "content": "```\n# svnadmin create /home/svn/repositories/REPO_NAME\n```\n\n"
+    },
+    {
+      "title": "Establecer permisos",
+      "level": 4,
+      "content": "El usuario de Apache necesita permisos sobre el nuevo repositorio.\n\n```\n# chown -R http:http /home/svn/repositories/REPO_NAME\n```\n\n"
+    },
+    {
+      "title": "Estructura de directorio para proyecto",
+      "level": 4,
+      "content": "Cree un directorio temporal con la estructura de directorio branches tags trunk en su máquina de desarrollo.\n\n```\n$ mkdir -p ~/svn-import/{ramas, etiquetas, principal}\n```\n\n"
+    },
+    {
+      "title": "Poblar el directorio",
+      "level": 4,
+      "content": "Copie o mueva los archivos de origen de su proyecto al directorio principal creado.\n\n```\n$ cp -R /my/existing/project/* ~/svn-import/trunk\n```\n\n"
+    },
+    {
+      "title": "Importar el proyecto",
+      "level": 4,
+      "content": "```\n$ svn import -m \"Initial import\" ~/svn-import https://yourdomain.net/svn/REPO_NAME/\n```\n\n"
+    },
+    {
+      "title": "Revisar prueba SVN",
+      "level": 4,
+      "content": "```\n$ svn checkout https://yourdomain.net/svn/REPO_NAME/ /my/svn/working/copy\n```\n\nSi todo funcionó, ahora debería tener una copia revisada y en funcionamiento de su repositorio SVN recién creado.\n\n"
+    },
+    {
+      "title": "Instalar el paquete",
+      "level": 3,
+      "content": "Instale el paquete subversion.\n\n"
+    },
+    {
+      "title": "Crear un repositorio",
+      "level": 3,
+      "content": "Cree su repositorio\n\n```\nmkdir /path/to/repos/\nsvnadmin create /path/to/repos/repo1\n```\n\nSu repositorio inicial está vacío, si desea importar archivos en él, use la siguiente orden:\n\n```\nsvn import ~/code/project1 file:///path/to/repos/repo1 --message 'Initial repository layout'\n```\n\n"
+    },
+    {
+      "title": "Establecer políticas de acceso",
+      "level": 3,
+      "content": "Edite el archivo /path/to/repos/repo1/conf/svnserve.conf y elimine el comentario o agregue la línea debajo de [general]\n\n```\npassword-db = passwd\n```\n\nEs posible que también desee cambiar la opción predeterminada para usuarios anónimos.\n\n```\nanon-access = read\n```\n\nReemplace «read» con «write» para un repositorio en el que cualquiera pueda comprometerse, o configúrelo en «none» para deshabilitar todo el acceso anónimo.\n\nAhora edite el archivo /path/to/repos/repo1/conf/passwd\n\n```\n[users]\nharry = foopassword\nsally = barpassword\n```\n\nLo anterior define a los usuarios harry y sally, con contraseñas foopassword y barpassword, cámbielas como desee.\n\n"
+    },
+    {
+      "title": "Iniciar el demonio del servidor",
+      "level": 3,
+      "content": "Antes de iniciar el servidor, edite el archivo de configuración:\n\n```\n/etc/conf.d/svnserve\n```\n\n```\nSVNSERVE_ARGS=\"--root=/path/to/repos\"\n```\n\nLa opción --root=/path/to/repos establece la raíz del árbol del repositorio. Si tiene varios repositorios, use --root=/path-to/reposparent. Luego acceda a los repositorios independientes pasando el nombre del repositorio en la URL: svn://host/repo1. asegúrese de que el usuario tenga acceso de lectura / escritura a los archivos del repositorio.\n\nOpcionalmente, agregue un --listen-port si desea un puerto diferente u otras opciones.\n\nPor defecto, el servicio se ejecuta como root. Si desea cambiar eso, agregue un drop-in:\n\n```\n/etc/systemd/system/svnserve.service.d/50-custom.conf\n```\n\n```\n[Service]\nUser=svn\n```\n\nAhora inicie el daemon svnserve.service.\n\n"
+    },
+    {
+      "title": "svn+ssh",
+      "level": 3,
+      "content": "Para usar svn+ssh: //, tenemos que tener un contenedor escrito para svnserve.\n\nCompruebe dónde se encuentran los binarios svnserve:\n\n```\n# which svnserve\n/usr/local/bin/svnserve\n```\n\nNuestro contenedor tendrá que caer en PATH antes de esta ubicación ...\n\ncree el contenedor:\n\n```\n# touch /usr/bin/svnserve\n# chmod 755 /usr/bin/svnserve\n```\n\nAhora edítelo para que se vea así:\n\n```\n/usr/bin/svnserve \n#!/bin/sh\n# wrapper script for svnserve\numask 007\n/usr/local/bin/svnserve -r /path/to \"$@\"\n```\n\n-r /path/to es lo que hace uso de la svn con svn+ssh://server.domain.com:/reponame en lugar de :/path/to/reponame.\n\nInicie svnserve con el nuevo script de contenedor de esta manera:\n\n```\n# /usr/bin/svnserve -d  ( start daemon mode )\n```\n\nTambién podemos verificar los permisos para usuarios remotos como este:\n\n```\n$ svn ls svn+ssh://server.domain.com:/reponame\n++server.domain.com++\ndev/\nqa/\nrelease/\n```\n\n"
+    },
+    {
+      "title": "Copia de seguridad y restauración de Subversion",
+      "level": 2,
+      "content": "Para hacer una copia de seguridad de sus repositorios de Subversion, haga esto para cada repositorio que tenga.\n\n```\n$ svnadmin dump /path/to/reponame > /tmp/reponame.dump\n$ scp -rp /tmp/reponame.dump user@server.domain.com:/tmp/\n```\n\nPara restaurar la copia de seguridad, cree primero los repositorios correspondientes:\n\n```\nsvnadmin create /path/to/reponame\n```\n\nLuego cargue svn dump en el nuevo repositorio:\n\n```\nsvnadmin load /path/to/reponame < /tmp/repo1.dump\n```\n\nPermisos de configuración:\n\n```\nchown -R svn:svnusers /path/to/reponame ; \nchmod -R g+w /path/to/reponame/db/\n```\n\nEstos repositorios ahora deberían estar todos configurados.\n\n"
+    },
+    {
+      "title": "Clientes Subversion",
+      "level": 2,
+      "content": "Vea también Wikipedia:Comparison of Subversion clients.\n\n- kdesvn — Cliente Subversion para KDE.\n\n- RabbitVCS — Conjunto de herramientas gráficas escritas para proporcionar acceso simple y directo a los sistemas de control de versiones que utiliza.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- https://svnbook.red-bean.com/en/1.1/svn-book.html#svn-ch-9-sect-2.2-re-load\n- https://subversion.apache.org/\n\n"
+    }
+  ]
+}

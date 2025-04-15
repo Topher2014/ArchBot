@@ -1,0 +1,91 @@
+{
+  "title": "Plex (Español)",
+  "url": "https://wiki.archlinux.org/title/Plex_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2020-12-04** \n\nPlex es un sistema de reproducción multimedia y un conjunto de software que consiste en muchas aplicaciones de reproducción para interfaces de usuario 10-foot además de un servidor de medios que organiza los medios almacenados localmente. Los canales Plex integrados proporcionan a los usuarios acceso a un número creciente de proveedores de contenido en línea como YouTube, Vimeo, TEDTalks, y CNN entre otros. Plex también proporciona integración para servicios en la nube como Dropbox, Box, Google Drive, o Copy.\n\nPlex para Linux se divide en un servidor de código cerrado Plex Media Server, y un cliente de código abierto Plex Home Theater, el cual es una bifurcación del conocido proyecto Kodi.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale el paquete plex-media-serverAUR, o el paquete plex-media-server-plexpassAUR si tiene un Plex Pass.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 3,
+      "content": "Inicie/active la unidad de systemd plexmediaserver.service.\n\nPara empezar a configurar el servidor de Plex, navegue a http://localhost:32400/web/.\n\nPara configurar el servidor de Plex remotamente, puede crear primero un túnel SSH (la configuración sólo puede hacerse desde localhost)\n\nssh direccion.ip.del.servidor -L 8888:localhost:32400\n\ny luego acceder a http://localhost:8888/web/.\n\no, si está ejecutando apache, con un proxy inverso, añadiendo esta configuración en httpd-vhosts.conf\n\n```\n<VirtualHost *:80>\n   ServerName direccion.ip.del.servidor\n   ProxyPass / http://localhost:32400/\n   ProxyPassReverse / http://localhost:32400/\n </VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "Plugins",
+      "level": 3,
+      "content": "PMS puede ser mejorado con plugins adicionales. Por ejemplo, PMS puede ser utilizado como un cliente IPTV con el plugin IPTV.\n\nLos plugins pueden ser instalados dentro de /var/lib/plex/Plex Media Server/Plug-ins.\n\n"
+    },
+    {
+      "title": "Plex Live TV y DVR",
+      "level": 3,
+      "content": "La TV en vivo de Plex requiere un Plex Pass.\n\nPara activar la visualización de TV en vivo y el soporte de DVR con plex, debe tener uno de los sintonizadores compatibles listados en la página de soporte y plex-media-server-plexpassAUR instalado. PMS reconocerá automáticamente cualquier sintonizador conectado.\n\nEl usuario de plex debe ser parte del grupo video para poder acceder a los sintonizadores locales. Esto puede hacerse ejecutando usermod -a -G video plex\n\nPara activar el soporte de IPTV a través de listas de reproducción m3u instale xTeVeAUR.\n\n"
+    },
+    {
+      "title": "Seguridad",
+      "level": 3,
+      "content": "Se recomienda almacenar los archivos multimedia fuera de su directorio principal, ya que hacerlo accesible a PMS significaría disminuir su seguridad. Tener una partición separada /media o /mnt/media una buena configuración para usar con PMS.\n\nPuedes aumentar aún más la seguridad a través de systemd, editando plexmediaserver.service de la siguiente manera:\n\n```\n/etc/systemd/system/plexmediaserver.service.d/restrict.conf\n```\n\n```\n[Service]\nReadOnlyPaths=/\nReadWritePaths=/var/lib/plex /tmp\n```\n\n"
+    },
+    {
+      "title": "Gestión de recursos",
+      "level": 3,
+      "content": "Originalmente, PMS utilizaba ulimit para limitar sus recursos asignados, sin embargo esto no es compatible con la ejecución como usuario normal. En su lugar, ahora puede establecer una cantidad máxima de memoria a través, de nuevo, de systemd. Por ejemplo, puede añadir:\n\n```\nMemoryMax=4G\n```\n\nal archivo mencionado anteriormente.\n\n"
+    },
+    {
+      "title": "Red",
+      "level": 3,
+      "content": "PMS y su servidor DLNA requieren que varios puertos estén abiertos:\n\n- Plex Media Server: TCP 32400\n- Plex DLNA Server: TCP 32469, UDP 1900\n- Network Discovery: UDP 32410, 32412, 32413, 32414\n- Bonjour/Avahi Network Discovery (legacy): UDP 5353\n\nUn ejemplo con iptables:\n\n```\n# iptables -A INPUT -p tcp -m multiport --dports 32400,32469 -j ACCEPT\n# iptables -A INPUT -p udp -m multiport --dports 1900,32410,32412,32413,32414 -j ACCEPT\n```\n\nPara conectarse a Plex a través de un puerto http estándar, se puede utilizar esta orden (para el puerto 8080):\n\n```\n#iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 32400\n```\n\nEntonces ya puede conectar directamente a http://direcciondeplex:8080 en este puerto.\n\n"
+    },
+    {
+      "title": "Actualizaciones de la biblioteca",
+      "level": 3,
+      "content": "Plex Media Server tiene un ajuste \"Actualizar mi biblioteca automáticamente\" que puede detectar nuevos archivos multimedia a medida que se descargan a su biblioteca. Pero conforme su biblioteca crece, estas actualizaciones pueden dejar de funcionar de manera fiable. Para solucionarlo, necesitará aumentar el número de archivos a los que los usuarios no-superusuario pueden suscribirse a través de inotify. Cree el archivo /etc/sysctl.d/40-max-user-watches.conf\n\n```\n/etc/sysctl.d/40-max-user-watches.conf\n```\n\n```\nfs.inotify.max_user_watches=524288\n```\n\ny ejecute sudo sysctl --system para aplicar sin reiniciar. Ahora plex debería detectar cualquier archivo nuevo.\n\n"
+    },
+    {
+      "title": "Solución de problemas",
+      "level": 3,
+      "content": "Los registros están ubicados en:\n\n```\n/var/lib/plex/Plex Media Server/Logs\n```\n\nEn caso de que no haya registros o estos no sean útiles, puede que quiera lanzar PMS manualmente para obtener información en la terminal:\n\n```\nsudo -u plex /usr/bin/bash\nsource /etc/conf.d/plexmediaserver\nexport LD_LIBRARY_PATH=/usr/lib/plexmediaserver\n/usr/lib/plexmediaserver/Plex\\ Media\\ Server\n```\n\n"
+    },
+    {
+      "title": "La WebUI de Plex devuelve 404",
+      "level": 4,
+      "content": "Puede haber una situación cuando actualizando la WebUI de Plex devuelva 404 Not Found. Para corregir esto sólo tiene que reiniciar plexmediaservice.service.\n\n"
+    },
+    {
+      "title": "Plex Home Theater (PHT)",
+      "level": 2,
+      "content": "Anteriormente conocido como Plex Media Center, Plex Home Theater es el componente de software utilizado durante mucho tiempo como el entorno de reproductor de medios para el componente back-end de servidor de Plex Media Server. Este componente vino de una bifurcación del software XBMC Media Center el 21 de mayo de 2008.\n\nEl apoyo oficial para Plex Home Theater (de Plex, Inc.) ha sido descontinuado en favor de Plex Media Player (basado en MPV). Sin embargo, Plex Home Theater fue bifurcado y ha sido desarrollado aún más por la comunidad de código abierto bajo el nombre OpenPHT\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale el paquete plex-media-playerAUR.\n\nPlex Home Theater puede ser lanzado ejecutando plexhometheater.sh desde su terminal.\n\n"
+    },
+    {
+      "title": "Plex Media Player (PMP)",
+      "level": 2,
+      "content": "Plex Media Player es el lanzamiento actual del cliente de medios de Plex. Ha reemplazado oficialmente a |#Plex Home Theater (PHT) (que todavía está recibiendo correcciones de errores) y se basa en funcionalidades anteriores, como el uso de mpv. Plex ha puesto PMP disponible a todos los usuarios y también se ha hecho compatible con Kodi. Tengan en cuenta que PMP no es de código abierto (a diferencia de PHT).\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale el paquete plex-media-playerAUR.\n\n"
+    },
+    {
+      "title": "Kodi y PleXBMC",
+      "level": 2,
+      "content": "Con el complemento PleXBMC, Kodi se puede utilizar como sustituto de PHT.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 3,
+      "content": "Instale el paquete kodi, luego siga las instrucciones de aquí.\n\n"
+    }
+  ]
+}

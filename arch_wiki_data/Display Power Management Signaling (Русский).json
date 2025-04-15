@@ -1,0 +1,51 @@
+{
+  "title": "Display Power Management Signaling (Русский)",
+  "url": "https://wiki.archlinux.org/title/Display_Power_Management_Signaling_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "DPMS (Display Power Management Signaling, сигналы управления энергопотреблением дисплеев) - это технология, позволяющая управлять питанием монитора, когда компьютер не используется. Время неактивности, по истечении которого монитор уходит в режим энергосбережения, сна или отключается, может быть задано как описано в DPMSSetTimeouts(3). Имейте в виду, что DPMS разрабатывался для ЭЛТ-мониторов, а для ЖК-дисплеев обычно нет разницы между разными режимами экономии энергии.\n\n"
+    },
+    {
+      "title": "Настройка DPMS в X",
+      "level": 2,
+      "content": "Добавьте следующие строки в /etc/X11/xorg.conf: в секцию Monitor:\n\n```\nOption \"DPMS\" \"true\"\n```\n\nДобавьте следующие строки в секцию ServerLayout, измените, как считаете нужным время (в минутах):\n\n```\nOption \"StandbyTime\" \"10\"\nOption \"SuspendTime\" \"20\"\nOption \"OffTime\" \"30\"\n```\n\nNote: Пример файла /etc/X11/xorg.conf.d/10-monitor.conf, который может выглядеть примерно так.\n\n```\nOption         \"BlankTime\" \"30\"\n```\n\nПример файла /etc/X11/xorg.conf.d/10-monitor.conf, который может выглядеть примерно так.\n\n```\nSection \"Monitor\"\n    Identifier \"LVDS0\"\n    Option \"DPMS\" \"false\"\nEndSection\n\nSection \"ServerFlags\"\n    Option \"StandbyTime\" \"0\"\n    Option \"SuspendTime\" \"0\"\n    Option \"OffTime\" \"0\"\n    Option \"BlankTime\" \"0\"\nEndSection\n\nSection \"ServerLayout\"\n    Identifier \"ServerLayout0\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Отключение DPMS",
+      "level": 2,
+      "content": "Так как DPMS обычно включен по умолчанию в большинстве случаев, для его отключение нужно явное действие. Чтобы полностью отключить DPMS, добавьте в файл /etc/X11/xorg.conf.d/10-monitor.conf:\n\n```\nSection \"Extensions\"\n    Option      \"DPMS\" \"Disable\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Изменение настроек DPMS и хранителя экрана с помощью команд",
+      "level": 2,
+      "content": "Можно выключить монитор с помощью команды xset из пакета xorg-xset.\n\nПримеры:\n\nTable content:\nКоманда | Описание\nxset s off | Отключить затемнение экрана (screen blanking)\nxset s 3600 3600 | Изменить время перехода в чёрный экран на 1 час\nxset -dpms | Отключить DPMS\nxset s off -dpms | Отключить DPMS и не уходить в чёрный экран\nxset dpms force off | Немедленно отключить экран\nxset dpms force standby | Перейти в режим standby\nxset dpms force suspend | Перейти в режим suspend\n\nДля просмотра текущих настроек:\n\n```\n$ xset q\n```\n\n```\n...\nScreen Saver:\n  prefer blanking:  yes    allow exposures:  yes\n  timeout:  600    cycle:  600\nDPMS (Energy Star):\n  Standby: 600    Suspend: 600    Off: 600\n  DPMS is Enabled\n  Monitor is On\n```\n\nДля изучения всех доступных команд смотрите xset(1).\n\n- XScreenSaver и xfce4-power-manager используют свои собственные настройки DPMS и перекрывают xset. Подробнее смотрите XScreenSaver#DPMS and blanking settings и Xfce#Display blanking.\n- При ручном запуске команд вам может понадобиться приписать sleep 1; для корректной работы, например sleep 1; xset dpms force off\n- Команда xset dpms 0 0 0, которая устанавливает все таймауты DPMS в ноль, может оказаться более хорошим способом «отключить» DPMS, так как эффект от -dpms может быть отменён, например, командой xset dpms force off.\n- Если прописывание xset в xinitrc не работает, пропишите настройки в файле /etc/X11/xorg.conf.d/. Подробнее смотрите #Настройка DPMS в X.\n\n"
+    },
+    {
+      "title": "Взаимодействие с DPMS в Linux-консоли с setterm",
+      "level": 2,
+      "content": "Утилита setterm выводит escape-коды для взаимодействия с терминалом. По сути, она просто печатает escape-последовательности в текущем терминале, неважно где вы сейчас находитесь: в screen-сессии, в ssh, serial и т.д.\n\nСинтаксис setterm: (0 отключает)\n\n```\nsetterm --blank [0-60|force|poke]\nsetterm --powersave [on|vsync|hsync|powerdown|off]\nsetterm --powerdown [0-60]\n```\n\n- Затемнение консоли само по себе не включает DPMS, и оно отключено по умолчанию. [1]\n- setterm --powerdown, похоже, ни на что не влияет, если настройка ядра APM_DISPLAY_BLANK не включена. [2]\n- Затемнение консоли также может быть включено параметром ядра consoleblank. Подробности смотрите в документации к ядру.\n\n"
+    },
+    {
+      "title": "Перенаправление вывода для просмотра escape-кодов",
+      "level": 3,
+      "content": "```\n$ setterm --powerdown 2>&1 | exec cat -v 2>&1 | sed \"s/\\\\^\\\\[/\\\\\\\\033/g\"\n```\n\n"
+    },
+    {
+      "title": "Перенаправление escape-кодов в любой tty (с правами на запись) для его изменения",
+      "level": 3,
+      "content": "```\n$ setterm --powerdown 0 >> /dev/tty3\n```\n\n"
+    },
+    {
+      "title": "цикл Bash для изменения ttys 0-256",
+      "level": 4,
+      "content": "```\n$ for i in {0..256}; do setterm --powerdown 0 >> /dev/tty$i; done; unset I;\n```\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- PC Monitor DPMS specification explanation\n- DPMS control in X\n\n"
+    }
+  ]
+}

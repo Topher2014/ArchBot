@@ -1,0 +1,116 @@
+{
+  "title": "Cómo configurar AutoFS (Español)",
+  "url": "https://wiki.archlinux.org/title/C%C3%B3mo_configurar_AutoFS_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **2021-03-15** \n\nAutofs provee montado automático para medios extraíbles y recursos de red cuando estos son insertados o accedidos.\n\n"
+    },
+    {
+      "title": "Instalación",
+      "level": 2,
+      "content": "Instale el paquete autofsAUR.\n\n"
+    },
+    {
+      "title": "Configuración",
+      "level": 2,
+      "content": "AutoFs ocupa los archivos de plantilla para la configuración que están ubicados en /etc/autofs. La plantilla principal se llama auto.master, y esta puede hacer referencia a una o más plantillas para distintos tipos de dispositivos.\n\n- Abra el archivo /etc/autofs/auto.master con su editor de texto favorito, va a ver algo así:\n\n```\n/etc/autofs/auto.master\n```\n\n```\n#/media /etc/autofs/auto.media\n```\n\nEl primer valor en cada linea determina el directorio base en donde todos los dispositivos en la plantilla van a ser montados, el segundo valor es la plantilla que se va a usar. El directorio base por defecto es /media, pero puede cambiarlo a la dirección que prefiera. Por ejemplo:\n\n```\n/etc/autofs/auto.master\n```\n\n```\n/media/misc     /etc/autofs/auto.misc     --timeout=5\n/media/net      /etc/autofs/auto.net      --timeout=60\n```\n\nEl directorio base va a ser creado sí es que no existe en su sistema. El directorio base va a ser montado para cargar dinámicamente los dispositivos, lo que significa que cualquier contenido en el directorio base no podrá accederse mientras autofs esté activado. Este procedimiento no es destructivo, así que sí se monta automáticamente en un directorio que está ocupando, simplemente puede cambiar la dirección en auto.master y reiniciarlo para acceder a sus archivos.\n\nSi aún así quiere montar automáticamente en un directorio que no esté vacío y tener acceso a los archivos incluso después que los directorios sean cargados dinámicamente, puede hacer que autofs los monte en otro directorio (p.ej /var/autofs/net) y los enlace.\n\n```\n# ln -s /var/autofs/net/nombre_del_dispocitivo /media/nombre_del_dispositivo\n```\n\nAlternativamente, puede hacer que autofs monte sus dispositivos en una carpeta especifica, en vez de hacerlo en una carpeta en común.\n\n```\n/etc/autofs/auto.master\n```\n\n```\n/-     /etc/autofs/auto.template\n```\n\n```\n/etc/autofs/auto.template\n```\n\n```\n/path/to/folder     -options :/device/path\n/home/user/usbstick  -fstype=auto,async,nodev,nosuid,umask=000  :/dev/sdb1\n```\n\n- Abra el archivo /etc/nsswitch.conf y añada una entrada para montarlo automáticamente:\n\n```\nautomount: files\n```\n\n- Cuando termine de configurar sus plantillas (vea más abajo), inicie el demonio de AutoFS como root habilitándolos e iniciando el servicio autofs.service.\n\nAhora los dispositivos son montados automáticamente cuando son accedidos, y se mantendrán montados mientras los acceda.\n\n"
+    },
+    {
+      "title": "Medios extraíbles",
+      "level": 3,
+      "content": "A los dispositivos extraíbles se les asigna su ubicación en los dispositivos de bloques según el que esté disponible, p.ej. sí /dev/sd{a,b,c} ya están ocupados, al siguiente dispositivo extraíble se le va a asignar el bloque /dev/sdd. En vez de asignar un punto de montaje a la ubicación de un dispositivo de bloques impredecible, una alternativa más robusta es usar el UUID (Identificación Universalmente Única) o el PARTUUID (Identificación Universalmente Única de la PARTE) del dispositivo extraíble como la ubicación a la que se le asigna el archivo.\n\nPor ejemplo, para montar una unidad USB especifico a la ubicación /mnt/black, configure el archivo de plantilla y el de asignado:\n\n```\n/etc/autofs/auto.master\n```\n\n```\n# master template file\n/mnt     /etc/autofs/auto.mnt   # [ponga aquí las opciones]\n```\n\nUse blkid para encontrar el UUID de la partición a montar, y genere el archivo de asignado:\n\n```\n# _ID=$( blkid --output value --match-tag PARTUUID /dev/sdXY )\n # printf \"%s %s\\n\" \"black -fstype=auto :PARTUUID=\" \"${_ID}\" >/etc/autofs/auto.mnt\n```\n\n"
+    },
+    {
+      "title": "Montado de red NFS",
+      "level": 3,
+      "content": "AutoFS puede descubrir y montar automáticamente recursos NFS en servidores remotos (la plantilla de red de AutoFS en /etc/autofs/auto.net fue removida en autofs5). Para habilitar el descubrimiento y montado automático de recursos compartidos en todos los servidores disponibles sin tener que configurar nada mas, tendrá que añadir lo siguiente a el archivo /etc/autofs/auto.master:\n\n```\n/net -hosts --timeout=60\n```\n\nPor ejemplo, sí tiene un servidor remoto llamado servidor (el nombre del directorio es el nombre del servidor) con un dispositivo NFS llamado /home/share, usted puede acceder a esté escribiendo:\n\n```\n# cd /net/servidor/home/share\n```\n\nLa opción -hosts usa un mecanismo similar al del comando showmount para detectar recursos compartidos. Usted puede ver los recursos exportados escribiendo:\n\n```\n# showmount <servername> -e\n```\n\nReemplazando <servername> con el nombre de su servidor.\n\n"
+    },
+    {
+      "title": "Configuración manual para NFS",
+      "level": 4,
+      "content": "Para montar un dispositivo NFS para el servidor_de_archivos en /srv/shared_dir en la ubicación /mnt/foo, añada un nuevo archivo de configuración, p.ej file_server.autofs:\n\n```\n/etc/autofs/auto.master.d/servidor_de_archivos.autofs\n```\n\n```\n/mnt   /etc/autofs/auto.servidor_de_archivos --timeout 60\n```\n\n```\n/etc/autofs/auto.servidor_de_archivos\n```\n\n```\nfoo  -rw,soft,rsize=8192,wsize=8192 servidor_de_archivos:/srv/shared_dir\n```\n\n"
+    },
+    {
+      "title": "Un solo recurso",
+      "level": 4,
+      "content": "Añada lo siguiente a /etc/autofs/auto.master:\n\n```\n/media/[servidor] /etc/autofs/auto.[servidor] --timeout 60 --browse\n```\n\nDonde --timeout define cuantos segundos se tienen que esperar antes de desmontar el sistema de archivos. La opción --browse crea carpetas vacías para cada punto de montaje en el archivo, para prevenir tiempos de espera sí es que no se puede contactar con el recurso compartido.\n\nDespués, cree el archivo /etc/autofs/auto.[servidor]\n\n```\n[nombre] -fstype=cifs,[otras_opciones] ://[servidor_remoto]/[nombre_del_servidor_remoto]\n```\n\nUsted puede especificar un nombre de usuario y contraseña para ocupar con el recurso en la sección otras_opciones:\n\n```\n[nombre] -fstype=cifs,username=[nombre_de_usuario],password=[contraseña],[otras_opciones] ://[servidor_remoto]/[nombre_del_servidor_remoto]\n```\n\n"
+    },
+    {
+      "title": "Múltiples recursos",
+      "level": 4,
+      "content": "Puede especificar múltiples recursos en /etc/autofs/auto.[servidor], por ejemplo:\n\n```\n[nombre] -fstype=cifs,[otras_opciones] /photos ://[servidor_remoto]/photos /music ://[servidor_remoto]/music /video ://[servidor_remoto]/video\n```\n\n"
+    },
+    {
+      "title": "Descubrimiento automático",
+      "level": 4,
+      "content": "Vea los comentarios en /etc/autofs/auto.smb.\n\n"
+    },
+    {
+      "title": "FTP y SSH (con FUSE)",
+      "level": 3,
+      "content": "Puede acceder servidores FTP y SSH sin problemas AutoFS usando FUSE, la implementación de un sistema de archivos virtual.\n\n"
+    },
+    {
+      "title": "FTP remoto",
+      "level": 4,
+      "content": "Primero, instale el paquete curlftpfs.\n\nCargue el modulo fuse:\n\n```\n# modprobe fuse\n```\n\nCree un archivo /etc/modules-load.d/fuse.conf que contenga fuse para que lo cargue en cada inicio.\n\nDespués, añada una nueva entrada para los servidores FTP en /etc/autofs/auto.master:\n\n```\n/media/ftp        /etc/autofs/auto.ftp    --timeout=60\n```\n\nCree el archivo /etc/autofs/auto.ftp y añada un servidor usando el formato ftp://usuario:contraseña@host:puerto/ruta:\n\n```\nnombre_del_servidor -fstype=curl,rw,allow_other,nodev,nonempty,noatime    :ftp\\://usuario\\:contraseña\\@servidor_remoto\n```\n\nSi quiere una opción ligeramente más segura, cree el archivo ~root/.netrc y añada ahí las contraseñas. Las contraseñas siguen en texto plano, pero puede ponerles el modo 600, y el comando df no las va a mostrar (montado o no). Este método también es menos sensible a los caracteres especiales (los que, sí no, deben ser escapados) en las contraseñas. El formato es:\n\n```\nmachine servidor_remoto\nlogin usuario\npassword contraseña\n```\n\nLa linea en /etc/autofs/auto.ftp se ve así sin el usuario ni la contraseña:\n\n```\nnombre_del_servidor -fstype=curl,allow_other    :ftp\\://servidor_remoto\n```\n\nCree el archivo /sbin/mount.curl con este código:\n\n```\n/sbin/mount.curl\n```\n\n```\n#! /bin/sh\n curlftpfs $1 $2 -o $4,disable_eprt\n```\n\nCree el archivo /sbin/umount.curl con este código:\n\n```\n/sbin/umount.curl\n```\n\n```\n#! /bin/sh\n fusermount -u $1\n```\n\nEstablezca los permisos para ambos archivos:\n\n```\n# chmod 755 /sbin/mount.curl\n# chmod 755 /sbin/umount.curl\n```\n\nDespués de un reinicio, su servidor FTP debería ser accesible a través de /media/ftp/nombre_del_servidor.\n\n"
+    },
+    {
+      "title": "SSH remoto",
+      "level": 4,
+      "content": "Aquí tiene instrucciones básicas de como acceder a un sistema de archivos a través de SSH con AutoFS.\n\nInstale el paquete sshfs.\n\nCargue el modulo fuse:\n\n```\n# modprobe fuse\n```\n\nCree un archivo /etc/modules-load.d/fuse.conf que contenga fuse para que lo cargue en cada inicio sí es que no tiene uno aun.\n\nInstale openssh.\n\nGenere unas llaves SSH:\n\n```\n$ ssh-keygen\n```\n\nCuando el generador le pida una contraseña, solo presione INTRO. Usar llaves SSH sin una contraseña es menos seguro, aún así, ejecutar AutoFS con contraseña posee dificultades adicionales que no están cubiertas (aun) en este articulo.\n\nDespués, copie la llave publica al servidor SSH:\n\n```\n$ ssh-copy-id nombre_de_usuario@host_remoto\n```\n\nVea sí puede iniciar sección en el servidor remoto como root:\n\n```\n# ssh nombre_de_usuario@host_remoto\n```\n\nCree una nueva entrada para los servidores SSH en /etc/autofs/auto.master:\n\n```\n/media/ssh\t\t/etc/autofs/auto.ssh\t--timeout=60\n```\n\nCree el archivo /etc/autofs/auto.ssh y añada un servidor SSH:\n\n```\n/etc/autofs/auto.ssh\n```\n\n```\nnombre_del_servidor     -fstype=fuse,rw,allow_other,IdentityFile=/home/nombre_de_usuario/.ssh/id_rsa :sshfs\\#nombre_de_usuario@host\\:/\n```\n\nDespués de un reinicio, su servidor SSH debería ser accesible a través de /media/ssh/nombre_del_servidor.\n\n"
+    },
+    {
+      "title": "MTP",
+      "level": 2,
+      "content": "El Protocolo de Transmisión de Medios (MTP) es usado en algunos dispositivos android.\n\nInstale el paquete mtpfs.\n\nCree una nueva entrada para el dispositivo MTP en /etc/autofs/auto.misc:\n\n```\nandroid -fstype=fuse,allow_other,umask=000     :mtpfs\n```\n\n"
+    },
+    {
+      "title": "Solución de problemas y ajustes",
+      "level": 2,
+      "content": "Esta sección tiene algunas soluciones para problemas comunes de AutoFS.\n\n"
+    },
+    {
+      "title": "Usando NIS",
+      "level": 3,
+      "content": "La versión 5.0.5 de AutoFS tiene un soporte más avanzado para NIS. Para usar AutoFS en conjunto con NIS, añada yp: adelante de los nombres de las plantillas en /etc/autofs/auto.master:\n\n```\n/home   yp:auto_home    --timeout=60 \n/sbtn   yp:auto_sbtn    --timeout=60\n+auto.master\n```\n\nEn versiones anteriores de NIS (antes de la 5.0.4), usted debía añadir nis a /etc/nsswitch.conf:\n\n```\nautomount: files nis\n```\n\n"
+    },
+    {
+      "title": "Parámetros opcionales",
+      "level": 3,
+      "content": "Puede establecer parámetros como timeout en el sistema para todos los recursos AutoFS en /etc/default/autofs:\n\n- Abra el archivo /etc/default/autofs y edite la linea OPTIONS:\n\n```\nOPTIONS='--timeout=5'\n```\n\n- Para activar el registro (por defecto no se registra nada), descomente y añada --verbose a la linea OPTIONS en /etc/default/autofs p.ej.:\n\n```\nOPTIONS='--verbose --timeout=5'\n```\n\nDespués de reiniciar el demonio autofs, la salida detallada va a ser visible con systemctl status o en journalctl.\n\n"
+    },
+    {
+      "title": "Identificado múltiples dispositivos",
+      "level": 3,
+      "content": "Si utiliza varias unidades USB y quiere poder distinguirlas fácilmente, puede hacer que AutoFS maneje los puntos de montado y que Udev cree nombres distintos para sus unidades USB. Vea Udev#Setting static device names para obtener instrucciones de como configurar reglas udev.\n\n"
+    },
+    {
+      "title": "Permisos de AutoFS",
+      "level": 3,
+      "content": "Si AutoFS no le está funcionando, asegúrese que los archivos de plantillas tengan los permisos correctos, sí no, AutoFS no va a iniciar. Esto puede suceder sí hizo un respaldo de esos archivos de una manera que no preserva los modos de sus archivos. Aquí salen los modos que deberían tener los archivos de configuración:\n\n- 0644 - /etc/autofs/auto.master\n- 0644 - /etc/autofs/auto.media\n- 0644 - /etc/autofs/auto.misc\n- 0644 - /etc/conf.d/autofs\n\nEn general, los scripts (como el previo auto.net) deberían tener los bits ejecutables (chmod a+x nombre_de_archivo) puestos y las listas de montados no.\n\nSi tiene errores en /var/log/daemon.log similares a este, tiene un problema con los permisos:\n\n```\nMay  7 19:44:16 peterix automount[15218]: lookup(program): lookup for petr failed\nMay  7 19:44:16 peterix automount[15218]: failed to mount /media/cifs/petr\n```\n\n"
+    },
+    {
+      "title": "Problemas con fusermount",
+      "level": 3,
+      "content": "Con algunas versiones de util-linux, puede que no pueda desmontar un sistema de archivos fuse montado por autofs, incluso sí tiene la opción \"user=\". Vía la discusión aquí: [1].\n\n"
+    },
+    {
+      "title": "Depurando problemas de automontado",
+      "level": 3,
+      "content": "Para una mejor depuración, usted puede intentar montando automáticamente en primer plano:\n\n```\n# systemctl stop autofs.service\n# automount -f -v\n```\n\nO, sí quiere más información de depuración, use:\n\n```\n# automount -f --debug\n```\n\n"
+    },
+    {
+      "title": "Alternativas a AutoFS",
+      "level": 2,
+      "content": "- Systemd (Español) puede montar sistemas de archivos automáticamente bajo demanda; vea aquí para la descripción y el articulo de sshfs para un ejemplo.\n- Administrador del Volumen Thunar es un sistema de montado automático para el gestor de archivos Thunar.\n- PCManFM es un gestor de archivos ligero con soporte incluido para acceder a recursos de red.\n- Udisks es servicio de montado automático de discos minimalista.\n\n"
+    },
+    {
+      "title": "Véase también",
+      "level": 2,
+      "content": "- Uso de FTP y SFTP con AutoFS está basado en este articulo de la Wiki de Gentoo: [2].\n- Mas información de SSH puede ser encontrada en las paginas SSH y SSH Keys de esta wiki.\n- La ayuda de AutoFS de Ubuntu esta en [3].\n- Para opciones especificas para el montado de los sistemas de archivos, vea mount(8) § FILESYSTEM-SPECIFIC MOUNT OPTIONS.\n- Para opciones de montado especificas para fuse, vea mount.fuse(8).\n\n"
+    }
+  ]
+}

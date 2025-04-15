@@ -1,0 +1,176 @@
+{
+  "title": "Pi-hole (Italiano)",
+  "url": "https://wiki.archlinux.org/title/Pi-hole_(Italiano)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- dnsmasq\n- Domain name resolution\n- lighttpd\n- Linux Containers\n- nginx\n- OpenVPN\n- WireGuard\n\nIl progetto Pi-hole è un DNS sinkhole che compila una lista nera di domini attingendo da diverse sorgenti di terze parti. Pi-hole usa pi-hole-ftlAUR (un fork di dnsmasq) per filtrare tutte le richieste di domini nella sua blocklist. L'esecuzione distribuisce efficacemente il blocco degli annunci a livello di rete senza la necessità di configurare i singoli client. Il pacchetto viene fornito con un'interfaccia di amministrazione web opzionale.\n\n"
+    },
+    {
+      "title": "Panoramica",
+      "level": 2,
+      "content": "Sono disponibili due versioni per Arch Linux:\n\n- #Pi-hole server – Questo è il server Pi-hole predefinito e noto che la maggior parte degli utenti sta cercando. Fornisce un server DNS per altri dispositivi sulla LAN.\n- #Pi-hole standalone – Questa è un'installazione Pi-hole leggera alternativa, progettata per un contesto mobile. È progettato per essere utilizzato sullo stesso dispositivo (ad esempio un laptop), dove non è disponibile un server Pi-hole esterno e centralizzato. Non ha interfaccia web e si aggiorna automaticamente.\n\n"
+    },
+    {
+      "title": "Installazione",
+      "level": 3,
+      "content": "Installa il pacchetto pi-hole-serverAUR[broken link: package not found].\n\n"
+    },
+    {
+      "title": "FTL (Faster Than Light)",
+      "level": 4,
+      "content": "Pi-hole-FTL è un resolver/forwarder DNS e un wrapper/API simile a un database che fornisce l'archiviazione a lungo termine delle richieste che gli utenti possono interrogare attraverso la sezione \"long-term data\" della WebGUI. I dati sono raccolti e conservati in due luoghi:\n\n1. I dati giornalieri vengono archiviati nella RAM e acquisiti in tempo reale all'interno di /run/log/pihole/pihole.log\n1. I dati storici (diversi giorni/settimane/mesi) sono archiviati nel file system /etc/pihole/pihole-FTL.db e scritti a intervalli specificati dall'utente.\n\npihole-FTL.service è abilitato staticamente; riavviarlo/avviarlo. Per la configurazione FTL, vedere la documentazione ufficiale.\n\n"
+    },
+    {
+      "title": "Interfaccia web",
+      "level": 4,
+      "content": "Pi-hole ha un'interfaccia web potente, facile da usare, ma completamente opzionale. Oltre a modificare le impostazioni, l'utente può analizzare e visualizzare le query DNS gestite da Pi-hole.\n\nInstalla php-sqlite (php verrà installato automaticamente) e abilita le estensioni pertinenti descritte qui:\n\n```\n/etc/php/php.ini\n```\n\n```\n[...]\nextension=pdo_sqlite\n[...]\nextension=sockets\n[...]\nextension=sqlite3\n[...]\n```\n\nIn php 7.0 e versioni successive, la direttiva PHP open_basedir è vuota, il che significa che PHP può accedere a ogni directory e file che può essere letto dall'id utente del server web. Per una maggiore sicurezza, decommenta open_basedir in /etc/php/php.ini e aggiungi l'elenco di directory e file a cui si accede dall'interfaccia web di amministrazione di Pi-hole. L'elenco è piuttosto lungo:\n\n```\n/srv/http/pihole\n/run/pihole-ftl/pihole-FTL.port\n/run/log/pihole/pihole.log\n/run/log/pihole-ftl/pihole-FTL.log\n/etc/pihole\n/etc/hosts\n/etc/hostname\n/etc/dnsmasq.d/02-pihole-dhcp.conf\n/etc/dnsmasq.d/03-pihole-wildcard.conf\n/etc/dnsmasq.d/04-pihole-static-dhcp.conf\n/var/log/lighttpd/error-pihole.log\n/proc/cpuinfo\n/proc/loadavg\n/proc/meminfo\n/sys/class/thermal/thermal_zone0/temp\n/tmp\n```\n\nLa direttiva open_basedir prevede un elenco separato da due punti:\n\n```\n/etc/php/php.ini\n```\n\n```\nopen_basedir = /srv/http/pihole:/run/pihole-ftl/pihole-FTL.port:/run/log/pihole/pihole.log:/run/log/pihole-ftl/pihole-FTL.log:/etc/pihole:/etc/hosts:/etc/hostname:/etc/dnsmasq.d/02-pihole-dhcp.conf:/etc/dnsmasq.d/03-pihole-wildcard.conf:/etc/dnsmasq.d/04-pihole-static-dhcp.conf:/var/log/lighttpd/error.log:/proc/loadavg:/proc/meminfo:/proc/cpuinfo:/sys/class/thermal/thermal_zone0/temp:/tmp\n```\n\nInstalla lighttpd e php-cgi.\n\nCopia la configurazione predefinita fornita dal pacchetto per Pi-hole:\n\n```\n# cp /usr/share/pihole/configs/lighttpd.example.conf /etc/lighttpd/lighttpd.conf\n```\n\nAbilita lighttpd.service e avvialo.\n\n"
+    },
+    {
+      "title": "Aggiornare il file hosts",
+      "level": 4,
+      "content": "filesystem fornisce un file /etc/hosts vuoto che è noto per impedire a Pi-hole il recupero delle blocklist. È necessario aggiungere quanto segue al file per garantirne il corretto funzionamento, notando che ip.address.of.pihole dovrebbe essere l'indirizzo IP effettivo della macchina che esegue Pi-hole (ad es. 192.168.1.250) e myhostname dovrebbe essere il nome host effettivo della macchina che esegue Pi-hole:\n\n```\n/etc/hosts\n```\n\n```\n127.0.0.1              localhost\nip.address.of.pihole   pi.hole myhostname\n```\n\nPer ulteriori informazioni, vedere Issue#1800.\n\n"
+    },
+    {
+      "title": "Configurare i dispositivi per l'uso di Pi-hole",
+      "level": 3,
+      "content": "Per utilizzare Pi-hole, i dispositivi all'interno della rete devono utilizzare l'indirizzo IP di Pi-hole come unico server DNS. Per fare questo, ci sono generalmente due metodi:\n\n1. Nelle impostazioni DHCP della LAN del router, impostare l'indirizzo IP di Pi-hole come unico server DNS disponibile per i dispositivi collegati.\n1. Configura manualmente ogni dispositivo per utilizzare l'indirizzo IP di Pi-hole come unico server DNS.\n\nMaggiori informazioni su come utilizzare Pi-hole per altri dispositivi sono disponibili all'indirizzo documentazione a monte.\n\n"
+    },
+    {
+      "title": "Installazione",
+      "level": 3,
+      "content": "Installa il pacchetto pi-hole-standaloneAUR[broken link: package not found].\n\n"
+    },
+    {
+      "title": "Timer",
+      "level": 4,
+      "content": "Il pacchetto standalone Pi-hole installa un timer abilitato staticamente (e relativo servizio) che aggiornerà settimanalmente l'elenco dei server nella lista nera di Pi-hole. I valori predefiniti possono essere modificati tramite una modifica nel servizio o può essere impedita l'esecuzione impostando un masking su di esso. Ricordarsi di avviare manualmente pi-hole-gravity.timer o semplicemente riavviare dopo la modifica.\n\n"
+    },
+    {
+      "title": "FTL",
+      "level": 4,
+      "content": "Vedi #FTL (Faster Than Light).\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 3,
+      "content": "Modifica le impostazioni di rete del computer in modo che l'unico server DNS in uso sia 127.0.0.1.\n\nSe si utilizza il DHCP da un router esterno per ottenere indirizzi IP, aggiungere bind-interfaces a /etc/dnsmasq.conf per la risoluzione delle query DNS.\n\nTestare le query DNS indipendentemente dal server dei nomi configurato in /etc/resolv.conf utilizzando drill @127.0.0.1 archlinux.org.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Sia la versione standalone che quella server possono essere controllate tramite CLI, ma solo la versione server può essere controllata tramite interfaccia web.\n\n"
+    },
+    {
+      "title": "Uso dell'interfaccia web",
+      "level": 3,
+      "content": "Vai su pi.hole o <Pi-hole IP address>/admin/ per accedere all'interfaccia web.\n\n"
+    },
+    {
+      "title": "Gestione dei DNS di Pi-hole",
+      "level": 4,
+      "content": "Per impostazione predefinita, Pi-hole utilizza il server DNS di Google. Modifica i server DNS utilizzati da Pi-hole con:\n\n```\n$ pihole -a setdns server\n```\n\nSpecifica più server DNS separando i loro indirizzi con virgole.\n\n"
+    },
+    {
+      "title": "Aggiornamento forzato dell'elenco dei domini della blocklist",
+      "level": 4,
+      "content": "Per aggiornare l'elenco dei domini bloccati, eseguire:\n\n```\n$ pihole -g\n```\n\n"
+    },
+    {
+      "title": "Disattiva temporaneamente Pi-hole",
+      "level": 4,
+      "content": "Pi-hole può essere messo in pausa tramite CLI eseguendo:\n\n```\n$ pihole disable [time]\n```\n\nLasciando vuoto il valore per time, la disabilitazione sarà permanente fino alla successiva riattivazione manuale. time può essere espresso in secondi o minuti con la sintassi #s e #m. Ad esempio, per disabilitare Pi-hole per 5 minuti:\n\n```\n$ pihole disable 5m\n```\n\nIn qualsiasi momento, riattiva Pi-hole eseguendo:\n\n```\n$ pihole enable\n```\n\n"
+    },
+    {
+      "title": "Interfaccia web protetta da password",
+      "level": 3,
+      "content": "Per proteggere con password l'interfaccia Web Pi-hole, eseguire il comando seguente e immettere la password:\n\n```\n$ pihole -a -p\n```\n\nPer disabilitare la protezione con password, impostare una password vuota.\n\n"
+    },
+    {
+      "title": "Cloudflare DoH",
+      "level": 3,
+      "content": "Pi-hole può essere configurato per utilizzare Cloudflared per ottenere la funzionalità DNS over HTTPS.\n\nPer far funzionare Cloudflared con Pi-hole, modifica il file cloudflared.yml e modifica le impostazioni come di seguito:\n\n```\n/etc/cloudflared/cloudflared.yml\n```\n\n```\n...\nproxy-dns-port: 53000\nproxy-dns-address: 127.0.0.1\n```\n\nQuindi riavvia cloudflared@cloudflared.service. Ora usa 127.0.0.1#53000 come unica voce del server DNS in Pi-hole.\n\n"
+    },
+    {
+      "title": "Ottimizzazione per unità a stato solido",
+      "level": 3,
+      "content": "Se Pi-hole è in esecuzione su un solid state drive (scheda SD, SSD ecc..) si consiglia di rimuovere il commento dal valore DBINTERVAL e cambiarlo almeno in 60.0 per ridurre al minimo le scritture nel database:\n\n```\n/etc/pihole/pihole-FTL.conf\n```\n\n```\n...\n\n## Database Interval\n## How often do we store queries in FTL's database -minutes-?\n## See: https://docs.pi-hole.net/ftldns/database/\n## Options: number of minutes\nDBINTERVAL=60.0\n\n...\n```\n\nDopo aver eseguito le modifiche, riavvia pihole-FTL.service.\n\n"
+    },
+    {
+      "title": "Disabilita la registrazione delle query",
+      "level": 3,
+      "content": "Sia i dati giornalieri che quelli storici raccolti per impostazione predefinita contengono dati di query che potrebbero essere considerati sensibili.\n\nPer disabilitare il salvataggio su database dei dati storici delle query, impostare il massimo livello di privacy Anonymous mode nell'amministrazione web (Settings > Privacy) o nel file di configurazione /etc/pihole/pihole-FTL.conf modificandolo alla linea:\n\n```\nPRIVACYLEVEL=3\n```\n\nPer disabilitare anche la registrazione per i dati giornalieri, utilizzare il comando seguente:\n\n```\n$ pihole logging off\n```\n\n"
+    },
+    {
+      "title": "Utilizzo con server VPN",
+      "level": 3,
+      "content": "Pi-hole può essere utilizzato dai client VPN connessi.\n\n"
+    },
+    {
+      "title": "OpenVPN",
+      "level": 4,
+      "content": "Un server OpenVPN può essere configurato per utilizzare un'istanza Pi-hole verso i suoi client. Aggiungi le seguenti due righe a /etc/openvpn/server/server.conf:\n\n```\npush \"redirect-gateway def1 bypass-dhcp\"\npush \"dhcp-option DNS Pi-hole-IP\"\n```\n\nSe ancora non funziona, prova a creare un file /etc/dnsmasq.d/00-openvpn.conf con il seguente contenuto:\n\n```\ninterface=tun0\n```\n\nPotrebbe essere necessario fare in modo che dnsmasq ascolti su tun0.\n\n"
+    },
+    {
+      "title": "WireGuard",
+      "level": 4,
+      "content": "I client WireGuard possono essere configurati per utilizzare il server DNS Pi-hole. Nel file di configurazione del client, specificare la riga seguente:\n\n```\nDNS = Pi-hole-IP\n```\n\nAffinché il DNS sia funzionante dalla VPN, Pi-hole deve ascoltare tutte le interfacce locali:\n\n```\npihole -a -i local\n```\n\nVedere ulteriori informazioni in WireGuard#Client configuration.\n\n"
+    },
+    {
+      "title": "Nginx al posto di Lighttpd",
+      "level": 3,
+      "content": "Questa è configurazione non ufficiale supportata dalla comunità[link interrotto 2025-03-15]. Assicurati che PHP sia impostato (vedi #Configurazione PHP) e che il server lighttpd sia inattivo.\n\nInstalla nginx-mainline e php-fpm.\n\nModifica /etc/nginx/nginx.conf per contenere quanto segue nella sezione http:\n\n```\ngzip            on;\ngzip_min_length 1000;\ngzip_proxied    expired no-cache no-store private auth;\ngzip_types      text/plain application/xml application/json application/javascript application/octet-stream text/css;\ninclude /etc/nginx/conf.d/*.conf;\n```\n\nCopia la configurazione predefinita fornita dal pacchetto per Pi-hole:\n\n```\n# mkdir /etc/nginx/conf.d\n# cp /usr/share/pihole/configs/nginx.example.conf /etc/nginx/conf.d/pihole.conf\n```\n\nModifica /etc/nginx/conf.d/pihole.conf e cambia la direttiva fastcgi_pass come segue:\n\n```\nfastcgi_pass  unix:/run/php-fpm/php-fpm.sock;\n```\n\nFacoltativamente, imposta VIRTUAL_HOST sul CNAME di Pi-hole se l'intenzione è di eseguire più host virtuali su Nginx.\n\n```\nfastcgi_param VIRTUAL_HOST \"pihole.example.com\";\n```\n\nDalla versione 7.4 php-fpm è protetto per impostazione predefinita e revoca l'accesso in lettura/scrittura su /usr (e sottodirectory).\n\nCrea un drop-in file per php-fpm con il seguente contenuto:\n\n```\n/etc/systemd/system/php-fpm.service.d/pihole.conf\n```\n\n```\n[Service]\nReadWritePaths = /srv/http/pihole\nReadWritePaths = /run/pihole-ftl/pihole-FTL.port\nReadWritePaths = /run/log/pihole/pihole.log\nReadWritePaths = /run/log/pihole-ftl/pihole-FTL.log\nReadWritePaths = /etc/pihole\nReadWritePaths = /etc/hosts\nReadWritePaths = /etc/hostname\nReadWritePaths = /etc/dnsmasq.d/01-pihole.conf\nReadWritePaths = /proc/meminfo\nReadWritePaths = /proc/cpuinfo\nReadWritePaths = /sys/class/thermal/thermal_zone0/temp\nReadWritePaths = /tmp\n```\n\nQuindi avvia e abilita nginx.service e php-fpm.service.\n\n"
+    },
+    {
+      "title": "Blocklists addizionali",
+      "level": 3,
+      "content": "Pi-hole è inteso con lo scopo di bloccare gli annunci, ma può anche essere utilizzato per bloccare altri contenuti indesiderati:\n\n1. Domini traccianti\n1. Domini malware\n1. Siti di pirateria\n1. Siti di notizie false\n1. Siti di phishing\n\nNote: **domini** \n\nCi sono molte fonti che forniscono queste liste di blocco. Alcuni esempi: firebog.net e oisd.nl.\n\n"
+    },
+    {
+      "title": "Usare Unbound come server DNS a monte",
+      "level": 3,
+      "content": "Per impostazione predefinita, Pi-hole inoltra le richieste ai server DNS a monte, il che potrebbe causare problemi di privacy. Vedere la documentatione per una guida sull'impostazione di Unbound in locale per risolvere le richieste DNS.\n\n"
+    },
+    {
+      "title": "Comportamento strano nell'interfaccia web dopo un aggiornamento",
+      "level": 3,
+      "content": "Alcuni problemi di rendering strani / inspiegabili nella GUI Web possono spesso essere risolti svuotando la cache del browser.\n\n"
+    },
+    {
+      "title": "Perdita di dati al riavvio",
+      "level": 3,
+      "content": "I sistemi senza un RTC come alcuni dispositivi ARM probabilmente subiranno la perdita di dati nel registro delle query al riavvio. Quando i sistemi non dispongono di un avvio RTC, l'ora viene impostata dopo che la rete e il resolver si sono attivati. Alcune parti di Pi-hole possono essere avviati prima che ciò accada portando alla perdita di dati. Anche un RTC impostato in modo errato può causare problemi. Vedere: Guida all'installazione#Fuso orario e System time.\n\nPer i dispositivi privi di RTC: Una soluzione fantasiosa per questo è usare un drop-in file su pihole-FTL.service in cui viene aggiunto un ritardo nella chiamata /usr/bin/sleep x in un'istruzione ExecStartPre. Si noti che il valore di \"x\" nel tempo di sospensione dipende dal tempo impiegato dall'hardware specifico per stabilire la sincronizzazione dell'ora.\n\nIssue#11008 su systemd-timesyncd che sta attualmente impedendo l'uso di time-sync.target per automatizzare questa operazione.\n\n"
+    },
+    {
+      "title": "Impossibile avviare il motore Pi-hole FTLDNS",
+      "level": 3,
+      "content": "Potrebbe essere che systemd-resolved.service occupi già la porta 53, richiesta per pihole-FTL.service. Per risolvere questo problema, disabilitare lo stub listener modificando il file di configurazione systemd-resolved:\n\n```\n/etc/systemd/resolved.conf\n```\n\n```\n[Resolve]\nDNSStubListener=no\n```\n\nQuindi riavvia systemd-resolved.service e pihole-FTL.service.\n\nPer ulteriori informazioni, vedere resolved.conf(5).\n\nIn alternativa, indicare a dnsmasq di collegarsi a ciascuna interfaccia in modo esplicito, invece del carattere jolly 0.0.0.0:53, decommentando la riga bind-interfaces in /etc/dnsmasq.conf. Ciò eviterà conflitti con systemd-resolved che è in ascolto su 127.0.0.53:53.\n\n"
+    },
+    {
+      "title": "Conflitto con il pacchetto DNSMasq",
+      "level": 3,
+      "content": "A partire da Pi-hole-FTL 4.0, un fork privato di dnsmasq è integrato nel sottoprogetto FTL. Il pacchetto originale dnsmasq è ora in conflitto con pi-hole-ftlAUR e verrà disinstallato durante l'aggiornamento da una versione precedente. È ancora possibile utilizzare i file di configurazione di dnsmasq precedenti, assicurati solo che conf-dir=/etc/dnsmasq.d/,*.conf nell'originale /etc/dnsmasq.conf non sia commentato.\n\n"
+    },
+    {
+      "title": "Stato sconosciuto e modifiche non salvate",
+      "level": 3,
+      "content": "Il problema, come visto in FS#63704, riguarda l'utente creato da systemd-sysusers http, che viene creato in uno stato scaduto. Per risolverlo, esegui:\n\n```\n# chage --expiredate -1 http\n```\n\n"
+    },
+    {
+      "title": "Tempi di caricamento lenti",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nSe i browser segnalano \"Risoluzione host\" o semplicemente impiegano più tempo del solito per caricare le pagine, assicurati che /etc/resolv.conf appaia esattamente come questo:\n\n```\n/etc/resolv.conf\n```\n\n```\nnameserver 127.0.0.1\n```\n\nSe ci vuole molto tempo per caricare le pagine, può essere un problema con l'esecuzione di lsof nello script di pihole (/usr/bin/pihole) chiamato tramite php. Verificalo durante il caricamento della pagina con: ps -ef | grep lsof. Terminalo e se la pagina viene visualizzata, sostituisci la chiamata di lsof nello script di pihole (ce n'è solo una) con:\n\n```\nss -lnp '( sport = 53 )'\n```\n\n"
+    },
+    {
+      "title": "Associa il servizio DNS di Pihole-FTL all'indirizzo IP effettivo del Pi-hole (invece di 0.0.0.0) per evitare problemi di risoluzione DNS per altri host virtuali",
+      "level": 3,
+      "content": "In maniera predefinita, il servizio DNS (pihole-FTL) viene associato all'indirizzo IP 0.0.0.0:\n\n```\n# netstat -ltnp | grep 53\ntcp        0      0 0.0.0.0:53              0.0.0.0:*               LISTEN      2196/pihole-FTL\ntcp6       0      0 :::53                   :::*                    LISTEN      2196/pihole-FTL\n```\n\nCiò potrebbe impedire a qualsiasi altro host virtuale sulla stessa macchina che ospita l'istanza pihole (come i contenitori docker) di ottenere le risoluzioni DNS. Approfondimenti qui e qui.\n\nPer risolvere questo problema, devi creare un file di configurazione in /etc/dnsmasq.d/ con il seguente contenuto (dove X.X.X.X è l'indirizzo IP del tuo pi-hole):\n\n```\n# cat /etc/dnsmasq.d/99-dns-bind.conf\nlisten-address=X.X.X.X\nbind-interfaces\n```\n\nQuindi, è necessario riavviare il servizio pihole-FTL per applicare le modifiche\n\n```\n# systemctl restart pihole-FTL\n```\n\n"
+    },
+    {
+      "title": "Risorse",
+      "level": 2,
+      "content": "- Homepage di Pi-hole\n- GitHub di Pi-hole\n- GitHub di Pi-hole FTL\n- Sky-hole, l'idea dietro Pi-hole standalone\n- Impedire a systemd-resolved stub server l'uso della porta 53\n- Problemi di lentezza con Unbound\n\n"
+    }
+  ]
+}

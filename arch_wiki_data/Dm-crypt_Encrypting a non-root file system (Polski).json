@@ -1,0 +1,51 @@
+{
+  "title": "Dm-crypt/Encrypting a non-root file system (Polski)",
+  "url": "https://wiki.archlinux.org/title/Dm-crypt/Encrypting_a_non-root_file_system_(Polski)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Poniżej przedstawiono przykłady szyfrowania wtórnego, tj. Innego niż root, systemu plików z dm-crypt.\n\n"
+    },
+    {
+      "title": "Overview",
+      "level": 2,
+      "content": "Szyfrowanie dodatkowego systemu plików zazwyczaj chroni tylko poufne dane, pozostawiając niezaszyfrowany system operacyjny i pliki programów. Jest to przydatne do szyfrowania zewnętrznego nośnika, takiego jak dysk USB, aby można go było bezpiecznie przenieść na inne komputery. Można również wybrać szyfrowanie zestawów danych osobno w zależności od tego, kto ma do nich dostęp.\n\nPonieważ dm-crypt jest warstwą szyfrowania blokowego, szyfruje tylko pełne urządzenia, pełne partycje i urządzenia pętli. Szyfrowanie pojedynczych plików wymaga warstwy szyfrowania na poziomie systemu plików, takiej jak eCryptfs lub EncFS. Zobacz Disk encryption (Polski), aby uzyskać ogólne informacje na temat zabezpieczania prywatnych danych.\n\n"
+    },
+    {
+      "title": "Partycja",
+      "level": 2,
+      "content": "Ten przykład obejmuje szyfrowanie partycji /home, ale można ją zastosować do dowolnej innej porównywalnej partycji innej niż root, zawierającej dane użytkownika.\n\nNajpierw upewnij się, że partycja jest pusta (nie ma do niej podłączonego systemu plików). Usuń partycję i utwórz pustą, jeśli ma system plików. Następnie przygotuj partycję przez jej bezpieczne usunięcie, zobacz dm-crypt (Polski)/Drive preparation (Polski)#Bezpieczne usuwanie danych z dysku twardego.\n\nNastępnie ustaw nagłówek LUKS na\n\n```\n# cryptsetup options luksFormat --type luks2 device\n```\n\nZamień urządzenie na poprzednio utworzoną partycję. zobacz dm-crypt (Polski)/Device encryption (Polski)#Opcje szyfrowania z dm-crypt po szczegóły, takie jak dostępne opcje.\n\nAby uzyskać dostęp do zaszyfrowanej partycji, odblokuj ją za pomocą urządzenia mapującego, używając:\n\n```\n# cryptsetup open device name\n```\n\nPo odblokowaniu partycji będzie ona dostępna pod adresem /dev/mapper/name. Teraz stwórz a System plików do wyboru z:\n\n```\n# mkfs.fstype /dev/mapper/name\n```\n\nZamontuj system plików na /home lub jeśli powinien być dostępny tylko dla jednego użytkownika na /home/username, zobacz #Ręczne montowanie i odmontowywanie.\n\n"
+    },
+    {
+      "title": "Ręczne zakładanie i odmontowywanie",
+      "level": 3,
+      "content": "Aby zamontować partycję:\n\n```\n# cryptsetup open device name\n# mount -t fstype /dev/mapper/name /mnt/home\n```\n\nAby odmontować:\n\n```\n# umount /mnt/home\n# cryptsetup close name\n```\n\n"
+    },
+    {
+      "title": "Automatyczne odblokowywanie i montowanie",
+      "level": 3,
+      "content": "Istnieją trzy różne rozwiązania do automatyzacji procesu odblokowywania partycji i montowania jej systemu plików.\n\n"
+    },
+    {
+      "title": "Podczas startu systemu",
+      "level": 4,
+      "content": "Użycie pliku konfiguracyjnego /etc/crypttab powoduje automatyczne odblokowanie podczas uruchamiania systemu. Jest to zalecane rozwiązanie, jeśli chcesz użyć jednej wspólnej partycji na wszystkich partycjach domowych użytkownika lub automatycznie zamontować inne zaszyfrowane urządzenie blokowe.\n\nZobacz Dm-crypt/System configuration#crypttab w przypadku odniesień i Dm-crypt/System configuration#Mounting at boot time na przykład skonfigurować.\n\n"
+    },
+    {
+      "title": "Przy logowaniu użytkownika",
+      "level": 4,
+      "content": "Za pomocą pam_exec możliwe jest odblokowanie (cryptsetup open) partycja przy logowaniu użytkownika: jest to zalecane rozwiązanie, jeśli chcesz mieć katalog domowy pojedynczego użytkownika na partycji. zobacz dm-crypt/Mounting at login.\n\nOdblokowanie przy logowaniu użytkownika jest również możliwe dzięki pam_mount.\n\n"
+    },
+    {
+      "title": "Loop device",
+      "level": 2,
+      "content": "Note: Za mało pliku dostaniesz Requested offset is beyond real size of device /dev/loop0 błąd, ale jako przybliżone odniesienie tworzenie pliku 4MiB spowoduje jego pomyślne zaszyfrowanie. [1]\n\n```\n# dd if=/dev/urandom of=key.img bs=20M count=1\n# cryptsetup --align-payload=1 --hash=sha512 --cipher=serpent-xts-plain64 --key-size=512 -i 30000 luksFormat key.img\n# cryptsetup open key.img lukskey\n```\n\nZa mało pliku dostaniesz Requested offset is beyond real size of device /dev/loop0 błąd, ale jako przybliżone odniesienie tworzenie pliku 4MiB spowoduje jego pomyślne zaszyfrowanie. [1]\n\nUrządzenie z pętlą umożliwia mapowanie urządzenia blokowego do pliku za pomocą standardowego narzędzia util-linux losetup. Plik może wówczas zawierać system plików, który może być używany podobnie jak każdy inny system plików. Wielu użytkowników wie TrueCrypt jako narzędzie do tworzenia zaszyfrowanych kontenerów. Mniej więcej taką samą funkcjonalność można osiągnąć za pomocą systemu plików loopback zaszyfrowanego za pomocą LUKS i pokazano go w poniższym przykładzie.\n\nNajpierw zacznij od utworzenia zaszyfrowanego kontenera, używając odpowiedniego random number generator\n\n```\n# dd if=/dev/urandom of=/bigsecret bs=1M count=10\n```\n\nSpowoduje to utworzenie dużego pliku o rozmiarze 10 megabajtów.\n\nNastępnie utwórz węzeł device /dev/loop0, abyśmy mogli zamontować / używać naszego kontenera:\n\n```\n# losetup /dev/loop0 /bigsecret\n```\n\nOdtąd procedura jest taka sama jak w przypadku #Partycja, z wyjątkiem faktu, że kontener jest już randomizowany i nie będzie wymagał kolejnego bezpiecznego usunięcia.\n\n"
+    },
+    {
+      "title": "Ręczne montowanie i odmontowywanie",
+      "level": 3,
+      "content": "Aby odmontować kontener:\n\n```\n# umount /mnt/secret\n# cryptsetup close secret\n# losetup -d /dev/loop0\n```\n\nAby ponownie zamontować kontener:\n\n```\n# losetup /dev/loop0 /bigsecret\n# cryptsetup open /dev/loop0 secret\n# mount -t ext4 /dev/mapper/secret /mnt/secret\n```\n\n"
+    }
+  ]
+}

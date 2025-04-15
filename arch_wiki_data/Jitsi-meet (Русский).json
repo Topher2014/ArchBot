@@ -1,0 +1,101 @@
+{
+  "title": "Jitsi-meet (Русский)",
+  "url": "https://wiki.archlinux.org/title/Jitsi-meet_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Jitsi is a set of open-source projects that allows you to easily build and deploy secure videoconferencing solutions. At the heart of Jitsi are Jitsi Videobridge and Jitsi Meet, which let you have conferences on the internet, while other projects from the community enable other features such as audio, dial-in, recording, and simulcasting.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Jitsi-meet consists of severals components:\n\n- jitsi-meet: the files for the webinterface, accessed via files served by a webserver\n- jitsi-meet-prosody: the prosody plugins for jitsi\n- jitsi-meet-turnserver: the configs example to run a stun/turn server\n- jitsi-videobridge: the video bridging service providing video streams to all participants\n- jicofo: the Jitsi conference focus determining who is speaking\n- Prosody: a free XMPP server serving as the base of the setup\n\nA graphical overview of the interfaces to the user and towards each other is given upstream.\n\nYou can either use the git versions, the nightly version or the stable versions.\n\nIt is possible to install them at the same time, but you will need to use separate port and several instances of prosody (the plugins cannot be scope by virtual host).\n\nYou need to choose between the normal or the bin version. The bin one conflicts with the normal version (i.e. nightly and nightly-bin can not be installed at the same time, but stable and nightly can be).\n\nTry to stick with only one of them:\n\n- stable\n- nightly\n- git\n\nYou need those optionals packages to run a standalone server:\n\n- nginx\n- coturn\n- prosody\n- lua52\n- lua52-sec\n- lua52-zlib\n- lua52-eventAUR\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "If your server name is example.com then a common choice for your jitsi will be meet.example.com, but you can choose freely. It is however strongly encouraged from security standpoint to host webapps on their own subdomain. You will need to update DNS record for your server with an entry of your chosen subdomain, in the above example meet. The remainder assumes that you have done this.\n\nAlso you should have SSL/TLS certificates for your meet.example.com domain, on how to obtain free certificates see certbot.\n\nIn the following, the following placeholders are used:\n\n- JITSIFQDN: your jitsi-meet domain, e.g. meet.example.com\n- SECRET_JVB_USER: password for the videobridge\n- SECRET_FOCUS_USER: password for the authenticator\n\nPasswords should be obtained in a safe way, e.g. via mktemp -u XXXXXXXX or via pwgen. Make sure to use different and safe passwords!\n\n"
+    },
+    {
+      "title": "Configuration paths",
+      "level": 3,
+      "content": "Table content:\nPackage | Configuration path\nStable\njitsi-meetAURjitsi-meet-binAUR | /etc/webapps/jitsi-meet\njitsi-meet-prosodyAURjitsi-meet-prosody-binAUR | /usr/lib/jitsi-meet-prosody\njitsi-meet-turnserverAURjitsi-meet-turnserver-binAUR | /usr/share/doc/jitsi-meet-turnserver\njicofoAURjicofo-binAUR | /etc/jicofo\njitsi-videobridgeAURjitsi-videobridge-binAUR | /etc/jitsi-videobridge\nNightly\njitsi-meet-nightlyAURjitsi-meet-nightly-binAUR | /etc/webapps/jitsi-meet-nightly\njitsi-meet-prosody-nightlyAURjitsi-meet-prosody-nightly-binAUR | /usr/lib/jitsi-meet-prosody-nightly\njitsi-meet-turnserver-nightlyAURjitsi-meet-turnserver-nightly-binAUR | /usr/share/doc/jitsi-meet-turnserver-nightly\njicofo-nightlyAURjicofo-nightly-binAUR | /etc/jicofo-nightly\njitsi-videobridge-nightlyAURjitsi-videobridge-nightly-binAUR | /etc/jitsi-videobridge-nightly\nGit\njitsi-meet-gitAUR | /etc/webapps/jitsi-meet-git\njitsi-meet-prosody-gitAUR | /usr/lib/jitsi-meet-prosody-git\njitsi-meet-turnserver-gitAUR | /usr/share/doc/jitsi-meet-turnserver-git\njicofo-gitAUR | /etc/jicofo-git\njitsi-videobridge-gitAUR | /etc/jitsi-videobridge-git\n\n"
+    },
+    {
+      "title": "Loopback",
+      "level": 3,
+      "content": "Let us jitsi-meet components reach each other with local ip. It works even if your domain is behind a proxy like Cloudflare which does not return the real ip of the server.\n\nIn /etc/hosts:\n\n```\n127.0.0.1 JITSIFQDN auth.JITSIFQDN\n::1 JITSIFQDN auth.JITSIFQDN\n```\n\n"
+    },
+    {
+      "title": "Configure prosody",
+      "level": 3,
+      "content": "prosody is a prerequisite and you will need to add a configuration to it for your Jitsi services. If you do not already have a prosody server set up, install prosody and lua52-sec now. The rest of the prosody configuration assumes you have a local install of prosody.\n\nThe package jitsi-meet-prosodyAUR provides a configuration you can easily customize:\n\n```\n# cd /etc/prosody\n# mkdir conf.d\n# cp /usr/share/doc/jitsi-meet-prosody/prosody.cfg.lua-jvb.example conf.d/jitsi.cfg.lua\n```\n\nThen add this at the end of:\n\n```\n/etc/prosody/prosody.cfg.lua\n```\n\n```\nInclude \"conf.d/*.cfg.lua\"\n```\n\nCustomize your configuration:\n\n```\n/etc/prosody/conf.d/jitsi.cfg.lua\n```\n\n```\n-- replace all occurences of jitmeet.example.com by JITSIFQDN\n-- replace all occurences of focusUser by focus\n-- then add or update those section\n\nVirtualHost \"JITSIFQDN\"\n    ssl = {\n        key = \"/etc/prosody/certs/JITSIFQDN.key\";\n        certificate = \"/etc/prosody/certs/JITSIFQDN.crt\";\n    }\n\nVirtualHost \"auth.JITSIFQDN\"\n    ssl = {\n        key = \"/etc/prosody/certs/auth.JITSIFQDN.key\";\n        certificate = \"/etc/prosody/certs/auth.JITSIFQDN.crt\";\n    }\n    authentication = \"internal_hashed\"\n```\n\n```\n/etc/prosody/conf.d/jitsi.cfg.lua\n```\n\n```\n-- Proxy to jicofo's user JID, so that it does not have to register as a component.\nComponent \"focus.JITSIFQDN\" \"client_proxy\"\n    target_address = \"focus@auth.JITSIFQDN\"\n```\n\nYou need now to generate the certificate for JITSIFQDN and auth.JITSIFQDN.\n\nIf you use certbot, you can import the certificate with:\n\n```\n# prosodyctl --root cert import /etc/letsencrypt/live\n```\n\nIf you want to use self generated certs, you can use:\n\n```\n[prosody]$ prosodyctl cert generate JITSIFQDN\n[prosody]$ prosodyctl cert generate auth.JITSIFQDN\n# mv /var/lib/prosody/*.{crt,cnf,key} /etc/prosody/certs/\n# trust anchor /etc/prosody/certs/JITSIFQDN.crt\n# trust anchor /etc/prosody/certs/auth.JITSIFQDN.crt\n# update-ca-trust\n```\n\nLet us register the users jvb and focus:\n\n```\n# prosodyctl register jvb auth.JITSIFQDN SECRET_JVB_USER\n# prosodyctl register focus auth.JITSIFQDN SECRET_FOCUS_USER\n# prosodyctl mod_roster_command subscribe focus.JITSIFQDN focus@auth.JITSIFQDN\n```\n\nThen restart prosody.service (or start/enable it if it was just installed).\n\n"
+    },
+    {
+      "title": "Configure jitsi-videobridge",
+      "level": 3,
+      "content": "The configuration for jitsi-videobridge. Add -nightly or -git to /etc/jitsi-videobridge for nightly and git version.\n\nFor MUC_NICKNAME, use uuidgen command:\n\n```\n/etc/jitsi-videobridge/sip-communicator.properties\n```\n\n```\norg.jitsi.videobridge.xmpp.user.shard.DOMAIN=auth.JITSIFQDN\norg.jitsi.videobridge.xmpp.user.shard.PASSWORD=SECRET_JVB_USER\norg.jitsi.videobridge.xmpp.user.shard.MUC_JIDS=JvbBrewery@internal.auth.JITSIFQDN\norg.jitsi.videobridge.xmpp.user.shard.MUC_NICKNAME=UUIDGEN_RESULT\n```\n\nThen start/enable jitsi-videobridge.service.\n\n"
+    },
+    {
+      "title": "Configure jicofo",
+      "level": 3,
+      "content": "The configuration for jicofo. Add -nightly or -git to /etc/jitsi-videobridge for nightly and git version.\n\n```\n/etc/jicofo/jicofo.conf\n```\n\n```\njicofo {\n  xmpp: {\n    client: {\n      client-proxy: \"focus.JITSIFQDN\"\n      xmpp-domain: \"JITSIFQDN\"\n      domain: \"auth.JITSIFQDN\"\n      username: \"focus\"\n      password: \"SECRET_FOCUS_USER\"\n      conference-muc-jid = conference.JITSIFQDN\n    }\n    trusted-domains: [ \"recorder.JITSIFQDN\" ]\n  }\n  bridge: {\n    brewery-jid: \"JvbBrewery@internal.auth.JITSIFQDN\"\n  }\n}\n```\n\nThen start/enable jicofo.service.\n\n"
+    },
+    {
+      "title": "Configure jitsi-meet",
+      "level": 3,
+      "content": "The configuration for jitsi-meet webapps. Add -nightly or -git to /etc/jitsi-videobridge for nightly and git version.\n\n```\n/etc/webapps/jitsi-meet/config.js\n```\n\n```\nvar config = {\n  hosts: {\n    domain: 'JITSIFQDN',\n    // ...\n    muc: 'conference.JITSIFQDN'\n  },\n  bosh: '//JITSIFQDN/http-bind',\n  // ...\n}\n```\n\n"
+    },
+    {
+      "title": "Configure nginx",
+      "level": 3,
+      "content": "Configure nginx with TLS as described in nginx#TLS.\n\nLet us copy the provided example.\n\n```\n# cd /etc/nginx\n# mkdir sites\n# cp /usr/share/doc/jitsi-meet/jitsi-meet.example sites/jitsi.conf\n```\n\nThen include it in your main configuration:\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nhttp {\n    // ...\n    // this should be placed near to the close bracket of the http block\n    include sites/*.conf;\n}\n```\n\nThen changes the jitsi configuration with yours:\n\n```\n/etc/nginx/sites/jitsi.conf\n```\n\n```\nserver {\n  # ...\n  server_name JITSIFQDN;\n\n  # ...\n  # use prosody path directly\n  ssl_certificate /etc/prosody/certs/JITSIFQDN.crt;\n  ssl_certificate_key /etc/prosody/certs/JITSIFQDN.key;\n  # or use letencrypt path\n  ssl_certificate /etc/letsencrypt/live/JITSIFQDN/fullchain.pem;\n  ssl_certificate_key /etc/letsencrypt/live/JITSIFQDN/privkey.pem;\n\n  # set the config path\n  # replace alias /etc/jitsi/meet/jitmeet.example.com-config.js by\n  location = /config.js {\n    alias /etc/webapps/jitsi-meet/config.js;\n  }\n  # ...\n  location ~ ^/([^/?&:'\"]+)/config.js$\n  {\n    set $subdomain \"$1.\";\n    set $subdir \"$1/\";\n    alias /etc/webapps/jitsi-meet/config.js;\n  }\n}\n```\n\nThen restart nginx.service.\n\n"
+    },
+    {
+      "title": "Running the server behind a NAT",
+      "level": 3,
+      "content": "The following ports need to be forwarded to your server:\n\nHTTPS:\n\n- TCP/443\n\nJitsi Videobridge:\n\n- UDP/10000\n\n"
+    },
+    {
+      "title": "Jitsi gateway to SIP (Jigasi)",
+      "level": 3,
+      "content": "To interface the Jitsi-meet meetings with traditional SIP install jigasiAUR or jigasi-gitAUR and edit the prosody config:\n\n```\n/etc/prosody/prosody.cfg.lua\n```\n\n```\nComponent \"callcontrol.JITSIFQDN\"\n    component_secret = \"SECRET_JIGASI_USER\"\n```\n\nfill the SIP access credentials (SIPUSER SIPSERVER and SIPPASSWORD)\n\n```\n/opt/jigasi/jigasi-home/sip-communicator.properties\n```\n\n```\nnet.java.sip.communicator.impl.protocol.sip.acc1403273890647.ACCOUNT_UID=SIP\\:\"SIPUSER@SIPSERVER\"\nnet.java.sip.communicator.impl.protocol.sip.acc1403273890647.PASSWORD=SIPPASSWORD\nnet.java.sip.communicator.impl.protocol.sip.acc1403273890647.SERVER_ADDRESS=SIPSERVER\nnet.java.sip.communicator.impl.protocol.sip.acc1403273890647.USER_ID=SIPUSER\n```\n\nTo change the default room name SIP is connecting to, change org.jitsi.jigasi.DEFAULT_JVB_ROOM_NAME in the above config.\n\nThen edit the jigasi configuration\n\n```\n/etc/jitsi/jigasi/config\n```\n\n```\nJIGASI_HOST=callcontrol.JITSIFQDN\nJIGASI_HOSTNAME=jitsi-videobridge.JITSIFQDN\nJIGASI_SECRET=SECRET_JIGASI_USER\nJIGASI_OPTS=\"\"\nLOGFILE=/var/log/jitsi/jigasi.log\n```\n\n```\n/opt/jitsi-meet/config.js\n```\n\n```\nhosts.call_control = 'callcontrol.meet.jit.si'\n```\n\nand then start/enable jigasi.service.\n\n"
+    },
+    {
+      "title": "Access restrictions for room creation",
+      "level": 3,
+      "content": "To restrict video conference room creation to authenticated users, you can do the following steps. Note that participants to the meeting are still not authenticated!\n\nAdd authentication to the jitsi domain in prosody and add a new virtual host for guests:\n\n```\n/etc/prosody/conf.d/jitsi.cfg.lua\n```\n\n```\n-- change authentification of your domain\nVirtualHost \"JITSIFQDN\"\n    authentification = \"internal_plain\"\n\n-- add guest virtual host to allow anonymous user to join your room\nVirtualHost \"guest.JITSIFQDN\"\n    authentication = \"jitsi-anonymous\"\n    c2s_require_encryption = false\n    modules_enabled = {\n        -- copy the content of the modules_enabled\n        -- of the VirtualHost \"JITSIFQDN\"\n        -- remove only the module \"muc_lobby_rooms\" of the list\n        -- example:\n        \"bosh\";\n        \"pubsub\";\n        \"ping\"; -- Enable mod_ping\n        \"speakerstats\";\n        \"external_services\";\n        \"conference_duration\";\n    }\n```\n\nEdit the configuration file for jitsi-meet:\n\n```\n/etc/webapps/jitsi-meet/config.js\n```\n\n```\nvar config = {\n  host: {\n    // anonymous users need to use a dedicated muc without authentication\n    anonymousdomain: 'guest.JITSIFQDN',\n  },\n}\n```\n\nAdd authentication for jicofo:\n\n```\n/etc/jicofo/jicofo.conf\n```\n\n```\njicofo {\n  authentication {\n    enabled = true\n    type = XMPP\n    login-url = JITSIFQDN\n    enable-auto-login = true\n  }\n}\n```\n\nThen create the desired users via\n\n```\n# prosodyctl register <username> JITSIFQDN <password>\n```\n\nOnly if you are using jigasi (if you do not know, you do not) edit the SIP interface to not allow anonymous authentication:\n\n```\n/etc/jitsi/jigasi/sip-communicator.properties\n```\n\n```\norg.jitsi.jigasi.xmpp.acc.ANONYMOUS_AUTH=false\n```\n\nThese steps are taken from this guide.\n\n"
+    },
+    {
+      "title": "Access restrictions with JWT token",
+      "level": 3,
+      "content": "To restrict video conference room creation to users authenticate with a JWT token (external service for authentication), you can do the following steps. Note that participants to the meeting are still not authenticated!\n\nInstall those dependencies:\n\n- lua52-base64AUR\n- lua52-basexx\n- lua52-cjsonAUR\n- lua52-jwtjitsiAUR\n- lua52-luaossl\n\nAdd authentication to the jitsi domain in prosody and add a new virtual host for guests:\n\n```\n/etc/prosody/conf.d/jitsi.cfg.lua\n```\n\n```\n-- change authentification of your domain\nVirtualHost \"JITSIFQDN\"\n    authentification = \"token\"\n    app_id = \"APP_ID\"\n    app_secret = \"APP_SECRET\"\n    allow_empty_token = false\n    modules_enabled = {\n        -- keep existing modules and add\n        \"presence_identity\";\n    }\n    c2s_require_encryption = false\n\n-- add guest virtual host to allow anonymous user to join your room\nVirtualHost \"guest.JITSIFQDN\"\n    authentication = \"jitsi-anonymous\"\n    c2s_require_encryption = false\n    modules_enabled = {\n        -- copy the content of the modules_enabled\n        -- of the VirtualHost \"JITSIFQDN\"\n        -- remove only the module \"muc_lobby_rooms\" of the list\n        -- example:\n        \"bosh\";\n        \"pubsub\";\n        \"ping\"; -- Enable mod_ping\n        \"speakerstats\";\n        \"external_services\";\n        \"conference_duration\";\n        \"presence_identity\";\n    }\n\nComponent \"conference.JITSIFQDN\" \"muc\"\n    modules_enabled = {\n        -- add this to the modules_enabled\n        \"token_verification\";\n    }\n```\n\nEdit the configuration file for jitsi-meet:\n\n```\n/etc/webapps/jitsi-meet/config.js\n```\n\n```\nvar config = {\n  host: {\n    // anonymous users need to use a dedicated muc without authentication\n    anonymousdomain: 'guest.JITSIFQDN',\n  },\n}\n```\n\nAdd authentication for jicofo:\n\n```\n/etc/jicofo/jicofo.conf\n```\n\n```\njicofo {\n  authentication {\n    enabled = true\n    type = JWT\n    login-url = JITSIFQDN\n    enable-auto-login = true\n  }\n}\n```\n\nThen restart prosody.service (or start/enable it if it was just installed). And restart jicofo.service (or start/enable it if it was just installed).\n\nNow you can use a JWT token to authenticate an user.\n\nYou can read the spec here: Jitsi Meet Tokens\n\nHere an quick example in nodejs:\n\n```\nconst jwt = require('jsonwebtoken')\nconst crypto = require('crypto');\nconst words = require('random-words')\nconst yourDomain = \"JITSIFQDN\"\nconst appId = \"APP_ID\"\nconst appSecret = \"APP_SECRET\"\nconst userName = \"YOUR_USERNAME\"\nconst userEmail = \"YOUR_EMAIL\"\n\nfunction getBody(domain, appId, name, email, room) {\n    const md5Email = crypto.createHash('md5').update(email).digest(\"hex\");\n    const id = crypto.createHash('sha1').update(`${name}:${email}`).digest(\"hex\")\n\n    return {\n        context: {\n            user: {\n                avatar: `https:/gravatar.com/avatar/${md5Email}`,\n                name,\n                email,\n                id,\n            },\n            group: 'users'\n        },\n        \"aud\": \"jitsi\",\n        \"iss\": appId,\n        \"sub\": domain,\n        room,\n    }\n}\n\nconst room = process.argv[2] || words({exactly: 3, join: '-'})\n\nconst data = getBody(\n    yourDomain,\n    appId,\n    userName,\n    userEmail,\n    room,\n)\n\nconst options = {\n    algorithm: 'HS256',\n    expiresIn: '2h',\n}\n\nconst jwtToken = jwt.sign(data, appSecret, options)\n\nconsole.log(`https://${yourDomain}/${room}?jwt=${jwtToken}`)\n```\n\n"
+    },
+    {
+      "title": "Log evaluation",
+      "level": 3,
+      "content": "For a publicly available IP address the above configuration leads to a public video conference server. To monitor server use one can use journalctl to get an at least vague idea of the usage:\n\n```\n# journalctl --unit=jicofo.service --grep=\"created new conference\" --output cat\n```\n\nshows all events of new chat room creation and\n\n```\n# journalctl --unit=jicofo.service --grep=\"Stopped\" --output cat\n```\n\nshows all events of chat room destruction.\n\nGrepping for 'member' also gives you (anonymous!) information on the participants.\n\n"
+    },
+    {
+      "title": "Running own STUN server",
+      "level": 3,
+      "content": "By default, Jitsi Meet uses STUN servers from jitsi.org. You can easily run your own STUN server using coturn and setting it in jitsi-meet's config.\n\n"
+    },
+    {
+      "title": "Check your logs",
+      "level": 3,
+      "content": "You can stop all service units (i.e., prosody.service, jitsi-videobridge.service, and jicofo.service), start them one at a time, and follow new messages in the journal for each service unit to see if something is wrong. Most problems are due to password or configuration issues.\n\nIf you have an upgrade from a very different version, or you mess up with your config, start other. It will be faster than trying to findout which part is wrong.\n\n"
+    },
+    {
+      "title": "Ask help on Matrix rooms",
+      "level": 3,
+      "content": "You can join matrix rooms and ask help there:\n\n- Jitsi Meet help and testing\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Project homepage\n- Help community\n- Official documentation\n- Arch Linux tutorial with more details\n\n"
+    }
+  ]
+}

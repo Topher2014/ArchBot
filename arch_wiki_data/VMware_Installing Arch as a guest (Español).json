@@ -1,0 +1,196 @@
+{
+  "title": "VMware/Installing Arch as a guest (Español)",
+  "url": "https://wiki.archlinux.org/title/VMware/Installing_Arch_as_a_guest_(Espa%C3%B1ol)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- VMware\n- VMWare vCLI\n\nThis article is about installing Arch Linux in a VMware product, such as Workstation Player, Fusion or Workstation Pro.\n\n"
+    },
+    {
+      "title": "In-kernel drivers",
+      "level": 2,
+      "content": "Note: Make sure to regenerate the initramfs.\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nMODULES=(... vmw_balloon vmw_pvscsi vsock vmw_vsock_vmci_transport ...)\n```\n\nMake sure to regenerate the initramfs.\n\n- vmw_balloon - The physical memory management driver. It acts like a \"balloon\" that can be inflated to reclaim physical pages by reserving them in the guest and invalidating them in the monitor, freeing up the underlying machine pages so they can be allocated to other guests. It can also be deflated to allow the guest to use more physical memory. Deallocated Virtual Machine memory can be reused in the host without terminating the guest.\n- vmw_pvscsi - For VMware's Paravirtual SCSI (PVSCSI) HBA.\n- vmw_vmci - The Virtual Machine Communication Interface. It enables high-speed communication between host and guest in a virtual environment via the VMCI virtual device.\n- vmwgfx - For 3D acceleration. This is a KMS enabled DRM driver for the VMware SVGA2 virtual hardware.\n- vmxnet3 - For VMware's vmxnet3 virtual ethernet NIC.\n- a fuse-based hgfs implementation has been added to open-vm-tools 10.0+ and is supported from kernel version 4.0+.\n\nThe following drivers are only needed if you are running Arch Linux on a hypervisor like VMware vSphere Hypervisor[dead link 2024-07-30 ⓘ]. Client-server applications can write to the VMCI Sock (vsock) interface to make use of the VMCI virtual device, when communicating between virtual machines.\n\n- vsock - The Virtual Socket Protocol. It is similar to the TCP/IP socket protocol, allowing communication between Virtual Machines and hypervisor or host.\n- vmw_vsock_vmci_transport - Implements a VMCI transport for Virtual Sockets.\n\nSome modules, such as the legacy vmhgfs shared folder module, will require additional work to manually compile and systemd enable in order to function properly.\n\n"
+    },
+    {
+      "title": "VMware Tools versus Open-VM-Tools",
+      "level": 2,
+      "content": "In 2007, VMware released large portions of the VMware Tools under the LGPL as Open-VM-Tools. The official Tools are not available separately for Arch Linux.\n\nOriginally, VMware Tools provided the best drivers for network and storage, combined with the functionality for other features such as time synchronization. However, now the drivers for the network/SCSI adapter are part of the Linux kernel.\n\nThe official VMware Tools also had the advantage of being able to use the Unity mode feature, but as of VMWare Workstation 12, Unity mode for Linux guests has been removed due to lack of use and developer difficulties in maintaining the feature. See this thread.\n\n"
+    },
+    {
+      "title": "Utilities",
+      "level": 3,
+      "content": "The open-vm-tools package comes with the following utilities:\n\n- vmtoolsd - Service responsible for the Virtual Machine status report.\n- vmware-checkvm - Tool to check whether a program is running in the guest.\n- vmware-toolbox-cmd - Tool to obtain Virtual Machine information of the host.\n- vmware-user - Tool to enable clipboard sharing (copy/paste) between host and guest.\n- vmware-vmblock-fuse - Filesystem utility. Enables drag & drop functionality between host and guest through FUSE (Filesystem in Userspace).\n- vmware-xferlogs - Dumps logging/debugging information to the Virtual Machine logfile.\n- vmhgfs-fuse - Utility for mounting vmhgfs shared folders.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 3,
+      "content": "Install open-vm-tools. Start and/or enable vmtoolsd.service and vmware-vmblock-fuse.service.\n\nTry to install gtkmm3 manually if copy and paste between host and guest does not work properly.\n\n"
+    },
+    {
+      "title": "Modules",
+      "level": 3,
+      "content": "- vmblock - Filesystem driver. Enables drag & drop functionality between host and guest (superseded by the vmware-vmblock-fuse utility).\n- vmci - High performance communication interface between host and guest.\n- vmmon - Virtual Machine Monitor.\n- vmnet - Networking driver.\n- vsock - VMCI sockets.\n\n"
+    },
+    {
+      "title": "Installation (from guest)",
+      "level": 3,
+      "content": "Install the dependencies: base-devel (for building), net-tools (for ifconfig, used by the installer) and linux-headers (for kernel headers). In order to check out open-vm-tools you will need pkgctl from the devtools package.\n\nThen, create bogus init directories for the installer:\n\n```\n# for x in {0..6}; do mkdir -p /etc/init.d/rc${x}.d; done\n```\n\nThe installer can then be mounted:\n\n```\n# mount /dev/cdrom /mnt\n```\n\nExtracted (e.g. to /root):\n\n```\n# tar xf /mnt/VMwareTools*.tar.gz -C /root\n```\n\nAnd started:\n\n```\n# perl /root/vmware-tools-distrib/vmware-install.pl\n```\n\nThe following build failures can safely be ignored:\n\n- VMNEXT 3 virtual network card\n- \"Warning: This script could not find mkinitrd or update-initramfs and cannot remake the initrd file!\"\n- Fuse components not found on the system.\n\nEnable vmware-vmblock-fuse systemd services (make sure the dependencies are manually installed, or that the -s flag) used. The open-vm-tools source code should be checked out using the Arch build system.\n\n```\n$ pkgctl repo clone open-vm-tools\n $ cd open-vm-tools\n $ makepkg -s --asdeps\n # cp vm* /usr/lib/systemd/system\n```\n\nEnable vmware-vmblock-fuse.service and vmtoolsd.service.\n\nReboot the Virtual Machine.\n\nLog in and start the VMware Tools:\n\n```\n# /etc/init.d/rc6.d/K99vmware-tools start\n```\n\nAdditionally, to auto start vmware-tools on boot, create a new file /etc/systemd/system/vmwaretools.service:\n\n```\n/etc/systemd/system/vmwaretools.service\n```\n\n```\n[Unit]\nDescription=VMWare Tools daemon\n\n[Service]\nExecStart=/etc/init.d/vmware-tools start\nExecStop=/etc/init.d/vmware-tools stop\nPIDFile=/var/lock/subsys/vmware\nTimeoutSec=0\nRemainAfterExit=yes\n \n[Install]\nWantedBy=multi-user.target\n```\n\nAnd enable the new vmwaretools.service.\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 2,
+      "content": "Install the dependencies: xf86-input-vmmouse, xf86-video-vmware, and mesa.\n\nThese packages should be all that are required to get started with booting into a graphical target: . /etc/xdg/autostart/vmware-user.desktop will get started which will set up most of what is needed to work with the Virtual Machine.\n\nHowever, if booting into multi-user.target or using an uncommon setup (e.g. multiple monitors), then vmtoolsd.service needs to be enabled. In addition to this, run Xorg as root to give permission for loading drivers.\n\n"
+    },
+    {
+      "title": "Shared Folders with vmhgfs-fuse",
+      "level": 3,
+      "content": "Share a folder by selecting Edit virtual machine settings > Options > Shared Folders > Always enabled, and creating a new share.\n\nThe shared folders should be visible with:\n\n```\n$ vmware-hgfsclient\n```\n\nNow the folder can be mounted:\n\n```\n# mkdir <shared folders root directory>\n# vmhgfs-fuse -o allow_other -o auto_unmount .host:/<shared_folder> <shared folders root directory>\n```\n\nIf the error message fusermount: option allow_other only allowed if 'user_allow_other' is set in /etc/fuse.conf is displayed, uncomment the following line in /etc/fuse.conf:\n\n```\nuser_allow_other\n```\n\nOther vmhgfs-fuse mount options can be viewed by using the -h input flag:\n\n```\n# vmhgfs-fuse -h\n```\n\n"
+    },
+    {
+      "title": "fstab",
+      "level": 4,
+      "content": "Add a rule for each share:\n\n```\n/etc/fstab\n```\n\n```\n.host:/<shared_folder> <shared folders root directory> fuse.vmhgfs-fuse nofail,allow_other 0 0\n```\n\nCreate and mount the Shared Folders (if not done so already):\n\n```\n# mkdir <shared folders root directory>\n# mount <shared folders root directory>\n```\n\n"
+    },
+    {
+      "title": "Systemd",
+      "level": 4,
+      "content": "Create the following .service:\n\n```\n/etc/systemd/system/<shared folders root directory>-<shared_folder>.service\n```\n\n```\n[Unit]\nDescription=Load VMware shared folders\nRequires=vmware-vmblock-fuse.service\nAfter=vmware-vmblock-fuse.service\nConditionPathExists=.host:/<shared_folder>\nConditionVirtualization=vmware\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/vmhgfs-fuse -o allow_other -o auto_unmount .host:/<shared_folder> <shared folders root directory>\n\n[Install]\nWantedBy=multi-user.target\n```\n\nEnsure the <shared folders root directory> folder exists on the system. If this folder does not exist then it must be created, as the systemd service depends on it:\n\n```\n# mkdir -p <shared folders root directory>\n```\n\nEnable the <shared folders root directory>-<shared_folder>.service mount target.\n\nIf all shared folders should be mounted automatically then omit <shared_folder>.\n\n"
+    },
+    {
+      "title": "Legacy Shared Folders with vmhgfs module",
+      "level": 3,
+      "content": "Share a folder by selecting Edit virtual machine settings > Options > Shared Folders > Always enabled, and creating a new share.\n\nEnsure the vmhgfs driver is loaded:\n\n```\n# modprobe vmhgfs\n```\n\nThe shared folders should be viewable with:\n\n```\n$ vmware-hgfsclient\n```\n\nNow the folder can be mounted:\n\n```\n# mkdir /home/user1/shares\n# mount -n -t vmhgfs .host:/<shared_folder> /home/user1/shares\n```\n\n"
+    },
+    {
+      "title": "Enable at boot",
+      "level": 4,
+      "content": "Edit mkinitcpio.conf thusly:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\n...\nMODULES=(... vmhgfs)\n...\n```\n\nand then regenerate the initramfs.\n\nAdd a rule for each share:\n\n```\n/etc/fstab\n```\n\n```\n.host:/<shared_folder> /home/user1/shares vmhgfs defaults 0 0\n```\n\nCreate and mount the Shared Folders:\n\n```\n# mkdir /home/user1/shares\n# mount /home/user1/shares\n```\n\nFor shared folders to work the vmhgfs driver must be loaded. Create the following .services:\n\n```\n/etc/systemd/system/<shared folders root directory>-<shared_folder>.mount\n```\n\n```\n[Unit]\nDescription=Load VMware shared folders\nConditionPathExists=.host:/<shared_folder>\nConditionVirtualization=vmware\n\n[Mount]\nWhat=.host:/<shared_folder>\nWhere=<shared folders root directory>/<shared_folder>\nType=vmhgfs\nOptions=defaults,noatime\n\n[Install]\nWantedBy=multi-user.target\n```\n\n```\n/etc/systemd/system/<shared folders root directory>-<shared_folder>.automount\n```\n\n```\n[Unit]\nDescription=Load VMware shared folders\nConditionPathExists=.host:/<shared_folder>\nConditionVirtualization=vmware\n\n[Automount]\nWhere=<shared folders root directory>/<shared_folder>\n\n[Install]\nWantedBy=multi-user.target\n```\n\nEnsure the <shared folders root directory> folder exists on the system. If this folder does not exist then it must be created, as the systemd scripts depend on it:\n\n```\n# mkdir -p <shared folders root directory>\n```\n\nEnable the mnt-hgfs.automount mount target.\n\nIf all shared folders should be mounted automatically then omit <shared_folder>.\n\n"
+    },
+    {
+      "title": "Prune locate DB",
+      "level": 4,
+      "content": "When using locate, it is pointless to index the shared directories in the locate DB. Therefore, add the directories to PRUNEPATHS in /etc/updatedb.conf.\n\n"
+    },
+    {
+      "title": "3D Acceleration",
+      "level": 3,
+      "content": "If not selected at guest creation time, 3D Acceleration can be enabled in: Edit virtual machine settings > Hardware > Display > Accelerate 3D graphics.\n\n"
+    },
+    {
+      "title": "OpenGL and GLSL support",
+      "level": 4,
+      "content": "It is possible to update OpenGL and GLSL with new kernel modules, overriding Arch-controlled versions.\n\nCurrently, OpenGL 3.3 and GLSL 3.30 can be supported. See https://bbs.archlinux.org/viewtopic.php?id=202713 for more details.\n\n"
+    },
+    {
+      "title": "Time synchronization",
+      "level": 3,
+      "content": "Configuring time synchronization in a Virtual Machine is important; fluctuations are bound to occur more easily in a guest VM. This is mostly due to the CPU being shared by more than one guest.\n\nThere are 2 options to set up time synchronization: the host or an external source.\n\n"
+    },
+    {
+      "title": "Host machine as time source",
+      "level": 4,
+      "content": "To use the host as a time source, ensure vmtoolsd.service is started. Then enable the time synchronization:\n\n```\n# vmware-toolbox-cmd timesync enable\n```\n\nTo synchronize the guest after suspending the host:\n\n```\n# hwclock --hctosys --localtime\n```\n\n"
+    },
+    {
+      "title": "External server as time source",
+      "level": 4,
+      "content": "See NTP.\n\n"
+    },
+    {
+      "title": "Network slow on guest",
+      "level": 3,
+      "content": "Arch Linux, as well as other Linux guests, may have slow network speeds while using NAT. To resolve this, switch the network type to Bridged mode in the guest settings on the host, changing the configuration file for the network on the guest where necessary. For more information on configuration, see Network configuration. If on a Windows host and it is not connecting properly despite correct guest configuration, open the Virtual Network Editor on the host as Administrator and press the Restore defaults button at the bottom left.\n\n"
+    },
+    {
+      "title": "Sound problems",
+      "level": 3,
+      "content": "If unacceptably loud or annoying sounds occur, then it may be related to the PC speaker. The issue may be resolved by disabling the PC speaker within the guest image.\n\n"
+    },
+    {
+      "title": "Audio and Video stuttering problems",
+      "level": 3,
+      "content": "In virtual machines, audio and video stuttering, crackling, or lag can occur, affecting playback in applications like Firefox and system notifications. This issue is often linked to the PipeWire audio backend and emulated drivers. Adjusting ALSA ringbuffer settings or PipeWire configurations can help resolve these glitches.\n\nFor detailed steps on troubleshooting and fixing these issues, see Audio and Video stuttering/crackling\n\n"
+    },
+    {
+      "title": "Mouse problems",
+      "level": 3,
+      "content": "The following problems may occur with the mouse:\n\n- The automatic grab/ungrab feature does not automatically grab input when the cursor enters the window\n- Missing buttons\n- Input lag\n- Clicks are not registered in some applications\n- Mouse cursor jumps when entering/leaving virtual machine\n- Mouse position jumps to where it left the guest virtual machine\n\nThese may be fixed by uninstalling the xf86-input-vmmouse package. xf86-input-vmmouse and xf86-input-libinput should be sufficient for handling mouse and keyboard inputs.\n\nAdding settings to the .vmx configuration file may help (Mouse position jumps to where it left the guest VM):\n\n```\n~/vmware/<Virtual Machine name>/<Virtual Machine name>.vmx\n```\n\n```\nmouse.vusb.enable = \"TRUE\"\nmouse.vusb.useBasicMouse = \"FALSE\"\n```\n\nVMware also attempts to automatically optimize the mouse for gaming. If problems are experienced, disabling the optimization is recommended: Edit > Preferences > Input > Optimize mouse for games: Never\n\nAlternatively, attempting to disable the catchall event in 60-libinput.conf may be required:\n\n```\n/usr/share/X11/xorg.conf.d/60-libinput.conf\n```\n\n```\n#Section \"InputClass\"\n#        Identifier \"libinput pointer catchall\"\n#        MatchIsPointer \"on\"\n#        MatchDevicePath \"/dev/input/event*\"\n#        Driver \"libinput\"\n#EndSection\n```\n\n"
+    },
+    {
+      "title": "Slow boot time",
+      "level": 4,
+      "content": "The following errors may be displayed if VMWare's memory hot-add feature is enabled:\n\n- add_memory failed\n- acpi_memory_enable_device() error\n\nDisable the memory hot-add feature by setting mem.hotadd = \"FALSE\" to the .vmx.\n\n```\n~/vmware/<Virtual Machine name>/<Virtual Machine name>.vmx\n```\n\n```\nmem.hotadd = \"FALSE\"\n```\n\n"
+    },
+    {
+      "title": "Shutdown/Reboot hangs",
+      "level": 4,
+      "content": "Adjust the timeout for the vmtoolsd service (defaults to 90 seconds).\n\n```\n/etc/systemd/system/vmtoolsd.service.d/timeout.conf\n```\n\n```\n[Service]\nTimeoutStopSec=1\n```\n\n"
+    },
+    {
+      "title": "Window resolution autofit problems",
+      "level": 3,
+      "content": "\"Autofit\" means that when the VMWare window's size is adjusted in the host, Arch Linux in the guest should automatically follow and readjust its resolution to fit the new size of the host window.\n\n"
+    },
+    {
+      "title": "Potential solution 1",
+      "level": 4,
+      "content": "Ensure autofit is enabled. For VMware Workstation the setting can be found in: View -> Autosize -> Autofit Guest\n\n"
+    },
+    {
+      "title": "Potential solution 2",
+      "level": 4,
+      "content": "For some reason, autofit requires that the packages gtkmm and gtk2, are installed. Hence ensure that those two packages are installed on the guest. If X windows is not installed or a non–GTK-based desktop environment (such as KDE) is being used, these packages might have to be installed independently.\n\n"
+    },
+    {
+      "title": "Potential solution 3",
+      "level": 4,
+      "content": "The relevant modules may have to be added to mkinitcpio.conf:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(vsock vmw_vsock_vmci_transport vmw_balloon vmw_vmci vmwgfx)\n```\n\nDo not forget to regenerate the initramfs.\n\n"
+    },
+    {
+      "title": "Potential solution 4",
+      "level": 4,
+      "content": "Enable vmtoolsd.service.\n\nIf this does not work, ensure the vmtoolsd.service is restarted.\n\n"
+    },
+    {
+      "title": "Potential solution 5",
+      "level": 4,
+      "content": "If GNOME is running on Wayland, install xf86-video-vmware (FS#57473).\n\nSee [1].\n\n"
+    },
+    {
+      "title": "Potential solution 6",
+      "level": 4,
+      "content": "Make sure that Stretch Mode is disabled. Follow VM > Settings > Display > Display Scaling and untick the option Stretch mode.\n\n"
+    },
+    {
+      "title": "Potential solution 7",
+      "level": 4,
+      "content": "Manually set the resolution using the video= option in the kernel command line.\n\n"
+    },
+    {
+      "title": "Drag and drop, copy/paste",
+      "level": 3,
+      "content": "The drag-and-drop (copy/paste) feature requires both open-vm-tools and gtkmm3 packages to be installed.\n\nMake the command vmware-user run after X11 by either:\n\n- Ensuring /etc/xdg/autostart/vmware-user.desktop exists, and if not, running:\n\n```\n# cp /etc/vmware-tools/vmware-user.desktop /etc/xdg/autostart/vmware-user.desktop\n```\n\nor\n\n- Add vmware-user to Xinitrc.\n\nCopy/paste does not currently work on Wayland, though applications running through Xwayland work fine.\n\nWith upgrade of VMWorkstation to version 17.6.2 copy/paste again silently stopped working. Adding the lines\n\n```\nkeyboard.allowBothIRQs = \"FALSE\"\nkeyboard.vusb.enable = \"TRUE\"\n```\n\nto the VMX file solved the problem.\n\n"
+    },
+    {
+      "title": "Problems when running as a shared virtual machine on Workstation 11",
+      "level": 3,
+      "content": "Workstation 11 has a bug where vmware-hostd crashes if an Arch guest is running as a shared virtual machine and vmtoolsd is running in the guest. A patch to open-vm-tools to work around the bug is here.\n\n"
+    },
+    {
+      "title": "Virtual Network Editor Wayland",
+      "level": 3,
+      "content": "Running GUI applications as root -- some of the following is copied from\n\n- When running VMWare workstation on a wayland host the Virtual Network Editor will not launch under Wayland this because\n\nTrying to run a graphical application as root via su, sudo or pkexec in a Wayland session (e.g. GParted or Gedit), will fail with an error similar to this:\n\n```\n$ sudo vmware-netcfg\nNo protocol specified\nUnable to init server: Could not connect: Connection refused\n\n(gedit:2349): Gtk-WARNING **: cannot open display: :0\n```\n\nThis is a security feature of Wayland they reason GUI applications should not be run as root. This can be achieved using the following in the terminal\n\n"
+    },
+    {
+      "title": "Using xhost",
+      "level": 4,
+      "content": "A more versatile —though much less secure— workaround is to use xhost to temporarily allow the root user to access the local user's X session[2]. To do so, execute the following command as the current (unprivileged) user:\n\n```\n$ xhost si:localuser:root\n```\n\nTo remove this access after the application has been closed:\n\n```\n$ xhost -si:localuser:root\n```\n\n"
+    },
+    {
+      "title": "Using sudo -E",
+      "level": 4,
+      "content": "Launch vmware-netcfg with:\n\n```\n$ sudo -E vmware-netcfg\n```\n\n"
+    }
+  ]
+}

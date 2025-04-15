@@ -1,0 +1,71 @@
+{
+  "title": "Shorewall (简体中文)",
+  "url": "https://wiki.archlinux.org/title/Shorewall_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section is a candidate for merging with Iptables#Front-ends.** This article or section is a candidate for merging with Iptables#Front-ends.\n\nThis article or section is a candidate for merging with Iptables#Front-ends.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nThe Shoreline Firewall, more commonly known as \"Shorewall\", is a high-level tool for configuring Netfilter.\n\nYou describe your firewall/gateway requirements using entries in a set of configuration files. Shorewall reads those configuration files and with the help of the iptables utility, Shorewall configures Netfilter to match your requirements.\n\nShorewall can be used on a dedicated firewall system, a multi-function gateway/router/server or on a standalone GNU/Linux system. Shorewall does not use Netfilter's ipchains compatibility mode and can thus take advantage of Netfilter's connection state tracking capabilities.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the shorewallAUR or shorewall6AUR package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "These settings are based on the two-interface documentation on the Shorewall web site.\n\nUse some example configuration files that come with the shorewall package\n\n```\n# cp /usr/share/doc/shorewall/Samples/one-interface/* /etc/shorewall/     # If you have a desktop-type system with a single network interface\n# cp /usr/share/doc/shorewall6/Samples6/one-interface/* /etc/shorewall6/  # If you have a desktop-type system with a single network interface, pkg shorewall6\n# cp /usr/share/doc/shorewall/Samples/two-interfaces/* /etc/shorewall/    # If you have a router with two network interfaces\n# cp /usr/share/doc/shorewall/Samples/three-interfaces/* /etc/shorewall/  # If you have a router with three network interfaces\n```\n\n"
+    },
+    {
+      "title": "/etc/shorewall/interfaces",
+      "level": 3,
+      "content": "Change the interface settings to match the names used for our Ethernet devices and to allow DHCP traffic on the local network. Edit /etc/shorewall/interfaces\n\noriginal\n\n```\nnet     eth0          dhcp,tcpflags,nosmurfs,routefilter,logmartians\nloc     eth1          tcpflags,nosmurfs,routefilter,logmartians\n```\n\nnew\n\n```\nnet     wan          dhcp,tcpflags,nosmurfs,routefilter,logmartians\nloc     lan          dhcp,tcpflags,nosmurfs,routefilter,logmartians\n```\n\n"
+    },
+    {
+      "title": "/etc/shorewall/policy",
+      "level": 3,
+      "content": "Change the policy file to allow the router (this machine) to access the Internet. Edit /etc/shorewall/policy\n\noriginal\n\n```\n###############################################################################\n#SOURCE         DEST            POLICY          LOG LEVEL       LIMIT:BURST\n\nloc             net             ACCEPT\nnet             all             DROP            info\n# THE FOLLOWING POLICY MUST BE LAST\nall             all             REJECT          info\n```\n\nnew\n\n```\n###############################################################################\n#SOURCE         DEST            POLICY          LOG LEVEL       LIMIT:BURST\n$FW             net             ACCEPT\nloc             net             ACCEPT\nnet             all             DROP            info\n# THE FOLLOWING POLICY MUST BE LAST\nall             all             REJECT          info\n```\n\n"
+    },
+    {
+      "title": "/etc/shorewall/rules",
+      "level": 3,
+      "content": "DNS look-ups are handled (actually forwarded) by dnsmasq, so Shorewall needs to allow those connections. Add these lines to /etc/shorewall/rules\n\n```\n#       Accept DNS connections from the local network to the firewall\n#\nDNS(ACCEPT)     loc              $FW\n```\n\n"
+    },
+    {
+      "title": "/etc/shorewall/masq",
+      "level": 3,
+      "content": "Note: As of version 5.0.14, /etc/shorewall/masq has been deprecated in favor of /etc/shorewall/snat. Add the following line to /etc/shorewall/snat instead of modifying masq.\n\nAs of version 5.0.14, /etc/shorewall/masq has been deprecated in favor of /etc/shorewall/snat. Add the following line to /etc/shorewall/snat instead of modifying masq.\n\n```\nMASQUERADE        192.168.1.0/24        eth0\n```\n\nChange the network interface to the one connected to your external (WAN) network and change the IP to the one used in your local network.\n\n```\neth0        192.168.1.0/24\n```\n\n"
+    },
+    {
+      "title": "SSH",
+      "level": 4,
+      "content": "OPTIONAL: You can add these lines to /etc/shorewall/rules if you want to be able to SSH into the router from computers on the Internet\n\n```\n#       Accept SSH connections from the internet for administration\n#\nSSH(ACCEPT)     net             $FW         TCP      <SSH port used>\n```\n\n"
+    },
+    {
+      "title": "Port forwarding (DNAT)",
+      "level": 4,
+      "content": "- /etc/shorewall/rules : here is an example for a webserver on our LAN with IP 10.0.0.85. You can reach it on port 5000 of our \"external\" IP.\n\n```\nDNAT        net        loc:10.0.0.85:80        tcp        5000\n```\n\n"
+    },
+    {
+      "title": "/etc/shorewall/stoppedrules",
+      "level": 3,
+      "content": "If you have a network name other than eth1 for the network interface in /etc/shorewall/interfaces, you need to update stoppedrules with the correct name.\n\n"
+    },
+    {
+      "title": "/etc/shorewall/shorewall.conf",
+      "level": 3,
+      "content": "When you are finished making above changes, enable shorewall by a change in its configuration file /etc/shorewall/shorewall.conf:\n\noriginal\n\n```\nSTARTUP_ENABLED=No\n```\n\nnew\n\n```\nSTARTUP_ENABLED=Yes\n```\n\nSee shorewall.conf(5) for more information.\n\n"
+    },
+    {
+      "title": "Start",
+      "level": 2,
+      "content": "Start/enable shorewall.service.\n\n"
+    },
+    {
+      "title": "Traffic shaping",
+      "level": 2,
+      "content": "Read Shorewall's Traffic Shaping/Control guide.\n\nHere is a configuration as an example:\n\n- /etc/shorewall/tcdevices : here is where you define the interface you want to have shaped and its rates. I have got a ADSL connection with a 4MBit down/256KBit up profile.\n\n```\nppp0        4mbit        256kbit\n```\n\n- /etc/shorewall/tcclasses : here you define the minimum (rate) and maximum (ceil) throughput per class. You will assign each one to a type of traffic to shape.\n\n```\n# interactive traffic (ssh)\nppp0            1       full    full    0\n# online gaming\nppp0            2       full/2  full    5\n# http\nppp0            3       full/4  full    10\n# rest\nppp0            4       full/6  full    15              default\n```\n\n- /etc/shorewall/tcrules : this file contains the types of traffic and the class it belongs to.\n\n```\n1       0.0.0.0/0       0.0.0.0/0       tcp     ssh\n2       0.0.0.0/0       0.0.0.0/0       udp     27000:28000\n3       0.0.0.0/0       0.0.0.0/0       tcp     http\n3       0.0.0.0/0       0.0.0.0/0       tcp     https\n```\n\nI have split it up my traffic in 4 groups:\n\n1. interactive traffic or ssh: although it takes up almost no bandwidth, it is very annoying if it lags due to leechers on the LAN. This gets the highest priority.\n1. online gaming: needless to say you cannot play when your ping sucks. ;)\n1. webtraffic: can be a bit slower\n1. everything else: every sort of download, they are the cause of the lag anyway.\n\n"
+    }
+  ]
+}

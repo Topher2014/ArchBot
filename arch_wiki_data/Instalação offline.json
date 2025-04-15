@@ -1,0 +1,51 @@
+{
+  "title": "Instalação offline",
+  "url": "https://wiki.archlinux.org/title/Instala%C3%A7%C3%A3o_offline",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Este artigo fornece instruções sobre como instalar o Arch Linux em um sistema sem conexão com a Internet. Para fazer isso, é necessário outro sistema com conexão ativa à Internet.\n\nPrimeiro, siga o Guia de instalação, pulando a seção Guia de instalação#Conectar à internet, até a etapa Guia de instalação#Instalar os pacotes essenciais.\n\n"
+    },
+    {
+      "title": "Preparar repositório local",
+      "level": 2,
+      "content": "Siga Pacman/Dicas e truques#Instalando pacotes a partir de um CD/DVD ou pendrive para obter instruções sobre como preparar um repositório local com os arquivos necessários em uma instalação de host separada.\n\nNo mínimo, para um sistema funcional, os seguintes pacotes são recomendados:\n\n```\n# pacman -Syw --cachedir . --dbpath /tmp/blankdb base base-devel linux linux-firmware mkinitcpio vim\n```\n\nCrie seu repositório offline personalizado:\n\n```\n# repo-add ./custom.db.tar.gz ./*[^sig]\n```\n\n"
+    },
+    {
+      "title": "Montar e configurar",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nAssim que o repositório estiver preparado, conecte a mídia externa à nova instalação e monte-a no sistema de arquivos raiz recém-criado:\n\n```\n# mount --mkdir /dev/sdxy /mnt/repo\n```\n\nEdite o /etc/pacman.conf do seu archiso e adicione uma nova seção:\n\n```\n/etc/pacman.conf\n```\n\n```\n[custom]\nSigLevel = Optional\nServer = file:///mnt/repo/\n```\n\nComente [core] e [extra] de forma que o pacman não falhe com os repositórios padrão.\n\n"
+    },
+    {
+      "title": "Pacstrap",
+      "level": 2,
+      "content": "Agora você pode continuar a usar pacstrap seus pacotes disponíveis localmente para a nova instalação:\n\n```\n# pacstrap -K /mnt base base-devel linux linux-firmware mkinitcpio vim\n```\n\n"
+    },
+    {
+      "title": "Instalar a partir de arquivo",
+      "level": 3,
+      "content": "Caso o processo de instalação offline tenha sido apenas temporário, mas exija a instalação manual de alguns pacotes antes de poder acessar uma rede, consulte pacman (Português)#Comandos adicionais para aprender como instalar pacotes locais.\n\nShell globbing pode ser usado para instalar muitos pacotes de uma vez:\n\n```\n# pacman -U /pasta/de/pacotes/*.tar.zst\n```\n\n"
+    },
+    {
+      "title": "Cache offline",
+      "level": 3,
+      "content": "Você pode colocar os arquivos necessários em /var/lib/pacman/sync e /var/cache/pacman/pkg, para fazer o pacman acreditar que tenha tudo o que precisa para fazer pesquisas, atualizações e instalações. O método a seguir é baseado em dois tópicos do fórum: [1][2].\n\nAs etapas são:\n\n1. baixar os bancos de dados de pacotes atualizados em um computador com acesso à Internet,\n1. transferi-los para o computador desconectado,\n1. gerar a lista de pacotes necessários do computador desconectado para atualizá-lo,\n1. baixá-los com sua assinatura em um computador com acesso à internet,\n1. transferi-los para o cache do pacman do computador desconectado,\n1. instalar as atualizações.\n\nO script a seguir fará o download dos bancos de dados de pacotes atualizados. Se necessário, altere MIRROR para qualquer espelho da lista de status de espelho.\n\n```\ndownload_databases.sh\n```\n\n```\n#!/bin/sh\n\nARCH=\"x86_64\"\nMIRROR=\"https://mirrors.kernel.org/archlinux/\"\n\nwget \"${MIRROR}/core/os/${ARCH}/core.db\"\nwget \"${MIRROR}/extra/os/${ARCH}/extra.db\"\nwget \"${MIRROR}/multilib/os/${ARCH}/multilib.db\"\n\n# e possivelmente -descomente- (se personalizou em /etc/pacman.conf ou pacman.conf.d):\n\n#wget \"${MIRROR}/core-testing/os/${ARCH}/core-testing.db\"\n#wget \"${MIRROR}/extra-testing/os/${ARCH}/extra-testing.db\"\n#wget \"${MIRROR}/multilib-testing/os/${ARCH}/multilib-testing.db\"\n\n# e -também- pacotes de debug e staging.\n```\n\nTorne o script executável e execute-o. Você obterá vários arquivos .db.\n\nOs passos a seguir serão transferir os arquivos .db para o PC offline, fazendo com que você esteja trabalhando com listas de pacotes atualizadas (como se você tivesse executado pacman -Sy), então gerando uma lista de pacotes necessários para a atualização:\n\n```\n# cp *.db /var/lib/pacman/sync/\n# pacman -Sup --noconfirm > pkglist\n```\n\nVocê também precisará baixar as assinaturas dos pacotes correspondentes, então prepare a lista de assinaturas para download:\n\n```\n# sed -e 's/\\.zst$/.zst.sig/' ../pkglist > ../siglist\n```\n\nEm seguida, leve as duas listas com você para um local onde você tenha internet e baixe os pacotes listados em um diretório vazio:\n\n```\n# wget -nv -i ../pkglist\n# wget -nv -i ../siglist\n```\n\nLeve todos os arquivos *.pkg.tar.zst e *.pkg.tar.zst.sig para casa e coloque-os em /var/cache/pacman/ pkg e finalmente execute:\n\n```\n# pacman -Su\n```\n\n"
+    },
+    {
+      "title": "Repositório local",
+      "level": 3,
+      "content": "Caso se espere que o novo sistema permaneça desconectado ou com airgap, ele deverá ser configurado para esperar apenas repositórios locais.\n\n"
+    },
+    {
+      "title": "Repositório completo",
+      "level": 4,
+      "content": "Depois de fazer chroot em sua nova instalação, edite o novo /etc/pacman.conf da mesma forma que anteriormente (mas sem o prefixo /mnt):\n\n```\n/etc/pacman.conf\n```\n\n```\n[custom]\nSigLevel = Optional\nServer = file:///repo/\n```\n\nComente todos os outros repositórios e salve. Continue configurando o novo sistema normalmente.\n\nDe agora em diante, quaisquer atualizações no sistema desconectado podem ser feitas trazendo uma cópia atualizada do repositório local, montando-o em /repo e executando comandos do pacman normalmente.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Leitura offline: para navegar no ArchWiki sem conexão.\n\n"
+    }
+  ]
+}

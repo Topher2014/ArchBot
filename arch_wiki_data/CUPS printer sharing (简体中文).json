@@ -1,0 +1,76 @@
+{
+  "title": "CUPS printer sharing (简体中文)",
+  "url": "https://wiki.archlinux.org/title/CUPS_printer_sharing_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Samba\n- CUPS\n\nThis article contains instruction on sharing printers from a GNU/Linux system.\n\nTable content:\nProtocol | Linux | Windows | macOS\nDiscovery (DNS-SD/mDNS) | CUPS with Avahi | Native support since Windows 10 | Bonjour\nInternet Printing Protocol | CUPS | Control Panel > Programs > Turn Windows features on or off > Print and Document Services > Internet Printing Client | Native support\nSMB shared printer | Samba with CUPS | Native support | Native support\nLine Printer Daemon protocol | CUPS | Control Panel > Programs > Turn Windows features on or off > Print services >LPD Print Service and LPR Port Monitor | Native support\n\n"
+    },
+    {
+      "title": "Creating class for multiple printers",
+      "level": 2,
+      "content": "In CUPS, a class is a group of printers which appears to clients as a single printer. When a client selects to print to the class, CUPS selects any printer in the group to accept the print job. This may be especially useful when one printer from the class must be removed. If it is excluded from the class, end users will not notice any change because the print job will be queued to another printer in the class. Creating and managing classes can be done from CUPS Web GUI.\n\n"
+    },
+    {
+      "title": "Printer sharing",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "DNS-SD advertisement",
+      "level": 3,
+      "content": "To announce the printer to the network over DNS-SD/mDNS (Bonjour in Apple world), Avahi must be installed and running on the server.\n\nTo enable it, either select Share printers connected to this system in the web interface, or manually set Browsing Yes in /etc/cups/cupsd.conf:\n\n```\n/etc/cups/cupsd.conf\n```\n\n```\n...\nBrowsing Yes\n...\n```\n\nAfterwards restart cups.service.\n\nNote that \"browsing\" at the print server is a different thing from \"browsing\" at a remote networked host. On the print server, cupsd provides the DNS-SD protocol support which the avahi-daemon broadcasts. The cups-browsed service is unnecessary on the print server, unless also broadcasting the old CUPS protocol, or the print server is also \"browsing\" for other networked printers. On the remote networked host, the cups-browsed service is required to \"browse\" for network broadcasts of print services, and running cups-browsed will also automatically start cupsd.\n\nThe cups.service service will be automatically started when a USB printer is plugged in, however this may not be the case for other connection types. If cups.service is not running, avahi-daemon does not broadcast the print services, so in that case the systemd unit service file must be modified to start on boot, and then the service must again be \"enabled/installed\" with the new dependency. To do this, edit the service file [Install] section to add a WantedBy=default.target dependency, and then enable and start the cups.service service.\n\n"
+    },
+    {
+      "title": "Sharing via Internet Printing Protocol",
+      "level": 3,
+      "content": "The server can be configured using either the web interface or by manually editing /etc/cups/cupsd.conf.\n\nOpen up the web interface to the server, select the Administration tab, look under the Server heading, and enable the \"Share printers connected to this system\" option. Save your change by clicking on the Change Settings button. The server will automatically restart.\n\nOn the server computer (the one directly connected to the printer), allow access to the server by modifying the location directive. For instance:\n\n```\n/etc/cups/cupsd.conf\n```\n\n```\n<Location />\n    Order allow,deny\n    Allow localhost\n    Allow 192.168.0.*\n</Location>\n...\n```\n\nAlso make sure the server is listening on the IP address the client will use:\n\n```\n/etc/cups/cupsd.conf\n```\n\n```\n...\nListen <hostname>:631\n...\n```\n\nThere are more configuration possibilities, including automatic methods, which are described in detail in Using Network Printers and cupsd.conf(5).\n\nAfter making any modifications, restart cups.service.\n\nIf CUPS is started using socket activation, create a drop-in snippet for cups.socket so that socket activation also works for remote connections:\n\n```\n/etc/systemd/system/cups.socket.d/override.conf\n```\n\n```\n[Socket]\nListenStream=631\n```\n\n"
+    },
+    {
+      "title": "Sharing via Samba",
+      "level": 3,
+      "content": "Samba is an implementation of the Windows file and printer sharing protocols, even the most vintage ones.\n\nTo configure Samba on the Linux server, edit /etc/samba/smb.conf file to allow access to printers. File smb.conf can look something like this:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\n...\nprinting = CUPS\n...\n\n[printers]\n    comment = All Printers\n    path = /var/spool/samba\n    browseable = yes\n    # to allow user 'guest account' to print.\n    guest ok = no\n    writable = no\n    printable = yes\n    create mode = 0700\n    write list = root @adm @wheel yourusername\n```\n\nThat should be enough to share the printer, yet adding an individual printer entry may be desirable:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[ML1250]\n    comment = Samsung ML-1250 Laser Printer\n    printer = ml1250\n    path = /var/spool/samba\n    printing = cups\n    printable = yes\n    user client driver = yes\n    # to allow user 'guest account' to print.\n    guest ok = no\n    writable = no\n    write list = root @adm @wheel yourusername\n    valid users = root @adm @wheel yourusername\n```\n\nPlease note that this assumes configuration was made so that users must have a valid account to access the printer. To have a public printer, set guest ok to yes, and remove the valid users line. To add accounts, set up a regular GNU/Linux account and then set up a Samba password on the server. See Samba#User management.\n\nAfter this, restart smb.service and nmb.service.\n\nSee Samba's documentation Setting up Samba as a Print Server for more details.\n\n"
+    },
+    {
+      "title": "Sharing via Line Printer Daemon protocol",
+      "level": 3,
+      "content": "Enable and start cups-lpd.socket.\n\n"
+    },
+    {
+      "title": "Remote administration",
+      "level": 2,
+      "content": "Once the server is set up as described in #Printer sharing, it can also be configured so that it can be remotely administered. Add the allowed hosts to the <Location /admin> block in /etc/cups/cupsd.conf, using the same syntax as described in #Sharing via Internet Printing Protocol. Note that three levels of access can be granted:\n\n```\n<Location />           #access to the server\n<Location /admin>\t#access to the admin pages\n<Location /admin/conf>\t#access to configuration files\n```\n\nTo give remote hosts access to one of these levels, add an Allow statement to that level's section. An Allow statement can take one or more of the forms listed below:\n\n```\nAllow from all\nAllow from host.domain.com\nAllow from *.domain.com\nAllow from ip-address\nAllow from ip-address/netmask\nAllow from @LOCAL\n```\n\nDeny statements can also be used. For example, to give full access to all hosts on your local network interfaces, edit /etc/cups/cupsd.conf to include this:\n\n```\n# Restrict access to the server...\n# By default only localhost connections are possible\n<Location />\n   Order allow,deny\n   Allow from @LOCAL\n</Location>\n\n# Restrict access to the admin pages...\n<Location /admin>\n   Order allow,deny\n   Allow from @LOCAL\n</Location>\n\n# Restrict access to configuration files...\n<Location /admin/conf>\n   AuthType Basic\n   Require user @SYSTEM\n   Order allow,deny\n   Allow from @LOCAL\n</Location>\n```\n\nYou might also need to disable the HTTPS requirement, when using the default self-signed certificate generated by CUPS:\n\n```\nDefaultEncryption IfRequested\n```\n\nThis should avoid the error: 426 - Upgrade Required when using the CUPS web interface from a remote machine.\n\n"
+    },
+    {
+      "title": "Kerberos",
+      "level": 3,
+      "content": "Kerberos can be used to authenticate users accessing a remote CUPS server. This assumes that your machine has a keytab and it will need a ticket for \"HTTP\". Instead of using http://localhost:631 you must use https://host.example.co.uk:631 - encryption is required for auth (hence https) and the full hostname is needed so that Kerberos/Negotiate can work. In addition, the server must be configured in /etc/cups/cupsd.conf to use a DefaultAuthType of Negotiate.\n\nIf you are using Samba's winbind NSS support, you can add an AD group name to /etc/cups/cups-files.conf - in the following example sysadmin might be an AD group:\n\n```\n/etc/cups/cups-files.conf\n```\n\n```\nSystemGroup sys root sysadmin\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "See CUPS/Troubleshooting for general troubleshooting tips.\n\n"
+    },
+    {
+      "title": "Cannot print with GTK applications",
+      "level": 3,
+      "content": "If you get a getting printer information failed message when you try to print from GTK applications, add this line to your /etc/hosts:\n\n```\n/etc/hosts\n```\n\n```\nserverip \tsome.name.tld \tServersHostname\n```\n\n"
+    },
+    {
+      "title": "Permission errors on Windows",
+      "level": 3,
+      "content": "Some users fixed NT_STATUS_ACCESS_DENIED (Windows clients) errors by using a slightly different syntax:\n\n```\nsmb://workgroup/username:password@hostname/printer_name\n```\n\n"
+    },
+    {
+      "title": "Local Printing is fine, but no printing via Network",
+      "level": 3,
+      "content": "Depending on the printer (Especially for unidirectional label-printers) one side must be configured with the raw-driver to be able to print\n\n"
+    },
+    {
+      "title": "Other operating systems",
+      "level": 2,
+      "content": "More information on interfacing CUPS with other printing systems can be found in the CUPS manual, e.g. on http://localhost:631/help/network.html.\n\n"
+    }
+  ]
+}

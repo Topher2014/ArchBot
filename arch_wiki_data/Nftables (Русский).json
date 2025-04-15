@@ -1,0 +1,196 @@
+{
+  "title": "Nftables (Русский)",
+  "url": "https://wiki.archlinux.org/title/Nftables_(%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ссылки по теме\n\n- iptables (Русский)\n- Firewalld\n\nnftables — проект netfilter, разработанный для замены существующего фреймворка {ip,ip6,arp,eb}tables. Предоставляет новую систему фильтрации пакетов, пользовательскую утилиту ntf, а также слой совместимости с {ip,ip6}tables. nftables использует существующие хуки, отслеживание соединений, очереди в пространстве пользователя и подсистему логирования netfilter.\n\nnftables состоит из трёх основных частей: низкоуровневая реализация в ядре, библиотека libnl, которая обеспечивает netlink-взаимодействие, и пользовательский фронтенд nftables. Ядро предоставляет интерфейс настройки netlink, а также занимается runtime-выполнением наборов правил. Библиотека libnl содержит низкоуровневые функции для взаимодействия с ядром. Фронтенд nftables — то, с чем пользователь взаимодействует утилитой nft.\n\nПодробную информацию о nftables можно найти на вики-странице проекта.\n\n"
+    },
+    {
+      "title": "Установка",
+      "level": 2,
+      "content": "Установите пакет nftables или git-версию nftables-gitAUR.\n\n"
+    },
+    {
+      "title": "Использование",
+      "level": 2,
+      "content": "В nftables не различаются временные правила, добавленные из командной строки, и постоянные, загруженные из файла или сохранённые в файл.\n\nВсе правила должны создаваться или загружаться утилитой nft. Подробнее о работе с ней см. раздел #Настройка.\n\nТекущий набор правил можно узнать командой:\n\n```\n# nft list ruleset\n```\n\n"
+    },
+    {
+      "title": "Простой межсетевой экран",
+      "level": 3,
+      "content": "В пакет nftables входит простая и надёжная конфигурация экрана, сохранённая в файле /etc/nftables.conf.\n\nСлужба nftables.service загрузит эти правила при запуске или включении.\n\n"
+    },
+    {
+      "title": "Настройка",
+      "level": 2,
+      "content": "Утилита nft выполняет большую часть обработки правил перед передачей их ядру. Правила объединяются в цепочки, которые, в свою очередь, входят в состав таблиц. В последующих разделах описано создание и модифицирование этих структур.\n\nПрочитать правила из файла можно с помощью опции -f/--file:\n\n```\n# nft --file имя-файла\n```\n\nОбратите внимание, что уже загруженные на этот момент правила не будут при этом автоматически стёрты.\n\nПолный список команд можно найти в руководстве nft(8).\n\n"
+    },
+    {
+      "title": "Таблицы",
+      "level": 3,
+      "content": "Таблицы содержат #Цепочки. В отличие от iptables, в nftables отсутствуют встроенные таблицы. Количество таблиц и их имена определяется пользователем. Тем не менее, каждая таблица имеет только одно семейство адресации и применяется к пакетам только этого семейства. Таблицы могут относиться к одному из пяти семейств.\n\nTable content:\nсемейство nftables | утилита iptables\nip | iptables\nip6 | ip6tables\ninet | iptables и ip6tables\narp | arptables\nbridge | ebtables\n\nip (т.е. IPv4) — семейство по умолчанию; используется, если семейство не было указано.\n\nСемейство inet объединяет протоколы IPv4 и IPv6, что позволяет унифицировать семейства ip и ip6 и упростить создание правил.\n\nОписание остальных семейств адресации вы найдёте в руководстве nft(8) § ADDRESS FAMILIES.\n\nВ командах ниже параметр семейство будет указываться не всегда; если его нет, то подразумевается семейство ip.\n\n"
+    },
+    {
+      "title": "Создание таблицы",
+      "level": 4,
+      "content": "Добавить новую таблицу:\n\n```\n# nft add table семейство таблица\n```\n\n"
+    },
+    {
+      "title": "Просмотр таблиц",
+      "level": 4,
+      "content": "Вывести список таблиц:\n\n```\n# nft list tables\n```\n\n"
+    },
+    {
+      "title": "Просмотр цепочек и правил в таблице",
+      "level": 4,
+      "content": "Вывести цепочки и правила выбранной таблицы:\n\n```\n# nft list table семейство таблица\n```\n\nНапример, чтобы вывести на экран правила таблицы my_table семейства inet, выполните команду:\n\n```\n# nft list table inet my_table\n```\n\n"
+    },
+    {
+      "title": "Удаление таблицы",
+      "level": 4,
+      "content": "Удалить таблицу со всеми цепочками:\n\n```\n# nft delete table семейство таблица\n```\n\n"
+    },
+    {
+      "title": "Очистка таблицы",
+      "level": 4,
+      "content": "Стереть все правила в таблице:\n\n```\n# nft flush table семейство таблица\n```\n\n"
+    },
+    {
+      "title": "Цепочки",
+      "level": 3,
+      "content": "Цепочка содержит #Правила. В отличие от iptables, в nftables отсутствуют встроенные цепочки. Соответственно, если опрелённые типы или хуки фреймворка netfilter не задействованы ни в одной цепочке, то проходящие через эти цепочки пакеты обрабатываться не будут (в отличие от iptables).\n\nЕсть два типа цепочек. Базовая цепочка является точкой входа для пакетов из сетевого стека; в ней указывается хук. Обычная цепочка может использоваться в качестве цели перехода и используется для лучшей организации правил.\n\nВ командах ниже параметр семейство будет указываться не всегда; если его нет, то подразумевается семейство ip.\n\n"
+    },
+    {
+      "title": "Создание цепочки",
+      "level": 4,
+      "content": "Добавить обычную цепочку цепочка в таблицу таблица:\n\n```\n# nft add chain семейство таблица цепочка\n```\n\nНапример, чтобы добавить обычную цепочку my_tcp_chain к таблице my_table семейства адресации inet, выполните:\n\n```\n# nft add chain inet my_table my_tcp_chain\n```\n\nЧтобы добавить базовую цепочку, укажите хук и значение приоритета:\n\n```\n# nft add chain семейство таблица цепочка '{ type тип hook хук priority приоритет ; }'\n```\n\nтип может принимать значения filter, route или nat.\n\nДля семейств адресации IPv4/IPv6/Inet хук может принимать значения prerouting, input, forward, output или postrouting. Описание других возможных хуков вы найдёте в руководстве nft(8) § ADDRESS FAMILIES.\n\nПараметр приоритет задаётся названием приоритета или его численным значением (подробнее см. nft(8) § CHAINS). Цепочки с более низкими значениями обрабатываются раньше. Значение приоритета может быть отрицательным [3].\n\nНапример, добавим базовую цепочку для фильтрации входящих пакетов:\n\n```\n# nft add chain inet my_table my_chain '{ type filter hook input priority 0; }'\n```\n\nЕсли заменить команду add на create в любом из правил выше, то цепочка тоже будет создана, но если цепочка с таким названием уже существует, то вы получите сообщение об ошибке.\n\n"
+    },
+    {
+      "title": "Просмотр правил",
+      "level": 4,
+      "content": "Следующая команда выводит на экран все правила в цепочке:\n\n```\n# nft list chain семейство таблица цепочка\n```\n\nНапример, следующая команда выведет правила цепочки my_output таблицы my_table семейства inet:\n\n```\n# nft list chain inet my_table my_output\n```\n\n"
+    },
+    {
+      "title": "Изменение цепочки",
+      "level": 4,
+      "content": "Для редактирования цепочки укажите её название и правила, которые нужно изменить:\n\n```\n# nft chain семейство таблица цепочка '{ [ type тип hook хук device устройство priority приоритет ; policy политика ; ] }'\n```\n\nНапример, для изменения политики обработки входящих пакетов цепочки исходной таблицы с accept на drop выполните команду:\n\n```\n# nft chain inet my_table my_input '{ policy drop ; }'\n```\n\n"
+    },
+    {
+      "title": "Удаление цепочки",
+      "level": 4,
+      "content": "Удалить цепочку:\n\n```\n# nft delete chain семейство таблица цепочка\n```\n\nЦепочка должна быть пустой (не содержащей правил) и не должна быть целью перехода из другой цепочки.\n\n"
+    },
+    {
+      "title": "Очистка цепочки",
+      "level": 4,
+      "content": "Стереть все правила в цепочке:\n\n```\n# nft flush chain семейство таблица цепочка\n```\n\n"
+    },
+    {
+      "title": "Правила",
+      "level": 3,
+      "content": "Правила конструируются из выражений (expressions) и операторов (statements) и содержатся внутри цепочек.\n\n"
+    },
+    {
+      "title": "Добавление правила",
+      "level": 4,
+      "content": "Добавить правило в цепочку:\n\n```\n# nft add rule семейство таблица цепочка handle маркер оператор\n```\n\nПравило будет прикреплено после маркер, который можно не указывать. Если маркер (handle) не задать, то правило добавится в конец цепочки.\n\nЧтобы добавить правило перед определённой позицией, выполните\n\n```\n# nft insert rule семейство таблица цепочка handle маркер оператор\n```\n\nЕсли маркер не указан, то правило добавится в начало цепочки.\n\nОбычно оператор включает некоторое выражение для сравнения и вынесения решения. Решениями могут быть accept, drop, queue, continue, return, jump цепочка и goto цепочка. Возможны и другие операторы помимо решений, подробнее смотрите nft(8).\n\nВ nftables доступен ряд выражений, по большей части совпадающий с аналогичными в iptables. Наиболее важное отличие заключается в том, что здесь нет обобщённых или неявных параметров. Обобщённый параметр (generic match) обычно доступен для всех правил, например, параметры --protocol или --source. Неявные правила (implicit matches) относятся к конкретному протоколу, как параметр --sport для пакетов TCP.\n\nНиже представлен неполный список возможных параметров:\n\n- meta (метасущности, напр. интерфейсы)\n- icmp (протокол ICMP)\n- icmpv6 (протокол ICMPv6)\n- ip (протокол IP)\n- ip6 (протокол IPv6)\n- tcp (протокол TCP)\n- udp (протокол UDP)\n- sctp (протокол SCTP)\n- ct (отслеживание соединений)\n\nНиже приведён неполный список аргументов для параметров (подробнее см. nft(8)):\n\n```\nmeta:\n  oif <интерфейс-отправитель НОМЕР>\n  iif <интерфейс-получатель НОМЕР>\n  oifname <интерфейс-отправитель ИМЯ>\n  iifname <интерфейс-получатель ИМЯ>\n\n  (параметры oif и iif принимают строковые значения, которые конвертируются в номер)\n  (параметры oifname и iifname более гибкие, но они медленнее из-за необходимости выполнять сравнение строк)\n\nicmp:\n  type <тип icmp>\n\nicmpv6:\n  type <тип icmpv6>\n\nip:\n  protocol <протокол>\n  daddr <адрес получателя>\n  saddr <адрес отправителя>\n\nip6:\n  daddr <адрес получателя>\n  saddr <адрес отправителя>\n\ntcp:\n  dport <порт получателя>\n  sport <порт отправителя>\n\nudp:\n  dport <порт получателя>\n  sport <порт отправителя>\n\nsctp:\n  dport <порт получателя>\n  sport <порт отправителя>\n\nct:\n  state <new | established | related | invalid>\n```\n\n"
+    },
+    {
+      "title": "Удаление",
+      "level": 4,
+      "content": "Отдельные правила могут быть удалены только с помощью маркера. Команда nft --handle list выведет список маркеров.\n\nНиже приведён пример правила с маркером и команда для его удаления. Аргумент --numeric позволяет выводить IP-адреса в численном виде.\n\n```\n# nft --handle --numeric list chain inet my_table my_input\n```\n\n```\ntable inet my_table {\n     chain my_input {\n          type filter hook input priority 0;\n          ip saddr 127.0.0.1 accept # handle 10\n     }\n}\n```\n\n```\n# nft delete rule inet my_table my_input handle 10\n```\n\nСтирание всех цепочек таблицы выполняется командой nft flush table. Отдельные цепочки могут быть стёрты командами nft flush chain или nft delete rule.\n\n```\n# nft flush table таблица\n# nft flush chain семейство таблица цепочка\n# nft delete rule семейство таблица цепочка\n```\n\nПервая команда стирает все цепочки в ip-таблице таблица. Вторая очищает цепочку цепочка в таблице таблица семейства семейство. Третья удаляет все правила в цепочке цепочка в таблице таблица семейства семейство.\n\n"
+    },
+    {
+      "title": "Множества",
+      "level": 3,
+      "content": "Множества бывают именованные и анонимные. Множество объявляется фигурными скобками, в которых перечислены разделённые запятыми элементы. Анонимные множества \"встраиваются\" в правило и не могут быть изменены отдельно от него. Если множество необходимо модифицировать, то придётся удалить правило целиком и добавить его заново. Так, не получится удалить \"http\" из множества dport'ов в следующем правиле:\n\n```\n# nft add rule ip6 filter input tcp dport {telnet, http, https} accept\n```\n\nИменованное множество можно изменить, а также присвоить ему тип и установить флаги. sshguard использует именованные множества для хранения адресов блокированных хостов.\n\n```\ntable ip sshguard {\n       set attackers {\n               type ipv4_addr\n               flags interval\n               elements = { 1.2.3.4 }\n       }\n```\n\nКоманды для добавления и удаления элементов из множества:\n\n```\n# nft add element ip sshguard attackers { 5.6.7.8/32 }\n# nft delete element ip sshguard attackers { 1.2.3.4/32 }\n```\n\nЕсли множество имеет тип ipv4_addr, то помимо адреса можно указать маску сети (маска \"/32\" в примере не обязательна, но указана для большей ясности). Обращение к множеству из примера выше (\"TABLE ip sshguard { SET attackers }\") производится по имени ip sshguard attackers.\n\n"
+    },
+    {
+      "title": "Полная перезагрузка правил",
+      "level": 3,
+      "content": "Создать файл для новых правил:\n\n```\n# echo \"flush ruleset\" > /tmp/nftables\n```\n\nСбросить дамп правил в новый файл:\n\n```\n# nft -s list ruleset >> /tmp/nftables\n```\n\nТеперь можно редактировать файл /tmp/nftables, создавая и изменяя правила. Применить изменения можно командой:\n\n```\n# nft -f /tmp/nftables\n```\n\n"
+    },
+    {
+      "title": "Рабочая станция",
+      "level": 3,
+      "content": "```\n/etc/nftables.conf\n```\n\n```\nflush ruleset\n\ntable inet my_table {\n\tset LANv4 {\n\t\ttype ipv4_addr\n\t\tflags interval\n\n\t\telements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 }\n\t}\n\tset LANv6 {\n\t\ttype ipv6_addr\n\t\tflags interval\n\n\t\telements = { fd00::/8, fe80::/10 }\n\t}\n\n\tchain my_input_lan {\n\t\tudp sport 1900 udp dport >= 1024 meta pkttype unicast limit rate 4/second burst 20 packets accept comment \"Accept UPnP IGD port mapping reply\"\n\n\t\tudp sport netbios-ns udp dport >= 1024 meta pkttype unicast accept comment \"Accept Samba Workgroup browsing replies\"\n\n\t}\n\n\tchain my_input {\n\t\ttype filter hook input priority filter; policy drop;\n\n\t\tiif lo accept comment \"Accept any localhost traffic\"\n\t\tct state invalid drop comment \"Drop invalid connections\"\n\t\tct state established,related accept comment \"Accept traffic originated from us\"\n\n\t\tmeta l4proto ipv6-icmp icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report } accept comment \"Accept ICMPv6\"\n\t\tmeta l4proto icmp icmp type { destination-unreachable, router-solicitation, router-advertisement, time-exceeded, parameter-problem } accept comment \"Accept ICMP\"\n\t\tip protocol igmp accept comment \"Accept IGMP\"\n\n\t\tudp dport mdns ip6 daddr ff02::fb accept comment \"Accept mDNS\"\n\t\tudp dport mdns ip daddr 224.0.0.251 accept comment \"Accept mDNS\"\n\n\t\tip6 saddr @LANv6 jump my_input_lan comment \"Connections from private IP address ranges\"\n\t\tip saddr @LANv4 jump my_input_lan comment \"Connections from private IP address ranges\"\n\n\t\tcounter comment \"Count any other traffic\"\n\t}\n\n\tchain my_forward {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\t# Drop everything forwarded to us. We do not forward. That is routers job.\n\t}\n\n\tchain my_output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\t# Accept every outbound connection\n\t}\n\n}\n```\n\n"
+    },
+    {
+      "title": "Сервер",
+      "level": 3,
+      "content": "```\n/etc/nftables.conf\n```\n\n```\nflush ruleset\n\ntable inet my_table {\n\tset LANv4 {\n\t\ttype ipv4_addr\n\t\tflags interval\n\n\t\telements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 }\n\t}\n\tset LANv6 {\n\t\ttype ipv6_addr\n\t\tflags interval\n\n\t\telements = { fd00::/8, fe80::/10 }\n\t}\n\n\tchain my_input_lan {\n\t\tmeta l4proto { tcp, udp } th dport 2049 accept comment \"Accept NFS\"\n\n\t\tudp dport netbios-ns accept comment \"Accept NetBIOS Name Service (nmbd)\"\n\t\tudp dport netbios-dgm accept comment \"Accept NetBIOS Datagram Service (nmbd)\"\n\t\ttcp dport netbios-ssn accept comment \"Accept NetBIOS Session Service (smbd)\"\n\t\ttcp dport microsoft-ds accept comment \"Accept Microsoft Directory Service (smbd)\"\n\n\t\tudp sport { bootpc, 4011 } udp dport { bootps, 4011 } accept comment \"Accept PXE\"\n\t\tudp dport tftp accept comment \"Accept TFTP\"\n\t}\n\n\tchain my_input {\n\t\ttype filter hook input priority filter; policy drop;\n\n\t\tiif lo accept comment \"Accept any localhost traffic\"\n\t\tct state invalid drop comment \"Drop invalid connections\"\n\t\tct state established,related accept comment \"Accept traffic originated from us\"\n\n\t\tmeta l4proto ipv6-icmp icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report } accept comment \"Accept ICMPv6\"\n\t\tmeta l4proto icmp icmp type { destination-unreachable, router-solicitation, router-advertisement, time-exceeded, parameter-problem } accept comment \"Accept ICMP\"\n\t\tip protocol igmp accept comment \"Accept IGMP\"\n\n\t\tudp dport mdns ip6 daddr ff02::fb accept comment \"Accept mDNS\"\n\t\tudp dport mdns ip daddr 224.0.0.251 accept comment \"Accept mDNS\"\n\n\t\tip6 saddr @LANv6 jump my_input_lan comment \"Connections from private IP address ranges\"\n\t\tip saddr @LANv4 jump my_input_lan comment \"Connections from private IP address ranges\"\n\n\t\ttcp dport ssh accept comment \"Accept SSH on port 22\"\n\n\t\ttcp dport ipp accept comment \"Accept IPP/IPPS on port 631\"\n\n\t\ttcp dport { http, https, 8008, 8080 } accept comment \"Accept HTTP (ports 80, 443, 8008, 8080)\"\n\n\t\tudp sport bootpc udp dport bootps ip saddr 0.0.0.0 ip daddr 255.255.255.255 accept comment \"Accept DHCPDISCOVER (for DHCP-Proxy)\"\n\t}\n\n\tchain my_forward {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\t# Drop everything forwarded to us. We do not forward. That is routers job.\n\t}\n\n\tchain my_output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\t# Accept every outbound connection\n\t}\n\n}\n```\n\n"
+    },
+    {
+      "title": "Ограничение скорости передачи",
+      "level": 3,
+      "content": "```\ntable inet my_table {\n\tchain my_input {\n\t\ttype filter hook input priority filter; policy drop;\n\n\t\tiif lo accept comment \"Accept any localhost traffic\"\n\t\tct state invalid drop comment \"Drop invalid connections\"\n\n\t\tmeta l4proto icmp icmp type echo-request limit rate over 10/second burst 4 packets drop comment \"No ping floods\"\n\t\tmeta l4proto ipv6-icmp icmpv6 type echo-request limit rate over 10/second burst 4 packets drop comment \"No ping floods\"\n\n\t\tct state established,related accept comment \"Accept traffic originated from us\"\n\n\t\tmeta l4proto ipv6-icmp icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report } accept comment \"Accept ICMPv6\"\n\t\tmeta l4proto icmp icmp type { destination-unreachable, router-solicitation, router-advertisement, time-exceeded, parameter-problem } accept comment \"Accept ICMP\"\n\t\tip protocol igmp accept comment \"Accept IGMP\"\n\n\t\ttcp dport ssh ct state new limit rate 15/minute accept comment \"Avoid brute force on SSH\"\n\n\t}\n\n}\n```\n\n"
+    },
+    {
+      "title": "Переход",
+      "level": 3,
+      "content": "Если вы используете переходы (jumps), то целевая цепочка должна быть описана до перехода. Иначе будет получена ошибка Error: Could not process rule: No such file or directory.\n\n```\ntable inet my_table {\n    chain web {\n        tcp dport http accept\n        tcp dport 8080 accept\n    }\n    chain my_input {\n        type filter hook input priority filter;\n        ip saddr 10.0.2.0/24 jump web\n        drop\n    }\n}\n```\n\n"
+    },
+    {
+      "title": "Несколько сетевых интерфейсов с разными правилами",
+      "level": 3,
+      "content": "Если у вашей системы несколько сетевых интерфейсов и вы хотите использовать для них разные наборы правил, то создайте фильтрующую цепочку-диспетчер, а после неё опишите цепочки для сетевых интерфейсов. Например, пусть ваша машина выступает в качестве домашнего маршрутизатора и вы желаете запустить веб-сервер, доступный по локальной сети (интерфейс enp3s0), но не из публичного интернета (интерфейс enp2s0). Создайте таблицу вроде этой:\n\n```\ntable inet my_table {\n  chain my_input { # this chain serves as a dispatcher\n    type filter hook input priority filter;\n\n    iif lo accept # always accept loopback\n    iifname enp2s0 jump my_input_public\n    iifname enp3s0 jump my_input_private\n\n    reject with icmpx type port-unreachable # refuse traffic from all other interfaces\n  }\n  chain my_input_public { # rules applicable to public interface interface\n    ct state {established,related} accept\n    ct state invalid drop\n    udp dport bootpc accept\n    tcp dport bootpc accept\n    reject with icmpx type port-unreachable # all other traffic\n  }\n  chain my_input_private {\n    ct state {established,related} accept\n    ct state invalid drop\n    udp dport bootpc accept\n    tcp dport bootpc accept\n    tcp port http accept\n    tcp port https accept\n    reject with icmpx type port-unreachable # all other traffic\n  }\n  chain my_output { # we let everything out\n    type filter hook output priority filter;\n    accept\n  }\n}\n```\n\nМожно поступить иначе - задать только одну строку iifname, например для интерфейса веб-сервера, а правила для остальных интерфейсов вместо диспетчеризации описать в одном месте.\n\n"
+    },
+    {
+      "title": "Маскарадинг",
+      "level": 3,
+      "content": "В nftables есть специальное ключевое слово masquerade, \"позволяющее автоматически изменять адрес источника на адрес интерфейса-отправителя\" [4]. Это особенно удобно в ситуациях, когда IP-адрес интерфейса непредсказуем или нестабилен — например, исходящий интерфейс маршрутизатора, подключённого к нескольким интернет-провайдерам. Маскарадинг позволяет не переписывать правила межсетевого экрана для трансляции сетевых адресов (NAT) при каждом изменении IP-адреса интерфейса.\n\nПравила работы маскарадинга:\n\n- опция masquerading в ядре Linux должна быть включена (в стандартном ядре она включена по умолчанию); в противном случае задайте параметр ядра CONFIG_NFT_MASQ=m.\n- ключевое слово masquerade может использоваться только в цепочке типа nat.\n- masquerading является подвидом SNAT, поэтому работает только для исходящих пакетов.\n\nПример правил межсетевого экрана для машины с двумя интерфейсами, локальным enp3s0 и публичным enp2s0:\n\n```\ntable inet my_nat {\n  chain my_masquerade {\n    type nat hook postrouting priority srcnat;\n    oifname \"enp2s0\" masquerade\n  }\n}\n```\n\nПоскольку таблица выше относится к типу inet, то маскарадингу подвергаются пакеты и IPv4, и IPv6. Чтобы ограничить маскарадинг только IPv4-пакетами (т.к. у IPv6 большое пространство адресов и NAT не требуется) либо добавьте выражение meta nfproto ipv4 перед oifname \"enp2s0\" masquerade, либо измените тип таблицы на ip.\n\n"
+    },
+    {
+      "title": "NAT с пробросом портов",
+      "level": 3,
+      "content": "Ниже приведён пример проброса портов 22 и 80 на адрес ip-адрес_получателя. Необходимо предварительно с помощью sysctl установить параметры net.ipv4.ip_forward и net.ipv4.conf.wan_интерфейс.forwarding на 1.\n\n```\ntable ip my_nat {\n  chain my_prerouting {\n    type nat hook prerouting priority dstnat;\n\n    tcp dport { ssh, http } dnat to destination_ip\n  }\n\n  chain my_postrouting {\n    type nat hook postrouting priority srcnat;\n\n    ip daddr destination_ip masquerade\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Счётчик новых соединений",
+      "level": 3,
+      "content": "Следующий сниппет позволяет считать открытые HTTPS-соединения:\n\n```\n/etc/nftables.conf\n```\n\n```\ntable inet filter {\n    set https {\n        type ipv4_addr;\n        flags dynamic;\n        size 65536;\n        timeout 60m;\n    }\n\n    chain input {\n        type filter hook input priority filter;\n        ct state new tcp dport 443 update @https { ip saddr counter }\n    }\n}\n```\n\nТекущее значение счётчика можно вывести командой nft list set inet filter https.\n\n"
+    },
+    {
+      "title": "Динамическая блокировка",
+      "level": 3,
+      "content": "Следующий сниппет позволяет в течение минуты отклонять все HTTPS-соединения от адресов, которые превысили лимит в 10 запросов на соединение в секунду:\n\n```\n/etc/nftables.conf\n```\n\n```\ntable inet dev {\n    set blackhole {\n        type ipv4_addr;\n        flags dynamic, timeout;\n        size 65536;\n    }\n\n    chain input {\n        ct state new tcp dport 443 \\\n                meter flood size 128000 { ip saddr timeout 10s limit rate over 10/second } \\\n                add @blackhole { ip saddr timeout 1m }\n\n        ip saddr @blackhole counter drop\n    }\n}\n```\n\nДля вывода заблокированных адресов выполните nft list set inet dev blackhole.\n\n"
+    },
+    {
+      "title": "Сохранение текущего набора правил",
+      "level": 3,
+      "content": "Вывод команды nft list ruleset можно использовать в качестве входных данных для других команд. Текущий набор правил можно сохранить в файл, а позже — загрузить их из него.\n\n```\n# nft -s list ruleset | tee название_файла\n```\n\n"
+    },
+    {
+      "title": "Настройка межсетевого экрана",
+      "level": 3,
+      "content": "См. также Настройка межсетевого экрана.\n\n"
+    },
+    {
+      "title": "Одиночная машина",
+      "level": 4,
+      "content": "Сотрите текущий набор правил:\n\n```\n# nft flush ruleset\n```\n\nДобавьте таблицу:\n\n```\n# nft add table inet my_table\n```\n\nДобавьте базовые цепочки input, forward и output. Политика для входящих и пересылаемых пакетов должна быть drop. Политика для исходящих пакетов — accept.\n\n```\n# nft add chain inet my_table my_input '{ type filter hook input priority 0 ; policy drop ; }'\n# nft add chain inet my_table my_forward '{ type filter hook forward priority 0 ; policy drop ; }'\n# nft add chain inet my_table my_output '{ type filter hook output priority 0 ; policy accept ; }'\n```\n\nДобавьте две обычные цепочки, которые будут обрабатывать пакеты протоколов TCP и UDP:\n\n```\n# nft add chain inet my_table my_tcp_chain\n# nft add chain inet my_table my_udp_chain\n```\n\nРазрешите related и established трафик:\n\n```\n# nft add rule inet my_table my_input ct state related,established accept\n```\n\nРазрешите трафик на петлевой интерфейс:\n\n```\n# nft add rule inet my_table my_input iif lo accept\n```\n\nЗаблокируйте invalid трафик:\n\n```\n# nft add rule inet my_table my_input ct state invalid drop\n```\n\nРазрешите пакеты ICMP и IGMP:\n\n```\n# nft add rule inet my_table my_input meta l4proto ipv6-icmp icmpv6 type '{ destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-reduction, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report }' accept\n# nft add rule inet my_table my_input meta l4proto icmp icmp type '{ destination-unreachable, router-solicitation, router-advertisement, time-exceeded, parameter-problem }' accept\n# nft add rule inet my_table my_input ip protocol igmp accept\n```\n\nНовый UDP-трафик будет передаваться цепочке my_udp_chain:\n\n```\n# nft add rule inet my_table my_input meta l4proto udp ct state new jump my_udp_chain\n```\n\nНовый TCP-трафик будет передаваться цепочке my_tcp_chain:\n\n```\n# nft add rule inet my_table my_input 'meta l4proto tcp tcp flags & (fin|syn|rst|ack) == syn ct state new jump my_tcp_chain'\n```\n\nЗаблокировать весь трафик, который не обрабатывается другими правилами:\n\n```\n# nft add rule inet my_table my_input meta l4proto udp reject\n# nft add rule inet my_table my_input meta l4proto tcp reject with tcp reset\n# nft add rule inet my_table my_input counter reject with icmpx type port-unreachable\n```\n\nВ этом месте необходимо выбрать, какие порты будут оставаться открытыми для входящих соединений, обрабатываемых цепочками my_tcp_chain и my_udp_chain. Например, открыть соединения для веб-сервера:\n\n```\n# nft add rule inet my_table my_tcp_chain tcp dport 80 accept\n```\n\nРазрешить HTTPS-соединения для веб-сервера на порте 443:\n\n```\n# nft add rule inet my_table my_tcp_chain tcp dport 443 accept\n```\n\nРазрешить SSH-трафик на порт 22:\n\n```\n# nft add rule inet my_table my_tcp_chain tcp dport 22 accept\n```\n\nРазрешить входящие DNS-запросы:\n\n```\n# nft add rule inet my_table my_tcp_chain tcp dport 53 accept\n# nft add rule inet my_table my_udp_chain udp dport 53 accept\n```\n\nВ конце не забудьте сохранить набор правил, чтобы они стали постоянными.\n\n"
+    },
+    {
+      "title": "Предотвращение атак перебором",
+      "level": 3,
+      "content": "Sshguard может обнаруживать атаки перебором и модифицировать сетевые экраны, временно помещая IP-адреса в чёрный список. Описание настройки nftables для работы с sshguard можно найти в статье Sshguard#nftables.\n\n"
+    },
+    {
+      "title": "Журналирование трафика",
+      "level": 3,
+      "content": "Действие log позволяет вести журнал пакетов. Простейшее правило для сохранения информации обо всём поступающем трафике:\n\n```\n# nft add rule inet filter input log\n```\n\nПодробнее см. nftables wiki.\n\n"
+    },
+    {
+      "title": "Работа с Docker",
+      "level": 3,
+      "content": "nftables может создавать помехи сетевой работе контейнеров Docker (возможно, и другим средствам виртуализации тоже). В частности, политика drop цепочки forward блокирует пакеты, источником которых является docker. Если вы не хотите удалять эту цепочку, то сделайте следующее:\n\n1. Установите пакет iptables-nft; он содержит iptables-совместимый интерфейс nftables, который docker сможет использовать.\n1. Модифицируйте цепочку forward таблицы inet: chain forward { type filter hook forward priority security; policy drop; mark 1 accept }\n1. Добавьте цепочку DOCKER-USER в таблицу ip filter, чтобы помечать (mark) пакеты docker: table ip filter { chain DOCKER-USER { mark set 1 } }\n\n```\nchain forward {\n  type filter hook forward priority security; policy drop;\n  mark 1 accept\n}\n```\n\n```\ntable ip filter {\n  chain DOCKER-USER {\n    mark set 1\n  }\n}\n```\n\nТеперь сгенерированные контейнером docker пакеты будут маркироваться и пересылаться дальше, поскольку docker уже их отфильтровал (цепочка forward в docker использует политику drop).\n\n"
+    },
+    {
+      "title": "Смотрите также",
+      "level": 2,
+      "content": "- netfilter nftables — документация от разработчиков проекта netfilter\n- debian:nftables — статья на Debian-wiki\n- gentoo:nftables — статья на Gentoo-wiki\n- First release of nftables — выход nftables (2009)\n- nftables quick howto — советы и подсказки\n- The return of nftables — обновление nftables (2013)\n- What comes after \"iptables\"? — nftables со временем заменит iptables\n\n"
+    }
+  ]
+}

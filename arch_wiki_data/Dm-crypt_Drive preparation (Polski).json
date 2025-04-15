@@ -1,0 +1,66 @@
+{
+  "title": "Dm-crypt/Drive preparation (Polski)",
+  "url": "https://wiki.archlinux.org/title/Dm-crypt/Drive_preparation_(Polski)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Przed zaszyfrowaniem dysku zaleca się bezpieczne wymazanie dysku poprzez nadpisanie całego dysku losowymi danymi. Aby zapobiec atakom kryptograficznym lub niepożądanemu odzyskiwaniu plików, dane te są idealnie nie do odróżnienia od danych później napisanych przez dm-crypt. Aby uzyskać bardziej wyczerpującą dyskusję zobacz Data-at-rest encryption#Preparing the disk.\n\n"
+    },
+    {
+      "title": "Bezpieczne usuwanie danych z dysku twardego",
+      "level": 2,
+      "content": "Podczas wybierania metody bezpiecznego usuwania dysku twardego należy pamiętać, że należy to zrobić tylko raz, dopóki dysk jest używany jako dysk zaszyfrowany.\n\n- Proces wypełniania zaszyfrowanego dysku może potrwać nawet dzień, zanim zostanie ukończony na dysku wieloterabajtowym. Aby nie pozostawić maszyny bezużytecznej podczas pracy, warto ją wykonać z systemu już zainstalowanego na innym dysku, a nie z systemu instalacji Arch na żywo.\n- W przypadku dysków SSD, aby zminimalizować artefakty pamięci podręcznej pamięci flash, rozważ wykonanie czyszczenia komórki SSD przed wykonaniem poniższych instrukcji.\n\n"
+    },
+    {
+      "title": "Metody ogólne",
+      "level": 3,
+      "content": "Aby uzyskać szczegółowe instrukcje na temat usuwania i przygotowania dysku, przeczytaj Bezpiecznie wymaż dysk.\n\n"
+    },
+    {
+      "title": "Metody specyficzne dla dm-crypt",
+      "level": 3,
+      "content": "Poniższe dwie metody są specyficzne dla dm-crypt i są wymienione, ponieważ są bardzo szybkie i mogą być wykonywane również po konfiguracji partycji.\n\ncryptsetup FAQ opisuje bardzo prostą procedurę użycia istniejącej woluminu dm-crypt do usunięcia całej dostępnej wolnej przestrzeni na bazowym urządzeniu blokowym za pomocą losowych danych, działając jako prosty generator liczb pseudolosowych. Ma również chronić przed ujawnieniem wzorców użytkowania. Dzieje się tak dlatego, że zaszyfrowane dane są praktycznie nie do odróżnienia od przypadkowych.\n\n"
+    },
+    {
+      "title": "dm-crypt wymazuje pusty dysk lub partycję",
+      "level": 4,
+      "content": "Najpierw utwórz tymczasowy zaszyfrowany kontener na partycji (sdXY) lub pełny dysk (sdX) do zaszyfrowania, np. przy użyciu domyślnych parametrów szyfrowania i losowego klucza za pośrednictwem --key-file /dev/{u}random opcja (patrz także Random number generation):\n\n```\n# cryptsetup open --type plain /dev/sdXY container --key-file /dev/random\n```\n\nPo drugie, sprawdź, czy istnieje:\n\n```\n# fdisk -l\n```\n\n```\nDisk /dev/mapper/container: 1000 MB, 1000277504 bytes\n...\nDisk /dev/mapper/container does not contain a valid partition table\n```\n\nPrzetrzyj pojemnik zerami. Użycie funkcji if=/dev/urandom nie jest wymagane, ponieważ do losowości wykorzystywany jest szyfr.\n\n```\n# dd if=/dev/zero of=/dev/mapper/container status=progress\n```\n\n```\ndd: writing to ‘/dev/mapper/container’: No space left on device\n```\n\n- Używanie dd z opcją bs=, np. bs=1M, jest często używany w celu zwiększenia przepustowości operacji na dysku.\n- Aby wykonać sprawdzenie operacji, wyzeruj partycję przed utworzeniem pojemnika czyszczenia. Po poleceniu czyszczenia blockdev --getsize64 /dev/mapper/containermoże być użyty do uzyskania dokładnego rozmiaru kontenera jako root. Teraz można użyć do sprawdzenia, czy czyszczenie zastąpiło wyzerowane sektory, np. od -j containersize - blocksize aby zobaczyć czy czyszczenie dobiegło końca.\n\nNa koniec zamknij tymczasowy kontener:\n\n```\n# cryptsetup close container\n```\n\nPodczas szyfrowania całego systemu, kolejnym krokiem jest #Partycjonowanie. Jeśli szyfrujesz tylko partycję, kontynuuj dm-crypt (Polski)/Encrypting a non-root file system (Polski)#Partycja.\n\n"
+    },
+    {
+      "title": "dm-crypt czyści po instalacji wolne miejsce",
+      "level": 4,
+      "content": "Użytkownicy, którzy nie mieli czasu na procedurę czyszczenia przed instalacją, może osiągnąć podobny efekt po uruchomieniu zaszyfrowanego systemu i zamontowaniu systemów plików. Należy jednak rozważyć, czy dany system plików mógł skonfigurować zarezerwowane miejsce, np. dla użytkownika root lub innego disk quota mechanizm, który może ograniczyć czyszczenie nawet w przypadku wykonywania przez użytkownika root: niektóre części podstawowego urządzenia blokowego mogą nie zostać w ogóle zapisane.\n\nAby wykonać operację czyszczenia, tymczasowo wypełnij pozostałą wolną przestrzeń partycji, pisząc do pliku wewnątrz zaszyfrowanego kontenera:\n\n```\n# dd if=/dev/zero of=/file/in/container status=progress\n```\n\n```\ndd: writing to ‘/file/in/container’: No space left on device\n```\n\nSync the cache to disk and then delete the file to reclaim the free space.\n\n```\n# sync\n# rm /file/in/container\n```\n\nPowyższy proces należy powtórzyć dla każdego utworzonego bloku partycji i systemu plików. Na przykład konfiguracja LVM na LUKS, proces musi zostać wykonany dla każdego woluminu logicznego.\n\n"
+    },
+    {
+      "title": "Wytrzyj nagłówek LUKS",
+      "level": 4,
+      "content": "Partycje sformatowane za pomocą dm-crypt/LUKS zawierają nagłówek z użytymi opcjami szyfrowania i krypt, które są określane jako dm-mod podczas otwierania bloku. Po nagłówku rozpoczyna się faktyczna losowa partycja danych. W związku z tym, przy ponownym instalowaniu na już losowym napędzie lub demontażu jednego (np. Sprzedaż komputera, przełączanie napędów itd.) Może to być wystarczające, aby wyczyścić nagłówek partycji, zamiast nadpisywać cały dysk - który może być długim procesem.\n\nWyczyszczenie nagłówka LUKS spowoduje usunięcie klucza głównego zaszyfrowanego PBKDF2 (AES), soli i tak dalej.\n\nNote: **1** \n\nNagłówek z jedną domyślną pamięcią kluczy o wielkości 256 bitów ma rozmiar 1024 KB. Zaleca się również nadpisanie pierwszego 4KiB napisanego przez dm-crypt, więc trzeba wyczyścić 1028 KB. To jest 1052672 bajtów.\n\nAby użyć przesunięcia punktu zerowego:\n\n```\n# head -c 1052672 /dev/urandom > /dev/sdX1; sync\n```\n\nDla 512-bitowej długości klucza (na przykład dla aes-xts-plain z 512-bitowym kluczem) nagłówek zajmuje 2 MB. Nagłówek LUKS2 4MiB.\n\nJeśli masz wątpliwości, po prostu bądź hojny i nadpisaj pierwsze 10 MB.\n\n```\n# dd if=/dev/urandom of=/dev/sdX1 bs=512 count=20480\n```\n\nPodczas wycierania nagłówka losowymi danymi wszystko, co pozostało na urządzeniu, jest zaszyfrowane. W przypadku dysku SSD może wystąpić wyjątek z powodu bloków pamięci podręcznej używanych przez dyski SSD. Teoretycznie może się zdarzyć, że nagłówek był w nich buforowany jakiś czas wcześniej, a ta kopia może być nadal dostępna po wyczyszczeniu oryginalnego nagłówka. Ze względów bezpieczeństwa należy wykonać bezpieczne wymazywanie dysku SSD z dysku SSD (procedura proszę zobaczysz FAQ 5.19).\n\n"
+    },
+    {
+      "title": "Partycjonowanie",
+      "level": 2,
+      "content": "Ta sekcja ma zastosowanie tylko podczas szyfrowania całego systemu. Po tym, jak napęd został (i) bezpiecznie nadpisany, właściwy schemat partycjonowania będzie musiał zostać dokładnie wybrany, biorąc pod uwagę wymagania dm-crypt oraz efekty, jakie różne wybory będą miały na zarządzanie systemem wynikowym.\n\nWażne jest, aby od razu zauważyć, że w prawie każdym przypadku musi istnieć osobna partycja dla / boot, która musi pozostać niezaszyfrowana, ponieważ bootloader musi uzyskać dostęp do katalogu / boot, gdzie załaduje moduły initramfs / encryption potrzebne do załadowania reszta systemu (szczegóły patrz mkinitcpio). Jeśli to podniesie obawy dotyczące bezpieczeństwa, patrz\n\nKolejnym ważnym czynnikiem, który należy wziąć pod uwagę, jest sposób obsługi obszaru wymiany i zawieszenia systemu, patrz dm-crypt (Polski)/Swap encryption (Polski).\n\n"
+    },
+    {
+      "title": "Partycje fizyczne",
+      "level": 3,
+      "content": "W najprostszym przypadku zaszyfrowane warstwy mogą być oparte bezpośrednio na fizycznych partycjach; zobacz Partycjonowanie metod ich tworzenia. Podobnie jak w systemie niezaszyfrowanym, wystarczająca jest partycja główna, oprócz innej dla /boot jak wspomniano wyżej. Ta metoda pozwala decydować, które partycje szyfrować, a które pozostawić niezaszyfrowane, i działa tak samo bez względu na liczbę dysków. Możliwe będzie również dodawanie lub usuwanie partycji w przyszłości, ale zmiana rozmiaru partycji będzie ograniczona wielkością hosta dysku. Na koniec zwróć uwagę, że do otwarcia każdej zaszyfrowanej partycji wymagane są osobne hasła lub klucze, mimo że można to zautomatyzować podczas uruchamiania z użyciem crypttab plik, patrz Dm-crypt/System configuration#crypttab.\n\n"
+    },
+    {
+      "title": "Ułożone urządzenia blokowe",
+      "level": 3,
+      "content": "Jeśli potrzebna jest większa elastyczność, dm-crypt może współistnieć z innymi urządzeniami blokowymi, takimi jak LVM i RAID. Zaszyfrowane pojemniki mogą znajdować się poniżej lub na innych urządzeniach blokowych:\n\n- Jeśli urządzenia LVM / RAID zostaną utworzone na wierzchu zaszyfrowanej warstwy, będzie można swobodnie dodawać, usuwać i zmieniać rozmiary systemów plików tej samej zaszyfrowanej partycji, a tylko jeden klucz lub hasło będzie wymagane dla nich wszystkich. Ponieważ zaszyfrowana warstwa znajduje się na partycji fizycznej, nie będzie możliwe wykorzystanie możliwości LVM i RAID do obsługi wielu dysków.\n- Jeśli zaszyfrowana warstwa zostanie utworzona na urządzeniach LVM / RAID, nadal będzie możliwa reorganizacja systemów plików w przyszłości, ale z dodatkową złożonością, ponieważ warstwy szyfrowania będą musiały zostać odpowiednio dostosowane. Ponadto do otwarcia każdego zaszyfrowanego urządzenia będą wymagane osobne hasła lub klucze. Jest to jednak jedyny wybór w przypadku systemów, które wymagają zaszyfrowanych systemów plików, aby obejmowały wiele dysków.\n\n"
+    },
+    {
+      "title": "Btrfs subvolumes",
+      "level": 3,
+      "content": "Wbudowana funkcja podpolumn Btrfs może być używana z dm-crypt, całkowicie zastępując potrzebę LVM, jeśli nie są wymagane żadne inne systemy plików. Należy jednak pamiętać, że pliki wymiany nie są obsługiwane przez brtrfs, więc jeśli wymagana jest partycja wymiany, konieczna jest szyfrowana partycja wymiany.\n\n"
+    },
+    {
+      "title": "Boot partition (GRUB)",
+      "level": 3,
+      "content": "Zobacz dm-crypt (Polski)/Encrypting an entire system (Polski)#Szyfrowana partycja rozruchowa (GRUB).\n\n"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "title": "PhpMyAdmin (Česky)",
+  "url": "https://wiki.archlinux.org/title/PhpMyAdmin_(%C4%8Cesky)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "phpMyAdmin is a web-based tool to help manage MariaDB or MySQL databases, written primarily in PHP and distributed under the GNU GPL.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the phpmyadmin package.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "Make sure the PHP mariadb and iconv extensions have been enabled.\n\nOptionally you can enable extension=bz2 and extension=zip for compression support.\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "Set up Apache to use PHP as outlined in the Apache HTTP Server#PHP article.\n\nCreate the Apache configuration file:\n\n```\n/etc/httpd/conf/extra/phpmyadmin.conf\n```\n\n```\nAlias /phpmyadmin \"/usr/share/webapps/phpMyAdmin\"\n<Directory \"/usr/share/webapps/phpMyAdmin\">\n    DirectoryIndex index.php\n    AllowOverride All\n    Options FollowSymlinks\n    Require all granted\n</Directory>\n```\n\nAnd include it in /etc/httpd/conf/httpd.conf:\n\n```\n# phpMyAdmin configuration\nInclude conf/extra/phpmyadmin.conf\n```\n\nAfter making changes to the Apache configuration file, restart httpd.service.\n\n"
+    },
+    {
+      "title": "Lighttpd",
+      "level": 3,
+      "content": "Configuring Lighttpd, make sure it is able to serve PHP files and mod_alias has been enabled.\n\nAdd the following alias for PhpMyAdmin to the config:\n\n```\nalias.url = ( \"/phpmyadmin\" => \"/usr/share/webapps/phpMyAdmin/\")\n```\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 3,
+      "content": "Make sure to set up nginx#FastCGI and use nginx#Server blocks to make management easier.\n\nBy preference, access phpMyAdmin by subdomain, e.g. https://pma.domain.tld:\n\n```\n/etc/nginx/sites-available/pma.domain.tld\n```\n\n```\nserver {\n    server_name pma.domain.tld;\n    ; listen 80; # also listen on http\n    ; listen [::]:80;\n    listen 443 ssl http2;\n    listen [::]:443 ssl http2;\n    index index.php;\n    access_log /var/log/nginx/pma.access.log;\n    error_log /var/log/nginx/pma.error.log;\n\n    # Allows limiting access to certain client addresses.\n    ; allow 192.168.1.0/24;\n    ; allow my-ip;\n    ; deny all;\n\n    root /usr/share/webapps/phpMyAdmin;\n    location / {\n        try_files $uri $uri/ =404;\n    }\n\n    error_page 404 /index.php;\n\n    location ~ \\.php$ {\n        try_files $uri $document_root$fastcgi_script_name =404;\n\n        fastcgi_split_path_info ^(.+\\.php)(/.*)$;\n        fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n        fastcgi_index index.php;\n        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n        include fastcgi_params;\n\n        fastcgi_param HTTP_PROXY \"\";\n        fastcgi_param HTTPS on;\n        fastcgi_request_buffering off;\n   }\n}\n```\n\nOr by subdirectory, e.g. https://domain.tld/phpMyAdmin:\n\n```\n/etc/nginx/sites-available/domain.tld\n```\n\n```\nserver {\n    server_name domain.tld;\n    listen 443 ssl http2;\n    listen [::]:443 ssl http2;\n    index index.php;\n    access_log /var/log/nginx/domain.tld.access.log;\n    error_log /var/log/nginx/domain.tld.error.log;\n\n    root /srv/http/domain.tld;\n    location / {\n        try_files $uri $uri/ =404;\n    }\n\n    location /phpMyAdmin {\n        root /usr/share/webapps/phpMyAdmin;\n    }\n\n    # Deny static files\n    location ~ ^/phpMyAdmin/(README|LICENSE|ChangeLog|DCO)$ {\n       deny all;\n    }\n\n    # Deny .md files\n    location ~ ^/phpMyAdmin/(.+\\.md)$ {\n      deny all;\n   }\n\n   # Deny setup directories\n   location ~ ^/phpMyAdmin/(doc|sql|setup)/ {\n      deny all;\n   }\n\n   #FastCGI config for phpMyAdmin\n   location ~ /phpMyAdmin/(.+\\.php)$ {\n      try_files $uri $document_root$fastcgi_script_name =404;\n\n      fastcgi_split_path_info ^(.+\\.php)(/.*)$;\n      fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n      fastcgi_index index.php;\n      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n      include fastcgi_params;\n\n      fastcgi_param HTTP_PROXY \"\";\n      fastcgi_param HTTPS on;\n      fastcgi_request_buffering off;\n   }\n}\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The main configuration file is located at /usr/share/webapps/phpMyAdmin/config.inc.php.\n\n"
+    },
+    {
+      "title": "Define a remote MySQL server",
+      "level": 3,
+      "content": "If the MySQL server is a remote host, append the following line to the configuration file:\n\n```\n$cfg['Servers'][$i]['host'] = 'example.com';\n```\n\n"
+    },
+    {
+      "title": "Using setup script",
+      "level": 3,
+      "content": "To allow the usage of the phpMyAdmin setup script (e.g. http://localhost/phpmyadmin/setup), make sure /usr/share/webapps/phpMyAdmin is writable for the http user:\n\n```\n# mkdir /usr/share/webapps/phpMyAdmin/config\n# chown http:http /usr/share/webapps/phpMyAdmin/config\n# chmod 750 /usr/share/webapps/phpMyAdmin/config\n```\n\n"
+    },
+    {
+      "title": "Add blowfish_secret passphrase",
+      "level": 3,
+      "content": "It is required to enter a unique 32 characters long string to fully use the blowfish algorithm used by phpMyAdmin, thus preventing the message ERROR: The configuration file now needs a secret passphrase (blowfish_secret):\n\n```\n/usr/share/webapps/phpMyAdmin/config.inc.php\n```\n\n```\n$cfg['blowfish_secret'] = '...';\n```\n\n"
+    },
+    {
+      "title": "Enabling Configuration Storage",
+      "level": 3,
+      "content": "Extra options such as table linking, change tracking, PDF creation, and bookmarking queries are disabled by default, displaying The phpMyAdmin configuration storage is not completely configured, some extended features have been deactivated. on the homepage.\n\nNote: **pma** \n\nIn /usr/share/webapps/phpMyAdmin/config.inc.php, uncomment (remove the leading \"//\"s), and change them to your desired credentials if needed:\n\n```\n/usr/share/webapps/phpMyAdmin/config.inc.php\n```\n\n```\n/* User used to manipulate with storage */\n// $cfg['Servers'][$i]['controlhost'] = 'my-host';\n// $cfg['Servers'][$i]['controlport'] = '3306';\n$cfg['Servers'][$i]['controluser'] = 'pma';\n$cfg['Servers'][$i]['controlpass'] = 'pmapass';\n\n/* Storage database and tables */\n$cfg['Servers'][$i]['pmadb'] = 'phpmyadmin';\n$cfg['Servers'][$i]['bookmarktable'] = 'pma__bookmark';\n$cfg['Servers'][$i]['relation'] = 'pma__relation';\n$cfg['Servers'][$i]['table_info'] = 'pma__table_info';\n$cfg['Servers'][$i]['table_coords'] = 'pma__table_coords';\n$cfg['Servers'][$i]['pdf_pages'] = 'pma__pdf_pages';\n$cfg['Servers'][$i]['column_info'] = 'pma__column_info';\n$cfg['Servers'][$i]['history'] = 'pma__history';\n$cfg['Servers'][$i]['table_uiprefs'] = 'pma__table_uiprefs';\n$cfg['Servers'][$i]['tracking'] = 'pma__tracking';\n$cfg['Servers'][$i]['userconfig'] = 'pma__userconfig';\n$cfg['Servers'][$i]['recent'] = 'pma__recent';\n$cfg['Servers'][$i]['favorite'] = 'pma__favorite';\n$cfg['Servers'][$i]['users'] = 'pma__users';\n$cfg['Servers'][$i]['usergroups'] = 'pma__usergroups';\n$cfg['Servers'][$i]['navigationhiding'] = 'pma__navigationhiding';\n$cfg['Servers'][$i]['savedsearches'] = 'pma__savedsearches';\n$cfg['Servers'][$i]['central_columns'] = 'pma__central_columns';\n$cfg['Servers'][$i]['designer_settings'] = 'pma__designer_settings';\n$cfg['Servers'][$i]['export_templates'] = 'pma__export_templates';\n```\n\n"
+    },
+    {
+      "title": "Setup database",
+      "level": 4,
+      "content": "Two options are available to create the required tables:\n\n- Import /usr/share/webapps/phpMyAdmin/sql/create_tables.sql by using PhpMyAdmin.\n- Execute mysql -u root -p < /usr/share/webapps/phpMyAdmin/sql/create_tables.sql in the command line.\n\n"
+    },
+    {
+      "title": "Setup database user",
+      "level": 4,
+      "content": "To apply the required permissions for controluser, execute the following query:\n\n```\nGRANT USAGE ON mysql.* TO 'pma'@'localhost' IDENTIFIED BY 'pmapass';\nGRANT SELECT (\n    Host, User, Select_priv, Insert_priv, Update_priv, Delete_priv,\n    Create_priv, Drop_priv, Reload_priv, Shutdown_priv, Process_priv,\n    File_priv, Grant_priv, References_priv, Index_priv, Alter_priv,\n    Show_db_priv, Super_priv, Create_tmp_table_priv, Lock_tables_priv,\n    Execute_priv, Repl_slave_priv, Repl_client_priv\n    ) ON mysql.user TO 'pma'@'localhost';\nGRANT SELECT ON mysql.db TO 'pma'@'localhost';\nGRANT SELECT ON mysql.host TO 'pma'@'localhost';\nGRANT SELECT (Host, Db, User, Table_name, Table_priv, Column_priv)\n    ON mysql.tables_priv TO 'pma'@'localhost';\n```\n\nIn order use the bookmark and relation features, set the following permissions:\n\n```\nGRANT SELECT, INSERT, UPDATE, DELETE ON phpmyadmin.* TO 'pma'@'localhost';\n```\n\nRe-login to ensure the new features are activated.\n\n"
+    },
+    {
+      "title": "Enabling template caching",
+      "level": 3,
+      "content": "Edit /usr/share/webapps/phpMyAdmin/config.inc.php to add the line:\n\n```\n$cfg['TempDir'] = '/tmp/phpmyadmin';\n```\n\n"
+    },
+    {
+      "title": "Remove config directory",
+      "level": 3,
+      "content": "Remove temporary configuration directory once configuration is done. This will also suppress warning from web interface:\n\n```\n# rm -r /usr/share/webapps/phpMyAdmin/config\n```\n\n"
+    },
+    {
+      "title": "Install themes",
+      "level": 3,
+      "content": "Themes are located in /usr/share/webapps/phpMyAdmin/themes. You can find new themes in https://www.phpmyadmin.net/themes/\n\nYou can simply download and extract the new theme and it will work after phpmyadmin refresh. However, you have to download theme for the correct version of phpmyadmin, themes for older versions will not work.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official website\n\n"
+    }
+  ]
+}

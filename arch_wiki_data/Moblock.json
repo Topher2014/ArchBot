@@ -1,0 +1,41 @@
+{
+  "title": "Moblock",
+  "url": "https://wiki.archlinux.org/title/Moblock",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "PeerGuardian Linux (pgl) is a privacy oriented firewall application. It blocks connections to and from hosts specified in huge block lists (thousands or millions of IP ranges). pgl is based on the Linux kernel netfilter framework and iptables.\n\nA more native, efficient solution to achieve the same end is to use the ipset kernel module in conjunction with the pg2ipset tool and the ipset-update script.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "There are two possible packages to install: pgl-cliAUR includes only the daemon and CLI tools, while pglAUR comes complete with a GUI (written using Qt).\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "- /etc/pgl/blocklists.list contains a list of URL for retrieving the various block lists.\n- /etc/pgl/pglcmd.conf, empty by default, overrides the default settings present in /usr/lib/pgl/pglcmd.defaults.\n- /etc/pgl/allow.p2p lists custom IP ranges that will not be filtered.\n\nThe default lists in /etc/pgl/blocklists.list block many potentially legitimate IP address. Users are encouraged to exercise best judgment and the information available at I-Blocklist.\n\nIt is recommended to disable the filtering of HTTP connections by adding the following to /etc/pgl/pglcmd.conf:\n\n```\n/etc/pgl/pglcmd.conf\n```\n\n```\nWHITE_TCP_OUT=\"http https\"\n```\n\nConversely, one could white list all the ports except the ones used by the program to be blocked. The following example only use the block lists to stop incoming traffic on ports 53 (DNS) and 80 (HTTP):\n\n```\n/etc/pgl/pglcmd.conf\n```\n\n```\nWHITE_TCP_IN=\"0:79 81:65535\"\nWHITE_UDP_IN=\"0:52 54:65535\"\n```\n\n"
+    },
+    {
+      "title": "Server",
+      "level": 3,
+      "content": "systemd initialization of the system means that it is quite possible for a server to be briefly unprotected, prior to pgl launch. To ensure adequate protection, extend the unit httpd.service with the following:\n\n```\n/etc/systemd/system/httpd.service.d/override.conf\n```\n\n```\n[Unit]\nWants=pgl.service\nAfter=pgl.service\n```\n\n"
+    },
+    {
+      "title": "LAN",
+      "level": 3,
+      "content": "By default, pgl blocks traffic on the local IPv4 addresses. To disable this behavior, edit /etc/pgl/pglcmd.conf to add an exception using the WHITE_IP_* setting:\n\n```\n/etc/pgl/pglcmd.conf\n```\n\n```\nWHITE_IP_OUT=\"192.168.0.0/24\"\n```\n\n```\n/etc/pgl/pglcmd.conf\n```\n\n```\nWHITE_IP_IN=\"192.168.0.0/24\"\n```\n\nFor further information, please refer to the # Whitelist IPs # section of /usr/lib/pgl/pglcmd.defaults.\n\n"
+    },
+    {
+      "title": "Starting up",
+      "level": 2,
+      "content": "Once comfortable with the configuration of both the daemon and lists, start the pgl service. To make sure that pgl works as intended, issue this command:\n\n```\n# pglcmd test\n```\n\nTo start pgl automatically at boot, enable the pgl service.\n\n"
+    },
+    {
+      "title": "Running pgl from within a container",
+      "level": 2,
+      "content": "Users running pgl within a Linux Container may need to edit the included lxc@.service to add the loading of key modules needed by pgl.\n\n```\n/etc/systemd/system/lxc@.service\n```\n\n```\n[Unit]\nDescription=%i LXC\nAfter=network.target\n\n[Service]\nType=forking\nExecStartPre=/usr/bin/modprobe -a xt_NFQUEUE xt_mark xt_iprange\nExecStart=/usr/bin/lxc-start -d -n %i\nExecStop=/usr/bin/lxc-stop -n %i\nDelegate=true\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    }
+  ]
+}

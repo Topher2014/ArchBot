@@ -1,0 +1,61 @@
+{
+  "title": "Ryzen",
+  "url": "https://wiki.archlinux.org/title/Ryzen",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Ryzen is a brand of microprocessors manufactured by Advanced Micro Devices (AMD). This article covers system configuration and troubleshooting information for different generations of the CPU.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nRelated articles\n\n- Improving performance\n- Improving performance/Boot process\n- Kernel\n- Microcode\n\n"
+    },
+    {
+      "title": "Enable microcode support",
+      "level": 2,
+      "content": "Install the amd-ucode package to enable microcode updates and enable it with the help of the Microcode page. These updates provide bug fixes that can be critical to the stability of your system. It is highly recommended to use it despite it being proprietary.\n\n"
+    },
+    {
+      "title": "Voltage, power and temperature monitoring",
+      "level": 3,
+      "content": "lm_sensors should be able to monitor temperatures out of the box. However, for more detailed information such as power consumption and voltage, zenpower3-dkmsAUR is needed. For GUI based monitoring tools, use zenmonitorAUR or zenmonitor3-gitAUR for Zen 3 CPUs.\n\n"
+    },
+    {
+      "title": "Power management, undervolting and overclocking",
+      "level": 3,
+      "content": "- RyzenAdj — RyzenAdj is a command-line tool that can adjust power management settings for Ryzen mobile processors.\n\n- amdctl — amdctl is a command-line tool for under/over clocking/volting AMD CPUs, currently supporting AMD CPU families 10h, 11h, 12h, 15h, 16h, 17h and 19h.\n\n- ZenStates-Linux — ZenStates is a command-line tool to adjust the clock speed and voltage. A detailed setup example is given in Level1Techs forum.\n\n- ryzen_smu — Ryzen SMU is a Linux kernel driver that exposes access to the SMU (System Management Unit) for certain AMD Ryzen Processors. Can for example be used for undervolting the 5800x3D (see this script as an example).\n\n"
+    },
+    {
+      "title": "Compiling a kernel",
+      "level": 2,
+      "content": "See Gentoo:Ryzen#Kernel on enabling Ryzen support. The officially supported kernels have the required configuration by default.\n\n"
+    },
+    {
+      "title": "Random reboots",
+      "level": 3,
+      "content": "See Gentoo:Ryzen#Random_reboots_with_mce_events if you are experiencing random reboots.\n\nWith Ryzen 5000 series, particularly the higher-end models of 5950X and 5900X there seem to be some slight instability issues under Linux, related possibly to the 5.11+ kernel, as shown by this kernel bug. After investigating and reading reports on the Internet, It seems that out of the box, Windows seems to run the CPUs at higher voltage and lower peak frequencies, compared to the stock linux kernel, which depending on your draw from the silicon lottery could cause a host of random application crashes or hardware errors that lead to reboots. You will recognise those by dmesg logs that look like:\n\n```\nkernel: mce: [Hardware Error]: Machine check events logged\nkernel: mce: [Hardware Error]: CPU 22: Machine Check: 0 Bank 1: bc800800060c0859\nkernel: mce: [Hardware Error]: TSC 0 ADDR 7ea8f5b00 MISC d012000000000000 IPID 100b000000000 \nkernel: mce: [Hardware Error]: PROCESSOR 2:a20f10 TIME 1636645367 SOCKET 0 APIC d microcode a201016\n```\n\nThe CPU ID and the Processor number may vary. To solve this problem you need to supply higher voltage to your CPU so that it is stable when running at peak frequencies. The easiest way to achieve this is to use the AMD curve optimiser which is accessible via your motherboard's UEFI. Access it and put a positive offset of 4 points, which will increase the voltage your CPU is getting at higher loads. It will limit overclocking potential due to higher heat dissipation requirements, but it will run stable. For more details check this forum post. When I did this for my 5950X, my processor stabilised and the frequency and voltage ranges were more similar to those observed under windows.\n\n"
+    },
+    {
+      "title": "System halts",
+      "level": 3,
+      "content": "Within similar context of #Random reboots, systems might halt under heavy or specific low loads, even after applying the fixes. Reset button or forced shutdowns don't work, peripherals powers off, video output might stop, and unplugging is the only way out of this state.\n\nReducing frequencies to within non-overclocked standards and increasing voltages of CPU or RAM helps, but might not fix the issue. A potential fix is to update the UEFI (also misnamed \"BIOS updates\"), and then apply the PBO+4 curve for more stability on higher frequencies. Per silicon lottery, some CPUs might need +6 or higher offsets.\n\n"
+    },
+    {
+      "title": "Screen-tearing (APU)",
+      "level": 3,
+      "content": "If you are using Xorg and are experiencing screen-tearing, see AMDGPU#Tear free rendering.\n\n"
+    },
+    {
+      "title": "Soft lock freezing",
+      "level": 3,
+      "content": "This bug is well known and is being discussed on bugzilla and launchpad. While the solution is not the same in all cases, this one helped some users. Add the output of this command echo rcu_nocbs=0-$(($(nproc)-1)) as a kernel parameter where the command nproc just prints your CPU's threads. For this option to be applied, you need a compiled kernel with option CONFIG_RCU_NOCB_CPU (like linux).\n\nA different cause for the freezes is the power saving management indicated by c-states. The maximum power saving state c6 can cause problems. Adding the kernel parameter processor.max_cstate=5 helped in some cases but other users reported that the option is not applied and the c6 state is still entered. For them, this package disable-c6-systemdAUR helped. Before using it, modprobe msr needs to be run in order to activate that kernel module.\n\nSome laptops with Ryzen CPUs such as the HP Envy x360 15-bq100na may experience CPU soft locks which result in a frozen system. These can be avoided with the kernel parameter idle=nomwait added.\n\nIn some cases, kernel parameter pci=nomsi fixes the issue.\n\nIn some other cases, the issue is simply bad hardware, and warranty claiming the CPU for a new one may just solve your issues.\n\n"
+    },
+    {
+      "title": "Freeze on shutdown, reboot and suspend",
+      "level": 3,
+      "content": "This seems to be related to the C6 c-state, that does not seem to be well supported (if at all) in Linux.\n\nTo fix this issue, go into UEFI Setup and search for an option labelled something like this: \"Power idle control\". Change its value to \"Typical current idle\". Note that these names are dependent on what the motherboard manufacturer calls them, so they may be a little different in your particular case.\n\nOther less ideal solutions include disabling c-states in the UEFI Setup or adding processor.max_cstate=1 to your kernel command line arguments.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gentoo:Ryzen\n\n"
+    }
+  ]
+}
