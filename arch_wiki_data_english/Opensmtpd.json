@@ -1,0 +1,96 @@
+{
+  "title": "Opensmtpd",
+  "url": "https://wiki.archlinux.org/title/Opensmtpd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Mail server\n\nOpenSMTPD is a free mail transfer agent, developed as part of the OpenBSD project. This article builds upon Mail server.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the opensmtpd package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "OpenSMTPD is configured in /etc/smtpd/.\n\n"
+    },
+    {
+      "title": "Local mail",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nTo have local mail working, for example for cron mails, it is enough to simply start smtpd.service.\n\nThe default configuration of OpenSMTPD is to do local retrieval and delivery of mail, and also relay outgoing mail. See smtpd.conf(5).\n\nTo have your local mails go to the /var/spool/mail/username i.e the path where most email clients expect the mails, use action \"local\" maildir \"/var/spool/mail/%{rcpt.user}\" alias <aliases> instead of action \"local\" mbox alias <aliases>\n\n"
+    },
+    {
+      "title": "Local mail only",
+      "level": 4,
+      "content": "To do only local mail, the following is enough:\n\n```\n/etc/smtpd/smtpd.conf\n```\n\n```\nlisten on lo\naction \"local\" mbox alias <aliases>\nmatch for local action \"local\"\n```\n\n"
+    },
+    {
+      "title": "Hybrid : local mail and relay",
+      "level": 4,
+      "content": "These two lines in /etc/smtpd/smtpd.conf :\n\n```\naction \"local\" mbox alias <aliases>\naction \"relay\" relay host \"smtp://smtp.foo.bar\" mail-from \"@foo.bar\"\nmatch for local action \"local\"\nmatch for any action \"relay\"\n```\n\nconfigure OpenSMTPD to :\n\n- send local email locally, without going through a relay (useful for cron & at mail notifications)\n\n- use a relay to send a mail outside of localhost\n\nSimply replace smtp.foo.bar by your ISP mail server, or another server at your convenience.\n\n"
+    },
+    {
+      "title": "Relay only",
+      "level": 4,
+      "content": "To send all local emails through a relay invoke procmail:\n\n```\n/etc/smtpd/smtpd.conf\n```\n\n```\naction \"local\" mda \"procmail -f -\" virtual <aliases>\naction \"relay\" relay host \"smtps://label@smtp.foo.bar\" auth <secrets> mail-from \"@foo.bar\"\nmatch for local action \"local\"\nmatch for any action \"relay\"\n```\n\nThe aliases option is used for the local user mapping, for a simplified mapping you can use virtual aliases with a catch all:\n\n```\n/etc/smtpd/aliases\n```\n\n```\n@ foo@bar\n```\n\n"
+    },
+    {
+      "title": "TLS",
+      "level": 4,
+      "content": "To obtain a certificate, see OpenSSL#Usage.\n\n"
+    },
+    {
+      "title": "Create user accounts",
+      "level": 4,
+      "content": "- Create a user account on the mail server for each desired mailbox.\n\n```\n# useradd -m roger\n# useradd -m shirley\n```\n\n- OpenSMTPD will deliver messages to the user account's mbox file at /var/spool/mail/<username>\n- Multiple SMTP email addresses can be routed to a given mbox if desired.\n\n"
+    },
+    {
+      "title": "Craft a simple smtpd.conf setup",
+      "level": 4,
+      "content": "- A working configuration can be had in as little as nine lines!\n\n```\n/etc/smtpd/smtpd.conf\n```\n\n```\npki mx.domain.tld cert         \"/etc/smtpd/tls/smtpd.crt\"\npki mx.domain.tld key          \"/etc/smtpd/tls/smtpd.key\"\n\ntable creds                    \"/etc/smtpd/creds\"\ntable vdoms                    \"/etc/smtpd/vdoms\"\ntable vusers                   \"/etc/smtpd/vusers\"\n\nlisten on eth0 tls pki mx.domain.tld\nlisten on eth0 port 465 smtps pki mx.domain.tld auth <creds>\nlisten on eth0 port 587 tls-require pki mx.domain.tld auth <creds>\n\naction receive\tmbox virtual <vusers>\naction send relay\n\nmatch from any for domain <vdoms> action receive\nmatch for any action send\n```\n\n"
+    },
+    {
+      "title": "Create tables",
+      "level": 4,
+      "content": "- For the domain table file; simply put one domain per line\n\n```\n/etc/smtpd/vdoms\n```\n\n```\npersonaldomain.org\nbusinessname.com\n```\n\n- For the user table file; list one inbound SMTP email address per line and then map it to an mbox user account name, SMTP email address, or any combination of the two on the right, separated by commas.\n\n```\n/etc/smtpd/vusers\n```\n\n```\nroger@personaldomain.org          roger\nnewsletters@personaldomain.org    roger,roger.rulz@gmail.com\n\nroger@businessname.com            roger\nshirley@businessname.com          shirley\ninfo@businessname.com             roger,shirley\ncontact@businessname.com          info@businessname.com\n```\n\n- For the creds table file; put the user name in the 1st column and the password hash in the 2nd column\n\n```\n/etc/smtpd/creds\n```\n\n```\nroger                              <password hash created using 'smtpctl encrypt' command>\nshirley                            <password hash created using 'smtpctl encrypt' command>\n```\n\n"
+    },
+    {
+      "title": "Test the configuration",
+      "level": 3,
+      "content": "```\n# smtpd -n\n```\n\nIf you get a message that says 'configuration OK' - you are ready to rock and roll. If not, work on any configuration errors and try again.\n\n"
+    },
+    {
+      "title": "Console debugging",
+      "level": 3,
+      "content": "If you are having problems with mail delivery, try stopping the smtpd.service and launching the daemon manually with the 'do not daemonize' and 'verbose output' options. Then watch the console for errors.\n\n```\n# smtpd -dv\n```\n\n"
+    },
+    {
+      "title": "Subsystem tracing",
+      "level": 3,
+      "content": "Add the -T flag to get real-time subsystem tracing\n\n```\n# smtpd -dv -T smtp\n```\n\nAlternately, use the smtpctl trace <subsystem> command if the daemon is already running. The trace output will appear in the console output above as well as the journalctl output for the smtpd.service. For example:\n\n```\n# smtpctl trace expand && smtpctl trace lookup\n```\n\n...will trace both aliases/virtual/forward expansion and user/credentials lookups\n\n"
+    },
+    {
+      "title": "Manual Submission port authentication",
+      "level": 3,
+      "content": "- Encode username and password in base64 $ printf '\\0%s\\0%s' 'username' 'password' | base64\n\n```\n$ printf '\\0%s\\0%s' 'username' 'password' | base64\n```\n\n- Connect to submission port using openssl s_client command, using one of the following commands: To connect via port 465 (implicit TLS): $ openssl s_client -host mx.domain.tld -port 465 To connect via port 587 (STARTTLS): $ openssl s_client -host mx.domain.tld -port 587 -starttls smtp\n\n- To connect via port 465 (implicit TLS): $ openssl s_client -host mx.domain.tld -port 465\n- To connect via port 587 (STARTTLS): $ openssl s_client -host mx.domain.tld -port 587 -starttls smtp\n\n```\n$ openssl s_client -host mx.domain.tld -port 465\n```\n\n```\n$ openssl s_client -host mx.domain.tld -port 587 -starttls smtp\n```\n\n- enter EHLO myhostname followed by AUTH PLAIN. Paste in the base64 string from step above after 334 response.\n\n```\n250 HELP\nEHLO test.domain.tld\n250-mx.hostname.tld Hello test.domain.tld [5.5.5.5], pleased to meet you\n250-8BITMIME\n250-ENHANCEDSTATUSCODES\n250-SIZE 36700160\n250-DSN\n250-AUTH PLAIN LOGIN\n250 HELP\nAUTH PLAIN\n334 \ndXNlcm5hbWUAdXNlcm5hbWUAcGFzc3dvcmQ=\n235 2.0.0: Authentication succeeded\n```\n\n"
+    },
+    {
+      "title": "\"Helo command rejected: need fully-qualified hostname\"",
+      "level": 3,
+      "content": "When sending email, if you get this kind of messages, set your FQDN in the file /etc/smtpd/mailname. Otherwise, the server name is derived from the local hostname returned by gethostname(3p), either directly if it is a fully qualified domain name, or by retrieving the associated canonical name through getaddrinfo(3).\n\n"
+    },
+    {
+      "title": "System users authentication failure",
+      "level": 3,
+      "content": "If you are using the system users and the authentication with valid credentials fails, you have to configure PAM:\n\n```\n/etc/pam.d/smtpd\n```\n\n```\nauth required pam_unix.so\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wikipedia:OpenSMTPD\n- OpenSMTPD pairs well with Dovecot. Combine the two for a nice minimalist mailserver\n- OpenSMTPD project page\n- Simple SMTP server with OpenSMTPD\n\n"
+    }
+  ]
+}

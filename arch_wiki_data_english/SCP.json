@@ -1,0 +1,66 @@
+{
+  "title": "SCP",
+  "url": "https://wiki.archlinux.org/title/SCP",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- SSHFS\n- SFTP chroot\n- Pure-FTPd\n\nNote: **This article or section is a candidate for merging with SFTP chroot.** This article or section is a candidate for merging with SFTP chroot.\n\nThis article or section is a candidate for merging with SFTP chroot.\n\nThe Secure copy (SCP) is a protocol to transfer files via a Secure Shell connection. The SSH file transfer protocol (SFTP) is a related protocol, also relying on a secure shell back-end. Both protocols allow secure file transfers, encrypting passwords and transferred data. The SFTP protocol, however, features additional capabilities like, for example, resuming broken transfers or remote file manipulation like deletion.\n\n"
+    },
+    {
+      "title": "Secure file transfer protocol (SFTP)",
+      "level": 2,
+      "content": "Install and configure OpenSSH. Once running, SFTP is available by default.\n\nAccess files with the sftp program or SSHFS. Many standard FTP programs should work as well.\n\n"
+    },
+    {
+      "title": "Secure file transfer protocol (SFTP) with a chroot jail",
+      "level": 2,
+      "content": "Sysadmins can jail a subset of users to a chroot jail using openssh thus restricting their access to a particular directory tree. This can be useful to simply share some files without granting full system access or shell access. Users with this type of setup may use SFTP clients such as filezilla to put/get files in the chroot jail.\n\n"
+    },
+    {
+      "title": "Setup the filesystem",
+      "level": 3,
+      "content": "Create a jail directory:\n\n```\n# mkdir -p /var/lib/jail\n```\n\nOptionally, bind mount the filesystem to be shared to this directory. In this example, /mnt/data/share is to be used. It is owned by root and has octal permissions of 755.\n\n```\n# mount -o bind /mnt/data/share /var/lib/jail\n```\n\n"
+    },
+    {
+      "title": "Create an unprivileged user",
+      "level": 3,
+      "content": "Create the share user and setup a good password:\n\n```\n# useradd -g sshusers -d /var/lib/jail foo\n# passwd foo\n```\n\n"
+    },
+    {
+      "title": "Setup OpenSSH",
+      "level": 3,
+      "content": "Add the following to the end of /etc/ssh/sshd_config to enable the share and to enforce the restrictions:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n...\n Match group sshusers\n  ChrootDirectory %h\n  X11Forwarding no\n  AllowTcpForwarding no\n  PasswordAuthentication yes\n  ForceCommand internal-sftp\n```\n\nRestart sshd.service to re-read the configuration file. See SFTP chroot to configure the keys correctly when using chroot or it will get permission denied.\n\nTest that in fact, the restrictions are enforced by attempting an ssh connection via the shell. The ssh server should return a polite notice of the setup:\n\n```\n$ ssh foo@someserver.com\n```\n\n```\nfoo@someserver.com's password:\nThis service allows sftp connections only.\nConnection to someserver.com closed.\n```\n\n"
+    },
+    {
+      "title": "Secure copy protocol (SCP)",
+      "level": 2,
+      "content": "Install, configure and start OpenSSH. It contains the scp utility to transfer files.\n\nMore features are available by installing additional packages, for example rsshAUR or scponly described below.\n\n"
+    },
+    {
+      "title": "Linux to Linux",
+      "level": 4,
+      "content": "Copy file from a remote host to local host SCP example:\n\n```\n$ scp username@from_host:file.txt /local/directory/\n```\n\nCopy file from local host to a remote host SCP example:\n\n```\n$ scp file.txt username@to_host:/remote/directory/\n```\n\nCopy directory from a remote host to local host SCP example:\n\n```\n$ scp -r username@from_host:/remote/directory/  /local/directory/\n```\n\nCopy directory from local host to a remote host SCP example:\n\n```\n$ scp -r /local/directory/ username@to_host:/remote/directory/\n```\n\nCopy file from remote host to remote host SCP example:\n\n```\n$ scp username@from_host:/remote/directory/file.txt username@to_host:/remote/directory/\n```\n\n"
+    },
+    {
+      "title": "Linux to Windows",
+      "level": 4,
+      "content": "Use a Windows program such as WinSCP\n\n"
+    },
+    {
+      "title": "Scponly",
+      "level": 3,
+      "content": "Scponly is a limited shell for allowing users scp/sftp access and only scp/sftp access. Additionally, one can setup scponly to chroot the user into a particular directory increasing the level of security.\n\ninstall scponly.\n\nFor existing users, simply set the user's shell to scponly:\n\n```\n# usermod -s /usr/bin/scponly username\n```\n\n"
+    },
+    {
+      "title": "Adding a chroot jail",
+      "level": 4,
+      "content": "The package comes with a script to create a chroot. To use it, run:\n\n```\n# /usr/share/doc/scponly/setup_chroot.sh\n```\n\n- Provide answers\n- Check that /path/to/chroot has root:root owner and r-x for others\n- Change the shell for selected user to /usr/bin/scponlyc\n- sftp-server may require some libnss modules such as libnss_files. Copy them to chroot's /lib path.\n\n"
+    },
+    {
+      "title": "Uploads to Chroot jail root dir",
+      "level": 4,
+      "content": "For security reasons the directory set as the chroot directory must be owned by root with only root having write access to it otherwise sftp/ssh connections will be denied. This of course means regular users cannot upload files to the root directory. In order to get around this while not compromising security you can create a folder inside the chroot directory which the regular user or group has write access to, e.g:\n\n```\n# cd /var/lib/jail\n# mkdir uploads\n# chown :sshusers uploads\n# chmod 730 uploads\n```\n\nSome applications utilizing SFTP do not allow input of sub-directories when performing operations (e.g. uploading files), and will attempt to upload files to the chroot base directory (which will be denied). In order to force these applications to use a specific sub-directory you can append the following to the \"ForceCommand\" option:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n...\n Match group sshusers\n  ...\n  ForceCommand internal-sftp -d /uploads\n```\n\nUsers on connect will then have their start directory change to the specified sub-directory (remember to restart the sshd server).\n\n"
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "title": "SOGo",
+  "url": "https://wiki.archlinux.org/title/SOGo",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Apache HTTP Server\n- Dovecot\n- MySQL\n- Nginx\n- OpenLDAP\n- Postfix\n- PostgreSQL\n- Samba/Active Directory domain controller\n- Virtual user mail system\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nSOGo provides a rich AJAX-based Web interface and supports multiple native clients through the use of standard protocols such as CalDAV, CardDAV and GroupDAV, as well as Microsoft ActiveSync. This article explains how to setup a groupware server using SOGo.\n\n"
+    },
+    {
+      "title": "Considerations",
+      "level": 3,
+      "content": "SOGo can use many different sources for user authentication including, but not limited to, Active Directory, OpenLDAP, MySQL/MariaDB, PostgreSQL, and probably many others if you include PAM. This article will focus on using a centrally managed user database for both authentication, and to provide a global address list.\n\nAdditionally, either mariadb or postgresql must be used to store the users' calendars and address books. As of this writing, the SOGo documentation has a clear preference for MariaDB (or MySQL), but if you have an existing PostgreSQL installation, it might make sense to use it. Other SQL implementations might also be supported, but are not currently covered.\n\nFinally, there are currently two versions of SOGo that are being actively maintained. SOGo-2.x is uses a look and feel that is similar to a desktop client, while SOGo-3.x uses a more modern interface, taking cues from Google using AngularJS. Instructions and configuration are interchangeable between the two versions.\n\n"
+    },
+    {
+      "title": "Prerequisites",
+      "level": 3,
+      "content": "Install sogoAUR or sogo2AUR.\n\n- For a local database install MySQL or PostgreSQL.\n- For a local mail server install Dovecot and Postfix.\n- For a local web server install Apache HTTP Server or nginx.\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "Install and configure apache following instructions at Apache HTTP Server and configure for TLS connections. Add SOGo to the Apache configuration appending the following lines at the end of the /etc/httpd/conf/httpd.conf file or VirtualHost entry:\n\n```\n...\n# Include SOGo configuration\ninclude conf/extra/SOGo.conf\n```\n\nIf not done already, uncomment mod_xml2enc and the needed proxy modules mod_proxy{,_http,_html} in the /etc/httpd/conf/httpd.conf:\n\n```\n# cp /etc/httpd/conf/httpd.conf{,.bak}\n# sed /mod_xml2enc\\.so/s/#//    -i /etc/httpd/conf/httpd.conf\n# sed /mod_proxy\\.so/s/#//      -i /etc/httpd/conf/httpd.conf\n# sed /mod_proxy_http\\.so/s/#// -i /etc/httpd/conf/httpd.conf\n# sed /mod_proxy_html\\.so/s/#// -i /etc/httpd/conf/httpd.conf\n```\n\nEdit the /etc/httpd/conf/extra/SOGo.conf file and modify the following lines (replace mail.domain.tld with the appropriate hostname for you desired configuration):\n\n```\n...\n## adjust the following to your configuration\n  RequestHeader set \"x-webobjects-server-port\" \"443\"\n  RequestHeader set \"x-webobjects-server-name\" \"mail.domain.tld\"\n  RequestHeader set \"x-webobjects-server-url\" \"https://mail.domain.tld\"\n...\n```\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 3,
+      "content": "If using nginx for the web server, you will only configure on 443, SSL certificates must be in place prior to configuration. Add the following to /etc/nginx/nginx.conf:\n\n```\nserver {\n       listen 443;\n       root /usr/lib/GNUstep/SOGo/WebServerResources/;\n       server_name mail.domain.tld\n       server_tokens off;\n       client_max_body_size 100M;\n       index  index.php index.html index.htm;\n       autoindex off;\n       ssl on;\n       ssl_certificate path /path/to/your/certfile; #eg. /etc/ssl/certs/keyfile.crt\n       ssl_certificate_key /path/to/your/keyfile; #eg /etc/ssl/private/keyfile.key\n       ssl_session_cache shared:SSL:10m;\n       #optional ssl_stapling on;\n       #optional ssl_stapling_verify on;\n       #optional ssl_trusted_certificate /etc/ssl/private/cacert-stapeling.pem; \n       #optional resolver 8.8.4.4 8.8.8.8 valid=300s;\n       #optionalresolver_timeout 10s;\n       ssl_prefer_server_ciphers on;\n       #optional ssl_dhparam /etc/ssl/certs/dhparam.pem;\n       #optional add_header Strict-Transport-Security max-age=63072000;\n       #optional add_header X-Frame-Options DENY;\n       #optional add_header X-Content-Type-Options nosniff;\n       location = / {\n               rewrite ^ https://$server_name/SOGo;\n               allow all;\n       }\n       location = /principals/ {\n               rewrite ^ https://$server_name/SOGo/dav;\n               allow all;\n       }\n       location ^~/SOGo {\n               proxy_pass http://127.0.0.1:20000;\n               proxy_redirect http://127.0.0.1:20000 default;\n               # forward user's IP address\n               proxy_set_header X-Real-IP $remote_addr;\n               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n               proxy_set_header Host $host;\n               proxy_set_header x-webobjects-server-protocol HTTP/1.0;\n               proxy_set_header x-webobjects-remote-host 127.0.0.1;\n               proxy_set_header x-webobjects-server-name $server_name;\n               proxy_set_header x-webobjects-server-url $scheme://$host;\n               proxy_connect_timeout 90;\n               proxy_send_timeout 90;\n               proxy_read_timeout 90;\n               proxy_buffer_size 4k;\n               proxy_buffers 4 32k;\n               proxy_busy_buffers_size 64k;\n               proxy_temp_file_write_size 64k;\n               client_max_body_size 50m;\n               client_body_buffer_size 128k;\n               break;\n       }\n       location /SOGo.woa/WebServerResources/ {\n               alias /usr/lib/GNUstep/SOGo/WebServerResources/;\n               allow all;\n       }\n       location /SOGo/WebServerResources/ {\n               alias /usr/lib/GNUstep/SOGo/WebServerResources/;\n               allow all;\n       }\n       location ^/SOGo/so/ControlPanel/Products/([^/]*)/Resources/(.*)$ {\n               alias /usr/lib/GNUstep/SOGo/$1.SOGo/Resources/$2;\n       }\n       location ^/SOGo/so/ControlPanel/Products/[^/]*UI/Resources/.*\\.(jpg|png|gif|css|js)$ {\n               alias /usr/lib/GNUstep/SOGo/$1.SOGo/Resources/$2;\n       }\n   }\n```\n\n"
+    },
+    {
+      "title": "Start and test web access",
+      "level": 3,
+      "content": "Create the state directory and start services:\n\n```\n# mkdir /var/run/sogo\n# chown sogo:sogo /var/run/sogo\n# chown sogo:sogo /etc/sogo/sogo.conf\n# chmod 0644 /etc/sogo/sogo.conf\n```\n\nThen enable and start the sogo and either httpd or nginx services.\n\nOpen a browser and go to http://mail.domain.tld/SOGo/ for Apache, or https://mail.domain.tld/SOGo/ for nginx. Do not try to login just yet, just verify that you can connect and get the login screen as authentication sources have not been setup yet.\n\n"
+    },
+    {
+      "title": "MySQL/MariaDB",
+      "level": 3,
+      "content": "If you have not already done so, create the first MySQL/MariaDB database with the following command:\n\n```\n# mysql_install_db --user=mysql --basedir=/usr/ --ldata=/var/lib/mysql/\n```\n\nEnable and start mariadb, then enter the MySQL shell as the root user:\n\n```\n# mysql -u root\n```\n\nAt the mysql prompt, enter the following commands (replace SogoPW with a secure password):\n\n```\nCREATE DATABASE sogo;\nCREATE USER 'sogo'@'localhost' IDENTIFIED BY 'SogoPW';\nGRANT ALL PRIVILEGES ON `sogo`.* TO 'sogo'@'localhost' WITH GRANT OPTION;\nFLUSH PRIVILEGES;\n```\n\n"
+    },
+    {
+      "title": "Migrating from a previous PostgreSQL configuration",
+      "level": 4,
+      "content": "If you had previously used PostgreSQL, you can migrate user data to MySQL/MariaDB using sogo-tool to backup and restore. Details are obviously site specific, but this example should work for most. Backup the full sogo-database with the following commands:\n\n```\n# mkdir /root/sogo-backup\n# sogo-tool backup /root/sogo-backup ALL\n```\n\nNow stop the sogo daemon, stop postgresql (if not used for other purposes), and reconfigure sogo (/etc/sogo/sogo.conf) using both the sogo user and sogo database keeping the last path element (see example below).\n\nTo restore all user data, run the following commands:\n\n```\n# for user in `ls -d /root/sogo-backup/*`\n  do\n      sogo-tool restore -f ALL /root/sogo-backup $(basename $user)\n  done\n```\n\nSimply restart sogo to continue using the MySQL/MariaDB.\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 3,
+      "content": "If you have elected to use PostgreSQL over MySQL/MariaDB, the old instructions have been left for convenience. If this is a new installation, it is recommended that you use only MySQL/MariaDB for sogo/openchange data.\n\nInitialize the default database and start PostgreSQL (be sure to replace en_US.UTF-8 with the correct locale for your installation):\n\n```\n# mkdir -p /var/lib/postgres/data\n# chown -R postgres:postgres /var/lib/postgres\n# su - postgres -c \"initdb --locale en_US.UTF-8 -D '/var/lib/postgres/data'\"\n```\n\nThen start and enable postgresql service.\n\nCreate the sogo user and the sogo DB for PostgreSQL (do not select a strong password for the sogo user, just use \"sogo\" for simplicity. This is temporary and will be changed later):\n\n```\n# su - postgres\n$ createuser --no-superuser --no-createdb --no-createrole --encrypted --pwprompt sogo\n$ createdb -O sogo sogo\n```\n\nEdit the access configuration for the openchange DB:\n\n```\n# cp /var/lib/postgres/data/pg_hba.conf{,.bak}\n# sed \\\n      's/D$/D\\n\\n#Configuration for OpenChange/' \\\n      -i /var/lib/postgres/data/pg_hba.conf\n# sed \\\n      's/ange$/ange\\nhost\\topenchange\\topenchange\\t127.0.0.1\\/32\\t\\tmd5/' \\\n      -i /var/lib/postgres/data/pg_hba.conf\n# chown postgres:postgres /var/lib/postgres/data/pg_hba.conf{,.bak}\n```\n\nRestart the postgresql service.\n\n"
+    },
+    {
+      "title": "Active Directory",
+      "level": 3,
+      "content": "If using Active Directory for user authentication, whether using Samba (following the Samba/Active Directory domain controller article) or using a Microsoft server, the needed attributes for mail users are already present in the default schema. Users, however, need to have both mail and proxyAddresses attributes set. The proxyAddress attribute labeled SMTP (as opposed to smtp) is the default mail address. If using internal and external domains, you will need to set SMTP to the user's external address as this will be the SMTP from address and envelope sender in outgoing messages. Additionally, the mail attribute must also be set to the user's external email address.\n\nFor Samba, you can use the ldbedit command to edit users. In this example, we will modify the \"Administrator\" user and add aliases for postmaster, as well as internal and external email addresses. Replace vim in the following command with your preferred editor:\n\n```\n# LDB_MODULES_PATH=\"/usr/lib/samba/ldb\" ldbedit -e vim -H /var/lib/samba/private/sam.ldb '(samaccountname=administrator)'\n```\n\nIt is important to change both the mail attribute (this is what will be used for group expansion and global address list functionality), and the primary SMTP address. The smtp entries for proxyAddresses act as aliases. Add the following attributes (again, substitute appropriate values for internal.domain.tld and domain.tld):\n\n```\n...\nmail: administrator@domain.tld\nproxyAddresses: SMTP:administrator@domain.tld\nproxyAddresses: smtp:postmaster@internal.domain.tld\nproxyAddresses: smtp:postmaster@domain.tld\nproxyAddresses: smtp:administrator@internal.domain.tld\n...\n```\n\nIf using Microsoft's Active Directory Users and Computers MMC snap-in to edit users, you will need to enable \"Show Advanced Features\" from the Tools menu, and use the Attribute Editor tab.\n\nNext, allow daemons to lookup users in the directory using LDAP. To do this, create an unprivileged user to use for LDAP lookups and optionally (recommended), set the password not to expire. If using Samba, execute the following commands. Be certain to set a suitably strong password:\n\n```\n# samba-tool user create ldap --description=\"Unprivileged user for LDAP lookups\"\n# samba-tool user setexpiry ldap --noexpiry\n```\n\nFinally, with Samba after 4.3.8 or 4.2.2, non-encrypted communication is disabled by default. Add the following configuration item to the [global] section of /etc/samba/smb.conf if you are not in a position to enable TLS or StartTLS:\n\n```\nldap server require strong auth = no\n```\n\n"
+    },
+    {
+      "title": "MySQL/MariaDB",
+      "level": 3,
+      "content": "The following procedure is valid for mariadb 10.1.25-1 but should also work for MySQL.\n\n1. Ensure the sogo user is created in the database (see #MySQL/MariaDB).\n1. Ensure that there is a database named sogo with the database scheme utf8 (and not utf8mb4). This is necessary because the automatic creation of the sogo_sessions_folder table will fail otherwise:\n\n```\nSQL: SELECT count(*) FROM sogo_sessions_folder;\n ERROR: Table 'sogo.sogo_sessions_folder' doesn't exist\n SQL: CREATE TABLE sogo_sessions_folder ( c_id VARCHAR(255) PRIMARY KEY, c_value VARCHAR(255) NOT NULL, c_creationdate INT NOT NULL, c_lastseen INT NOT NULL);\n ERROR: Specified key was too long; max key length is 767 bytes          <-- This happens because VARCHAR(255) is too big as primary key for utf8mb4\n```\n\nScheme can be altered via\n\n```\nALTER SCHEMA `sogo`  DEFAULT CHARACTER SET utf8\n```\n\nUpdate: There seems to be a way around this and utf8mb4 could be used. Check page 33 ff of SOGo installation guide pdf.\n\nThe sogo_users table has to be created manually:\n\nChange user and create table with comments, explaining what each column is (see https://www.sogo.nu/files/docs/SOGoInstallationGuide.html#Authentication-using-SQL)\n\n```\nUSE sogo;\n CREATE TABLE `sogo`.`sogo_users` (\n `c_uid` VARCHAR(128) NOT NULL COMMENT 'c_uid: will be used for authentication - it’s a username or username@domain.tld',  \n `c_name` VARCHAR(128) NOT NULL COMMENT 'c_name: will be used to uniquely identify entries - which can be identical to c_uid',\n `c_password` VARCHAR(128) NOT NULL COMMENT 'c_password: password of the user, plain text, crypt, md5 or sha encoded',\n `c_cn` VARCHAR(128) NULL COMMENT 'c_cn: the user’s common name',\n `mail` VARCHAR(128) NOT NULL COMMENT 'mail: the user’s email address',  PRIMARY KEY (`c_uid`));\n```\n\nCreate a user\n\n- Generate the MD5 sum of the password (MD5 is still safe for password checking as of August 2017. On top of that, webaccess should be done via SSL anyways).\n\n```\necho -n 'mypassword' | md5sum\n 34819d7beeabb9260a5c854bc85b3e44  -\n```\n\n- Create the entry for this user\n\n```\nINSERT INTO `sogo`.`sogo_users` (`c_uid`, `c_name`, `c_password`, `c_cn`, `mail`) VALUES ('username', 'username', '34819d7beeabb9260a5c854bc85b3e44', 'Archie Username', 'archie@example.com');\n```\n\n"
+    },
+    {
+      "title": "OpenLDAP",
+      "level": 3,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 3,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "Basic configuration",
+      "level": 3,
+      "content": "Create a very basic dovecot configuration layout:\n\n```\n# install -vdm755 /etc/dovecot/conf.d\n# cp /usr/share/doc/dovecot/example-config/dovecot.conf /etc/dovecot/\n# cp -r /usr/share/doc/dovecot/example-config/conf.d /etc/dovecot/conf.d.dist\n```\n\nRemove the submission protocol from the /etc/dovecot/dovecot.conf file (this will be handled by postfix). Additionally, remove pop3 if you do not wish to provide POP3 support:\n\n```\n...\nprotocols = imap lmtp\n...\n```\n\nThen create the file /etc/dovecot/conf.d/local.conf with this content:\n\n```\nauth_mechanisms = plain login\ndisable_plaintext_auth = no\nssl = no\nauth_username_format = %n\nmail_location = /home/vmail/%Lu/Maildir\n```\n\nEnable and start dovecot.\n\n"
+    },
+    {
+      "title": "Active Directory",
+      "level": 4,
+      "content": "Add the LDAP lookup configuration /etc/dovecot/conf.d/ldap.conf:\n\n```\npassdb ldap {\n    driver = ldap\n    args = /etc/dovecot/dovecot-ldap-passdb.conf\n}\nuserdb ldap {\n    driver = ldap\n    args = /etc/dovecot/dovecot-ldap-userdb.conf\n}\n```\n\nSet permissions:\n\n```\n# chmod 0644 /etc/dovecot/conf.d/ldap.conf\n# chown root:root /etc/dovecot/conf.d/ldap.conf\n```\n\nCreate the LDAP user and password configuration files (replace dc=internal,dc=domain,dc=tld, INTERNAL, and ldapPW with appropriate values). Remove the tls lines below if you have not enabled the TLS configuration in your directory:\n\n/etc/dovecot/dovecot-ldap-passdb.conf\n\n```\nhosts = localhost\nauth_bind = yes\nauth_bind_userdn = INTERNAL\\%u\nldap_version = 3\ntls = yes\nbase = dc=internal,dc=domain,dc=tld\nscope = subtree\nderef = never\npass_filter = (&(objectClass=person)(sAMAccountName=%u)(mail=*))\n```\n\n/etc/dovecot/dovecot-ldap-userdb.conf\n\n```\nhosts = localhost\ndn = cn=ldap,cn=Users,dc=internal,dc=domain,dc=tld\ndnpass = ldapPW\nldap_version = 3\ntls = yes\nbase = cn=Users,dc=internal,dc=domain,dc=tld\nuser_attrs = =uid=5000,=gid=5000,=home=/home/vmail/%Lu,=mail=maildir:/home/vmail/%Lu/Maildir/\nuser_filter = (&(objectClass=person)(sAMAccountName=%u)(mail=*))\n\n# Attributes and filter to get a list of all users\niterate_attrs = sAMAccountName=user\niterate_filter = (objectClass=person)\n```\n\nSet permissions:\n\n```\n# chown root:root /etc/dovecot/dovecot-ldap-{pass,user}db.conf\n# chmod 0600 /etc/dovecot/dovecot-ldap-userdb.conf\n# chmod 0644 /etc/dovecot/dovecot-ldap-passdb.conf\n```\n\nCreate the SASL configuration /etc/dovecot/conf.d/sasl.conf:\n\n```\nservice auth {\n    unix_listener /var/spool/postfix/private/auth {\n        mode = 0660\n        user = postfix\n        group = postfix\n     }\n}\n```\n\nSet permissions:\n\n```\n# chmod 0644 /etc/dovecot/conf.d/sasl.conf\n# chown root:root /etc/dovecot/conf.d/sasl.conf\n```\n\nReload Dovecot for the configuration to take effect:\n\n```\n# dovecot reload\n```\n\n"
+    },
+    {
+      "title": "Maria DB",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "OpenLDAP",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "Testing Dovecot authentication",
+      "level": 3,
+      "content": "Create the vmail user and group:\n\n```\n# groupadd -g 5000 vmail\n# useradd -u 5000 -g vmail -s /usr/bin/nologin -d /home/vmail -m vmail\n# chmod 750 /home/vmail\n```\n\nOpen a telnet session and test (commands you enter are in bold, replace Administrator with a valid user account and UserPass with your real password):\n\n```\ntelnet localhost 143\nTrying 127.0.0.1...\nConnected to localhost.\nEscape character is '^]'.\n* OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE AUTH=PLAIN AUTH=LOGIN] Dovecot ready.\na LOGIN Administrator UserPass\n. OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE SORT SORT=DISPLAY THREAD=REFERENCES THREAD=REFS THREAD=ORDEREDSUBJECT MULTIAPPEND  URL-PARTIAL CATENATE UNSELECT CHILDREN NAMESPACE UIDPLUS LIST-EXTENDED I18NLEVEL=1 CONDSTORE QRESYNC ESEARCH ESORT SEARCHRES WITHIN CONTEXT=SEARCH LIST-STATUS SPECIAL-USE BINARY MOVE] Logged in\na LOGOUT\n* BYE Logging out\n. OK Logout completed.\nConnection closed by foreign host.\n```\n\nIf anything other than OK is returned, go back and double check the configuration before continuing.\n\n"
+    },
+    {
+      "title": "LMTP configuration",
+      "level": 3,
+      "content": "Create the LMTP configuration file /etc/dovecot/conf.d/lmtp.conf:\n\n```\nmail_location = /home/vmail/%Lu/Maildir\nservice lmtp {\n  unix_listener /var/spool/postfix/private/dovecot-lmtp {\n    mode = 0600\n    user = postfix\n    group = postfix\n  }\n  user = vmail\n}\n\nprotocol lmtp {\n  postmaster_address = postmaster@domain.tld\n}\n```\n\n```\n# chmod 0644 /etc/dovecot/conf.d/lmtp.conf\n# dovecot reload\n```\n\n"
+    },
+    {
+      "title": "TLS configuration",
+      "level": 3,
+      "content": "Put your certificates into place and create the TLS configuration file /etc/dovecot/conf.d/tls.conf (adjust paths and names as necessary). The keyfile should be owned by root with 0600 permissions. Any intermediate certificates should be concatenated after the public cert:\n\n```\nssl = yes\nssl_cert = </etc/dovecot/ssl/host.domain.tld.pem\nssl_key = </etc/dovecot/ssl/host.domain.tld.key\n```\n\n```\n# chmod 644 /etc/dovecot/conf.d/tls.conf\n# chmod 600 /etc/dovecot/ssl/host.domain.tld.key\n```\n\nAdd the imaps protocol to the /etc/dovecot/dovecot.conf file:\n\n```\n...\nprotocols = imap imaps lmtp\n...\n```\n\nRemove the earlier explicitly defined values from local.conf and reload Dovecot:\n\n```\n# sed -e '/^ssl/d' -e '/disable_plaintext/s/no/yes/' \\\n      -i /etc/dovecot/conf.d/local.conf\n# dovecot reload\n```\n\n"
+    },
+    {
+      "title": "Sieve configuration",
+      "level": 3,
+      "content": "If you wish to support sieve configurations, install pigeonhole and edit /etc/dovecot/dovecot.conf. Uncomment the protocols line and add sieve as a service. Remove submission (this will be handled by Postfix or Exim) and pop3 (if you do not intend to provide pop access):\n\n```\n...\nprotocols = imap imaps lmtp sieve\n...\n```\n\nAppend the following to /etc/dovecot/conf.d/local.conf:\n\n```\n...\nplugin {\n   sieve_before = /home/vmail/sieve/spam-global.sieve\n   sieve=/home/vmail/%Lu/dovecot.sieve\n   sieve_dir=/home/vmail/%Lu/sieve\n}\n```\n\nCreate the global sieve directory:\n\n```\nmkdir -p /home/vmail/sieve/\n```\n\nCreate the /home/vmail/sieve/spam-global.sieve file with the following contents:\n\n```\nrequire \"fileinto\";\nif header :contains \"X-Spam-Flag\" \"YES\" {\n  fileinto \"Spam\";\n}\n```\n\nSet permissions on the directory (and file):\n\n```\nchown -R vmail:vmail /home/vmail/sieve\n```\n\nModify the /etc/dovecot/conf.d/lmtp.conf file, adding the bold text below:\n\n```\nmail_location = /home/vmail/%Lu/Maildir\nservice lmtp {\n  unix_listener /var/spool/postfix/private/dovecot-lmtp {\n    mode = 0600\n    user = postfix\n    group = postfix\n  }\n  user = vmail\n}\n\nprotocol lmtp {\n  postmaster_address = postmaster@domain.tld\n  mail_plugins = sieve\n}\n\nplugin {\n  sieve_before = /home/vmail/sieve/spam-global.sieve\n  sieve = /home/vmail/%Lu/dovecot.sieve\n  sieve_dir = /home/vmail/%Lu/sieve\n}\n```\n\nReload dovecot\n\n"
+    },
+    {
+      "title": "Basic configuration",
+      "level": 3,
+      "content": "Create a minimal Postfix configuration. Replace server.internal.domain.tld with a valid internal FQDN):\n\n```\n# postconf -e myhostname=server.internal.domain.tld\n# postconf -e mydestination=localhost\n```\n\nIf this server will be accessible from the internet, set the HELO/EHLO values to match the FQDN as seen from the internet (replace mail.domain.tld):\n\n```\n# postconf -e smtp_helo_name=mail.domain.tld\n# postconf -e smtpd_banner='$smtp_helo_name ESMTP $mail_name'\n```\n\nEnable and start postfix.\n\nConfigure Postfix to use the vmail user and group:\n\n```\n# postconf -e virtual_minimum_uid=5000\n# postconf -e virtual_uid_maps=static:5000\n# postconf -e virtual_gid_maps=static:5000\n# postconf -e virtual_mailbox_base=/home/vmail\n# postfix reload\n```\n\n"
+    },
+    {
+      "title": "Active Directory",
+      "level": 4,
+      "content": "Install postfix-ldap and create a LDAP alias and group maps for Postfix by pasting the following lines in the file /etc/postfix/ldap-alias.cf as root (replace dc=internal,dc=domain,dc=tld with appropriate values and ldapPW with the password of the ldap user). If TLS has not been configured for your directory, remove the start_tls line:\n\n```\n# Directory settings\nserver_host = 127.0.0.1\nsearch_base = dc=internal,dc=domain,dc=tld\nscope = sub\nversion = 3\nstart_tls = yes\n\n# User Binding\nbind = yes\nbind_dn = cn=ldap,cn=users,dc=internal,dc=domain,dc=tld\nbind_pw = ldapPW\n\n# Filter\nquery_filter = (&(objectclass=person)(proxyAddresses=smtp:%s))\nresult_attribute = samaccountname\nresult_format = %s@internal.domain.tld\n```\n\nCreate the group map:\n\n```\n# sed -e '/^query/d' \\\n      -e '/^result/d' \\\n      /etc/postfix/ldap-alias.cf > /etc/postfix/ldap-group.cf\n```\n\nAppend the following lines to the newly created /etc/postfix/ldap-group.cf (in the #Filter secton):\n\n```\nquery_filter = (&(objectclass=group)(mail=%s))\nspecial_result_attribute = member\nleaf_result_attribute = mail\n```\n\nSet the permissions:\n\n```\n# chmod 0600 /etc/postfix/ldap-{alias,group}.cf\n```\n\nNext test our lookup maps for users (groups have not yet been created) (substitute internal.domain.tld):\n\n```\n# postmap -q administrator@domain.tld ldap:/etc/postfix/ldap-alias.cf\n# postmap -q administrator@internal.domain.tld ldap:/etc/postfix/ldap-alias.cf\n```\n\nThe following output should be displayed for both commands:\n\n```\nAdministrator@internal.domain.tld\n```\n\nAppend any other hosted domains to the first command below, add the maps, and then reload the Postfix configuration (again replacing domain values):\n\n```\n# postconf -e virtual_mailbox_domains=\"domain.tld, internal.domain.tld\"\n# postconf -e virtual_alias_maps=\"ldap:/etc/postfix/ldap-alias.cf, ldap:/etc/postfix/ldap-group.cf\"\n# postfix reload\n```\n\n"
+    },
+    {
+      "title": "Maria DB",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "OpenLDAP",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "SASL configuration",
+      "level": 3,
+      "content": "Modify the default smtpd instance:\n\n```\n# postconf -e smtpd_sasl_type=dovecot\n# postconf -e smtpd_sasl_path=private/auth\n# postconf -e smtpd_sasl_auth_enable=yes\n# postconf -e smtpd_relay_restrictions=\"permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination\"\n```\n\n"
+    },
+    {
+      "title": "LMTP configuration",
+      "level": 3,
+      "content": "Use dovecot LMTP for delivery:\n\n```\n# postconf -e virtual_transport=lmtp:unix:private/dovecot-lmtp\n```\n\n"
+    },
+    {
+      "title": "TLS configuration",
+      "level": 3,
+      "content": "If you intend to use STARTTLS (as you should), enable the mail submission port and restrict to authenticated clients. Edit the following lines in /etc/postfix/master.cf:\n\n```\nsubmission inet n       -       n       -       -       smtpd\n  -o syslog_name=postfix/submission\n  -o smtpd_tls_security_level=encrypt\n  -o smtpd_sasl_auth_enable=yes\n  -o smtpd_sasl_type=dovecot\n  -o smtpd_sasl_path=private/auth\n  -o smtpd_sasl_security_options=noanonymous\n  -o smtpd_client_restrictions=permit_sasl_authenticated,reject\n  -o smtpd_sender_login_maps=ldap:/etc/postfix/ldap-sender.cf\n  -o smtpd_sender_restrictions=reject_sender_login_mismatch\n  -o smtpd_recipient_restrictions=reject_non_fqdn_recipient,reject_unknown_recipient_domain,permit_sasl_authenticated,reject\n```\n\nAdd SSL certificates. If you intend to put Postfix in a chroot jail (not discussed in this guide), these need to be placed in the Postfix configuration directory as opposed to the default /etc/ssl/private directory. Additionally, any intermediate certs should be concatenated with the public cert being first in the chain, and the key file should be owned by root with 0400 permission mode (replace mail.domain.tld):\n\n```\n# postconf -e smtpd_tls_key_file=/etc/postfix/ssl/mail.domain.tld.key\n# postconf -e smtpd_tls_cert_file=/etc/postfix/ssl/mail.domain.tld.pem\n```\n\nCreate a map to verify addresses to authenticated users /etc/postfix/ldap-sender.cf. If TLS has not been configured for your directory, remove the start_tls line:\n\n```\n# Directory settings\nserver_host = localhost\nsearch_base = dc=internal,dc=domain,dc=tld\nversion = 3\nscope = sub\nstart_tls = yes\n\n# User Binding\nbind = yes\nbind_dn = cn=ldap,cn=Users,dc=internal,dc=domain,dc=tld\nbind_pw = ldapPW\n\n# Filter\nquery_filter = (&(objectclass=person)(proxyAddresses=smtp:%s))\nleaf_result_attribute = proxyAddresses\nresult_attribute = sAMAccountName\n```\n\nSet permissions:\n\n```\n# chown root:root /etc/postfix/ldap-sender.cf\n# chmod 0640 /etc/postfix/ldap-sender.cf\n```\n\nIf you would like to enable TLS on the default SMTP port, you should make it optional. If you make it required, you will not be able to receive mail from many hosts on the internet.\n\n```\n# postconf -e smtpd_tls_security_level=may\n```\n\nReload postfix to apply the configuration changes:\n\n```\n# postfix reload\n```\n\n"
+    },
+    {
+      "title": "Testing the Postfix SASL configuration",
+      "level": 3,
+      "content": "Begin by getting a base64 encoded version of the username and password (replace Administrator with a valid username and UserPass with your real password):\n\n```\n$ echo -ne '\\000Administrator\\000UserPass' | openssl base64\n```\n\nYou should receive output similar to the following:\n\n```\nAEFkbWluaXN0cmF0b3IAVXNlclBhc3M=\n```\n\nNow, open a telnet session and test (commands you enter are in bold, replace host.domain.tld with the real external FQDN and AEFkbWluaXN0cmF0b3IAVXNlclBhc3M= with the result of the previous command):\n\n```\n$ telnet localhost 25\nTrying 127.0.0.1...\nConnected to localhost.\nEscape character is '^]'.\n220 host.domain.tld ESMTP Postfix\nehlo host.domain.tld\n250-host.domain.tld\n250-PIPELINING\n250-SIZE 10240000\n250-VRFY\n250-ETRN\n250-STARTTLS\n250-AUTH PLAIN LOGIN\n250-ENHANCEDSTATUSCODES\n250-8BITMIME\n250 DSN\nAUTH PLAIN AEFkbWluaXN0cmF0b3IAVXNlclBhc3M=\n235 2.7.0 Authentication successful\nquit\n221 2.0.0 Bye\nConnection closed by foreign host.\n```\n\nIf anything other than a 235 message is returned, something is wrong and you should troubleshoot now rather than later.\n\n"
+    },
+    {
+      "title": "Basic configuration",
+      "level": 3,
+      "content": "Edit the SOGo http configuration file, /etc/httpd/conf/extra/SOGo.conf, and comment out the following lines for testing (until SSL certs are in place and configuration is complete):\n\n```\n## adjust the following to your configuration\n#  RequestHeader set \"x-webobjects-server-port\" \"443\"\n#  RequestHeader set \"x-webobjects-server-name\" \"yourhostname\"\n#  RequestHeader set \"x-webobjects-server-url\" \"https://yourhostname\"\n```\n\nCreate a suitable SOGo configuration file in /etc/sogo/sogo.conf (replace items in bold with appropriate values). If using PostgreSQL, replace the \"mysql:\" lines with the appropriate \"postgresql:\" lines (as above):\n\n```\n{\n    /* Database Configuration */\n    SOGoProfileURL = \"mysql://sogo:SogoPW@localhost/sogo/sogo_user_profile\";\n    OCSFolderInfoURL = \"mysql://sogo:SogoPW@localhost/sogo/sogo_folder_info\";\n    OCSSessionsFolderURL = \"mysql://sogo:SogoPW@localhost/sogo/sogo_sessions_folder\";\n\n    /* Mail */\n    SOGoDraftsFolderName = Drafts;\n    SOGoSentFolderName = Sent;\n    SOGoTrashFolderName = Trash;\n    SOGoJunkFolderName = Junk;\n    SOGoIMAPServer = localhost;\n    SOGoSieveServer = sieve://127.0.0.1:4190;\n    SOGoSMTPServer = 127.0.0.1;\n    SOGoMailDomain = internal.domain.tld;\n    SOGoMailingMechanism = smtp;\n    SOGoForceExternalLoginWithEmail = NO;\n    SOGoMailSpoolPath = /var/spool/sogo;\n    NGImap4ConnectionStringSeparator = \"/\";\n\n    /* Notifications */\n    SOGoAppointmentSendEMailNotifications = YES;\n    SOGoACLsSendEMailNotifications = NO;\n    SOGoFoldersSendEMailNotifications = NO;\n\n    /* Authentication */\n    SOGoPasswordChangeEnabled = YES;\n\n    /* Web Interface */\n    SOGoPageTitle = SOGo;\n    SOGoVacationEnabled = YES;\n    SOGoForwardEnabled = YES;\n    SOGoSieveScriptsEnabled = YES;\n    SOGoMailAuxiliaryUserAccountsEnabled = YES;\n    SOGoTrustProxyAuthentication = NO;\n    SOGoXSRFValidationEnabled = NO;\n\n    /* General */\n    SOGoLanguage = English;\n    SOGoTimeZone = America/Chicago;\n    SOGoCalendarDefaultRoles = (\n        PublicDAndTViewer,\n        ConfidentialDAndTViewer\n    );\n    SOGoSuperUsernames = (administrator);\n    SxVMemLimit = 384;\n    //WOPidFile = \"/var/run/sogo/sogo.pid\";\n    SOGoMemcachedHost = \"127.0.0.1\";\n\n    /* Debug */\n    //SOGoDebugRequests = YES;\n    //SoDebugBaseURL = YES;\n    //ImapDebugEnabled = YES;\n    //LDAPDebugEnabled = YES;\n    //PGDebugEnabled = YES;\n    //MySQL4DebugEnabled = YES;\n    //SOGoUIxDebugEnabled = YES;\n    //WODontZipResponse = YES;\n    //WOLogFile = /var/log/sogo/sogo.log;\n\n}\n```\n\nThen issue the following commands:\n\n```\n# chown sogo:sogo /etc/sogo/sogo.conf\n# chmod 0600 /etc/sogo/sogo.conf\n# mkdir /var/spool/sogo\n# chown sogo:sogo /var/spool/sogo\n# chmod 700 /var/spool/sogo\n```\n\n"
+    },
+    {
+      "title": "Active Directory",
+      "level": 4,
+      "content": "Modify the /etc/sogo/sogo.conf file and add the LDAP user sources (and global address list). Place the following contents before the Web Interface section. If TLS is not configured for your Directory, exclude the \"/????!StartTLS\" strings at the end of the LDAP URIs:\n\n```\n/* User Authentication */\n    SOGoUserSources = (\n     {\n        id = directory;\n        displayName = \"Active Directory\";\n        canAuthenticate = YES;\n        type = ldap;\n        CNFieldName = cn;\n        IDFieldName = sAMAccountName;\n        UIDFieldName = sAMAccountName;\n        baseDN = \"dc=internal,dc=domain,dc=tld\";\n        bindDN = \"cn=ldap,cn=Users,dc=internal,dc=domain,dc=tld\";\n        bindFields = (sAMAccountName);\n        bindPassword = \"ldapPW\";\n        hostname = ldap://server.internal.domain.tld:389/????!StartTLS;\n      },\n      {\n        id = sambaShared;\n        displayName = \"Shared Addressbook\";\n        canAuthenticate = NO;\n        isAddressBook = YES;\n        type = ldap;\n        CNFieldName = cn;\n        IDFieldName = mail;\n        UIDFieldName = mail;\n        hostname = ldap://server.internal.domain.tld:389/????!StartTLS;\n        baseDN = \"dc=internal,dc=domain,dc=tld\";\n        bindDN = \"cn=ldap,cn=Users,dc=internal,dc=domain,dc=tld\";\n        bindPassword = \"ldapPW\";\n        filter = \"((NOT isCriticalSystemObject='TRUE') AND (mail=\\'*\\') AND (NOT objectClass=contact))\";\n        //Uncomment to list local users in WebUI without searching (small directories only)\n        //listRequiresDot = NO;\n      },\n      {\n        id = sambaContacts;\n        displayName = \"Shared Contacts\";\n        canAuthenticate = NO;\n        isAddressBook = YES;\n        type = ldap;\n        CNFieldName = cn;\n        IDFieldName = mail;\n        UIDFieldName = mail;\n        hostname = ldap://server.internal.domain.tld:389/????!StartTLS;\n        baseDN = \"dc=internal,dc=domain,dc=tld\";\n        bindDN = \"cn=ldap,cn=Users,dc=internal,dc=domain,dc=tld\";\n        bindPassword = \"ldapPW\";\n        filter = \"((((objectClass=person) AND (objectClass=contact) AND ((uidNumber>=2000) OR (mail='*')))\n                 AND (NOT isCriticalSystemObject='TRUE') AND (NOT showInAdvancedViewOnly='TRUE') AND (NOT uid=Guest))\n                 OR (((objectClass=group) AND (gidNumber>=2000)) AND (NOT isCriticalSystemObject='TRUE') AND (NOT showInAdvancedViewOnly='TRUE')))\";\n        mapping = {\n            displayname = (\"cn\");\n        //Uncomment to list contacts in WebUI without searching (few contacts only)\n        //listRequiresDot = NO;\n        };\n      }\n    );\n```\n\n"
+    },
+    {
+      "title": "Maria DB",
+      "level": 4,
+      "content": "For debugging purposes, edit the /etc/sogo/sogo.conf to enable all debugging switches:\n\n```\n/* Debug */\n SOGoDebugRequests = YES;\n SoDebugBaseURL = YES;  \n ImapDebugEnabled = YES;\n LDAPDebugEnabled = YES;\n PGDebugEnabled = YES;\n MySQL4DebugEnabled = YES;\n SOGoUIxDebugEnabled = YES;\n WODontZipResponse = YES;\n WOLogFile = /var/log/sogo/sogo.log;\n```\n\nIf problems occur, check by running journalctl -xe as root.\n\nFurther modify the /etc/sogo/sogo.conf file to include SQL as a user source (change the password to the chosen password for the sogo mysql user):\n\n```\nSOGoUserSources =\n    (\n      {\n        type = sql;\n        id = directory;\n        viewURL = \"mysql://sogo:yoursogopassword@127.0.0.1:3306/sogo/sogo_users\";\n        canAuthenticate = YES;\n        isAddressBook = YES;\n        userPasswordAlgorithm = md5;\n      }\n    );\n```\n\nAlternatively, a view can be used instead of the table directly. More information about which values are available for SOGoUserSources can be found here: https://sogo.nu/files/docs/SOGoInstallationGuide.html#_authentication_using_sql\n\n"
+    },
+    {
+      "title": "OpenLDAP",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "To be added...\n\n"
+    },
+    {
+      "title": "Completing configuration",
+      "level": 3,
+      "content": "Now enable and start the memcached service and restart the sogo service. Test by visiting http://server.internal.domain.tld/SOGo/ .\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 3,
+      "content": "To add ActiveSync support, simply uncomment the following lines in /etc/httpd/conf/extra/SOGo.conf:\n\n```\n...\nProxyPass /Microsoft-Server-ActiveSync \\\n http://127.0.0.1:20000/SOGo/Microsoft-Server-ActiveSync \\\n retry=60 connectiontimeout=5 timeout=3600\n...\n```\n\nThis will result in extended locking delays if you have more than a handful of users, so some tuning is required. You may notice that the above line was changed from 360 seconds to 3600 seconds (or one hour). This is because EAS devices need to keep their HTTP connections open for very long times (up to one hour). Because of this, you will need to tell SOGo (see below) to honor that timeout. Reload the httpd service before continuing.\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 3,
+      "content": "Add the following to your server definition for SOGo in /etc/nginx/nginx.com:\n\n```\n...\n        location ^~ /Microsoft-Server-ActiveSync {\n                proxy_pass http://127.0.0.1:20000/SOGo/Microsoft-Server-ActiveSync;\n                proxy_redirect http://127.0.0.1:20000/Microsoft-Server-ActiveSync /;\n        }\n\n        location ^~ /SOGo/Microsoft-Server-ActiveSync {\n                proxy_pass http://127.0.0.1:20000/SOGo/Microsoft-Server-ActiveSync;\n                proxy_redirect http://127.0.0.1:20000/SOGo/Microsoft-Server-ActiveSync /;\n        }\n...\n```\n\nAdditional tuning may be required for the parameters in the SOGo section below (timeout, retry, and next host values, specifically).\n\n"
+    },
+    {
+      "title": "SOGo",
+      "level": 3,
+      "content": "As stated above for the listed HTTP servers, some tuning is required to use EAS. While the timeouts below (59 minutes) are appropriate for the HTTP session timeout set above, the number of workers is dependent on the number of simultaneous EAS clients you must support. In short, you will always need more workers than EAS clients to allow start of another worker for push operations. Additionally, the sync interval will allow you to reduce the load on the server so that less delay is generated, and this dependent on the total number of clients. The SOGo configuration guide, available at https://sogo.nu/files/docs/SOGoInstallationGuide.pdf, lists two example configurations. The 100 user with 10 EAS users example was chosen for this article. Append the following lines to /etc/sogo/sogo.conf making sure that they are placed before the closing brace (\"}\") character:\n\n```\n/* ActiveSync */\n  WOWorkersCount = 15;\n  WOWatchDogRequestTimeout = 59;\n  SOGoMaximumPingInterval = 3540;\n  SOGoMaximumSyncInterval = 3540;\n  SOGoInternalSyncInterval = 30;\n```\n\nFinally, restart the sogo service.\n\n"
+    }
+  ]
+}

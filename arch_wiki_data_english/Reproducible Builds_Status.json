@@ -1,0 +1,51 @@
+{
+  "title": "Reproducible Builds/Status",
+  "url": "https://wiki.archlinux.org/title/Reproducible_Builds/Status",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Arch Linux is constantly rebuilding core and extra packages and has a status page. This page contains a status of bad packages and what needs to be fixed.\n\n"
+    },
+    {
+      "title": "General",
+      "level": 3,
+      "content": "- A rebuild is required for all packages build with pacman < 5.2 to resolve file order issues and a btrfs size bug. For the file order issue the affecting extra packages can be found running the following one liner on a mirror directory:\n\n```\nfor i in /srv/ftp/extra/os/x86_64/*.pkg.tar.??; do\n   bsdtar -tf $i | grep \"^\\.\" > pkg-order\n   sort pkg-order > sort-order\n   if ! diff pkg-order sort-order &>/dev/null; then\n     echo $i;\n   fi\n   rm pkg-order sort-order\ndone\n```\n\n"
+    },
+    {
+      "title": "File order rebuild FTBFS",
+      "level": 4,
+      "content": "```\naccounts-qml-module-0.7-2-x86_64.pkg.tar.xz\narchboot-2019.03-1-any.pkg.tar.xz\ncmark-0.29.0-1-x86_64.pkg.tar.xz\ngtk-sharp-2-2.12.45-2-x86_64.pkg.tar.xz\nguile1.8-1.8.8-7-x86_64.pkg.tar.xz\njava11-openjfx-11.0.3.u1-1-x86_64.pkg.tar.xz\njava11-openjfx-doc-11.0.3.u1-1-x86_64.pkg.tar.xz\njava11-openjfx-src-11.0.3.u1-1-x86_64.pkg.tar.xz\njava8-openjfx-8.u202-3-x86_64.pkg.tar.xz\njava8-openjfx-doc-8.u202-3-x86_64.pkg.tar.xz\njava8-openjfx-src-8.u202-3-x86_64.pkg.tar.xz\njava-openjfx-13.u14-1-x86_64.pkg.tar.xz\njava-openjfx-doc-13.u14-1-x86_64.pkg.tar.xz\njava-openjfx-src-13.u14-1-x86_64.pkg.tar.xz\njdk10-openjdk-10.0.2.u13-2-x86_64.pkg.tar.xz\njre10-openjdk-10.0.2.u13-2-x86_64.pkg.tar.xz\njre10-openjdk-headless-10.0.2.u13-2-x86_64.pkg.tar.xz\njsonrpc-glib-3.34.0-1-x86_64.pkg.tar.xz\nlibva-vdpau-driver-0.7.4-4-x86_64.pkg.tar.xz\nliferea-1.12.7-1-x86_64.pkg.tar.xz\nlinux-atm-2.5.2-6-x86_64.pkg.tar.xz\nmono-tools-4.2-2-x86_64.pkg.tar.xz\nnpapi-sdk-0.27.2-2-any.pkg.tar.xz\nnss_ldap-265-7-x86_64.pkg.tar.xz\nopenjdk10-doc-10.0.2.u13-2-x86_64.pkg.tar.xz\nopenjdk10-src-10.0.2.u13-2-x86_64.pkg.tar.xz\npam_ldap-186-6-x86_64.pkg.tar.xz\nportaudio-1:19.6.0-6-x86_64.pkg.tar.xz\nqtav-1.13.0-1-x86_64.pkg.tar.xz\n```\n\n"
+    },
+    {
+      "title": "Packages with JAR files",
+      "level": 4,
+      "content": "JARs include a modification timestamp for each file, making them unreproducible. Depending on the build system, there are different solutions available for this.\n\nCurrently has no support for reproducible builds, see the upstream feature request.\n\nShould support reproducible builds out of the box.\n\nSupports the project.build.outputTimestamp property that can be set to a fixed timestamp. Recent versions of Maven plugins respect this property to create reproducible artefacts. The property should be set in the project's pom.xml file, if upstream does not already do this, you can define it at compile time using a command like\n\n```\nmvn -Dproject.build.outputTimestamp=\"$SOURCE_DATE_EPOCH\" clean package\n```\n\nIt might be necessary to patch the project's pom.xml to update plugins to a more recent version with support for reproducible builds, see the Maven guide to reproducible builds for the minimum required versions and more information like additional necessary configuration options.\n\nExample package (including a patch for a Maven plugin version update): junit-system-rules.\n\nThe builtin OpenJDK jar program will support SOURCE_DATE_EPOCH starting with OpenJDK version 15.\n\nAs a last resort, strip-nondeterminism from Debian is able to strip unreproducible metadata like file timestamps from a variety of file types, including JARs. It is not a cure-all (e.g. build systems might include additional unreproducible metadata in the JAR manifest, strip-nondeterminism removes some, but not all of these) and should only be used as a last resort if no native support for reproducible builds is available:\n\n```\nstrip-nondeterminism --timestamp \"$SOURCE_DATE_EPOCH\"\n```\n\n"
+    },
+    {
+      "title": "KDE Kdeveloper project files",
+      "level": 4,
+      "content": "KDE creates Package App template .tar.bz2 files which tar files and userid is different when reproducing with repro which might be a bug in repro. https://gist.githubusercontent.com/jelly/570313f56ee59be7674ad4cc002232e7/raw/b85536690c48b23ce97650e8db8f0ca18c2dbf1a/gistfile1.txt\n\nThe cmake file which generates the issue.\n\n"
+    },
+    {
+      "title": "Doxygen documentation build with graphviz-2.44.0-2",
+      "level": 4,
+      "content": "graphviz lacked a dependency on libpng, making PNG generation unavailable in dot as graphviz was installed before libpng was available and therefore not marking it as to be dlopen'd. All packages which depend on doxygen for generation documentation and with the following diff require a rebuild.\n\n```\n│ │ --rw-r--r--   0 root         (0) root         (0)    20234 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser.html\n│ │ --rw-r--r--   0 root         (0) root         (0)      265 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser__inherit__graph.map\n│ │ --rw-r--r--   0 root         (0) root         (0)       32 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser__inherit__graph.md5\n│ │ --rw-r--r--   0 root         (0) root         (0)     3136 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser__inherit__graph.png\n│ │ +-rw-r--r--   0 root         (0) root         (0)    19961 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser.html\n│ │ +-rw-r--r--   0 root         (0) root         (0)      598 2020-05-16 12:32:36.000000 usr/share/doc/grantlee/classGrantlee_1_1Parser__inherit__graph.dot\n```\n\n"
+    },
+    {
+      "title": "[core]",
+      "level": 3,
+      "content": "Table content:\nPackage | Issue | Solution/Patch | Assignee | Solved\nlinux | Signed modules | none | none | No\nlinux-docs | lots of issues - ordering, linking, ... | none | none | No\nlinux-headers | /usr/lib/modules/*/build/vmlinux diff[dead link 2021-11-15 ⓘ] | none | none | No\nlinux-lts | as for linux | none | none | No\nlinux-lts-docs | as for linux-docs | none | none | No\nlinux-lts-headers | as for linux-headers | none | none | No\n\n"
+    },
+    {
+      "title": "[extra]",
+      "level": 3,
+      "content": "Table content:\nPackage | Issue | Solution/Patch | Assignee | Solved\namdvlk | many differences in usr/lib/amdvlk64.so | none | none | No\nant | .jar file differences | none | none | No\nant-doc | lots of timestamps (javadoc), and .zip file difference | none | none | No\nasymptote | Dates in html and info. PDF document differences (dates?) | none | none | No\nautogen | Timestamp in man pages, sr/share/autogen/libopts-42.1.17.tar.gz with different file ownership, and a small binary change in usr/bin/autogen | need export MAN_PAGE_DATE=... and configure --enable-timeout=70 | none | No\nbigloo | uname and timestamps all over the place | none | none | No\nbreezy | 3.0.2.3-3 reproducible with both repro and makechrootpkg | tooling issue? | none | No\nclisp | ip address; timestamps in ps docs, likely much more | none | none | No\ndeluge | .pyc file, .egg files | none | none | No\ndoxygen-docs | lots of pdfs with differences | none | none | No\necl | uname, timestamp, gzip, lots of other binary differences | none | none | No\neclipse-ecj | .jar file | none | none | No\nefitools | /usr/share/efitools/efi/LockDown.efi has binary differences | none | none | No\nefl | lots of binary differences | none | none | No\nemacs | binary differences in usr/bin/emacs | none | none | No\nfirefox | It is firefox; PGO? | none | none | No\nlibbluray | file attribute(?) differences in usr/share/java/{libbluray{,-awt}-j2se-1.2.0.jar | none | none | No\nlibgtop | uname in /usr/bin/libgtop_server2 | none | none | No\nlibmp4v2 | timestamp in usr/include/mp4v2/project.h & usr/lib/libmp4v2.so.2.0.0 | none | none | No\nlirc | timestamp in yaml files, usr/share/lirc/lirc-0.10.1.tar.gz has lots of timestamp differences, repro causes poll() detection issue not found in makerepropkg | patch | none | No\nr | Lots of timestamps in files, gzip timestamps, randomly(?) generated paths in /tmp/, binary differences... | none | none | No\nzabbix-agent2 | Timestamp in /usr/bin/zabbix_agent2 | none | none | No\n\n"
+    },
+    {
+      "title": "[multilib]",
+      "level": 3,
+      "content": "Table content:\nPackage | Issue | Solution/Patch | Assignee | Solved\nlib32-keyutils | Binary includes build date | proposed | none | No\n\n"
+    }
+  ]
+}

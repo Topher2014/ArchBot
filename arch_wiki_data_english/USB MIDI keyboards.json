@@ -1,0 +1,51 @@
+{
+  "title": "USB MIDI keyboards",
+  "url": "https://wiki.archlinux.org/title/USB_MIDI_keyboards",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis how-to assumes that you are using ALSA and that your sound card is set up so you can listen to music. Known to work using this how-to is the Evolution MK-631 USB midi keyboard with SB Live! Value card. Execute these instructions as an unprivileged user unless otherwise noted.\n\n"
+    },
+    {
+      "title": "ALSA",
+      "level": 3,
+      "content": "Install the alsa-utils package.\n\nType aseqdump. It should output something like:\n\n```\nWaiting for data at port 128:0. Press Ctrl+C to end.\nSource_ Event_________________ Ch _Data__\n```\n\nNot much will show up there, so press Ctrl+C to quit the program.\n\n"
+    },
+    {
+      "title": "Plugging the keyboard",
+      "level": 2,
+      "content": "Now plug the keyboard in and turn it on. The keyboard should power up. Output of lsusb should contain:\n\n```\nBus 002 Device 002: ID 0a4d:00a0 Evolution Electronics, Ltd\n```\n\nOutput of lsmod | grep usb should contain the following modules:\n\n```\nusb_midi               25348  0\nsnd_usb_audio          70592  0\nsnd_usb_lib            16640  1 snd_usb_audio\n```\n\nNow type aconnect -i to list all MIDI input ports. The output should contain:\n\n```\nclient 72: 'MK-361 USB MIDI keyboard' [type=kernel]\n    0 'MK-361 USB MIDI keyboard MIDI 1'\n```\n\nThe client number is probably going to be different though. Take note of it.\n\n"
+    },
+    {
+      "title": "Verifying Events",
+      "level": 2,
+      "content": "Type aseqdump -p ## where you should replace ## with the client number of your keyboard. You should see:\n\n```\n72:0   Active Sensing\n```\n\npopping out all the time. Pressing a key should produce:\n\n```\n72:0   Note on                 0  65  94\n 72:0   Note on                 0  65   0\n```\n\nVarious other events (turning control knobs, changing channels, etc.) should register in the list. This is a handy way of ensuring that your keyboard is running properly.\n\nTo send MIDI events back to the keyboard or another MIDI output device, you can use run aplaymidi -p ## midifile.mid and specify a MIDI file.\n\n"
+    },
+    {
+      "title": "Recording",
+      "level": 2,
+      "content": "First, use arecordmidi -l to list the available input devices, and determine the port_number for the desired device. Then, execute the following to start recording:\n\n```\narecordmidi -p <port_number> <output_file>\n```\n\nTo stop recording, simply kill the process.\n\nman arecordmidi provides details about additional options available with this tool.\n\n"
+    },
+    {
+      "title": "Playing",
+      "level": 2,
+      "content": "To hear a sound when you push a button on your keyboard, you need a synthesizer that converts the MIDI signal into audio.\n\nSome soundcards have a built-in hardware synthesizer, but these are not common in modern sound cards, especially not in onboard sound cards. An easier option is a software synthesizer, which is just a program which you can load with you own instrument samples.\n\n"
+    },
+    {
+      "title": "Hardware synthesizer",
+      "level": 3,
+      "content": "Type aconnect -o to list all MIDI output ports. It depends a lot on your sound card. On SB Live! Value, you get the following output:\n\n```\nclient 64: 'EMU10K1 MPU-401 (UART)' [type=kernel]\n    0 'EMU10K1 MPU-401 (UART)'\nclient 65: 'Emu10k1 WaveTable' [type=kernel]\n    0 'Emu10k1 Port 0  '\n    1 'Emu10k1 Port 1  '\n    2 'Emu10k1 Port 2  '\n    3 'Emu10k1 Port 3  '\n```\n\nHere client 65 is the actual MIDI synthesizer. Assuming the soundcard is set up properly, you should be able to route the output of the keyboard to the MIDI synthesizer. Assuming out is the output client number (65 in our example) and in is the input client number (72 in our example), type aconnect in out. Now you can play your keyboard via the MIDI output of your sound card.\n\n"
+    },
+    {
+      "title": "Qsynth",
+      "level": 4,
+      "content": "1. Install qsynth.\n1. Start QSynth and go to Setup, where you need to load soundfont in SF2 format. You can get free SoundFonts from fluidplug-gitAUR, or from http://soundfonts.narod.ru/ (in Russian). When QSynth asks you to restart the engine after loading the SoundFont, do so.\n1. Type aconnect -o to list all MIDI output ports. Find the one that contains FLUID Synth and note the client number.\n1. Type aconnect -i to list all MIDI input ports. Note the Keyboard client number.\n1. Assuming out is the output client number and in is the input client number (72 in our example), type aconnect in out. Now you can play your keyboard and QSynth should produce sounds.\n\n"
+    },
+    {
+      "title": "Qsynth using JACK",
+      "level": 4,
+      "content": "1. We need to install qsynth, JACK, qjackctl\n1. Launch qjackctl and check the settings: Server Path: jackd Driver: alsa Realtime=enable; Priority:0 Frames/Period:512 Soft Mode=enable; Periods/Buffer:2 Rest of parameters=disable(by default) Dither: None Audio: Duplex\n1. Start jackd using qjackctl (the Play button)\n1. Connect your USB keyboard\n1. Start QSynth and go to Setup, where you need to load soundfont in SF2 format. You can get free SoundFonts from http://soundfonts.narod.ru/ (in Russian). When QSynth asks you to restart the engine after loading the SoundFont, do so.\n1. Go to qjackctl, click Connect and choose the ALSA tab. On the left side you will see connected MIDI keyboard, on the left side - QSynth. Choose MIDI keyboard and QSynth, and click Connect.\n\n```\nServer Path: jackd\nDriver: alsa\nRealtime=enable; Priority:0\nFrames/Period:512\nSoft Mode=enable; Periods/Buffer:2\nRest of parameters=disable(by default)\nDither: None\nAudio: Duplex\n```\n\n"
+    }
+  ]
+}

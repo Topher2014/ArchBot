@@ -1,0 +1,61 @@
+{
+  "title": "Hybrid graphics",
+  "url": "https://wiki.archlinux.org/title/Hybrid_graphics",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- NVIDIA Optimus\n- PRIME\n- Xorg\n- External GPU\n\nHybrid-graphics is a concept involving two graphics cards on same computer. Laptop manufacturers have developed technologies involving two graphics cards with different abilities and power consumption on a single computer. Hybrid-graphics has been developed to support both high performance and power saving use cases by keeping the Dedicated/Discrete Graphics Processor inactive unless its 3D rendering performance is needed over the Integrated Graphics Processor.\n\nThere are a variety of technologies and each manufacturer developed its own solution to this problem. This technology is well supported on Windows but it is still rough around the edges with Linux distributions. This article will try to explain a little about each approach and describe some community solutions to the lack of GNU/Linux systems support by vendors.\n\n"
+    },
+    {
+      "title": "Dynamic switching",
+      "level": 2,
+      "content": "Most of the new Hybrid-graphics technologies involve two graphics cards: the dedicated and integrated cards are plugged to a framebuffer and there is no hardware multiplexer. The integrated card is always on and the dedicated card is switched on/off when there is a need in power-save or performance-rendering. In most cases there is no way to use only the dedicated card and all the switching and rendering is controlled by software. At startup, the Linux kernel starts using a video mode and setting up low-level graphic drivers which will be used by the applications. Most of the Linux distributions then use X.org to create a graphical environment. Finally, a few other softwares are launched, first a login manager and then a window manager, and so on. This hierarchical system has been designed to be used in most of cases on a single graphics card.\n\n"
+    },
+    {
+      "title": "Fully power down discrete GPU",
+      "level": 3,
+      "content": "You may want to turn off the high-performance graphics processor to save battery power.\n\n"
+    },
+    {
+      "title": "Using BIOS/UEFI",
+      "level": 4,
+      "content": "Some laptop manufacturers provide a toggle in the BIOS or UEFI to fully deactivate the dedicated card.\n\n"
+    },
+    {
+      "title": "Using udev rules",
+      "level": 4,
+      "content": "Ensure any display manager config for NVIDIA is removed.\n\nBlacklist the nouveau drivers by creating\n\n```\n/etc/modprobe.d/blacklist-nouveau.conf\n```\n\n```\nblacklist nouveau\noptions nouveau modeset=0\n```\n\nThen create\n\n```\n/etc/udev/rules.d/00-remove-nvidia.rules\n```\n\n```\n# Remove NVIDIA USB xHCI Host Controller devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x0c0330\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA USB Type-C UCSI devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x0c8000\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA Audio devices, if present\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x040300\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n\n# Remove NVIDIA VGA/3D controller devices\nACTION==\"add\", SUBSYSTEM==\"pci\", ATTR{vendor}==\"0x10de\", ATTR{class}==\"0x03[0-9]*\", ATTR{power/control}=\"auto\", ATTR{remove}=\"1\"\n```\n\nReboot and run lspci to see if your NVIDIA GPU is still listed.\n\nCheck power usage to ensure your GPU is not drawing power, if it does #Using acpi_call may be another option to fully power it down.\n\n"
+    },
+    {
+      "title": "Using bbswitch",
+      "level": 4,
+      "content": "With an NVIDIA GPU, this can be more safely done using bbswitch, which consists of a kernel package that automatically issues the correct ACPI calls to disable the discrete GPU when not needed, or automatically at boot.\n\n"
+    },
+    {
+      "title": "Using acpi_call",
+      "level": 4,
+      "content": "Otherwise, and for GPUs not supported by bbswitch, the same can be done manually installing the acpi_call package.\n\nOnce installed load the kernel module:\n\n```\n# modprobe acpi_call\n```\n\nWith the kernel module loaded, execute the script at /usr/share/acpi_call/examples/turn_off_gpu.sh\n\nThe script will go through all the known data buses and attempt to turn them off. You will get an output similar to the following:\n\n```\n# /usr/share/acpi_call/examples/turn_off_gpu.sh\n```\n\n```\nTrying \\_SB.PCI0.P0P1.VGA._OFF: failed\nTrying \\_SB.PCI0.P0P2.VGA._OFF: failed\nTrying \\_SB_.PCI0.OVGA.ATPX: failed\nTrying \\_SB_.PCI0.OVGA.XTPX: failed\nTrying \\_SB.PCI0.P0P3.PEGP._OFF: failed\nTrying \\_SB.PCI0.P0P2.PEGP._OFF: failed\nTrying \\_SB.PCI0.P0P1.PEGP._OFF: failed\nTrying \\_SB.PCI0.MXR0.MXM0._OFF: failed\nTrying \\_SB.PCI0.PEG1.GFX0._OFF: failed\nTrying \\_SB.PCI0.PEG0.GFX0.DOFF: failed\nTrying \\_SB.PCI0.PEG1.GFX0.DOFF: failed\nTrying \\_SB.PCI0.PEG0.PEGP._OFF: works!\nTrying \\_SB.PCI0.XVR0.Z01I.DGOF: failed\nTrying \\_SB.PCI0.PEGR.GFX0._OFF: failed\nTrying \\_SB.PCI0.PEG.VID._OFF: failed\nTrying \\_SB.PCI0.PEG0.VID._OFF: failed\nTrying \\_SB.PCI0.P0P2.DGPU._OFF: failed\nTrying \\_SB.PCI0.P0P4.DGPU.DOFF: failed\nTrying \\_SB.PCI0.IXVE.IGPU.DGOF: failed\nTrying \\_SB.PCI0.RP00.VGA._PS3: failed\nTrying \\_SB.PCI0.RP00.VGA.P3MO: failed\nTrying \\_SB.PCI0.GFX0.DSM._T_0: failed\nTrying \\_SB.PCI0.LPC.EC.PUBS._OFF: failed\nTrying \\_SB.PCI0.P0P2.NVID._OFF: failed\nTrying \\_SB.PCI0.P0P2.VGA.PX02: failed\nTrying \\_SB_.PCI0.PEGP.DGFX._OFF: failed\nTrying \\_SB_.PCI0.VGA.PX02: failed\n```\n\nSee the \"works\"? This means the script found a bus which your GPU sits on and it has now turned off the chip. To confirm this, your battery time remaining should have increased.\n\nCurrently, the chip will turn back on with the next reboot. To get around this, load the module at boot:\n\n```\n/etc/modules-load.d/acpi_call.conf\n```\n\n```\n#Load 'acpi_call.ko' at boot.\nacpi_call\n```\n\nTo turn off the GPU at boot it is possible to use systemd-tmpfiles.\n\n```\n/etc/tmpfiles.d/acpi_call.conf\n```\n\n```\nw /proc/acpi/call - - - - \\\\_SB.PCI0.PEG0.PEGP._OFF\n```\n\nThe configuration above will be loaded at boot by systemd. What it does is write the specific OFF signal to the /proc/acpi/call file. Obviously, replace the \\_SB.PCI0.PEG0.PEGP._OFF with the one which works on your system (please note that you need to escape the backslash).\n\nOn some systems, turning off the discrete GPU before the X server is initialized may hang the system. In such cases, it may be better to disable the GPU after X server initialization, which is possible with some display managers. In LightDM, for instance, the display-setup-script seat configuration parameter could be used to execute a script as root that disables the GPU. If you use SDDM then you can add the line echo \"\\_SB.PCI0.PEG0.PEGP._OFF\" > /proc/acpi/call to either /usr/share/sddm/scripts/wayland-session or /usr/share/sddm/scripts/Xsession depending if you use Wayland or Xorg, replacing \\_SB.PCI0.PEG0.PEGP._OFF with the one which works on your system.\n\n"
+    },
+    {
+      "title": "System76",
+      "level": 3,
+      "content": "Some System76 laptops (like the Oryx Pro) have their own unique hybrid graphics option. To make use of it, install system76-powerAUR, enable system76-power.service, and run system76-power graphics hybrid.\n\n"
+    },
+    {
+      "title": "Fully power down discrete GPU",
+      "level": 4,
+      "content": "First ensure you are using integrated graphics mode by running system76-power graphics integrated and rebooting. Once in integrated mode, to power down the discrete graphics card run system76-power graphics power off. This command is not persistent and will need to be run after each boot.\n\n"
+    },
+    {
+      "title": "The startup time for certain applications is delayed by 30 seconds",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Vulkan.** This article or section is a candidate for merging with Vulkan.\n\nThis article or section is a candidate for merging with Vulkan.\n\nWhen invoked, Vulkan attempts to initialize the Installable Client Driver (ICD) specified in /usr/share/vulkan/icd.d/nvidia_icd.json. The package nvidia-utils configures this file to reference the libGLX_nvidia driver, providing Vulkan with information about the GPU driver's path. However, if the GPU is disabled, initialization of this driver will fail, causing certain applications (e.g., those based on Chromium/Electron) to undergo delayed startup until a 30-second timeout is reached. To prevent Vulkan from attempting to load the driver in the first place and thus mitigate this timeout, you can override the location of the ICD JSON file using the VK_DRIVER_FILES environment variable. To unset it, use:\n\n```\n$ export VK_DRIVER_FILES=\n```\n\n"
+    },
+    {
+      "title": "High power draw even after disabling NVIDIA discrete GPU",
+      "level": 3,
+      "content": "If after disabling the dedicated GPU bus #Using acpi_call the power draw is still high, check if the nouveau kernel module is loaded with lsmod. If it is not then make sure it is installed, that any entries in .conf files that blacklist Nouveau in /etc/modprobe.d/ are removed and that the Nouveau kernel module is automatically loaded at boot. After rebooting the power draw should be lower.\n\n"
+    }
+  ]
+}

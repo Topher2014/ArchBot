@@ -1,0 +1,41 @@
+{
+  "title": "Ext3",
+  "url": "https://wiki.archlinux.org/title/Ext3",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- File systems\n- Ext4\n\nThe ext3 filesystem used to be a great choice back when it was added in 2001 due to its introduction of journaling. However, ext4 should be used instead unless it is required by e.g legacy software. See Wikipedia:Ext3#ext4 for improvements of ext4 over ext3.\n\n"
+    },
+    {
+      "title": "Using tune2fs and e2fsck",
+      "level": 2,
+      "content": "Before we begin, we need to make sure you are comfortable with using the tune2fs utility to alter the filesystem options of an ext2 or ext3 partition (or convert ext2 to ext3). Please read tune2fs(8).\n\nIt is generally a good idea to run a filesystem check using the e2fsck utility after you have completed the alterations you wish to make on your filesystem. This will verify that your filesystem is clean and fix it if needed. You should also read the manual page for the e2fsck utility if you have not yet done so.\n\nNote: **Only run unmounted!** \n\n"
+    },
+    {
+      "title": "Using directory indexing",
+      "level": 2,
+      "content": "This feature improves file access in large directories or directories containing many files by using hashed binary trees to store the directory information. It is perfectly safe to use, and it provides a fairly substantial improvement in most cases; so it is a good idea to enable it:\n\n```\n# tune2fs -O dir_index /dev/sdXY\n```\n\nThis will only take effect with directories created on that filesystem after tune2fs is run. In order to apply this to currently existing directories, we must run the e2fsck utility to optimize and reindex the directories on the filesystem:\n\n```\n# e2fsck -D -f /dev/sdXY\n```\n\n- This should work with ext2, ext3 and ext4 filesystems. Depending on the size of your filesystem, this could take a long time.\n- Directory indexing is activated by default in Arch Linux via /etc/mke2fs.conf.\n\n"
+    },
+    {
+      "title": "Enable full journaling",
+      "level": 2,
+      "content": "By default, ext3 partitions mount with the 'ordered' data mode. In this mode, all data is written to the main filesystem and its metadata is committed to the journal, whose blocks are logically grouped into transactions to decrease disk I/O. This tends to be a good default for most people. However, I have found a method that increases both reliability and performance (in some situations): journaling everything, including the file data itself (known as 'journal' data mode). Normally, one would think that journaling all data would decrease performance, because the data is written to disk twice: once to the journal then later committed to the main filesystem, but this does not seem to be the case. I have enabled it on all nine of my partitions and have only seen a minor performance loss in deleting large files. In fact, doing this can actually improve performance on a filesystem where much reading and writing is to be done simultaneously. See this article written by Daniel Robbins on IBM's website for more information.\n\nThere are two different ways to activate journal data mode. The first is by adding data=journal as a mount option in /etc/fstab. If you do it this way and want your root filesystem to also use it, you should also pass rootflags=data=journal as a kernel parameter in your boot loader configuration. In the second method, you will use tune2fs to modify the default mount options in the file system superblock:\n\n```\n# tune2fs -O has_journal -o journal_data /dev/sdXY\n```\n\nPlease note that the second method may not work for older kernels. Especially Linux 2.4.20 and below will likely disregard the default mount options on the superblock. If you are feeling adventurous you may also want to tweak the journal size. (I have left the journal size at the default.) A larger journal may give you better performance (at the cost of more disk space and longer recovery times). Please be sure to read the relevant section of the tune2fs manual before doing so:\n\n```\n# tune2fs -J size=$SIZE /dev/sdXY\n```\n\n"
+    },
+    {
+      "title": "Disable lengthy boot time checks",
+      "level": 2,
+      "content": "Note: **at your own risk** \n\nIt seems that our ext3 filesystems are still being checked every 30 mounts or so. This is a good default for many because it helps prevent filesystem corruption when you have hardware issues, such as bad IDE/SATA/SCSI cabling, power supply failures, etc. One of the driving forces for creating journaling filesystems was that the filesystem could easily be returned to a consistent state by recovering and replaying the needed journaled transactions. Therefore, we can safely disable these mount-count and time-dependent checks if we are certain the filesystem will be quickly checked to recover the journal if needed to restore filesystem and data consistency. Before you do this please make sure your filesystem entry in /etc/fstab has a positive integer in its 6th field (pass) so that it is checked at boot time automatically. You may do so using the following command:\n\n```\n# tune2fs -c 0 -i 0 /dev/sdXY\n```\n\nIf you just want to limit the checks to happen less often without totally disabling them (for peace of mind). A great method is to change from a number of count's check to a time frame check. See tune2fs(8). Here is once every month:\n\n```\n# tune2fs -c 0 -i 1m /dev/sdXY\n```\n\n"
+    },
+    {
+      "title": "Reclaim reserved filesystem space",
+      "level": 2,
+      "content": "Ext3 partition contain a used space of 5% for special reasons by default. The main reason is to help with less fragmentation on the filesystem. The other reason for such space is so root can log in even when the filesystem becomes 100% used. Without this option, the root user might not be able to log in to \"clean up\" because the system could become unstable, trying to write logs to a 100% full system for example.\n\nThe issue with this is that hard drives are getting so big the 5% can add up to be quite a large amount of wasted space. (eg. 100 GB = 5 GB reserved). Now if you separate your filesystems to like /home for example it might be a good idea to adjust these and reclaim that wasted space on long-term archive partitions (see this email for more info). It is a safe bet to leave your / filesystem at 5% reserved just in case. Leave reserved space for filesystems containing /var and /tmp also or else you will end up with problems.\n\nNow to change your reserved space to 1% of the drive, which is fair for non-root filesystems.\n\n```\n# tune2fs -m 1 /dev/sdXY\n```\n\n"
+    },
+    {
+      "title": "Assigning a label",
+      "level": 2,
+      "content": "Once you have created and formated a partition, you can assign it a label using the e2label command. This allows you to add the partition to /etc/fstab using a label instead of using a device path (useful for an USB drive). To add a label to a partition, type the following command as root:\n\n```\n# e2label /dev/sdXY new-label\n```\n\nIf the optional argument new-label is not present, e2label will simply display the current filesystem label. If the optional argument new-label is present, then e2label will set the filesystem label to be new-labelq. Ext2 and ext3 filesystem labels can be at most 16 characters long; if new-label is longer than 16 characters, e2label will truncate it and print a warning message.\n\n"
+    }
+  ]
+}

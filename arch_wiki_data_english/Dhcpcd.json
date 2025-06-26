@@ -1,0 +1,111 @@
+{
+  "title": "Dhcpcd",
+  "url": "https://wiki.archlinux.org/title/Dhcpcd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Network configuration\n- Wireless network configuration\n- dhcpd\n\ndhcpcd is a DHCP and DHCPv6 client. It is currently the most feature-rich open source DHCP client; see the home page for the full list of features.\n\nNote: **client** \n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the dhcpcd package.\n\ndhcpcd-uiAUR is a GTK frontend for the dhcpcd daemon, and optionally wpa_supplicant. It features a configuration dialogue and the ability to enter a pass phrase for wireless networks.\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "To start the daemon for all network interfaces, start/enable dhcpcd.service.\n\nTo start the daemon for a specific interface alone, start/enable the template unit dhcpcd@interface.service, where interface can be found with Network configuration#Listing network interfaces.\n\nUsing the template unit is recommended; see #dhcpcd and systemd network interfaces for details. In either case, you will be assigned a dynamic IP address. To assign a static IP address, see #Static profile.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The main configuration is done in /etc/dhcpcd.conf. See dhcpcd.conf(5) for details. Some of the frequently used options are highlighted below.\n\n"
+    },
+    {
+      "title": "DHCP static route(s)",
+      "level": 3,
+      "content": "If you need to add a static route client-side, add it to /etc/dhcpcd.exit-hook. The example shows a new hook-script which adds a static route to a VPN subnet on 10.11.12.0/24 via a gateway machine at 192.168.192.5:\n\n```\n/etc/dhcpcd.exit-hook\n```\n\n```\nip route add 10.11.12.0/24 via 192.168.192.5\n```\n\nYou can add multiple routes to this file.\n\n"
+    },
+    {
+      "title": "DHCP Client Identifier",
+      "level": 3,
+      "content": "The DHCP client may be uniquely identified in different ways by the server:\n\n1. hostname (or the hostname value sent by the client),\n1. MAC address of the network interface controller through which the connection is being made, linked to this is the third,\n1. Identity Association ID (IAID), which is an abstraction layer to differentiate different use-cases and/or interfaces on a single host,\n1. DHCP Unique Identifier (DUID).\n\nFor a further description, see RFC 3315.\n\nIt depends on the DHCP-server configuration which options are optional or required to request a DHCP IP lease.\n\nIf the dhcpcd default configuration fails to obtain an IP, the following options are available to use in dhcpcd.conf:\n\n- hostname sends the hostname set in /etc/hostname\n- clientid sends the MAC address as identifier\n- iaid <interface> derives the IAID to use for DHCP discovery. It has to be used in an interface block (started by interface <interface>, see [1]), but more frequently the next option is used:\n- duid triggers using a combination of DUID and IAID as identifier.\n\nThe DUID value is set in /var/lib/dhcpcd/duid. For efficient DHCP lease operation it is important that it is unique for the system and applies to all network interfaces alike, while the IAID represents an identifier for each of the systems' interfaces (see RFC 4361).\n\nCare must be taken on a network running Dynamic DNS to ensure that all three IDs are unique. If duplicate DUID values are presented to the DNS server, e.g. in the case where a virtual machine has been cloned and the hostname and MAC have been made unique but the DUID has not been changed, then the result will be that as each client with the duplicated DUID requests a lease the server will remove the predecessor from the DNS record.\n\n"
+    },
+    {
+      "title": "Static profile",
+      "level": 3,
+      "content": "Required settings are explained in Network configuration. These typically include the network interface name, IP address, router address, and name server.\n\nConfigure a static profile for dhcpcd in /etc/dhcpcd.conf, for example:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\ninterface eth0\nstatic ip_address=192.168.0.10/24\t\nstatic routers=192.168.0.1\nstatic domain_name_servers=192.168.0.1 8.8.8.8\n```\n\nMore complicated configurations are possible, for example combining with the arping option. See dhcpcd.conf(5) for details.\n\n"
+    },
+    {
+      "title": "Fallback profile",
+      "level": 4,
+      "content": "It is possible to configure a static profile within dhcpcd and fall back to it when DHCP lease fails. This is useful particularly for headless machines, where the static profile can be used as \"recovery\" profile to ensure that it is always possible to connect to the machine.\n\nThe following example configures a static_eth0 profile with 192.168.1.23 as IP address, 192.168.1.1 as gateway and name server, and makes this profile fallback for interface eth0.\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# define static profile\nprofile static_eth0\nstatic ip_address=192.168.1.23/24\nstatic routers=192.168.1.1\nstatic domain_name_servers=192.168.1.1\n\n# fallback to static profile on eth0\ninterface eth0\nfallback static_eth0\n```\n\n"
+    },
+    {
+      "title": "Hooks",
+      "level": 2,
+      "content": "dhcpcd executes all scripts found in /usr/lib/dhcpcd/dhcpcd-hooks/ in a lexical order. See dhcpcd.conf(5) and dhcpcd-run-hooks(8) for details.\n\nNote: **all** \n\n- Each script can be disabled using the nohook option in dhcpcd.conf.\n- The env option can be used to set an environment variable for all hooks. For example, you can force the hostname hook to always set the hostname with env force_hostname=YES.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "10-wpa_supplicant",
+      "level": 3,
+      "content": "Enable this hook by creating a symbolic link, which ensures the current version is used, even after package updates:\n\n```\n# ln -s /usr/share/dhcpcd/hooks/10-wpa_supplicant /usr/lib/dhcpcd/dhcpcd-hooks/\n```\n\nThe 10-wpa_supplicant hook, if enabled, automatically launches wpa_supplicant on wireless interfaces. It is started only if:\n\n- no wpa_supplicant process is already listening on that interface.\n- a wpa_supplicant configuration file exists. dhcpcd checks\n\n```\n/etc/wpa_supplicant/wpa_supplicant-interface.conf\n/etc/wpa_supplicant/wpa_supplicant.conf\n/etc/wpa_supplicant-interface.conf\n/etc/wpa_supplicant.conf\n```\n\nby default, in that order, but a custom path can be set by adding env wpa_supplicant_conf=configuration_file_path into /etc/dhcpcd.conf.\n\nIf you manage wireless connections with wpa_supplicant itself, the hook may create unwanted connection events. For example, if you stop wpa_supplicant the hook may bring the interface up again. Also, if you use netctl-auto, wpa_supplicant is started automatically with /run/network/wpa_supplicant_interface.conf for config, so starting it again from the hook is unnecessary and may result in boot-time parse errors of the /etc/wpa_supplicant/wpa_supplicant.conf file, which only contains dummy values in the default packaged version.\n\nTo disable the hook remove the symbolic link you added, or add nohook wpa_supplicant to dhcpcd.conf.\n\n"
+    },
+    {
+      "title": "Speed up DHCP by disabling ARP probing",
+      "level": 3,
+      "content": "dhcpcd contains an implementation of a recommendation of the DHCP standard (RFC 2131) to verify via ARP if the assigned IP is not used by something else. This is usually not needed in home networks, so it is possible to save about 5 seconds on every connect by disabling it:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\nnoarp\n```\n\nThis is equivalent to passing --noarp to dhcpcd, and disables the described ARP probing, speeding up connections to networks with DHCP.\n\n"
+    },
+    {
+      "title": "Remove old DHCP lease",
+      "level": 3,
+      "content": "The file /var/lib/dhcpcd/interface.lease, where interface is the name of the interface on which you have a lease, contains the actual DHCP lease reply sent by the DHCP server. For a wireless interface, the filename is /var/lib/dhcpcd/interface-ssid.lease, where ssid is the name of the wireless network. It is used to determine the last lease from the server, and its mtime attribute is used to determine when it was issued. This last lease information is then used to request the same IP address previously held on a network, if it is available. If you do not want that, simply delete this file.\n\nIf the DHCP server still assigns the same IP address, this may happen because it is configured to keep the assignment stable and recognizes the requesting DHCP client id or DUID (see #DHCP Client Identifier). You can test it by stopping dhcpcd and removing or renaming /var/lib/dhcpcd/duid. dhcpcd will generate a new one on next run.\n\nKeep in mind that the DUID is intended as persistent machine identifier across reboots and interfaces. If you are transferring the system to new computer, preserving this file should make it appear as old one.\n\n"
+    },
+    {
+      "title": "Different IPs when multi-booting",
+      "level": 3,
+      "content": "If you are dualbooting Arch and macOS or Windows and want each to receive different IP addresses, you can exert control about the IPs leased by specifying a different DUID in each operating system installation.\n\nIn Windows the DUID should be stored in the\n\n```\n\\HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters\\Dhcpv6DUID\n```\n\nregistry key.\n\nOn macOS it is directly accessible in Network\\adapter\\dhcp preferences panel.\n\nIf you are using a dnsmasq DHCP server, the different DUIDs can be used in appropriate dhcp-host= rules in its configuration.\n\n"
+    },
+    {
+      "title": "/etc/resolv.conf",
+      "level": 3,
+      "content": "If resolvconf is available, DNS information will be sent to it; otherwise, dhcpcd itself will write to /etc/resolv.conf.\n\n/etc/resolv.conf overwriting can be stopped by disabling the hook /usr/lib/dhcpcd/dhcpcd-hooks/20-resolv.conf. Do so by adding the following to the last section of /etc/dhcpcd.conf:\n\n```\nnohook resolv.conf\n```\n\nNote that disabling this hook also disables dhcpcd's use of resolvconf in general.\n\nAlternatively, you can create a file called /etc/resolv.conf.head containing your DNS servers. dhcpcd will prepend this file to the beginning of /etc/resolv.conf.\n\nOr you can configure dhcpcd to use the same DNS servers every time. To do this, add the following line at the end of your /etc/dhcpcd.conf, where dns-server-ip-addressses is a space separated list of DNS IP addresses.\n\n```\nstatic domain_name_servers=dns-server-ip-addresses\n```\n\nFor example, to set it to Google's DNS servers:\n\n```\nstatic domain_name_servers=8.8.8.8 8.8.4.4\n```\n\n"
+    },
+    {
+      "title": "Client ID",
+      "level": 3,
+      "content": "If you are on a network with DHCPv4 that filters Client IDs based on MAC addresses, you may need to change the following line:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# Use the same DUID + IAID as set in DHCPv6 for DHCPv4 Client ID as per RFC4361. \nduid\n```\n\nTo:\n\n```\n/etc/dhcpcd.conf\n```\n\n```\n# Use the hardware address of the interface for the Client ID (DHCPv4).\nclientid\n```\n\nElse, you may not obtain a lease since the DHCP server may not read your DHCPv6-style Client ID correctly. See RFC 4361 for more information.\n\n"
+    },
+    {
+      "title": "Check DHCP problem by releasing IP first",
+      "level": 3,
+      "content": "A problem may occur when DHCP gets a wrong IP assignment, such as when two routers are tied together through a VPN. The router that is connected through the VPN may be assigning IP address. To fix it, as root, release the IP address:\n\n```\n# dhcpcd -k\n```\n\nThen request a new one:\n\n```\n# dhcpcd\n```\n\nYou may have to run those two commands many times.\n\n"
+    },
+    {
+      "title": "Problems with noncompliant routers",
+      "level": 3,
+      "content": "For some (noncompliant) routers, you will not be able to connect properly unless you comment the line\n\n```\nrequire dhcp_server_identifier\n```\n\nin /etc/dhcpcd.conf. This should not cause issues unless you have multiple DHCP servers on your network (not typical); see this page for more information.\n\n"
+    },
+    {
+      "title": "dhcpcd and systemd network interfaces",
+      "level": 3,
+      "content": "dhcpcd.service can be enabled without specifying an interface. This may, however, create a race condition at boot with systemd-udevd trying to apply a predictable network interface name:\n\n```\nerror changing net interface name wlan0 to wlp4s0: Device or resource busy\"\n```\n\nTo avoid this problem use denyinterfaces or allowinterfaces in dhcpcd.conf(5) to stop dhcpcd from binding to kernel names, for example:\n\n```\ndenyinterfaces wlan* eth*\n```\n\nIt is also possible to enable dhcpcd on a per interface basis as described in #Running. The downside of the template unit is, however, that it does not support hot-plugging of a wired connection and will fail if the network cable is not connected. To work-around the failure, see #Timeout delay.\n\n"
+    },
+    {
+      "title": "Timeout delay",
+      "level": 3,
+      "content": "If dhcpcd operates on a single interface and fails to obtain a lease after 30 seconds (for example when the server is not ready or the cable not plugged), it will exit with an error.\n\nTo have dhcpcd wait indefinitely for one-time, edit the unit and set the timeout option to 0:\n\n```\n/etc/systemd/system/dhcpcd@.service.d/timeout.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/dhcpcd -w -q -t 0 %I\n```\n\nTo have it wait indefinitely, let the unit restart after it exited:\n\n```\n/etc/systemd/system/dhcpcd@.service.d/dhcpcdrestart.conf\n```\n\n```\n[Service]\nRestart=always\n```\n\n"
+    },
+    {
+      "title": "dhcpcd@.service causes slow startup",
+      "level": 3,
+      "content": "By default the dhcpcd@.service waits to get an IP address before forking into the background via the -w flag for dhcpcd. If the unit is enabled, this may cause the boot to wait for an IP address before continuing. To fix this, create a drop-in file for the unit with the following:\n\n```\n/etc/systemd/system/dhcpcd@.service.d/no-wait.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/dhcpcd -b -q %I\n```\n\nSee also FS#49685.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- dhcpcd(8)\n- dhcpcd.conf(5)\n\n"
+    }
+  ]
+}

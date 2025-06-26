@@ -1,0 +1,86 @@
+{
+  "title": "Incus",
+  "url": "https://wiki.archlinux.org/title/Incus",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Linux Containers\n- LXD\n\nIncus is a manager/hypervisor for containers (via LXC) and virtual-machines (via QEMU).\n\nIt is a fork of LXD by the original maintainers. Documentation from the LXD wiki page is still largely relevant and encouraged reading.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the incus package, then enable the incus.socket.\n\nAlternatively, you can enable/start the incus.service directly, in case you want instances to autostart for example.\n\nTo delegate container creation to users, enable/start the incus-user.socket unit. See #Accessing Incus as an unprivileged user for group delegation.\n\n"
+    },
+    {
+      "title": "Migrating from LXD",
+      "level": 3,
+      "content": "If you wish to migrate from an existing LXD installation, you should do so at this point, as the migration tool will only run against an empty target Incus server.\n\nAfter verifying that both the lxc info and incus info commands are running correctly, read the upstream documentation about the process, and afterwards run the migration tool:\n\n```\n# lxd-to-incus\n```\n\n"
+    },
+    {
+      "title": "Unprivileged containers",
+      "level": 3,
+      "content": "Incus launches unprivileged containers by default (see Linux Containers#Privileged or unprivileged containers for an explanation of the difference).\n\nFor this to work, you need to setup an appropriate range of sub{u,g}ids for the root user[1]: unlike e.g. podman, Incus uses a daemon that needs to run as root.[2]\n\nVerify the content of both /etc/subuid and /etc/subgid, and if needed add a contiguous range of at least 10M UID/GID for the root user:\n\n```\n# usermod -v 1000000-1000999999 -w 1000000-1000999999 root\n```\n\nThen restart incus.\n\nFor the alternative, see LXD#Privileged containers.\n\n"
+    },
+    {
+      "title": "Accessing Incus as an unprivileged user",
+      "level": 3,
+      "content": "From the official documentation:\n\n\"Access to Incus is controlled through two groups:\n\n- incus allows basic user access, no configuration and all actions restricted to a per-user project.\n- incus-admin allows full control over Incus.\"\n\nTo have a normal user capable of launching and operating instances, add the user to the incus group.\n\nTo give a normal user full control over Incus without having to use sudo, add the user to incus-admin (not recommended).\n\n"
+    },
+    {
+      "title": "Initialize Incus config",
+      "level": 3,
+      "content": "Before it can be used, Incus' config needs to be initialized:\n\n```\n$ incus admin init\n```\n\nFrom the official documentation:\n\nThis will start an interactive configuration guide in the terminal, that covers different topics like storages, networks etc. You can find an overview in the official Getting Started Guide.\n\n"
+    },
+    {
+      "title": "Adding a Web-UI",
+      "level": 3,
+      "content": "The lxd-ui browser frontend has been patched to fit Incus. These patches are found in the debian package source. [5]\n\nTo make use of this UI install the incus-ui package.\n\nThen set the address and port for the webserver:\n\n```\n$ incus config set core.https_address=127.0.0.1:8443\n```\n\nAnd restart Incus.\n\nAnother available option is to run the web server with the following command:\n\n```\n$ incus webui\n```\n\nFor this option, see incus webui\n\n"
+    },
+    {
+      "title": "Overview of commands",
+      "level": 3,
+      "content": "You can get an overview of all available commands by typing:\n\n```\n$ incus\n```\n\n"
+    },
+    {
+      "title": "Create a container",
+      "level": 3,
+      "content": "Container are based on images, that are downloaded from image servers or remote LXD servers.\n\nYou can see the list of already added servers with:\n\n```\n$ incus remote list\n```\n\nYou can list all images on a server with incus image list <server-name>:, for example:\n\n```\n$ incus image list images:\n```\n\nThis will show you all images on one of the default servers: images.linuxcontainers.org\n\nYou can also search for images by adding terms like the distribution name:\n\n```\n$ incus image list images:debian\n```\n\nLaunch a container with an image from a specific server with:\n\n```\n$ incus launch servername:imagename\n```\n\nFor example to create a randomly named container instance from the Ubuntu Noble image from the default server:\n\n```\n$ incus launch images:ubuntu/noble\n```\n\nTo specify a name for the instance simply add it afterwards, e.g.:\n\n```\n$ incus launch images:archlinux/current/amd64 arch\n```\n\nwill create an amd64 Arch container named arch.\n\n"
+    },
+    {
+      "title": "Access the containers by name on the host",
+      "level": 3,
+      "content": "This assumes that you are using the default bridge that it is named incusbr0 and that you are using systemd-resolved.\n\n```\n# systemd-resolve --interface incusbr0 --set-domain '~incus' --set-dns $(incus network get incusbr0 ipv4.address | cut -d / -f 1)\n```\n\nYou can now access the containers by name:\n\n```\n$ ping containername.incus\n```\n\nTo make this change permanent, edit the incus.service systemd unit to include an ExecStartPost directive, which runs the command after launch:\n\n```\n# systemctl edit incus.service\n```\n\n```\n...\n\n[Service]\nExecStartPost=/bin/sh -c 'systemd-resolve --interface incusbr0 --set-domain \"~incus\" --set-dns $(incus network get incusbr0 ipv4.address | cut -d / -f 1)'\n\n...\n```\n\n"
+    },
+    {
+      "title": "Starting a virtual machine fails",
+      "level": 3,
+      "content": "If you see the error:\n\n```\nError: Couldn't find one of the required UEFI firmware files: [{code:OVMF_CODE.4MB.fd vars:OVMF_VARS.4MB.ms.fd} {code:OVMF_CODE.2MB.fd vars:OVMF_VARS.2MB.ms.fd} {code:OVMF_CODE.fd vars:OVMF_VARS.ms.fd} {code:OVMF_CODE.fd vars:qemu.nvram}]\n```\n\nIt's because Arch Linux does not distribute secure boot signed ovmf firmware. To boot virtual machines, you need to disable secure boot for the time being:\n\n```\n$ incus launch ubuntu:18.04 test-vm --vm -c security.secureboot=false\n```\n\nThis can also be added to the default profile by doing:\n\n```\n$ incus profile set default security.secureboot=false\n```\n\n"
+    },
+    {
+      "title": "Incus does not respect Shell's environment proxy variables",
+      "level": 3,
+      "content": "Examples are incus launch or incus image commands not using value of *_proxy/*_PROXY variables when downloading images.\n\nIncus implements a server-client paradigm. It simply means that operations are done by incusd acting as the Incus server — usually running in the background, unless invoked from an interactive shell. And incus commandline interface is used to communicate with Incus server acting as the Incus client.\n\nThat makes incusd, typically started as a service, not inheriting shell's environment variables of the client. But respecting variables of the environment that it's invoked from, instead.[6] In Arch Linux, Incus server is started by systemd.\n\nThere can be many workarounds to this difficulty, following exist some examples. See Incus's issue#574 for more information.\n\n"
+    },
+    {
+      "title": "Temporary",
+      "level": 4,
+      "content": "First, export *_PROXY variables:\n\n```\n$ export ALL_PROXY=\"socks://proxy_server_address:port/\"\n```\n\nImport them to systemd's environment:\n\n```\n# systemctl import-environment ALL_PROXY\n```\n\nRe/start incus.service unit.\n\n"
+    },
+    {
+      "title": "Persistent",
+      "level": 4,
+      "content": "If you want Incus daemon to always start with some static environment variables, like *_proxy, you can use Environment directive of systemd. systemctl set-property command cannot manipulate Environment directive. Edit incus.service and add Environment key with appropriate variable=value pair. For example:\n\n```\n# systemctl edit incus.service\n```\n\n```\n...\n\n[Service]\nEnvironment=ALL_PROXY=\"socks://proxy_server_address:port/\"\n\n...\n```\n\nOne can make Incus server use a desired proxy with configuring Incus's server with core.proxy options. For instance:\n\n```\n# incus config set core.proxy_http \"proxy_address:proxy_port\"\n```\n\n"
+    },
+    {
+      "title": "Uninstall",
+      "level": 2,
+      "content": "Stop and disable the services. Then uninstall the incus package.\n\nIf you want to remove all data:\n\n```\n# rm -r /var/lib/incus\n```\n\nIf you used any of the example networking configuration, you should remove those as well.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The official Incus homepage\n- Official documentation\n- Getting Started Guide\n- Official Forum\n- The Incus GitHub repository\n\n"
+    }
+  ]
+}

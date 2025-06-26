@@ -1,0 +1,66 @@
+{
+  "title": "Haproxy",
+  "url": "https://wiki.archlinux.org/title/Haproxy",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites and powers quite a number of the world's most visited ones. Over the years it has become the de-facto standard opensource load balancer, is now shipped with most mainstream Linux distributions, and is often deployed by default in cloud platforms.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the haproxy package.\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "Enable haproxy.service. HAProxy's configuration can be reloaded live by reloading haproxy.service as root.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "An example configuration is available in /etc/haproxy/haproxy.cfg. Edit it to suit your needs, and then start haproxy.service.\n\n"
+    },
+    {
+      "title": "ACLs",
+      "level": 4,
+      "content": "HAProxy supports ACLs, which can be used to test conditions and perform a given action based on the results of those tests. A typical ACL would be written as follows:\n\n```\n/etc/haproxy/haproxy.cfg\n```\n\n```\nacl photo_page path_beg /photos\n```\n\nIn this case, the ACL is matched if the user's request path begins with /photos.\n\n"
+    },
+    {
+      "title": "Backends",
+      "level": 4,
+      "content": "In HAProxy terminology, backends are a server or set of servers that will receive forwarded requests. Backends can balance load based on several load balancing algorithms, including:\n\n- Round-robin\n- Static round-robin (also known as weighted round-robin)\n- Least connections\n\nAn example backend may be written as follows:\n\n```\n/etc/haproxy/haproxy.cfg\n```\n\n```\nbackend http-in\n   balance roundrobin\n   server s1 web1.example.com:80 check\n   server s2 web2.example.com:80 check\n```\n\n"
+    },
+    {
+      "title": "Frontends",
+      "level": 4,
+      "content": "Frontends are used to define how requests should be forwarded to backends. They consist of the following:\n\n- IP addresses and ports\n- ACLs\n- use_backend rules\n\n"
+    },
+    {
+      "title": "Health checks",
+      "level": 4,
+      "content": "When a backend is declared with the check option, HAProxy will check on startup and on scheduled intervals if the backend is available to process forwarded requests. If a backend fails the health check, it will be removed from rotation until it is deemed to be healthy again, i.e. it passes the health check.\n\nBy default, HAProxy will attempt to establish a TCP connection to the backend to determine healthiness.\n\nIf a large number of backends are declared with the check option, HAProxy will query all of them on startup, which may delay startup time.\n\n"
+    },
+    {
+      "title": "Logging with systemd",
+      "level": 4,
+      "content": "To configure HAproxy to use systemd /dev/log compatibility socket add the following to your configuration file under the global section.\n\n```\nlog /dev/log local0 info\n```\n\nIf you use the chroot option in your global configuration, you need to bind the socket into the chroot.\n\nFor this we will use a systemd.mount(5) unit. Generate the unit name with:\n\n```\n# systemd-escape --suffix=mount --path /var/lib/haproxy/dev/log\n```\n\nWe want mount /dev/log into the chroot, but just after journald came up. Create a replacement unit file:\n\n```\n/etc/systemd/system/var-lib-haproxy-dev-log.mount\n```\n\n```\n[Unit]\nRequires=systemd-journald.service\nDescription=/Expose Systemd Log for HAProxy\n\n[Mount]\nWhat=/dev/log\nWhere=/var/lib/haproxy/dev/log\nType=none\nOptions=bind\n```\n\nWith the mount file created it is time to expand the original service unit so it mounts up everything correctly. Use a drop-in file for haproxy.service and add:\n\n```\n/etc/systemd/system/haproxy.service.d/override.conf\n```\n\n```\n[Unit]\nRequires=var-lib-haproxy-dev-log.mount\n```\n\n"
+    },
+    {
+      "title": "Performing TLS/SSL termination",
+      "level": 4,
+      "content": "In order to use haproxy as a TLS terminator you have to set inside your frontend section\n\n```\nbind :80\nbind :443 ssl crt /path/to/combined/cert\n```\n\nSet in your frontend section\n\n```\nredirect scheme https code 301 if !{ ssl_fc }\n```\n\n"
+    },
+    {
+      "title": "Virtual host like configuration",
+      "level": 4,
+      "content": "Suppose you have two backends: foo and bar and each should handle requests only for a specific domain. In order to perform this in your frontend section you can configure\n\n```\nuse_backend foo-backend if { hdr(host) -i foo.example.com || hdr(host) -i www.foo.example.com }\nuse_backend bar-backend if { hdr(host) -i bar.example.com || hdr(host) -i www.bar.example.com }\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The official HAProxy website\n- Configuration guide\n\n"
+    }
+  ]
+}

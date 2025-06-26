@@ -1,0 +1,46 @@
+{
+  "title": "Clover",
+  "url": "https://wiki.archlinux.org/title/Clover",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Arch boot process\n- Unified Extensible Firmware Interface\n- EFI boot stub\n\nClover EFI is a boot loader developed to boot macOS (Hackintoshes), Windows and Linux in legacy or UEFI mode.\n\nThe main advantages of Clover are:\n\n- Emulate UEFI on legacy BIOS systems\n- Boot Linux kernels with EFI boot stub support\n- Supports native resolution GUI on wide screens people commonly use today\n- Easy to use\n- Easily customizable\n\n"
+    },
+    {
+      "title": "Supported file systems",
+      "level": 2,
+      "content": "Clover inherits the support for the file systems from the firmware (i.e. at least FAT12, FAT16 and FAT32). Additionally it loads any UEFI drivers placed in the drivers subdirectory of its own installation directory on the ESP (i.e. esp/EFI/clover/drivers/)[1].\n\nClover also ships with multiple EFI file system drivers.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "As Clover emulates a UEFI environment on BIOS systems, the steps for each type of system are similar.\n\n"
+    },
+    {
+      "title": "UEFI Systems",
+      "level": 3,
+      "content": "Mount EFI system partition to /boot. This is the preferred method when directly booting an EFI boot stub kernel from UEFI.\n\nGenerate initial ramdisk environment with mkinitcpio\n\nDownload Clover Bootable ISO from here.\n\nExtract the archive Clover-*-X64.iso.7z and find the Clover-*-X64.iso file, mount it to a directory like /mnt/iso. It should be noted all file/folder names will be displayed in lower case in Linux, which is different from Windows and Mac OS.\n\nCopy the whole /mnt/iso/efi folder to your EFI system partition. The tree for /boot should look likes the following\n\n```\n/boot/EFI\n/boot/EFI/BOOT\n/boot/EFI/CLOVER\n/boot/initramfs-linux-fallback.img\n/boot/initramfs-linux.img\n/boot/vmlinuz-linux\n```\n\n"
+    },
+    {
+      "title": "BIOS Systems",
+      "level": 3,
+      "content": "Download the Clover Bootable ISO.\n\nExtract the archive Clover-*-X64.iso.7z and find the Clover-*-X64.iso file, mount it to directory like /mnt/iso.\n\nThe Clover code must be merged now with current Master and Partition Boot Records. Example with block device /dev/sda and ESP on 1st partition /dev/sda1, change if necessary:\n\n```\n# dd if=/dev/sda1 of=/tmp/original_PBR bs=512 count=1 conv=notrunc\n# cp /mnt/iso/usr/standalone/i386/boot1f32 /tmp/new_PBR\n# dd if=/tmp/original_PBR of=/tmp/new_PBR skip=3 seek=3 bs=1 count=87 conv=notrunc\n# dd if=/tmp/new_PBR of=/dev/sda1 bs=512 count=1 conv=notrunc\n# dd if=/mnt/iso/usr/standalone/i386/boot0ss of=/dev/sda bs=440 count=1 conv=notrunc\n```\n\nMount the EFI system partition to /boot.\n\nCopy the whole /mnt/iso/efi folder to your EFI system partition.\n\nCopy the legacy boot loader to the EFI system partition:\n\n```\n# cp /mnt/iso/usr/standalone/i386/x64/boot6 /boot/boot\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Configuration is done through an XML file config.plist under path EFI/CLOVER from the EFI system partition.\n\nA tool is now available to easily edit your config.plist in any OS: Cloud Clover Editor (CCE)[dead link 2024-10-12 ⓘ]\n\nFor the meaning of each key, please reference their wiki for custom entries. The key Volume should be the PARTUUID of the EFI system partition and must be in uppercase. The minimal initramfs initramfs-linux.img in Argumentsand the Linux kernel executable vmlinuz-linux in Path are relative to the EFI system partition. Backslashes should be used in accordance with EFI standards. For other arguments in Arguments, please reference EFI boot stub and Kernel parameters#Parameter list.\n\nIn this example, the initramfs and kernel files are placed at the root of the EFI system partition, at the same level as the efi directory. The EFI system partition is mounted at /boot\n\n```\n/boot/EFI/CLOVER/config.plist\n```\n\n```\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"https://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>GUI</key>\n  <dict>\n    <key>Custom</key>\n    <dict>\n      <key>Entries</key>\n      <array>\n        <dict>\n          <key>Arguments</key>\n          <string>initrd=\\initramfs-linux.img root=PARTUUID=d5d0fceb-c58e-c745-a7ff-f2f1b2824e66 rw add_efi_memmap</string>\n          <key>Path</key>\n          <string>\\vmlinuz-linux</string>\n          <key>Title</key>\n          <string>Arch Linux</string>\n          <key>Type</key>\n          <string>Linux</string>\n          <key>Volume</key>\n          <string>33BA6C23-4772-294D-9053-72A49FCAEF39</string>\n          <key>VolumeType</key>\n          <string>Internal</string>\n        </dict>\n        <dict>\n          <key>Arguments</key>\n          <string>initrd=\\initramfs-linux-fallback.img root=PARTUUID=d5d0fceb-c58e-c745-a7ff-f2f1b2824e66 rw debug add_efi_memmap</string>\n          <key>Path</key>\n          <string>\\vmlinuz-linux</string>\n          <key>Title</key>\n          <string>Arch Linux Rescue Mode</string>\n          <key>Type</key>\n          <string>Linux</string>\n          <key>Volume</key>\n          <string>33BA6C23-4772-294D-9053-72A49FCAEF39</string>\n          <key>VolumeType</key>\n          <string>Internal</string>\n        </dict>\n      </array>\n    </dict>\n  </dict>\n</dict>\n</plist>\n```\n\n"
+    },
+    {
+      "title": "chainload systemd-boot",
+      "level": 3,
+      "content": "If you need a boot loader for BIOS systems that follows The Boot Loader Specification, then systemd-boot can be pressed into service on BIOS systems. This is the configuration file needed make Clover chainload systemd-boot.\n\n```\n/boot/EFI/CLOVER/config.plist\n```\n\n```\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"https://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>Boot</key>\n\t<dict>\n\t\t<key>DefaultVolume</key>\n\t\t<string>EFI</string>\n\t\t<key>DefaultLoader</key>\n\t\t<string>\\EFI\\systemd\\systemd-bootx64.efi</string>\n\t\t<key>Fast</key>\n\t\t<true/>\n\t</dict>\n\t<key>GUI</key>\n\t<dict>\n\t\t<key>Custom</key>\n\t\t<dict>\n\t\t\t<key>Entries</key>\n\t\t\t<array>\n\t\t\t\t<dict>\n\t\t\t\t\t<key>Hidden</key>\n\t\t\t\t\t<false/>\n\t\t\t\t\t<key>Disabled</key>\n\t\t\t\t\t<false/>\n\t\t\t\t\t<key>Image</key>\n\t\t\t\t\t<string>os_arch</string>\n\t\t\t\t\t<key>Volume</key>\n\t\t\t\t\t<string>EFI</string>\n\t\t\t\t\t<key>Path</key>\n\t\t\t\t\t<string>\\EFI\\systemd\\systemd-bootx64.efi</string>\n\t\t\t\t\t<key>Title</key>\n\t\t\t\t\t<string>Arch Linux</string>\n\t\t\t\t\t<key>Type</key>\n\t\t\t\t\t<string>Linux</string>\n\t\t\t\t</dict>\n\t\t\t</array>\n\t\t</dict>\n\t</dict>\n</dict>\n</plist>\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Project homepage\n- Clover Wiki\n\n"
+    }
+  ]
+}

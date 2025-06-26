@@ -1,0 +1,166 @@
+{
+  "title": "NVIDIA Optimus",
+  "url": "https://wiki.archlinux.org/title/NVIDIA_Optimus",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- PRIME\n- Bumblebee\n- Nouveau\n- NVIDIA\n- nvidia-xrun\n- External GPU\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n- Make clear what's specific to X and what is usable on Wayland.\n- Remove the leftover mentions of \"Intel\" instead of \"integrated\": Optimus also works with AMD iGPUs.\n\nNVIDIA Optimus is a technology that allows an integrated GPU and discrete NVIDIA GPU to be built into and accessed by a laptop. As a prerequisite, install the relevant GPU driver for both cards.\n\n"
+    },
+    {
+      "title": "Available methods",
+      "level": 2,
+      "content": "There are several methods available:\n\n- #Use integrated graphics only - saves power, because NVIDIA GPU will be completely powered off.\n- #Use NVIDIA graphics only - gives more performance than integrated graphics, but drains more battery (which is not welcome for mobile devices). This utilizes the same underlying process as the optimus-manager and nvidia-xrun options, it should be utilized for troubleshooting and verifying general functionality, before opting for one of the more automated approaches.\n- Using both (use NVIDIA GPU when needed and keep it powered off to save power): #Using PRIME render offload - official method supported by NVIDIA. #Using optimus-manager - switches graphics with a single command (logout and login required to take effect). Also supports hybrid mode with PRIME render offload. It achieves maximum performance out of NVIDIA GPU and switches it off if not in use. Since the 1.4 release AMD+NVIDIA combination is also supported. #Using nvidia-xrun - run separate X session on different TTY with NVIDIA graphics. It achieves maximum performance out of NVIDIA GPU and switches it off if not in use. #Using Bumblebee - provides Windows-like functionality by allowing to run selected applications with NVIDIA graphics while using Intel graphics for everything else. Has significant performance issues. #Using switcheroo-control - Similar to Bumblebee, but specifically for GNOME users. Allows applications to specify if they prefer the dedicated GPU in their desktop entry file, and lets you manually run any application on the NVIDIA GPU from the right-click menu. #Using nouveau - offers poorer performance (compared to the proprietary NVIDIA driver) and may cause issues with sleep and hibernate. Does not work with latest NVIDIA GPUs. #Using EnvyControl - Similar to optimus-manager but does not require extensive configuration or having a daemon running in the background as well as having to install a patched version of GDM if you are a GNOME user. #Using NVidia-eXec - Similar to Bumblebee, but without the performance impact. It works on both Xorg and Wayland. This package is experimental, and is currently being tested only under GNOME/GDM. #Using nvidia-switch - Similar to nvidia-xrun, but not needing to change TTY, the switches will be done by login and logouts in your display manager. This package is being tested on Debian based system, but, like nvidia-xrun, it must work in all Linux systems.\n\n- #Using PRIME render offload - official method supported by NVIDIA.\n- #Using optimus-manager - switches graphics with a single command (logout and login required to take effect). Also supports hybrid mode with PRIME render offload. It achieves maximum performance out of NVIDIA GPU and switches it off if not in use. Since the 1.4 release AMD+NVIDIA combination is also supported.\n- #Using nvidia-xrun - run separate X session on different TTY with NVIDIA graphics. It achieves maximum performance out of NVIDIA GPU and switches it off if not in use.\n- #Using Bumblebee - provides Windows-like functionality by allowing to run selected applications with NVIDIA graphics while using Intel graphics for everything else. Has significant performance issues.\n- #Using switcheroo-control - Similar to Bumblebee, but specifically for GNOME users. Allows applications to specify if they prefer the dedicated GPU in their desktop entry file, and lets you manually run any application on the NVIDIA GPU from the right-click menu.\n- #Using nouveau - offers poorer performance (compared to the proprietary NVIDIA driver) and may cause issues with sleep and hibernate. Does not work with latest NVIDIA GPUs.\n- #Using EnvyControl - Similar to optimus-manager but does not require extensive configuration or having a daemon running in the background as well as having to install a patched version of GDM if you are a GNOME user.\n- #Using NVidia-eXec - Similar to Bumblebee, but without the performance impact. It works on both Xorg and Wayland. This package is experimental, and is currently being tested only under GNOME/GDM.\n- #Using nvidia-switch - Similar to nvidia-xrun, but not needing to change TTY, the switches will be done by login and logouts in your display manager. This package is being tested on Debian based system, but, like nvidia-xrun, it must work in all Linux systems.\n\n"
+    },
+    {
+      "title": "Use integrated graphics only",
+      "level": 2,
+      "content": "If you only care to use a certain GPU without switching, check the options in your system's BIOS. There should be an option to disable one of the cards. Some laptops only allow disabling of the discrete card, or vice-versa, but it is worth checking if you only plan to use just one of the cards.\n\nIf your BIOS does not allow to disable Nvidia graphics, you can disable it from the Linux kernel itself. See Hybrid graphics#Fully power down discrete GPU.\n\n"
+    },
+    {
+      "title": "Use CUDA without switching the rendering provider",
+      "level": 3,
+      "content": "You can use CUDA without switching rendering to the Nvidia graphics. All you need to do is ensure that the Nvidia card is powered on before starting a CUDA application, see Hybrid graphics#Fully power down discrete GPU for details.\n\nNow when you start a CUDA application, it will automatically load all necessary kernel modules. Before turning off the Nvidia card after using CUDA, the nvidia kernel modules have to be unloaded first:\n\n```\n# rmmod nvidia_uvm\n# rmmod nvidia\n```\n\n"
+    },
+    {
+      "title": "Use NVIDIA graphics only",
+      "level": 2,
+      "content": "The proprietary NVIDIA driver can be configured to be the primary rendering provider. It also has notable screen-tearing issues unless you enable prime sync by enabling NVIDIA#DRM kernel mode setting, see [1] for further information. It does allow use of the discrete GPU and has (as of January 2017) a marked edge in performance over the nouveau driver.\n\nFirst, install the NVIDIA driver and xorg-xrandr. Then, configure /etc/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf the options of which will be combined with the package provided /usr/share/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf to provide compatibility with this setup.\n\n```\n/etc/X11/xorg.conf.d/10-nvidia-drm-outputclass.conf\n```\n\n```\nSection \"OutputClass\"\n    Identifier \"intel\"\n    MatchDriver \"i915\"\n    Driver \"modesetting\"\nEndSection\n\nSection \"OutputClass\"\n    Identifier \"nvidia\"\n    MatchDriver \"nvidia-drm\"\n    Driver \"nvidia\"\n    Option \"AllowEmptyInitialConfiguration\"\n    Option \"PrimaryGPU\" \"yes\"\n    ModulePath \"/usr/lib/nvidia/xorg\"\n    ModulePath \"/usr/lib/xorg/modules\"\nEndSection\n```\n\nNext, add the following two lines to the beginning of your ~/.xinitrc:\n\n```\n~/.xinitrc\n```\n\n```\nxrandr --setprovideroutputsource modesetting NVIDIA-0\nxrandr --auto\n```\n\nNow reboot to load the drivers, and X should start.\n\nIf your display dpi is not correct add the following line:\n\n```\nxrandr --dpi 96\n```\n\nIf you get a black screen when starting X, make sure that there are no ampersands after the two xrandr commands in ~/.xinitrc. If there are ampersands, it seems that the window manager can run before the xrandr commands finish executing, leading to a black screen.\n\n"
+    },
+    {
+      "title": "Display managers",
+      "level": 3,
+      "content": "If you are using a display manager then you will need to create or edit a display setup script for your display manager instead of using ~/.xinitrc.\n\n"
+    },
+    {
+      "title": "LightDM",
+      "level": 4,
+      "content": "For the LightDM display manager:\n\n```\n/etc/lightdm/display_setup.sh\n```\n\n```\n#!/bin/sh\nxrandr --setprovideroutputsource modesetting NVIDIA-0\nxrandr --auto\n```\n\nMake the script executable.\n\nNow configure lightdm to run the script by editing the [Seat:*] section in /etc/lightdm/lightdm.conf:\n\n```\n/etc/lightdm/lightdm.conf\n```\n\n```\n[Seat:*]\ndisplay-setup-script=/etc/lightdm/display_setup.sh\n```\n\nNow reboot and your display manager should start.\n\n"
+    },
+    {
+      "title": "SDDM",
+      "level": 4,
+      "content": "For the SDDM display manager (SDDM is the default DM for KDE):\n\n```\n/usr/share/sddm/scripts/Xsetup\n```\n\n```\nxrandr --setprovideroutputsource modesetting NVIDIA-0\nxrandr --auto\n```\n\n"
+    },
+    {
+      "title": "GDM",
+      "level": 4,
+      "content": "For the GDM display manager create two new .desktop files:\n\n```\n/usr/share/gdm/greeter/autostart/optimus.desktop\n/etc/xdg/autostart/optimus.desktop\n```\n\n```\n[Desktop Entry]\nType=Application\nName=Optimus\nExec=sh -c \"xrandr --setprovideroutputsource modesetting NVIDIA-0; xrandr --auto\"\nNoDisplay=true\nX-GNOME-Autostart-Phase=DisplayServer\n```\n\nMake sure that GDM use X as default backend.\n\n"
+    },
+    {
+      "title": "Checking 3D",
+      "level": 3,
+      "content": "You can check if the NVIDIA graphics are being used by installing mesa-utils and running\n\n```\n$ glxinfo | grep NVIDIA\n```\n\n"
+    },
+    {
+      "title": "Further information",
+      "level": 3,
+      "content": "For more information, look at NVIDIA's official page on the topic [2].\n\n"
+    },
+    {
+      "title": "Using PRIME render offload",
+      "level": 3,
+      "content": "This is the official NVIDIA method to support switchable graphics.\n\nSee PRIME#PRIME render offload for details.\n\n"
+    },
+    {
+      "title": "Using nouveau",
+      "level": 3,
+      "content": "See PRIME for graphics switching and nouveau for open-source NVIDIA driver.\n\n"
+    },
+    {
+      "title": "Using Bumblebee",
+      "level": 3,
+      "content": "See Bumblebee.\n\n"
+    },
+    {
+      "title": "Using switcheroo-control",
+      "level": 3,
+      "content": "See PRIME#GNOME integration.\n\n"
+    },
+    {
+      "title": "Using nvidia-xrun",
+      "level": 3,
+      "content": "See nvidia-xrun.\n\n"
+    },
+    {
+      "title": "Using optimus-manager",
+      "level": 3,
+      "content": "See Optimus-manager upstream documentation. It covers both installation and configuration in Arch Linux systems.\n\n"
+    },
+    {
+      "title": "Using EnvyControl",
+      "level": 3,
+      "content": "See EnvyControl upstream documentation. It covers both installation and usage instructions.\n\n"
+    },
+    {
+      "title": "Using NVidia-eXec",
+      "level": 3,
+      "content": "See NVidia-eXec upstream documentation. It covers both installation and usage instructions.\n\n"
+    },
+    {
+      "title": "Using nvidia-switch",
+      "level": 3,
+      "content": "See nvidia-switch upstream documentation. It covers both installation and usage instructions.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\n"
+    },
+    {
+      "title": "Tearing/Broken VSync",
+      "level": 3,
+      "content": "Enable DRM kernel mode setting, which will in turn enable the PRIME synchronization and fix the tearing.\n\nYou can read the official forum thread for details.\n\n"
+    },
+    {
+      "title": "Failed to initialize the NVIDIA GPU at PCI:1:0:0 (GPU fallen off the bus / RmInitAdapter failed!)",
+      "level": 3,
+      "content": "Add rcutree.gp_init_delay=1 to the kernel parameters. Original topic can be found in [3] and [4].\n\n"
+    },
+    {
+      "title": "Resolution, screen scan wrong. EDID errors in Xorg.log",
+      "level": 3,
+      "content": "This is due to the NVIDIA driver not detecting the EDID for the display. You need to manually specify the path to an EDID file or provide the same information in a similar way.\n\nTo provide the path to the EDID file edit the Device Section for the NVIDIA card in Xorg.conf, adding these lines and changing parts to reflect your own system:\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"Device\"\n       \tOption\t\t\"ConnectedMonitor\" \"CRT-0\"\n       \tOption\t\t\"CustomEDID\" \"CRT-0:/sys/class/drm/card0-LVDS-1/edid\"\n\tOption\t\t\"IgnoreEDID\" \"false\"\n\tOption\t\t\"UseEDID\" \"true\"\nEndSection\n```\n\nIf Xorg will not start try swapping out all references of CRT to DFB. card0 is the identifier for the Intel card to which the display is connected via LVDS. The edid binary is in this directory. If the hardware arrangement is different, the value for CustomEDID might vary but yet this has to be confirmed. The path will start in any case with /sys/class/drm.\n\nAlternatively you can generate your edid with tools like read-edid and point the driver to this file. Even modelines can be used, but then be sure to change UseEDID and IgnoreEDID.\n\n"
+    },
+    {
+      "title": "Wrong resolution without EDID errors",
+      "level": 3,
+      "content": "Using nvidia-xconfig, incorrect information might be generated in xorg.conf and in particular wrong monitor refresh rates that restrict the possible resolutions. Try commenting out the HorizSync/VertRefresh lines. If this helps, you can probably also remove everything else not mentioned in this article.\n\n"
+    },
+    {
+      "title": "Lockup issue (lspci hangs)",
+      "level": 3,
+      "content": "Symptoms: lspci hangs, system suspend fails, shutdown hangs, optirun hangs.\n\nApplies to: newer laptops with GTX 965M or alike when bbswitch (e.g. via Bumblebee) or nouveau is in use.\n\nWhen the dGPU power resource is turned on, it may fail to do so and hang in ACPI code (kernel bug 156341).\n\nWhen using nouveau, disabling runtime power-management stops it from changing the power state, thus avoiding this issue. To disable runtime power-management, add nouveau.runpm=0 to the kernel parameters.\n\nFor known model-specific workarounds, see this issue. In other cases you can try to boot with acpi_osi=\"!Windows 2015\" or acpi_osi=! acpi_osi=\"Windows 2009\" added to your Kernel parameters. (Consider reporting your laptop to that issue.)\n\n"
+    },
+    {
+      "title": "No screens found on a laptop/NVIDIA Optimus",
+      "level": 3,
+      "content": "Check if the output is something similar to:\n\n```\n$ lspci | grep VGA\n```\n\n```\n00:02.0 VGA compatible controller: Intel Corporation Core Processor Integrated Graphics Controller (rev 02)\n01:00.0 VGA compatible controller: nVidia Corporation Device 0df4 (rev a1)\n```\n\nNVIDIA drivers now offer Optimus support since 319.12 Beta [5] with kernels above and including 3.9.\n\nAnother solution is to install the Intel driver to handle the screens, then if you want 3D software you should run them through Bumblebee to tell them to use the NVIDIA card.\n\n"
+    },
+    {
+      "title": "Random freezes \"(EE) NVIDIA(GPU-0): WAIT\"",
+      "level": 3,
+      "content": "Using the proprietary drivers on a setup with an integrated AMD card and with the dedicated NVIDIA card set as the only one in use, users report freezes for up to 10 seconds, with the following errors in the Xorg logs:\n\n```\n[   219.796] (EE) NVIDIA(GPU-0): WAIT (2, 8, 0x8000, 0x0002e1c4, 0x0002e1cc)\n[   226.796] (EE) NVIDIA(GPU-0): WAIT (1, 8, 0x8000, 0x0002e1c4, 0x0002e1cc)\n```\n\nWhile this is not root-caused yet, it seems linked to a conflict in how the integrated and dedicated cards interact with Xorg.\n\nThe workaround is to use switchable graphics, see PRIME#PRIME render offload for details.\n\n"
+    },
+    {
+      "title": "\"No Devices detected\" with optimus-manager",
+      "level": 3,
+      "content": "There are cases where lspci will show the PCI domain as first output column, making optimus-manager generated files break while trying to map BusID on multiple laptop models.\n\nIf you face a black screen that never ends to load your GUI, GUI partially loading with console artifacts or Xorg crashing with (EE) - No Devices detected, the workaround and bug reports are available at the upstream GitHub.\n\n"
+    },
+    {
+      "title": "Xorg: external monitor updates only when the mouse is moving",
+      "level": 3,
+      "content": "A workaround for the issue is to uninstall the Xorg driver of the iGPU (e.g. xf86-video-amdgpu or xf86-video-intel) [6]. This should work as long as the external monitor port (HDMI/DP/USB-C) is connected directly to the Nvidia dGPU.\n\n"
+    },
+    {
+      "title": "Low power usage (TDP)",
+      "level": 3,
+      "content": "Since the 530.41 driver version, cases of cards locked at low power consumption limits appeared (see GitHub issue 483). The NVIDIA driver has disabled the ability to manually set the power limit using nvidia-smi command, so many laptops are stuck with low power usage and bad performance.\n\nTo workaround this problem (for the Ampere generation or newer), start/enable nvidia-powerd.service, which enables DynamicBoost.\n\n"
+    },
+    {
+      "title": "NVIDIA GPU will not turn off or stay deactivated",
+      "level": 3,
+      "content": "Some processes may keep your NVIDIA GPU on due to their way of interacting with the GPU. This causes significantly increased power usage, lower battery life, and higher temperatures.\n\nYou can check if your GPU is in an active state or suspended by running the following command:\n\n```\n$ cat /sys/bus/pci/devices/0000\\:01\\:00.0/power/runtime_status\n```\n\nIf the state is active, you are probably running a process that keeps your GPU alive.\n\nIf you use a thermal monitor that is probing your GPU temperature, it typically calls nvidia-smi to get this temperature, which will wake up your GPU and keep it in an active state.\n\nYou can use nvtop to check if a process (such as Xorg) is using the NVIDIA GPU, but this method does not work in all cases. For example, if you have a Ollama server running, it will always keep your GPU on but will not show in nvtop or invoke nvidia-smi.\n\nRemember to check the articles related to your specific chosen method for troubleshooting as well.\n\n"
+    }
+  ]
+}

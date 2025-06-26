@@ -1,0 +1,56 @@
+{
+  "title": "Gitolite",
+  "url": "https://wiki.archlinux.org/title/Gitolite",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Gitolite allows you to host Git repositories for multiple users easily and securely.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the gitolite package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Installing gitolite automatically adds the gitolite user to the system, with home directory /var/lib/gitolite.\n\n"
+    },
+    {
+      "title": "Admin SSH access",
+      "level": 3,
+      "content": "To give yourself admin access, copy your SSH public key to /var/lib/gitolite/username.pub, where username is your username.\n\n```\n# install -o gitolite -g gitolite ~/.ssh/id_rsa.pub /var/lib/gitolite/username.pub\n```\n\nThen run the Gitolite setup script as the gitolite user:\n\n```\n[gitolite]$ gitolite setup -pk /var/lib/gitolite/username.pub\n```\n\nThis puts your public key into the gitolite-admin keydir and gives your username RW+ access to the gitolite-admin repository\n\nYou can now remove the copy of your SSH public key:\n\n```\n# rm /var/lib/gitolite/username.pub\n```\n\nNow as your user you can check that everything went correctly\n\n```\n$ ssh gitolite@hostname info\n```\n\n```\nhello username, this is gitolite@hostname running gitolite3 v3.6.2 on git 2.3.3\n\n R W    gitolite-admin\n R W    testing\n```\n\nDo not add repositories or users directly as gitolite on the server! The server must be managed by cloning the special gitolite-admin repository:\n\n```\n$ git clone gitolite@hostname:gitolite-admin\n```\n\nFor reference see Gitolite.\n\n"
+    },
+    {
+      "title": "Create a repository",
+      "level": 3,
+      "content": "To create a repository, first check out the gitolite-admin repository as a client.\n\n```\n$ git clone gitolite@server:gitolite-admin\n```\n\nAppend a new repository to gitolite-admin/conf/gitolite.conf:\n\n```\nrepo repository_name\n    RW+     =   @all\n```\n\nCommit and push the changes and gitolite will automatically generate the necessary files on the server.\n\n"
+    },
+    {
+      "title": "Adding http(s) access via Apache (with basic authentication)",
+      "level": 3,
+      "content": "We need to create an suEXEC wrapper script. To satisfy suEXEC's security requirements, the script and the directory containing it must be owned by gitolite:gitolite and below /srv/http in the directory hierarchy. For this example, we create the directory as /srv/http/git/cgi-bin.\n\n```\n# install -o gitolite -g gitolite -d /srv/http/git/cgi-bin\n```\n\nCreate an suEXEC wrapper for the gitolite shell with the contents below. For this example, we create it as /srv/http/git/cgi-bin/gitolite-suexec-wrapper.\n\n```\n/srv/http/git/cgi-bin/gitolite-suexec-wrapper\n```\n\n```\n#!/usr/bin/bash\n#\n# suEXEC wrapper for gitolite-shell\n#\n\nexport GIT_PROJECT_ROOT=/var/lib/gitolite/repositories\nexport GITOLITE_HTTP_HOME=/var/lib/gitolite\n\nexec /usr/lib/gitolite/gitolite-shell\n```\n\nMake the wrapper executable and owned by gitolite:gitolite.\n\n```\n# chown gitolite:gitolite /srv/http/git/cgi-bin/gitolite-suexec-wrapper\n# chmod 0755 /srv/http/git/cgi-bin/gitolite-suexec-wrapper\n```\n\nCreate an empty password database file, owned by gitolite:http\n\n```\n# install -o gitolite -g http -m 0640 /dev/null /srv/http/git/htpasswd\n```\n\nApache's basic authentication mechanism is separate from ssh, and therefore requires a separate set of credentials. Create your web users using htpasswd.\n\n```\n# htpasswd /srv/http/git/htpasswd username\n```\n\nAdd the following to your Apache vhost configuration:\n\n```\nSuexecUserGroup gitolite gitolite\nScriptAlias /git/ /srv/http/git/cgi-bin/gitolite-suexec-wrapper/\n\n<Directory /srv/http/git/cgi-bin>\n    Require all granted\n</Directory>\n\n<Location /git>\n    AuthType Basic\n    AuthName \"Git Access\"\n    AuthBasicProvider file\n    AuthUserFile /srv/http/git/htpasswd\n    Require valid-user\n</Location>\n```\n\nRestart httpd.service.\n\nFinally, in the gitolite-admin repository you cloned in the previous section, edit conf/gitolite.conf, add an R = daemon access rule to all repositories you want to make available via http, and push the changes.\n\n"
+    },
+    {
+      "title": "ssh users",
+      "level": 3,
+      "content": "Ask each user who will get access to send you an SSH public key. Rename each public key to username.pub, where username is the user name which will be used in gitolite.conf. Then move all new public keys to the keydir directory in the cloned gitolite-admin repository. You can also organize them into various sub-directories of keydir if you wish, since the entire tree is searched.\n\nFinally commit and push the changes.\n\nSee the add/remove users in the official documentation for details.\n\nTo grant access rights to the new users, edit the configuration file (conf/gitolite.conf in the gitolite-admin repository). See the .conf file in the official documentation for details.\n\n"
+    },
+    {
+      "title": "http(s) users",
+      "level": 3,
+      "content": "User management for http(s) is more suitable for single-user setups. To add a new user or to change an existing user's password:\n\n```\n# htpasswd /srv/http/git/htpasswd username\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "In case you cannot log in with the gitolite account, it may be caused by the account being locked, and depending of your ssh configuration.\n\nIf you have done some SSH hardening, it may be the cause of this behavior, as noted in SSH and locked users Article and Unix & Linux StackExchange - How to unlock account for public key ssh authorization, but not for password authorization.\n\nTo solve this, you have to allow PAM in sshd_config or unlock the account by:\n\n```\n# usermod -p '*' gitolite\n```\n\n```\n/etc/passwd\n```\n\n```\n...\ngitolite:*:16199:0:99999:7:::\n...\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gitolite Site\n- SSH and locked users Article\n- Unix & Linux StackExchange - How to unlock account for public key ssh authorization, but not for password authorization\n\n"
+    }
+  ]
+}

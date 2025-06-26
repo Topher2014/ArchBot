@@ -1,0 +1,61 @@
+{
+  "title": "Lenovo ThinkPad Helix 2nd Gen",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_Helix_2nd_Gen",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nGPU |  | Yes\nSound |  | Yes\nWi-Fi |  | Partial\nBluetooth |  | Untested\nCamera |  | Untested\nSensors |  | Yes\nFingerprint reader |  | No\n\nThis hardware is substantially different from the Lenovo ThinkPad Helix 1st Gen and thus the solutions outlined there are not helpful. Note: the following was tested with the standard ThinkPad Ultrabook keyboard, not the Pro one.\n\n"
+    },
+    {
+      "title": "Suspend",
+      "level": 3,
+      "content": "In order for s2idle to work completely, you must update the BIOS to the latest version (1.99 works). Otherwise, you may only be able to suspend-to-idle and resume while docked in the keyboard (detaching to tablet mode while suspended would prevent the device from resuming).\n\nOlder versions of the BIOS misreport the suspend capabilities, and thus the system will try to suspend to RAM.\n\nSee Power management/Suspend and hibernate#Changing suspend method for manually setting the suspend method.\n\nOn the most recent BIOS versions, this is not necessary.\n\n"
+    },
+    {
+      "title": "Disable embedded-controller wake-ups",
+      "level": 3,
+      "content": "By default, s2idle will still exhibit a significant battery drain while suspended (the batteries will be dead within a few hours). It appears that the device suffers from embedded controller wake-ups. For a more reasonable drain while suspended (i.e. you can leave it suspended for days), you must set the acpi.ec_no_wakeup=1 kernel parameter.\n\n"
+    },
+    {
+      "title": "Workaround for no Wi-Fi connection on resume",
+      "level": 3,
+      "content": "The Wi-Fi chip in this computer (Intel Wireless 7265) has a problem where it can stop re-connecting after waking from suspend. The system can no longer communicate with the card, so restarting NetworkManager (etc) is not sufficient to regain a connection, nor is unloading and reloading the iwlwifi module after resuming. A casual internet search reveals this to be a hardware problem that affects Windows users as well.\n\nAn effective workaround, however, is to unload the kernel modules before suspending and reloading them upon resuming. For example, using systemd:\n\n```\n/etc/systemd/system/suspend-unload-iwlwifi.service\n```\n\n```\n[Unit]\nDescription=Unload iwlwifi before suspending\nBefore=suspend.target\nStopWhenUnneeded=no\n\n[Service]\ntype=oneshot\nExecStart=/usr/bin/bash -c \"rmmod iwlmvm && rmmod iwlwifi\"\n\n[Install]\nWantedBy=suspend.target\n```\n\n```\n/etc/systemd/system/suspend-unload-iwlwifi.service\n```\n\n```\n[Unit]\nDescription=Unload iwlwifi before suspending\nBefore=suspend.target\nStopWhenUnneeded=no\n\n[Service]\ntype=oneshot\nExecStart=/usr/bin/bash -c \"lsmod iwlmvm iwlwifi\"\n\n[Install]\nWantedBy=suspend.target\n```\n\n"
+    },
+    {
+      "title": "ACPI CPU load and Battery Power",
+      "level": 2,
+      "content": "Many ACPI Interrupt - Events are triggered on older Kernels making CPU load up to 80% of one Kernel => Battery goes empty within 3 hours. With me this problem was fixed when upgrading to Kernel 5.1rc1. Powertop estimates over 7 hours with a pro keyboard attached. Use tlp package for further improvements.\n\n"
+    },
+    {
+      "title": "Sensors",
+      "level": 2,
+      "content": "In order to use the sensors (particularly the accelerometer and the ambient light sensor) in GNOME, you should install the iio-sensor-proxy package. There is presumably a quirk with this sensor hardware. The effect is that iio-sensor-proxy loads too early, requiring the service to be restarted before the sensors can be read properly. To fix this, edit the systemd unit so that it starts after GDM (After=gdm.service; see Systemd#Editing provided units).\n\nIf you are using GNOME, a program called tp-helix-orientation-lock enables the use of the \"rotation lock\" button on the Helix 2, as well as optionally automatically locking/unlocking the screen orientation when docking/undocking the tablet.\n\n"
+    },
+    {
+      "title": "Touch Screen",
+      "level": 2,
+      "content": "In order to enable multitouch, install xf86-input-wacom and libwacom. By default, xf86-input-wacom handles multitouch, however it is limited to two-finger input. In order to allow true multitouch, you must disable this built-in support. Multitouch events will then be passed on to XServer. To test this, try running\n\n```\n$ xset \"Wacom HID 501D Finger touch\" Gesture off\n```\n\nTo make it permanent, copy /usr/share/X11/xorg.conf.d/70-wacom.conf to /etc/X11/xorg.conf.d/70-wacom.conf and edit it so the input entries all contain Option \"Gesture\" \"Off\".\n\n"
+    },
+    {
+      "title": "Touch Pad and Pointing Stick",
+      "level": 2,
+      "content": "After detaching and attaching a Pro Keyboard the mouse stops working in gnome. Probably there is a sync problem. Attempt to load psmouse with \"proto=imps\" option. To do that, add this line to your /etc/modprobe.d/modprobe.conf:\n\n```\n/etc/modprobe.d/modprobe.conf\n```\n\n```\noptions psmouse proto=imps\n```\n\nYou can test this before making it permanent by:\n\n```\n$ modprobe -r psmouse\n$ modprobe psmouse proto=imps\n```\n\n"
+    },
+    {
+      "title": "Graphics",
+      "level": 2,
+      "content": "Install xf86-video-intel for graphics acceleration.\n\n"
+    },
+    {
+      "title": "Firefox",
+      "level": 3,
+      "content": "Touch Screen Scrolling can be activated by the ScrollAnywhere firefox Plugin\n\n"
+    },
+    {
+      "title": "Unresolved Issues",
+      "level": 2,
+      "content": "- The fingerprint reader is apparently not supported by any driver.\n- The speakers make popping sounds.\n\n"
+    }
+  ]
+}

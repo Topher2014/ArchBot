@@ -1,0 +1,56 @@
+{
+  "title": "Go package guidelines",
+  "url": "https://wiki.archlinux.org/title/Go_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document covers standards and guidelines on writing PKGBUILDs for Go.\n\n"
+    },
+    {
+      "title": "Package naming",
+      "level": 3,
+      "content": "Use go-modulename if the package provides a program that is strongly coupled to the Go ecosystem. For other applications, use only the program name.\n\n"
+    },
+    {
+      "title": "Dependencies",
+      "level": 3,
+      "content": "Go 1.11 introduced the initial support for go modules. This allows Go upstream code to declare dependencies and pin them to the given project version. Currently our packaging efforts utilize this to vendor dependencies.\n\n"
+    },
+    {
+      "title": "Upstream project without go modules",
+      "level": 4,
+      "content": "For upstream code that does not utilise Go modules, the following workaround exists. Consider filing an issue upstream.\n\n```\nPKGBUILD\n```\n\n```\nurl=https://github.com/upstream_user/upstream_project\n\nprepare() {\n  cd \"$pkgname-$pkgver\"\n  go mod init \"${url#https://}\" # strip https:// from canonical URL\n  go mod tidy\n}\n```\n\n"
+    },
+    {
+      "title": "Flags and build options",
+      "level": 3,
+      "content": "Most Makefiles written for go applications do not respect the build flags provided by build systems along with overwriting GOFLAGS, this causes Go binaries to not be compiled with RELRO as we need CGO_CFLAGS and CGO_LDFLAGS to be set for the compiler. This needs to be patched into the Makefile, or the Makefile should be omitted.\n\n```\nexport CGO_CPPFLAGS=\"${CPPFLAGS}\"\nexport CGO_CFLAGS=\"${CFLAGS}\"\nexport CGO_CXXFLAGS=\"${CXXFLAGS}\"\nexport CGO_LDFLAGS=\"${LDFLAGS}\"\nexport GOFLAGS=\"-buildmode=pie -trimpath -ldflags=-linkmode=external -mod=readonly -modcacherw\"\n\n# or alternatively you can define some of these flags from the CLI options\ngo build \\\n    -trimpath \\\n    -buildmode=pie \\\n    -mod=readonly \\\n    -modcacherw \\\n    -ldflags \"-linkmode external -extldflags \\\"${LDFLAGS}\\\"\" \\\n    .\n```\n\n"
+    },
+    {
+      "title": "Flag meaning",
+      "level": 4,
+      "content": "- -buildmode=pie enables PIE compilation for binary harderning.\n- -trimpath important for reproducible builds so full build paths and module paths are not embedded.\n- -mod=readonly ensure the module files are not updated in any go actions.\n- -modcacherw is not important, but it ensures that go modules creates a write-able path. Default is read-only.\n\n"
+    },
+    {
+      "title": "Supporting debug packages",
+      "level": 4,
+      "content": "Enabling debug packages with source listing and proper symbol look ups require a few modifications to the default buildflags.\n\n- Removal of -trimpath to ensure source paths are rewritten in the binary\n- Include -compressdwarf=false in -ldflags to ensure we can parse the DWARF headers as current tooling does not support compressed headers.\n- Ensure -linkmode=external as the internal linker go uses does not embed a build-id into the binary.\n- Include GOPATH=\"${srcdir}\" so makepkg can include the source code for all modules.\n\nThe above options should produce a debug package with proper detached symbols and source listings which can then be picked up by the debugger.\n\n```\nexport CGO_CPPFLAGS=\"${CPPFLAGS}\"\nexport CGO_CFLAGS=\"${CFLAGS}\"\nexport CGO_CXXFLAGS=\"${CXXFLAGS}\"\nexport CGO_LDFLAGS=\"${LDFLAGS}\"\nexport GOPATH=\"${srcdir}\"\nexport GOFLAGS=\"-buildmode=pie -mod=readonly -modcacherw\"\n\ngo build -ldflags \"-compressdwarf=false -linkmode external\" .\n```\n\n"
+    },
+    {
+      "title": "Output directory",
+      "level": 3,
+      "content": "There are currently a few ways to build all go binaries in a project.\n\n```\nbuild(){\n    cd \"$pkgname-$pkgver\"\n    go build -o output-binary .\n}\n```\n\n... is a shorthand for the compiler to recursively descend into the directory and find all binaries. It can be used in conjunction with a output directory to build everything.\n\n```\nprepare(){\n    cd \"$pkgname-$pkgver\"\n    mkdir -p build\n}\n\nbuild(){\n    cd \"$pkgname-$pkgver\"\n    go build -o build ./cmd/...\n}\n```\n\n"
+    },
+    {
+      "title": "Sample PKGBUILD",
+      "level": 2,
+      "content": "```\npkgname=foo\npkgver=0.0.1\npkgrel=1\npkgdesc='Go PKGBUILD Example'\narch=('x86_64')\nurl=\"https://example.org/$pkgname\"\nlicense=('GPL')\nmakedepends=('go')\nsource=(\"$url/$pkgname-$pkgver.tar.gz\")\nsha256sums=('1337deadbeef')\n\nprepare(){\n  cd \"$pkgname-$pkgver\"\n  mkdir -p build/\n}\n\nbuild() {\n  cd \"$pkgname-$pkgver\"\n  export CGO_CPPFLAGS=\"${CPPFLAGS}\"\n  export CGO_CFLAGS=\"${CFLAGS}\"\n  export CGO_CXXFLAGS=\"${CXXFLAGS}\"\n  export CGO_LDFLAGS=\"${LDFLAGS}\"\n  export GOFLAGS=\"-buildmode=pie -trimpath -ldflags=-linkmode=external -mod=readonly -modcacherw\"\n  go build -o build ./cmd/...\n}\n\ncheck() {\n  cd \"$pkgname-$pkgver\"\n  go test ./...\n}\n\npackage() {\n  cd \"$pkgname-$pkgver\"\n  install -Dm755 build/$pkgname \"$pkgdir\"/usr/bin/$pkgname\n}\n```\n\n"
+    },
+    {
+      "title": "Example packages",
+      "level": 2,
+      "content": "- podman\n- k9s\n- helm\n\n"
+    }
+  ]
+}

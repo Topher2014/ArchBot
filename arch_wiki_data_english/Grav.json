@@ -1,0 +1,101 @@
+{
+  "title": "Grav",
+  "url": "https://wiki.archlinux.org/title/Grav",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- PHP\n- Nginx\n- UWSGI\n- Apache HTTP Server\n\nFrom Wikipedia:\n\n"
+    },
+    {
+      "title": "Prerequisites",
+      "level": 2,
+      "content": "Grav comes with surprisingly few prerequisites by itself. Of course as a web application written in PHP it needs PHP. The only required PHP module is php-gd. A few others are also required but already part of the bare PHP installation. The following PHP modules are optional but highly recommended for better performance:\n\n- php-apcu for increased cache performance\n- php-yamlAUR for native YAML processing dramatically increasing performance\n\nAlthough Grav can serve the content on its own this article describes a setup with a full blown web server in front. So you need:\n\n- A web server: Apache HTTP Server or nginx or others\n- An application server: uWSGI (together with uwsgi-plugin-php) or FPM\n\nThe following combinations will be covered:\n\n- nginx → uWSGI (plus uwsgi-plugin-php)\n- nginx → FPM,\n- Apache (using mod_proxy_uwsgi) → uWSGI (plus uwsgi-plugin-php)\n- Apache (using mod_proxy_fcgi) → FPM\n\nThe installation of Grav complies with Arch Linux' web application package guidelines. This means among other details that Grav must be run with its own system user (grav). So it is not possible anymore to execute the PHP code directly in the Apache process by means of php-apache.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the gravAUR package. This automatically takes care of installing the two requires dependencies php and php-gd. Also install php-apcu and php-yamlAUR - preferrably as a dependency (--asdeps). Comment the only line in /etc/php/conf.d/yaml.ini. Do not modify /etc/php/conf.d/apcu.ini, i.e. leave the only line commented. Activating these two extensions for Grav will be taken care of in other places (see below).\n\n"
+    },
+    {
+      "title": "Application server",
+      "level": 2,
+      "content": "There are two prevalent application servers that can be used to process PHP code: uWSGI or FPM. FPM as the name suggests is specialized on PHP. The protocol used between the web server and FPM is fastcgi. The tool is has been part of the PHP distribution since many years and is actively maintained. The downside being that the official documentation leaves much room for improvement. uWSGI on the other hand can serve code written in a handful of languages by means of language specific plugins. The protocol used is uwsgi (lowercase). The tool is extensively documented - albeit the sheer amount of documentation can become confusing and unwieldy. Maintainance has slowed down significantly - this applies especially for the PHP plugin.\n\n"
+    },
+    {
+      "title": "uWSGI",
+      "level": 3,
+      "content": "uWSGI has its own article. A lot of useful information can be found there. Install uwsgi and the plugin uwsgi-plugin-php - preferrably as dependencies, i.e. with --asdeps. Setup of your Grav application requires only copying one file and defining one systemd service.\n\n"
+    },
+    {
+      "title": "grav.ini",
+      "level": 4,
+      "content": "Copy the Grav specific uWSGI setup file to the appropriate location.\n\n```\n# cp /usr/share/webapps/grav/webserver-configs/uwsgi-grav.ini /etc/uwsgi/grav.ini\n```\n\nMake sure grav.ini is owned and only writeable by root, i.e. -rw-r--r-- 1 root root ... grav.ini. This configuration is functional but feel free to adapt it to your liking. E.g. you might like to change php-set = date.timezone= to your preferred timezone.\n\n"
+    },
+    {
+      "title": "Systemd service",
+      "level": 4,
+      "content": "The package uwsgi provides a template unit file (uwsgi@.service). The instance ID (here grav) is used to pick up the right configuration file. So we start/enable uwsgi@grav.service.\n\nIn case you have more than a few (e.g. 2) services started like this and get the impression this is a waste of resource you might consider using emperor mode.\n\n"
+    },
+    {
+      "title": "FPM",
+      "level": 3,
+      "content": "In case you opt to use FPM as your application server install php-fpm - preferrably as a dependent package (--asdeps).\n\nYou have to tweak its configuration a little bit.\n\n"
+    },
+    {
+      "title": "php-fpm.ini",
+      "level": 4,
+      "content": "It is a good practice to run FPM with its own version of php.ini. You thus avoid cluttering the standard INI file (/etc/php/php.ini) with stuff only needed by FPM. There is a copy of a functional INI file in /usr/share/webapps/grav/webserver-configs. Copy it to /etc/php.\n\n```\n# cp /usr/share/webapps/grav/webserver-configs/php-fpm.ini /etc/php\n```\n\nMake sure it is owned and only writeable by root. Something along -rw-r--r-- 1 root root ... php-fpm.ini. Feel free to customize the configuration as you see fit.\n\n"
+    },
+    {
+      "title": "grav.conf",
+      "level": 4,
+      "content": "You have to create a so called pool file for FPM. It is responsible for spawning a dedicated FPM process for the Grav application. Copy the version provided by the gravAUR package.\n\n```\n# cp /usr/share/webapps/grav/webserver-configs/php-fpm.d/grav.conf /etc/php/php-fpm.d\n```\n\nAgain make sure this pool file is owned and only writeable by root (i.e. -rw-r--r-- 1 root root ... grav.conf). You may tweak some settings (especially pm... and php_admin_value[date.timezone] to your liking.\n\n"
+    },
+    {
+      "title": "Systemd service",
+      "level": 4,
+      "content": "FPM is run as a systemd service. You have to modify the service configuration to be able to run Grav. This is best achieved by means of a drop-in file.\n\n```\n/etc/systemd/system/php-fpm.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/php-fpm --nodaemonize --fpm-config /etc/php/php-fpm.conf --php-ini /etc/php/php-fpm.ini\nReadWritePaths=/etc/webapps/grav/config\nPrivateTmp=false\n```\n\nThe drop-in file has three purposes.\n\n- It replaces the ExecStart line by a start command that uses the php-fpm.ini covered in the previous section.\n- It explicitly enables read/write access on /etc/webapps/grav/config that would otherwise be inhibited by ProtectSystem=full in /usr/lib/systemd/system/php-fpm.service.\n- It disables the PrivateTmp option set in /usr/lib/systemd/system/php-fpm.service as this doesn't work together with php_admin_value[open_basedir] = …:/var/tmp/$pool:… in /etc/php/php-fpm.d/grav.conf.\n\nDo not forget to start/enable php-fpm.service.\n\n"
+    },
+    {
+      "title": "Web server",
+      "level": 2,
+      "content": "There is an abundance of web servers you can choose from. Whatever option you finally choose you have to keep in mind that the Grav application needs to be run with its own system user grav. So you probably need to forward your requests to one of the above mentioned application servers.\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 3,
+      "content": "Configuration of nginx is way beyond the scope of this article. See the relevant article for further information. The package gravAUR comes with a sample configuration file /usr/share/webapps/grav/webserver-configs/nginx.conf. This file is not functional as is. Use it as a starting point for your own configuration. Most likely you will have to copy it into /etc/nginx/sites-available with an appropriate name and create the corresponding symbolic link in /etc/nginx/sites-enabled.\n\nThe sample file assumes you are using SSL/TLS and some ACME client (e.g. Certbot) to get your certificates. OCSP stapling is not configured.\n\nThings you might have to adapt (not exhaustive):\n\n- Your server name (server_name clauses 2x), i.e. the server part of the URL your Grav installation will be reachable with.\n- The name of the certificate and key you use for SSL / TLS.\n- If and where you want an access log written to.\n- The location where Certbot (or any other ACME client) will put the domain verification challenges.\n- The path under which your Grav installation will be reachable. (The part right to the server name & port section in the URL.)\n- What application server (uWSGI or FPM) you are using, i.e. how and where nginx will pass requests that need to trigger some PHP code.\n\nThere is no need to install any additional modules since nginx natively supports both protocols FastCGI and uwsgi.\n\nGrav's documentation also covers setting up Grav with nginx. But be aware that the instructions are Ubuntu / Debian centric and do not mention uWSGI.\n\n"
+    },
+    {
+      "title": "Apache HTTP Server",
+      "level": 3,
+      "content": "Unfortunately upstream Grav does not provide a sample configuration file for Apache HTTP Server. At least there is a section in this wiki about how to integrate Apache with PHP by means of FPM and mod_proxy_fcgi. uWSGI's documentation has some information about how to integrate Apache with PHP by means of uWSGI and mod_proxy_uwsgi. Mind that the apache package comes with both modules mod_proxy_fcgi and mod_proxy_uwsgi. They need to be loaded as required.\n\n"
+    },
+    {
+      "title": "Plugins",
+      "level": 2,
+      "content": "A lot of Grav's power comes from the large set of plugins that can be installed. Just follow the instructions on Grav's documentation how to install plugins.\n\n```\n# runuser -u grav -- bin/gpm install admin\n```\n\nCurrently there are no grav-plugin-... packages that allow installing plugins via pacman (or some AUR wrapper). This will probably not change in the foreseeable future.\n\n"
+    },
+    {
+      "title": "Content",
+      "level": 2,
+      "content": "See the extensive documentation on Grav's website on how to create content with this CMS.\n\n"
+    },
+    {
+      "title": "Skeletons",
+      "level": 3,
+      "content": "Chances are the big empty board named Grav appears too intimidating to you. In this case you may want to use one of the many skeletons as a starting point. Skeletons are prefabricated bundles of Grav itself, some plugins, a theme and some sample content that give you some bits and pieces to play around with. Skeletons are supposed to be installed instead of a bare Grav installation. Unfortunately this makes it impossible to use a skeleton together with the gravAUR package.\n\nWith a bit of fiddling you can import the content of an arbitrary skeleton into your existing Grav installation.\n\n1. Download the desired skeleton.\n1. Extract the user directory: # bsdtar -xf grav-skeleton-blahblah.zip user\n1. Replace the directories pages, plugins and themes in /var/lib/grav/user with the corresponding directories from the extracted user directory.\n1. Fix ownership and permissions # chown -R grav:http /var/lib/grav/user/{pages,plugins,themes}# chmod -R 640 /var/lib/grav/user/{pages,plugins,themes}# find /var/lib/grav/user/{pages,plugins,themes} -type d -exec chmod 750 {} \\;\n1. Replace the configuration files site.yaml system.yaml in /etc/webapps/grav/config with the corresponding files from the extracted user/config.\n1. Fix ownership and permissions # chown grav:grav /etc/webapps/grav/config/{site,system}.yaml# chmod 644 /etc/webapps/grav/config/{site,system}.yaml\n\n```\n# bsdtar -xf grav-skeleton-blahblah.zip user\n```\n\n```\n# chown -R grav:http /var/lib/grav/user/{pages,plugins,themes}# chmod -R 640 /var/lib/grav/user/{pages,plugins,themes}# find /var/lib/grav/user/{pages,plugins,themes} -type d -exec chmod 750 {} \\;\n```\n\n```\n# chown grav:grav /etc/webapps/grav/config/{site,system}.yaml# chmod 644 /etc/webapps/grav/config/{site,system}.yaml\n```\n\n"
+    },
+    {
+      "title": "Migrating from v1.6 to v1.7",
+      "level": 2,
+      "content": "Migrating from earlier package versions (< 1.7) will most likely require manual intervention. Errors may happen. So backup your data before trying an upgrade from earlier version! This comprises at least the /usr/share/webapps/grav/user directory.\n\nThe upgrade will probably fail right away with lots of error messages complaining about files already existing under /usr/share/webapps/grav/vendor. Just delete this directory.\n\nSince the last package of version 1.6 (v1.6.28, 2020-11-18) php has been upgraded from version 7 to 8. This may render some of your plugins non-functional.\n\nGrav v1.7 has become stricter in many ways. See Grav's migration guide about details.\n\nDo not try to tweak your setup to use system user http as used to be. For good reasons Arch Linux' web application package guidelines dictates to use a dedicated system user (here grav) to run the application.\n\nProbably the best migration strategy is to backup the /usr/share/webapps/grav/user directory, uninstall Grav and all dependent packages, remove all remnants of the Grav installation (including all Grav specific configurations with your web server and application server), update your system (including PHP) and then install Grav from scratch. When everything is set up and your server successfully presents Grav's default page you can start to restore your previous content.\n\n"
+    },
+    {
+      "title": "Upgrade",
+      "level": 2,
+      "content": "Upgrading Grav itself must exclusively be done by pacman (or some AUR wrapper)!\n\nUnlike upgrading Grav itself, upgrading plugins and themes must be done with gpm update or via the admin plugin.\n\nAlso not recommended is to download Grav releases as ZIP archives directly from Grav's GitHub project site and copy around stuff in the filesystem. Only do so when you know exactly what you are doing.\n\n"
+    }
+  ]
+}

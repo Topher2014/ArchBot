@@ -1,0 +1,131 @@
+{
+  "title": "TrueCrypt",
+  "url": "https://wiki.archlinux.org/title/TrueCrypt",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Data-at-rest encryption\n- Tcplay\n- Tomb\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nVeraCrypt is fork of TrueCrypt, a free open source on-the-fly encryption (OTFE) program. Some of its features are:\n\n- Virtual encrypted disks within files that can be mounted as real disks.\n- Encryption of an entire hard disk partition or a storage device/medium.\n- All encryption algorithms use the LRW mode of operation, which is more secure than CBC mode with predictable initialization vectors for storage encryption.\n- \"Hidden volumes\" within a normal \"outer\" encrypted volume. A hidden volume can not be distinguished from random data without access to a passphrase and/or keyfile.\n\nFor more details on how TrueCrypt compares to other disk encryption solution, see Data-at-rest encryption#Comparison table.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the veracrypt package.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Accessing a TrueCrypt or VeraCrypt container using cryptsetup",
+      "level": 2,
+      "content": "cryptsetup supports opening VeraCrypt and TrueCrypt containers natively, without the need of the veracrypt package. Use the following command as a guideline.\n\n```\n$ cryptsetup --type tcrypt open container-to-mount container-name\n```\n\nIf using a custom Personal Iteration Multiplier (PIM), use the --veracrypt-query-pim option to be promoted for the PIM.\n\nReplace container-to-mount with the device file under /dev or the path to the file you wish to open. Upon successful opening, the plaintext device will appear as /dev/mapper/container-name, which you can mount like any normal device.\n\nIf you are using key files, supply them using the --key-file option, to open a hidden volume, supply the --tcrypt-hidden option and for a partition or whole drive that is encrypted in system mode use the --tcrypt-system option.\n\nSee cryptsetup(8) § TCRYPT (TRUECRYPT AND VERACRYPT COMPATIBLE) EXTENSION for more details and all supported options.\n\n"
+    },
+    {
+      "title": "Automounting using /etc/crypttab",
+      "level": 3,
+      "content": "Since version 206, systemd supports (auto)mounting TrueCrypt containers at boot or runtime using /etc/crypttab.\n\nThe following example setup will mount /dev/sda2 in system encryption mode as soon as /mnt/truecrypt-volume is accessed using systemd's automounting logic. The passphrase to open the volume is given in /etc/volume.password. Note that the device file given in /etc/fstab needs to be the one from /dev/mapper/ and not, for example, from /dev/disk/by-uuid/ for automounting logic to kick in. Other than that you can still reliably identify the encrypted volume itself inside of /etc/crypttab using device file names from /dev/disk/.\n\n```\n/etc/crypttab\n```\n\n```\ntruecrypt-volume    /dev/sda2    /etc/volume.password    tcrypt-system,noauto\n```\n\nFor a standard truecrypt volume, use tcrypt instead of tcrypt-system. And for a hidden one, use tcrypt-hidden. For a veracrypt volume, use tcrypt-veracrypt alongside tcrypt.\n\n```\n/etc/fstab\n```\n\n```\n/dev/mapper/truecrypt-volume    /mnt/truecrypt-volume    auto    noauto,x-systemd.automount    0    0\n```\n\nInstead of auto, you can put directly your filesystem, and put usual mount options. It is useful with NTFS for mounting as a normal user.\n\nSee crypttab(5) for more details and options supported.\n\n"
+    },
+    {
+      "title": "Encrypting a file as a virtual volume",
+      "level": 2,
+      "content": "The following instructions will create a file that will act as a virtual filesystem, allowing you to mount it and store files within the encrypted file. This is a convenient way to store sensitive information, such as financial data or passwords, in a single file that can be accessed from Linux, Windows, or Macs.\n\nTo create a new truecrypt file interactively, type the following in a terminal:\n\n```\n$ veracrypt -t -c\n```\n\nFollow the instructions, choosing the default values unless you know what you are doing:\n\n```\nVolume type:\n 1) Normal\n 2) Hidden\nSelect [1]: 1\n```\n\n```\nEnter file or device path for new volume: /home/user/EncryptedFile.tc\n```\n\n```\nEnter volume size (bytes - size/sizeK/sizeM/sizeG): 32M\n```\n\n```\nEncryption algorithm:\n 1) AES\n 2) Blowfish\n 3) CAST5\n 4) Serpent\n 5) Triple DES\n 6) Twofish\n 7) AES-Twofish\n 8) AES-Twofish-Serpent\n 9) Serpent-AES\n10) Serpent-Twofish-AES\n11) Twofish-Serpent\nSelect [1]: 1\n```\n\n```\nHash algorithm:\n 1) RIPEMD-160\n 2) SHA-1\n 3) Whirlpool\nSelect [1]: 1\n```\n\nFilesystem:\n\n```\n1) None\n2) FAT\n3) Linux Ext2\n4) Linux Ext3\n5) Linux Ext4\n```\n\nSelect [2]:\n\n```\nEnter password for new volume '/home/user/EncryptedFile.tc': *****************************\nRe-enter password: *****************************\n```\n\n```\nEnter keyfile path [none]:\n```\n\n```\nPlease type at least 320 randomly chosen characters and then press Enter:\n```\n\n```\nDone: 32.00 MB  Speed: 10.76 MB/s  Left: 0:00:00  \nVolume created.\n```\n\nYou can now mount the new encrypted file to a previously-created directory:\n\n```\n$ veracrypt -t /home/user/EncryptedFile.tc /home/user/EncryptedFileFolder\n```\n\nNote: **sudo** \n\nOnce mounted, you can copy or create new files within the encrypted directory as if it was any normal directory. When you are you ready to re-encrypt the contents and unmount the directory, run:\n\n```\n$ veracrypt -t -d\n```\n\nAgain, this will require administrator privileges through the use of sudo. After running it check if the files that are to be encrypted are indeed no longer in the directory. (might want to try unimportant data first) If they are still there, note that rm does not make the data unrecoverable.\n\nFor more information about truecrypt in general, run:\n\n```\n$ man veracrypt\n```\n\nSeveral options can be passed at the command line, making automated access and creation a simple task. The man page is highly recommended reading.\n\n"
+    },
+    {
+      "title": "Encrypting a physical volume",
+      "level": 2,
+      "content": "If you want to use a keyfile, create one with this command:\n\n```\nveracrypt --create-keyfile /etc/disk.key\n```\n\nBy default both passphrase and key will be needed to unlock the volume.\n\nCreate a new volume in the device /dev/sda1:\n\n```\n# veracrypt --volume-type=normal -c /dev/sda1\n```\n\nMap the volume to /dev/mapper/truecrypt1:\n\n```\n# veracrypt -N 1 /dev/sda1\n```\n\nIf this command does not for you try this to map the volume:\n\n```\n# veracrypt --filesystem=none --slot=1 /dev/sda1\n```\n\nSimply format the disk like you normally would choosing your favourite file system, except use the path /dev/mapper/truecrypt1. E.g. for ext4 use:\n\n```\n# mkfs.ext4 /dev/mapper/truecrypt1\n```\n\nMount the volume:\n\n```\n# mount /dev/mapper/truecrypt1 /media/disk\n```\n\nMap and mount a volume:\n\n```\n# veracrypt /dev/sda1 /media/disk\n```\n\nUnmount and unmap a volume:\n\n```\n# veracrypt -u /dev/sda1\n```\n\n"
+    },
+    {
+      "title": "Creating a hidden volume",
+      "level": 2,
+      "content": "First, create a normal outer volume as described in #Encrypting a physical volume.\n\nMap the outer volume to /dev/mapper/truecrypt1:\n\n```\n# veracrypt -N 1 /dev/sda1\n```\n\nCreate a hidden truecrypt volume in the free space of the outer volume:\n\n```\n# veracrypt --type hidden -c /dev/sda1\n```\n\nYou need to use another passphrase and/or keyfile here than the one you used for the outer volume.\n\nUnmap the outer truecrypt volume and map the hidden one:\n\n```\n# veracrypt -d /dev/sda1\n# veracrypt -N 1 /dev/sda1\n```\n\nJust use the passphrase you chose for the hidden volume and TrueCrypt will automatically choose it before the outer.\n\nCreate a file system on it (if you have not already) and mount it:\n\n```\n# mkfs.ext4 /dev/mapper/truecrypt1\n# mount /dev/mapper/truecrypt1 /media/disk\n```\n\nMap and mount the outer volume with the hidden write-protected:\n\n```\nveracrypt -P /dev/sda1 /media/disk\n```\n\n"
+    },
+    {
+      "title": "Mount a special filesystem",
+      "level": 2,
+      "content": "In the following example I want to mount a ntfs-volume, but TrueCrypt does not use ntfs-3g by default (so there is no write access; checked in version 6.1). The following command works for me:\n\n```\nveracrypt --filesystem=ntfs-3g --mount /file/you/want/to/mount\n```\n\nYou may also want to mount ntfs volume without execute flag on all files\n\n```\nveracrypt --filesystem=ntfs-3g --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002\n```\n\n"
+    },
+    {
+      "title": "Mount volumes via fstab",
+      "level": 2,
+      "content": "First of all, we need to write a script which will handle the way mounting via fstab is done. Place the following in /usr/bin/mount.truecrypt:\n\n```\n#!/bin/sh\nDEV=\"$1\"\nMNTPT=\"$2\"\nOPTIONS=\"\"\nTCOPTIONS=\"\"\n\nshift 3\nIFS=','\nfor arg in $*; do\n    case \"$arg\" in\n        system)                   TCOPTIONS=(${TCOPTIONS[*]} --m=system);;\n        fs*)                      TCOPTIONS=(${TCOPTIONS[*]} --filesystem=${arg#*=});;\n        keyfiles*)                TCOPTIONS=(${TCOPTIONS[*]} --keyfiles=${arg#*=});;\n        password*)                TCOPTIONS=(${TCOPTIONS[*]} --password=${arg#*=}) && echo \"password triggered\" ;;\n        protect-hidden*)          TCOPTIONS=(${TCOPTIONS[*]} --protect-hidden=${arg#*=});;\n        *)                        OPTIONS=\"${OPTIONS}${arg},\";;\n\n    esac\ndone\n\n/bin/veracrypt --text --non-interactive ${DEV} ${MNTPT} ${TCOPTIONS[*]} --fs-options=\"${OPTIONS%,*}\"\n```\n\nAlso do not forget to make the file executable.\n\nFinally, add the device to fstab somewhat like this:\n\n```\n/dev/sdb3 /mnt truecrypt fs=vfat,defaults 0 0\n```\n\n"
+    },
+    {
+      "title": "Mount volumes as a normal user",
+      "level": 2,
+      "content": "TrueCrypt needs root privileges to work: this procedure will allow normal users to use it, also giving writing permissions to mounted volumes.\n\nBoth methods below require Sudo. Make sure it is configured before proceeding.\n\n"
+    },
+    {
+      "title": "Method 1: add a truecrypt group",
+      "level": 3,
+      "content": "Create a new group called truecrypt and give it the necessary permissions. Any users that belongs to that group, will be able to use TrueCrypt.\n\n```\n# groupadd truecrypt\n```\n\nEdit the sudo configuration:\n\n```\n# visudo\n```\n\nAppend the following lines at the bottom of the sudo configuration file:\n\n```\n# Users in the truecrypt group are allowed to run TrueCrypt as root.\n%truecrypt ALL=(root) NOPASSWD:/usr/bin/truecrypt\n```\n\nYou can now add your users to the truecrypt group:\n\n```\n# gpasswd -M first_user,second_user,etc truecrypt\n```\n\nAfter that, you can mount your device by\n\n```\n# veracrypt --mount /path/to/device /path/to/mountpoint\n```\n\nDefault mountpoint is /media/truecrypt1. Normally, it is not necessary to explicitly specify the filesystem of your device using the --filesystem flag.\n\nIt is definitely reasonable to give truecrypt some permission masks. Otherwise, every file on your mounted device will be executable. So instead of the above, you can use\n\n```\n# veracrypt --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002 --mount /PATH/TO/DEVICE /PATH/TO/MOUNTPOINT\n```\n\nand add this line to your bash configuration file, ~/.bashrc as an alias:\n\n```\nalias tc1='veracrypt --fs-options=users,uid=$(id -u),gid=$(id -g),fmask=0113,dmask=0002 --mount /path/to/device\"\" /path/to/mountpoint'\n```\n\nTo mount this specific device, use\n\n```\n# tc1\n```\n\nas a normal user.\n\n"
+    },
+    {
+      "title": "Method 2: sudo simplified",
+      "level": 3,
+      "content": "Simply enable desired user to run truecrypt without a password:\n\n```\n# visudo\n```\n\nAppend the following:\n\n```\nUSERNAME ALL = (root) NOPASSWD:/usr/bin/veracrypt\n```\n\nalternatively, if you make use of the wheel group:\n\n```\n%wheel ALL = (root) NOPASSWD:/usr/bin/veracrypt\n```\n\nIf you have any difficulties with permissions as a normal user, just add the -u flag to the truecrypt mount command, for example:\n\n```\n$ veracrypt -u /home/user/EncryptedFile.tc /home/user/EncryptedFileFolder\n```\n\n"
+    },
+    {
+      "title": "Automatic mount on login",
+      "level": 3,
+      "content": "Simply add:\n\n```\n$ veracrypt /home/user/Encrypted File.tc /home/user/Encrypted File Folder <<EOF\npassword\nEOF\n```\n\nto your startup procedure. Do not use the -p switch, this method is more secure. Otherwise everyone can just look up the password via ps and similar tools, as it is in the process name! source\n\nThe most recent truecrypt has a couple of followup questions. If you have expect installed, this will work (assuming no keyfile and no desire to protect hidden volume), saved to a file with root-only perms called from /etc/rc.local:\n\n```\n#! /bin/bash\nexpect << EOF\nspawn /usr/bin/truecrypt ''/path/to/EncryptedFile'' ''/mount/point''\nexpect \"Enter password\"\nsend \"volume password\\n\"\nexpect \"Enter keyfile\"\nsend \"\\n\"\nexpect \"Protect hidden volume\"\nsend \"\\n\"\nexpect eof;\nEOF\n```\n\nOf course, this is not as secure as entering your password manually. But for some use cases, such as when your TrueCrypt filesystem is in a file on shared storage, it is better than being unencrypted.\n\n"
+    },
+    {
+      "title": "Safely unmount and unmap volumes (on shutdown)",
+      "level": 2,
+      "content": "You can unmount a specific device by\n\n```\n# veracrypt -d /path/to/mountpoint\n```\n\nor leave away the path to unmount all truecrypt volumes.\n\nIf you want your truecrypt device to be unmounted automatically at shutdown, add the following to the file /etc/rc.local.shutdown:\n\n```\nif (/usr/bin/veracrypt --text --list)\nthen {\n/usr/bin/veracrypt -d\nsleep 3\n}\nfi\n```\n\nYou can also leave away the sleep command, it is just to give the unmounting some time to complete before the actual shutdown.\n\n"
+    },
+    {
+      "title": "TrueCrypt is already running",
+      "level": 3,
+      "content": "If a messagebox TrueCrypt is already running appears when starting TrueCrypt, check for a hidden file in the home directory of the concerned user called .TrueCrypt-lock-username. Substitute username with the individual username. Delete the file and start TrueCrypt again.\n\n"
+    },
+    {
+      "title": "Deleted stale lockfile",
+      "level": 3,
+      "content": "If you always get a message \"Delete stale lockfile [....]\" after starting Truecrypt, the Truecrypt process with the lowest ID has to be killed during Gnome log out. Edit /etc/gdm/PostSession/Default and add the following line before exit 0:\n\n```\nkill $(ps -ef | grep veracrypt | tr -s ' ' | cut -d ' ' -f 2)\n```\n\n"
+    },
+    {
+      "title": "NTFS",
+      "level": 4,
+      "content": "Should files resp. folders containing Unicode characters in their names be incorrectly or not at all displayed on TrueCrypt NTFS volumes (while e. g. being correctly handled on non-encrypted NTFS partitions), first verify that you have the NTFS-3G driver installed and then create the following symlink as root:\n\n```\nln -s /sbin/mount.ntfs-3g /sbin/mount.ntfs\n```\n\nThat will cause TrueCrypt to automatically use this driver for NTFS volumes, having the same effect as the explicit use of\n\n```\ntruecrypt --filesystem=ntfs-3g /path/to/volume\n```\n\nvia the console.\n\nOne may also consider setting e.g.:\n\n```\nrw,noatime\n```\n\namongst other options in the TrueCrypt GUI (Settings > Preferences > Mount Options).\n\n"
+    },
+    {
+      "title": "FAT",
+      "level": 4,
+      "content": "Similarly, FAT32 volumes created using Windows may use Unicode rather than ISO 8859-1. In order to use UTF-8 globally, set the mount option:\n\n```\niocharset=utf8\n```\n\nAlternatively, when mounting volumes locally use:\n\n```\n--fs-options=iocharset=utf8\n```\n\nSince linux-4.14.4, UTF8 charset is enabled by default. So in order to mount volumes using ISO 8859-1 encoding, you need to use --fs-options=utf8=no, see FS#56781.\n\n"
+    },
+    {
+      "title": "Unmount error (device mapper)",
+      "level": 3,
+      "content": "If you always get a message \"device-mapper: remove ioctl failed: Device or resource busy\" when attempting to dismount your truecrypt volume, the solution is to goto: Setting > Preferences > System Integration > Kernel Service and check the box\n\n```\nDo not use kernel cryptographic services\n```\n\n"
+    },
+    {
+      "title": "Mount error (device mapper, truecrypt partition)",
+      "level": 3,
+      "content": "When attempting to mount your truecrypt volume, a message like this one may appear:\n\n```\nError: device-mapper: create ioctl failed: Device or resource busy\nCommand failed\n```\n\nIf so, run:\n\n```\n# cryptsetup remove /dev/mapper/truecrypt1\n```\n\n"
+    },
+    {
+      "title": "Failed to set up a loop device",
+      "level": 3,
+      "content": "If you get a message \"Failed to set up a loop device\" when trying to create/mount a TrueCrypt volume, it may be because you updated your kernel recently without rebooting. Rebooting should fix this error.\n\nOtherwise, check if loop has been loaded as kernel module:\n\n```\n$ lsmod | grep loop\n```\n\nIf not listed, retry the TrueCrypt command after modprobe loop. Should it work, consider to add loop to the modules in /etc/modules-load.d:\n\n```\n# tee /etc/modules-load.d/truecrypt.conf <<< \"loop\"\n```\n\nWith newer kernel versions there are no loop devices created at startup. If there are no loop devices the first time mounting a container file, TrueCrypt fails (\"Failed to set up a loop device\") but also creates the maximum number of loop devices (usually 256), mounting should now work.\n\nTo avoid this you can create a loop device before mounting a file:\n\n```\n# mknod -m 0660 /dev/loop8 b 7 8\n```\n\nThis creates /dev/loop8. Or create some loop devices at startup:\n\n```\n# echo \"options loop max_loop=8\" > /etc/modprobe.d/eightloop.conf\n```\n\nChange max_loop=8 to the number of devices you need.\n\n"
+    },
+    {
+      "title": "System partition passwords need en_US keymap",
+      "level": 3,
+      "content": "If you are using Xorg (which you most likely are, should you not know what that is), use the following command to use US keymap until restart:\n\n```\n# setxkbmap us\n```\n\n"
+    },
+    {
+      "title": "Permission denied on NTFS volume",
+      "level": 3,
+      "content": "If you cannot modify the filesystem, although permissions seem to be correct, this can be a result of not having NTFS-3G installed, see NTFS.\n\n"
+    },
+    {
+      "title": "Corrupted standard volume file system",
+      "level": 3,
+      "content": "In case you cannot access your VeraCrypt volume or container anymore, install testdisk. See more information on CGSecurity page.\n\n```\n$ ./truecrypt -t --filesystem=none /data/data_for_testdisk/truecrypt.dd \nEnter password for /data/data_for_testdisk/truecrypt.dd: \nEnter keyfile [none]: \nProtect hidden volume? (y=Yes/n=No) [No]: \nEnter system administrator password: \n$ mount\n...\ntruecrypt on /tmp/.truecrypt_aux_mnt1 type fuse.truecrypt (rw,nosuid,nodev,allow_other)\n# testdisk /tmp/.truecrypt_aux_mnt1/volume\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- VeraCrypt homepage\n- Truecrypt tutorial on HowToForge\n- There is a good chance the CIA has a backdoor? (via Wikipedia)\n\n"
+    }
+  ]
+}

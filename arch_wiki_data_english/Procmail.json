@@ -1,0 +1,81 @@
+{
+  "title": "Procmail",
+  "url": "https://wiki.archlinux.org/title/Procmail",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Procmail is a program for filtering, sorting and storing email. It can be used both on mail clients and mail servers. It can be used to filter out spam, checking for viruses, to send automatic replies, etc.\n\nThe goal of this article is to teach the configuration of procmail. This article assumes you already have either a email client (Mutt, nmh, etc) or a mail server (Sendmail, Postfix, etc) working, that can use (or requires) procmail. It also assumes you have at least basic knowledge on regular expressions. This article will give only a minimal explanation, for a complete manual, check the procmailrc(5).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the package procmailAUR.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The configuration is going to be saved on ~/.procmailrc if this is the configuration for an email client, or on /etc/procmailrc if is going to be used by an email server.\n\nThe configuration is composed of two sections; assignments and recipes.\n\n"
+    },
+    {
+      "title": "Assignments",
+      "level": 3,
+      "content": "The assignments section provides variables for procmail\n\n```\nPATH=/bin:/usr/bin\nMAILDIR=$HOME/Mail\nDEFAULT=$HOME/Mail/inbox\nLOGFILE=/dev/null\nSHELL=/bin/sh\n```\n\n"
+    },
+    {
+      "title": "Recipes",
+      "level": 3,
+      "content": "Recipes are the main section, they are the actual filters that do the actions. Recipes have the following format:\n\n```\n:0 [flags] [ : [locallockfile] ]\n<zero or more conditions (one per line)>\n<exactly one action line>\n```\n\nThe conditions are extended regular expressions, with some few extra options. Conditions always start with an asterisk.\n\nThe action can be only a mailbox name, or an external program.\n\n"
+    },
+    {
+      "title": "Flags and lockfile",
+      "level": 4,
+      "content": "For basic recipes, you do not need any flags. But they can be necessary if your script calls an external command. Here is a list of some of the most used flags:\n\n- f Consider the pipe as a filter.\n- w Wait for the filter or program to finish and check its exitcode (normally ignored); if the filter is unsuccessful, then the text will not have been filtered.\n\nUsing a : after the :0 is to use a lockfile. A lockfile is necessary to prevent problems if 2 or more instances of procmail are working at the same time (that may happen if 2 or more email arrive almost at the same moment).\n\nYou can set the name of the lockfile after the :\n\n"
+    },
+    {
+      "title": "Conditions",
+      "level": 4,
+      "content": "A condition starts with an asterisk, following an extended regexp, like this one:\n\n```\n* ^From.* someperson@\\w+.com\n```\n\n"
+    },
+    {
+      "title": "Action",
+      "level": 4,
+      "content": "An action can be something as simple as\n\n```\nwork\n```\n\nin that case, the mail that complies with the condition will be saved in the work inbox.\n\nAn action can also start with a pipe, which means the message is going to be passed to the standard input of the command following the pipe. For example:\n\n```\n| /usr/bin/vendor_perl/spamc\n```\n\nBy default, once a recipe's action is done, the processing is over.\n\nIf the f flag was used, the command can alter the message and keep reading recipes. In this example, the SpamAssassin command will add headers to the mail, with its spam status level, which later can be used by another recipe to block it, or store it on a different mailbox.\n\n"
+    },
+    {
+      "title": "SpamAssassin",
+      "level": 3,
+      "content": "Here is an example using SpamAssassin to block spam. You should already have SpamAssassin installed and working.\n\n```\n# By using the f and w flags and no condition, SpamAssassin is going add the X-Spam headers to every single mail, and then process other recipes.\n# No lockfile is used.\n:0fw\n| /usr/bin/vendor_perl/spamc\n\n# Messages with a 5 stars or higher spam level are going to be deleted right away\n# And since we never touch any inbox, no lockfile is needed.\n:0\n* ^X-Spam-Level: \\*\\*\\*\\*\\*\n/dev/null\n\n# If a mail with spam-status:yes was not deleted by previous line, it could be a false positive. So its going to be sent to an spam mailbox instead.\n# Since we do not want the possibility of one procmail instance messing with another procmail instance, we use a lockfile\n:0:\n* ^X-Spam-Status: Yes\n$HOME/mail/Spam\n```\n\n"
+    },
+    {
+      "title": "ClamAV",
+      "level": 3,
+      "content": "An example using the ClamAV antivirus.\n\n```\n# We make sure its going to use the sh shell. Mostly needed for mail-only account that have /usr/bin/nologin as shell\nSHELL=/bin/sh\n\n# We will scan the mail with clam using the standard input, and saving the result on the AV_REPORT variable\nAV_REPORT=`clamdscan --stdout --no-summary - |sed 's/^stream: //'`\n\n# We check if the word FOUND was in the result and save \"Yes\" or \"No\" according to that\nVIRUS=`echo $AV_REPORT|sed '/FOUND/ { s/.*/Yes/; q  };  /FOUND/  !s/.*/No/'`\n\n# formail is a filter that can alter a mail message, while keeping the correct format. We use it here to add/alter a header called \n# X-Virus with either value Yes or No\n:0fw\n| formail -i \"X-Virus: $VIRUS\"\n\n# And if we just added \"X-Virus: Yes\", we will also add another header with the scan result, and alter the subject, again, with the scan result.\n# Since we are using the f flag, the mail is going to be delivered anyway.\n:0fw\n* ^X-Virus: Yes\n| formail -i \"X-Virus-Report: $AV_REPORT\" -i \"Subject: [Virus] $AV_REPORT\"\n```\n\n"
+    },
+    {
+      "title": "Filtering mail to a different mailbox",
+      "level": 3,
+      "content": "If a coworker keeps using forward to send you jokes and other non serious stuff, but at the same time, writes you work related mails, you could save the forwarded mails (most likely not-work-related mails) on a different mailbox.\n\n```\n:0:\n* ^From.*coworker@domain.com\n* ^Subject.*FW:\n$HOME/mail/jokes\n```\n\n"
+    },
+    {
+      "title": "Postfix Piping",
+      "level": 3,
+      "content": "To pipe from postfix open /etc/postfix/main.cf then add\n\n```\nmailbox_command = /usr/bin/procmail -a \"$EXTENSION\"\n```\n\nAfter reloading postfix.service, email will be send to procmail for filtering and delivery.\n\n"
+    },
+    {
+      "title": "Exim",
+      "level": 3,
+      "content": "To use with Exim, invoke procmail in the .forward file, or edit /etc/mail/exim.conf to use it directly as a local delivery agent:\n\n```\n# under \"Routers\" (order important, define before the \"localuser:\" router)\nprocmail:\n  driver = accept\n  check_local_user\n  # only invoke procmail for users with a conf file:\n  require_files = $local_part_data:$home/.procmailrc\n  transport = procmail_pipe\n\n# under \"Transports\" (in any order)\nprocmail_pipe:\n  driver = pipe\n  command = /usr/bin/procmail -d $local_part_data\n  return_path_add\n  delivery_date_add\n  envelope_to_add\n  # Next 2 lines unneeded unless using obsolete MBOX files\n  # check_string = \"From \"\n  # escape_string = \">From \"\n  umask = 077\n  user = $local_part_data\n  group = mail\n```\n\nThis was tested on Arch's standard Exim 4.94-2 package.\n\n"
+    },
+    {
+      "title": "Sending to Dovecot",
+      "level": 3,
+      "content": "To forward to dovecot change the following assignments\n\nThe deliver will be the first attempt then Default will be the back up.\n\n```\nDELIVER=\"/usr/lib/dovecot/deliver -d $LOGNAME\"\nDEFAULT=\"$HOME/Maildir/\"\nMAILDIR=\"$HOME/Maildir/\"\n```\n\nThe advantage is the dovecot will have its databases up to date at all times.\n\nThen to spam mail and deliver for example\n\n```\n# deliver spam to spam folder\n:0 w\n* ^X-Spam-Status: Yes\n| $DELIVER -m Spam\n\n# deliver to INBOX and stop\n:0 w\n| $DELIVER\n```\n\nFurther information can be found here https://wiki2.dovecot.org/procmail\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Procmail Homepage\n- Last working version of the Procmail Homepage from the Web Archive\n\n"
+    }
+  ]
+}

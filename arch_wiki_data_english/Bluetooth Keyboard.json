@@ -1,0 +1,46 @@
+{
+  "title": "Bluetooth Keyboard",
+  "url": "https://wiki.archlinux.org/title/Bluetooth_Keyboard",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article describes how to set up a Bluetooth HID keyboard with Arch Linux, bluez version 5.\n\n"
+    },
+    {
+      "title": "Pairing process",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with Bluetooth.** This article or section is a candidate for merging with Bluetooth.\n\nThis article or section is a candidate for merging with Bluetooth.\n\nLogin to the affected computer by a wired keyboard or by ssh.\n\nFirst, make sure the local Bluetooth controller (e.g. a Bluetooth dongle the built in Bluetooth radio) is recognized:\n\n```\n# lsusb\n```\n\n```\nBus 001 Device 004: ID 0a12:0001 Cambridge Silicon Radio, Ltd Bluetooth Dongle (HCI mode)\nBus 001 Device 003: ID 0424:ec00 Standard Microsystems Corp. SMSC9512/9514 Fast Ethernet Adapter\nBus 001 Device 002: ID 0424:9512 Standard Microsystems Corp. LAN9500 Ethernet 10/100 Adapter / SMSC9512/9514 Hub\nBus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub\n```\n\nThe above output is from a Raspberry-Pi revision 'B' with archlinux-arm and a Keysonic Bluetooth Dongle.\n\nThree items worth remembering:\n\n- Bluetooth devices (keyboard) and controllers (dongle) need to be paired once.\n- The Bluetooth controller needs to be powered up after every boot.\n- The Bluetooth controller needs to be told to connect to the keyboard after every boot.\n\nPairing is a one time process, required only once. There are Bluetooth keyboards sold with a Bluetooth dongle which come already paired, but that is not certain. We will use the bluetoothctl command from bluez-utils to pair our dongle and the keyboard.\n\nPower up can be done with bluetoothctl, or automatically in /etc/bluetooth/main.conf, see below.\n\nSame for connecting, either bluetoothctl or hcitool can be used, the latter is more useful for scripting.\n\nWe will use bluetoothctl for the pairing process. Run the command to get at the [bluetooth]# prompt.\n\n```\n# bluetoothctl\n```\n\n```\n[bluetooth]#\n```\n\nWhile in bluetoothctl power up the controller:\n\n```\n[bluetooth]# power on\n```\n\n```\nChanging power on succeeded\n[CHG] Controller 06:05:04:03:02:01 Powered: yes\n```\n\nNext, tell bluetoothctl to look only for keyboards, and make that the default agent:\n\n```\n[bluetooth]# agent KeyboardOnly\n```\n\n```\nAgent registered\n```\n\n```\n[bluetooth]# default-agent\n```\n\n```\nDefault agent request successful\n```\n\nNext, put your controller (the local dongle) in pairable mode:\n\n```\n[bluetooth]# pairable on\n```\n\n```\nChanging pairable on succeeded\n```\n\nNext, put your keyboard in an active mode, where it is discoverable, i.e. pairable. Some keyboards have a special button for this on the underside, or require a special key combination to be pressed. See the documentation of your keyboard. Please note that this discoverability of a device is time limited; some devices are only visible for 30 seconds, other for 2 minutes. Your mileage may vary.\n\nNext, let the controller scan the Bluetooth frequencies for a suitable device:\n\n```\n[bluetooth]# scan on\n```\n\n```\nDiscovery started\n[CHG] Controller 06:05:04:03:02:01 Discovering: yes\n```\n\nAfter a few seconds the address of the keyboard should be listed as found. This line will repeat over and over, but will not stop you from entering new commands.\n\nNext, actually do the pairing. The address used is the Bluetooth MAC address of the keyboard:\n\n```\n[bluetooth]# pair 01:02:03:04:05:06\n```\n\n```\nPairing successful\n```\n\nNext, make this a trusted device (this allows the device to establish the connection on itself). Again, the Bluetooth MAC address is the address of the keyboard device:\n\n```\n[bluetooth]# trust 01:02:03:04:05:06\n```\n\n```\nTrusted\n```\n\nNext and finally connect to the device (keyboard). Again, the Bluetooth MAC address is the address of the keyboard device:\n\n```\n[bluetooth]# connect 01:02:03:04:05:06\n```\n\n```\nConnection successful\n```\n\nDone. Leave the bluetoothctl utility:\n\n```\n[bluetooth]# quit\n```\n\nNow the external device (i.e. keyboard) and the USB Bluetooth dongle are paired permanently, unless you break the pairing intentionally.\n\n"
+    },
+    {
+      "title": "Bluetooth controller does not show up in lsusb",
+      "level": 3,
+      "content": "Manually load the generic Bluetooth driver:\n\n```\n# modprobe btusb\n```\n\nFor integrated Bluetooth controller, some are not internally wired through USB, and only appear using lspci.\n\n"
+    },
+    {
+      "title": "Bluetooth controller is not visible in bluetoothctl",
+      "level": 3,
+      "content": "Check the unit status of bluetooth.service.\n\nIf the [bluetooth]# prompt is blue and you get No default controller available message when powering on the controller with power on, run bluetoothctl as root.\n\n"
+    },
+    {
+      "title": "Bluetooth keyboard does not work",
+      "level": 3,
+      "content": "Start with basic troubleshooting steps : does the device have power; if so, did it connect to the Bluetooth controller? If not, try with another controller or your smartphone to confirm where the issue lies.\n\n"
+    },
+    {
+      "title": "Error: hci0 ACL packet for unknown connection handle 4",
+      "level": 3,
+      "content": "Try a reset with hciconfig hci0 reset\n\n"
+    },
+    {
+      "title": "Alt and Super are swapped",
+      "level": 3,
+      "content": "Some keyboards have separate macOS and Windows mode. When the keyboard is connected or when modes change, the Apple mode may activate. Remove the hid_apple kernel module and re-connect the keyboard:\n\n```\n# rmmod hid_apple\n```\n\nIf this works, blacklist the module to have a permanent solution.\n\n"
+    },
+    {
+      "title": "Xorg",
+      "level": 2,
+      "content": "Device should be added as /dev/input/event* and your Xorg should add it automatically if you did not disable such feature.\n\n"
+    }
+  ]
+}

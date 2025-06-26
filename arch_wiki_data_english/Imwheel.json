@@ -1,0 +1,61 @@
+{
+  "title": "Imwheel",
+  "url": "https://wiki.archlinux.org/title/Imwheel",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Xorg\n- Mouse acceleration\n- Wayland#Remap keyboard or mouse keys\n\nIMWheel is a tool for tweaking mouse wheel behavior, on a per-program basis. It can map mouse wheel input to keyboard input, increase mouse wheel speed, and has support for modifier keys.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the imwheel package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "See imwheel(1).\n\nIMWheel matches window class strings with regular expressions for deciding which windows to apply tweaks to. To find the specific class strings that are being matched, kill all other IMWheel processes, then run this command:\n\n```\n$ imwheel -d --debug --kill\n```\n\nThis will run IMWheel in the foreground in debug mode. As you use your mouse and keyboard, you will be able to see the window property values that IMWheel is attempting to match.\n\n"
+    },
+    {
+      "title": "Edit your configuration file",
+      "level": 3,
+      "content": "Create or edit ~/.imwheelrc. In this configuration file lines can be added for each program you want to tweak mouse wheel behavior for.\n\nThe syntax of the translation definition is the following:\n\n```\n<Key Modifiers Input>, <Mouse Action Input>, <Key Action Output>\n\n Key Modifiers Input:\n  Alt_L, Alt_R, Meta_L, Meta_R, Control_L, Control_R, Shift_L, Shift_R or None\n Mouse Action Input:\n  Up, Down, Left, Right, Thumb\n Key Action Output:\n  KeySym [, Output Repetitions[, Delay Before KeyUp Event [, Delay Before Next KeyPress Event]]]\n```\n\nThe following example will increase the mouse wheel speed for the document viewer zathura:\n\n```\n# Speed up scrolling for the document viewer\n\"^org\\.pwmt\\.zathura$\"\n    None, Up, Button4, 4\n    None, Down, Button5, 4\n```\n\nThis example enables back/forward thumb buttons for all applications and increases scroll speed in Chromium:\n\n```\n\"^chromium$\"\nNone, Up, Button4, 3\nNone, Down, Button5, 3\n\".*\"\nNone, Thumb1, Alt_L|Left\nNone, Thumb2, Alt_L|Right\n```\n\nKeep in mind that certain values, like the Window title, are Unicode. This can lead to difficulties when trying to write regular expressions that will match them. For example, an em dash (—) looks very much like a standard dash (-), but in regex is considered three \"characters\", not one.\n\nUp and Down may be used in the place of Button4 and Button5 respectively for the mouse wheel.\n\nMatching all programs (using \".*\") can cause unwanted behaviour in some programs; since IMWheel emulates multiple scroll actions for each one the user makes, programs that have actions bound to the mouse wheel will perform those actions more times than expected.\n\nFor example, terminal emulators in which scrolling selects commands from the history will jump multiple items per scroll.\n\nIMWheel catches modifier keys for monitored mouse buttons, for passing them further you need to explicitly configure it to do so. In the example below, the left Ctrl and mouse wheel combinations are passed to Chromium for zooming in/out without multiplying:\n\n```\n# Speed up scrolling for chromium and pass unchanged for zoom\n\"^chromium$\"\n    None, Up, Button4, 4\n    None, Down, Button5, 4\n    Shift_L,   Up,   Shift_L|Button4, 4\n    Shift_L,   Down, Shift_L|Button5, 4\n    Control_L, Up,   Control_L|Button4\n    Control_L, Down, Control_L|Button5\n```\n\nTo match a certain program in the terminal, use Bash to set the program name in the window title before the program is started. See Bash/Prompt customization#Customizing the terminal window title. You may need to reconfigure your terminal emulator to allow the window title to be set by programs running in the shell. Some terminals, like Konsole and GNOME Terminal, do this automatically.\n\n"
+    },
+    {
+      "title": "Run IMWheel",
+      "level": 3,
+      "content": "Run IMWheel simply like so:\n\n```\n$ imwheel\n```\n\nThe program will print its PID and run in the background.\n\n"
+    },
+    {
+      "title": "Run IMWheel on startup using a service",
+      "level": 3,
+      "content": "To avoid starting IMWheel manually, you can run it as part of your systemd startup.\n\nExample:\n\n```\n~/.config/systemd/user/imwheel.service\n```\n\n```\n[Unit]\nDescription=IMWheel\nWants=display-manager.service\nAfter=display-manager.service\n\n[Service]\nType=simple\n#Next line is only required for Xorg, should be removed for Wayland\nEnvironment=XAUTHORITY=%h/.Xauthority\nExecStart=/usr/bin/imwheel -d\nExecStop=/usr/bin/pkill imwheel\nRemainAfterExit=yes\n\n[Install]\nWantedBy=graphical-session.target\n```\n\nAfter creating the service above, reload the systemd manager configuration of the calling user and start/enable the imwheel.service user unit. Verify that the user service is running by checking its unit status or by checking the journal.\n\n"
+    },
+    {
+      "title": "Run IMWheel on startup using a shell script",
+      "level": 3,
+      "content": "Alternatively, you can create a startup.sh script in /etc/profile.d/:\n\n```\n#!/bin/sh\n\nimwheel\n```\n\nAnd then, on restart, it will automatically read and run the file. Always test your script manually before putting it in /etc/profile.d\n\n"
+    },
+    {
+      "title": "Run IMWheel by connecting a device",
+      "level": 3,
+      "content": "IMWheel can also be started and stopped when a device, such as a bluetooth mouse, is connected and disconnected. For example, the scroll speed could be adjusted when an external mouse is connected.\n\nThe device name must be updated to match the systemd device. Run the following command to get a list of possible devices:\n\n```\n$ systemctl --all --full -t device\n```\n\nExample:\n\n```\n~/.config/systemd/user/imwheel.service\n```\n\n```\n[Unit]\nDescription=IMWheel\nBindsTo=sys-subsystem-bluetooth-devices-hci0:1234.device\n\n[Service]\nType=simple\n#Next line is only required for Xorg, should be removed for Wayland\nEnvironment=XAUTHORITY=%h/.Xauthority\nExecStart=/usr/bin/imwheel -d\nExecStop=/usr/bin/imwheel -k\nRemainAfterExit=true\n\n[Install]\nWantedBy=sys-subsystem-bluetooth-devices-hci0:1234.device\n```\n\nEnabling and verification of the service is the same as the startup service. After enabling the service, it will activate IMWheel the next time the device is connected.\n\n"
+    },
+    {
+      "title": "Back/forward buttons not working",
+      "level": 3,
+      "content": "You may need to restrict IMWheel so only the scroll wheel is affected to prevent it from breaking other mouse input like the back/forward buttons. You can do this with the -b option.\n\n```\n$ imwheel -b \"45\"\n```\n\nSee also a related question on Ask Ubuntu.\n\n"
+    },
+    {
+      "title": "Scroll speed is not affected when I hover over the target window",
+      "level": 3,
+      "content": "In order for IMWheel to affect the scroll speed of a window, it must be focused. Scroll speed of an unfocused window will remain unchanged.\n\n"
+    },
+    {
+      "title": "Freezing while scrolling Amazon.com in Chrome and Firefox",
+      "level": 3,
+      "content": "Presumably, Amazon.com runs JavaScript that loads content based on the user's assumed scroll point on the page, without taking IMWheel into consideration. This leads to pages with missing content, increased CPU usage, and other bugs.\n\nYou may consider disabling IMWheel for these browsers and instead solving the problem using a browser extension, like Fast Scroll in the Chrome Web Store (add \"amazon.com\" to blacklist or a similar bug occurs), or FoxScroller for Firefox.\n\n"
+    }
+  ]
+}

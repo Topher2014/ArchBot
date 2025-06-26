@@ -1,0 +1,51 @@
+{
+  "title": "Lenovo ThinkPad T480s",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T480s",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nGPU (Intel) | 8086:5917 | Yes\nGPU (NVIDIA) |  | Untested\nWireless | 8086:24fd | Yes\nAudio | 8086:9d71 | Yes\nTrackPoint |  | Yes [1]\nTouchpad |  | Yes [2]\nWebcam | 5986:2113 | Yes\nFingerprint reader | 06cb:009a | Yes\nMobile broadband |  | Yes\nBluetooth | 8087:0a2b | Yes\nSmartcard reader | 058f:9540 | Yes\nSD card reader | 0bda:0316 | Yes\nPrivacyGuard |  | Yes\n\nThis article covers the installation and configuration of Arch Linux on a Lenovo T480s laptop. For the most part things work out-of-the-box, but some features may need to be configured manually.\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Powersaving",
+      "level": 2,
+      "content": "Without special configuration and with default firmware settings, power usage is a bit high (around 7,5W in idle). There are a few knobs to improve battery life:\n\n- Set \"Thunderbolt BIOS Assist Mode\" to \"Enabled\" in the EFI firmware interface. This seems to reduce number of idle wakeups. However, kernel versions since 4.19+ should support it natively ([8]), and some power consumption improvements is reported if this is switched to \"Disabled\" [9].\n- Disable unused peripherals under \"Security\" -> \"I/O port access\" in the firmware. This especially applies to the SD/MMC-cardreader, which seems to drain some power even when idle\n\n- However, kernel versions since 4.19+ should support it natively ([8]), and some power consumption improvements is reported if this is switched to \"Disabled\" [9].\n\nAs of Kernel 4.15, DisplayPort PSR (Panel self refresh) is disabled by default and broken when forcibly enabled (system hangs after a few seconds, display lag). 4.17-rc1 seems to improve a lot in this regard, but PSR still sometimes causes the screen to freeze for a few seconds.\n\n"
+    },
+    {
+      "title": "SD card reader",
+      "level": 3,
+      "content": "According to various reports the SD card reader drains several watts of power. If you do not want to disable it in bios because you use it semi-regularly, you can turn it off by unbinding its driver using this command:\n\n```\n# echo 2-3 > /sys/bus/usb/drivers/usb/unbind\n```\n\nYou can then turn the reader back on by running:\n\n```\n# echo 2-3 > /sys/bus/usb/drivers/usb/bind\n```\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 2,
+      "content": "The fingerprint sensor is not supported by libfprint.\n\nThere is a project python-validity based on open-fprintd, see [10].\n\nInstall python-validityAUR or python-validity-gitAUR and enroll your fingerprint:\n\n```\n$ fprintd-enroll\n```\n\nRefer to Fprint#Configuration for configuration.\n\nYou may experience an issue where the fingerprint reader does not work after the laptop wakes up from suspension. To fix this, try enabling the open-fprintd-resume and open-fprintd-suspend systemd services [11]. If the issue is still present, create a unit file as follows, then enable it [12].\n\n```\n/etc/systemd/system/fingerprint-restart.service\n```\n\n```\n[Unit]\nDescription=Restart services to fix fingerprint integration\nAfter=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target\n\n[Service]\nType=oneshot\nExecStart=systemctl restart open-fprintd.service python3-validity.service\n\n[Install]\nWantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target\n```\n\nIf this solves the issue, you may disable open-fprintd-resume and open-fprintd-suspend again.\n\n"
+    },
+    {
+      "title": "PrivacyGuard",
+      "level": 2,
+      "content": "The PrivacyGuard feature is referred to as LCD Shadow and was introduced in Linux 5.4.[13]\n\nTo enable or turn on the LCD shadow:\n\n```\n# echo 1 > /proc/acpi/ibm/lcdshadow\n```\n\nConversely, use 0 to disable it:\n\n```\n# echo 0 > /proc/acpi/ibm/lcdshadow\n```\n\n```\n$ cat /proc/acpi/ibm/lcdshadow\n```\n\n```\nstatus:         not supported\n```\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Table content:\nKey | Visible?1 | Marked?2 | Effect\nFn+Esc | No | Yes | Toggles Fn lock\nF1 | Yes | Yes | XF86AudioMute\nF2 | Yes | Yes | XF86AudioLowerVolume\nF3 | Yes | Yes | XF86AudioRaiseVolume\nF4 | Yes | Yes | XF86AudioMicMute\nF5 | Yes | Yes | XF86MonBrightnessDown\nF6 | Yes | Yes | XF86MonBrightnessUp\nF7 | Yes | Yes | XF86Display\nF8 | Yes | Yes | XF86WLAN\nF9 | Yes | Yes | XF86Tools\nF10 | Yes | Yes | XF86Bluetooth\nF11 | Wayland only3 | Yes | XF86Keyboard\nF12 | Yes | Yes | XF86Favorites\nFn+Space | No | Yes | Controls the keyboard backlight\nFn+Left | Yes | No | Home\nFn+Right | Yes | No | End\nFn+b | Yes | No | Control_L+Break\nFn+k | Yes | No | Scroll_Lock\nFn+p | Yes | No | Pause\nFn+s | Yes | No | Alt_L Alt_L+Sys_Req\nFn+4 | Yes | No | XF86Sleep\nFn | Yes | No | XF86WakeUp\n\n1. The key is visible to xev and similar tools.\n1. The physical key has a symbol on it, which describes its function.\n1. This key has a keyboard symbol on it. According to Lenovo, it should open the keyboard settings page [14], which it does on Windows 10. It does generate an event on Wayland, but not on X.\n\n"
+    },
+    {
+      "title": "Thermal throttling",
+      "level": 3,
+      "content": "There are reported throttling issues for Lenovo T480/T480s/X1C6 notebooks.[15]\n\nThis script forces the CPU package power limit (PL1/2) to 44 W (29 W on battery) and the temperature trip point to 95 'C (85 'C on battery) by overriding default values in MSR and MCHBAR every 5 seconds (30 on battery) to block the Embedded Controller from resetting these values to default.\n\nInstall the throttled package and enable the throttled.service.[16]\n\nIt is recommended to also undervolt the CPU (Undervolting CPU#intel-undervolt). Most Kaby Lake R chips are able to easily undervolt to -100mV or more, which significantly helps to keep the device from thermal throttling. Throttled also provides undervolting capabilities and will overwrite the undervolt settings applied by intel-undervolt when it updates settings if both services are enabled.\n\n"
+    },
+    {
+      "title": "Fix freezes/hangs on QT applications (with Intel driver)",
+      "level": 3,
+      "content": "See Intel graphics#AccelMethod.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- T480s install video playlist\n\n"
+    }
+  ]
+}

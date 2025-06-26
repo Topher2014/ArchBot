@@ -1,0 +1,301 @@
+{
+  "title": "Pipewire",
+  "url": "https://wiki.archlinux.org/title/Pipewire",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- /Examples\n- Sound system\n- WirePlumber\n\nPipeWire is a new low-level multimedia framework. It aims to offer capture and playback for both audio and video with minimal latency and support for PulseAudio, JACK, ALSA and GStreamer-based applications.\n\nThe daemon based on the framework can be configured to be both an audio server (with PulseAudio and JACK features) and a video capture server.\n\nPipeWire also supports containers like Flatpak and does not rely on the audio and video user groups. Instead, it uses a Polkit-like security model, asking Flatpak or Wayland for permission to record screen or audio.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the pipewire package from the official repositories. There is also lib32-pipewire for multilib support.\n\nPipewire uses systemd/User for management of the server and automatic socket activation.\n\nOptionally, install pipewire-docs to review the documentation.\n\nPipewire can work as drop-in replacement for other audio servers. See #Audio for details.\n\n"
+    },
+    {
+      "title": "Session manager",
+      "level": 3,
+      "content": "Like JACK, PipeWire implements no connection logic internally. The burden of watching for new streams and connecting them to the appropriate output device or application is left to an external component known as a session manager.\n\n"
+    },
+    {
+      "title": "WirePlumber",
+      "level": 4,
+      "content": "WirePlumber is the recommended session manager. It is based on a modular design, with Lua plugins that implement the actual management functionality.\n\nThe stock configuration files are stored in /usr/share/wireplumber. The recommended way to customize Wireplumber is adding snippets overriding specific settings in /etc/wireplumber or ~/.config/wireplumber. [1].\n\nWirePlumber changed its configuration format in version 0.5 from .lua to .conf. See https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/migration.html#config-migration for migration instructions.\n\n"
+    },
+    {
+      "title": "PipeWire Media Session",
+      "level": 4,
+      "content": "pipewire-media-session is deprecated and no longer recommended. It was mostly implemented for testing and as an example for building new session managers.\n\n"
+    },
+    {
+      "title": "GUI",
+      "level": 3,
+      "content": "- coppwr — Low level control and diagnostic GUI for PipeWire.\n\n- Helvum — GTK-based patchbay for PipeWire, inspired by the JACK tool catia. Does not save wire sets.\n\n- qpwgraph — Qt-based Graph/Patchbay for PipeWire, inspired by the JACK tool QjackCtl. Saves wire sets.\n\n- pwvucontrol — Pipewire Volume Control. Alternative to pavucontrol.\n\n- sonusmix — Pipewire audio routing tool\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The PipeWire package provides an initial set of configuration files in /usr/share/pipewire. You should not edit these files directly, as package updates will overwrite your changes. To configure PipeWire, you can copy files from /usr/share/pipewire to the alternate system-wide location /etc/pipewire, or to the user location ~/.config/pipewire. An equally named file in a directory with a higher precedence makes the analogous files ignored. [2]\n\n"
+    },
+    {
+      "title": "Profiles",
+      "level": 3,
+      "content": "Pipewire brings a custom \"Pro Audio\" profile in addition to the PulseAudio profiles, selectable through pavucontrol. The effect of which is described in the PipeWire wiki.\n\n"
+    },
+    {
+      "title": "Audio",
+      "level": 3,
+      "content": "PipeWire can be used as an audio server, similar to PulseAudio and JACK. It aims to replace both PulseAudio and JACK, by providing a PulseAudio-compatible server implementation and ABI-compatible libraries for JACK clients. See the blog post PipeWire Late Summer Update 2020 for more information.\n\nFirst, install pipewire-audio. Depending on the type of audio clients, you may also need to take some extra steps. You may need to install additional firmware for your audio device, see Advanced Linux Sound Architecture#Firmware.\n\n"
+    },
+    {
+      "title": "ALSA clients",
+      "level": 4,
+      "content": "Install pipewire-alsa (and remove pulseaudio-alsa if it was installed) to route all applications using the ALSA API through PipeWire.\n\n"
+    },
+    {
+      "title": "PulseAudio clients",
+      "level": 4,
+      "content": "Install pipewire-pulse. It will replace pulseaudio and pulseaudio-bluetooth. Reboot, re-login or stop pulseaudio.service and start the pipewire-pulse.service user unit to see the effect.\n\nNormally, no further action is needed as the user service pipewire-pulse.socket should be enabled automatically by the package. To check if the replacement is working, run the following command for the Server Name and default input/output:\n\n```\n$ pactl info\n```\n\n```\n...\nServer Name: PulseAudio (on PipeWire x.y.z)\n...\nDefault Sink: alsa_output.{bus}-{device}.{profile}\nDefault Source: alsa_input.{bus}-{device}.{profile}\n...\n```\n\npactl(1) is provided by PulseAudio client library package (libpulse), which is installed with pipewire-pulse as a dependency.\n\nTo adjust output channel volume, the sink needs to be specified using pactl get-sink-volume {sink} using the value of Default Sink: (above) or Name: (below), default sink device (@DEFAULT_SINK@), or Sink # (e.g. 1 below):\n\n```\n$ pactl list sinks | grep -B1 -A9 State:\n```\n\n```\nSink #1\n        State: RUNNING\n        Name: alsa_output.pci-0000_2d_00.4.analog-surround-51\n...\n        Driver: PipeWire\n...\n        Mute: no\n        Volume: front-left: 65536 / 100% / 0.00 dB,   front-right: 65536 / 100% / 0.00 dB,   rear-left: 65536 / 100% / 0.00 dB,   rear-right: 65536 / 100% / 0.00 dB,   front-center: 65536 / 100% / 0.00 dB,   lfe: 65536 / 100% / 0.00 dB\n                balance 0.00\n```\n\nHint: if audio is playing, grep(1) for RUNNING as other devices will be SUSPENDED.\n\nThe balance ratio is calculated automatically. To set the overall volume of the default device use:\n\n```\npactl set-sink-volume @DEFAULT_SINK@ 75%\n```\n\nTo set individual channels, provide each channel volume separately:\n\n```\npactl set-sink-volume @DEFAULT_SINK@ 100% 75% 100% 75% 100% 100%\n```\n\nSource inputs are handled similarly. For further configuration (e.g. regarding modules) see the official upstream Wiki about Migration from PulseAudio and Pipewire-Pulse Configuration.\n\n"
+    },
+    {
+      "title": "JACK clients",
+      "level": 4,
+      "content": "Install pipewire-jack for JACK support. There is also lib32-pipewire-jack for multilib support.\n\npw-jack(1) may be used to start JACK clients, but it is technically not required, as it only serves as a wrapper around the PIPEWIRE_REMOTE, PIPEWIRE_DEBUG and PIPEWIRE_LATENCY environment variables.\n\nIt is possible to request a custom buffer size by setting a quotient of buffersize/samplerate (which equals the block latency in seconds):\n\n```\nPIPEWIRE_LATENCY=\"128/48000\" application\n```\n\n"
+    },
+    {
+      "title": "Bluetooth devices",
+      "level": 4,
+      "content": "PipeWire handles Bluetooth audio devices if the pipewire-audio package is installed.\n\nWirePlumber has profile auto-switching enabled by default. It can automatically switch between HSP/HFP and A2DP profiles whenever an input stream is detected. You can disable it with the following command:\n\n```\n$ wpctl settings --save bluetooth.autoswitch-to-headset-profile false\n```\n\npipewire-media-session has it disabled by default. You can set bluez5.autoswitch-profile property to true to enable it:\n\n```\n/etc/pipewire/media-session.d/bluez-monitor.conf (or ~/.config/pipewire/media-session.d/bluez-monitor.conf)\n```\n\n```\n...\nrules = [\n    {\n        ...\n        actions = {\n            update-props = {\n                ...\n                bluez5.autoswitch-profile = true\n...\n```\n\n"
+    },
+    {
+      "title": "PipeWire patch sets for command line",
+      "level": 4,
+      "content": "qpwgraph can be used to visualize and create connections, and also save and load patch sets.\n\nFor non-GUI needs, the following are bash scripts to save wiresets, load wiresets, and dewire all connections. For saving and loading, use a command-line parameter for the filename.\n\n```\npw-savewires\n```\n\n```\n#!/bin/bash\n\nif [[ \"$#\" -ne 1 ]]; then\n\techo\n\techo 'usage: pw-savewires filename'\n\techo\n\texit 0\nfi\n\nrm $1 &> /dev/null\nwhile IFS= read -r line; do\n\tlink_on=`echo $line | cut -f 4 -d '\"'`\n\tlink_op=`echo $line | cut -f 6 -d '\"'`\n\tlink_in=`echo $line | cut -f 8 -d '\"'`\n\tlink_ip=`echo $line | cut -f 10 -d '\"'`\n\techo \"Saving: \" \"'\"$link_on:$link_op\"','\"$link_in:$link_ip\"'\"\n\techo \"'\"$link_on:$link_op\"','\"$link_in:$link_ip\"'\" >> $1\ndone < <(pw-cli dump short link)\n```\n\n```\npw-loadwires\n```\n\n```\n#!/bin/python\n\nimport sys\nimport csv\nimport os\n\nif len(sys.argv) < 2:\n\tprint('\\n usage: pw-loadwires filename\\n')\n\tquit()\n\nwith open(sys.argv[1], newline='') as csvfile:\n\tpwwreader = csv.reader(csvfile, delimiter=',', quotechar='\"')\n\tfor row in pwwreader:\n\t\tprint('Loading:  ' + row[0] + ' --> ' + row[1])\n\t\tprocess = os.popen('pw-link ' + row[0] + ' ' + row[1])\n```\n\n```\npw-dewire\n```\n\n```\n#!/bin/bash\nwhile read -r line; do\n\techo 'Dewiring: ' $line '...'\n\tpw-link -d $line\ndone < <(pw-cli dump short link {{!}} grep -Eo '^[0-9]+')\n```\n\n"
+    },
+    {
+      "title": "Sharing audio devices with computers on the network",
+      "level": 4,
+      "content": "While PipeWire itself is not network transparent, its pulse implementation supports network streaming. An easy way to share audio between computers on the network is to use the Avahi daemon for discovery. To enable this functionality, install the pipewire-zeroconf package.\n\nMake sure that the avahi-daemon.service is running (and UDP port 5353 is open if using a firewall) on all computers that will be sharing audio.\n\nTo share the local audio devices load the appropriate modules on the host (make sure to use the local IP address):\n\n```\n$ pactl load-module module-native-protocol-tcp listen=192.168.1.10\n$ pactl load-module module-zeroconf-publish\n```\n\nThen load the discovery module on the clients:\n\n```\n$ pactl load-module module-zeroconf-discover\n```\n\nIt is also possible to load the modules automatically by creating a dedicated configuration file:\n\n```\n/etc/pipewire/pipewire-pulse.conf.d/50-network-party.conf (or ~/.config/pipewire/pipewire-pulse.conf.d/50-network-party.conf)\n```\n\n```\npulse.cmd = [\n    { cmd = \"load-module\" args = \"module-native-protocol-tcp listen=192.168.1.10\" }\n    { cmd = \"load-module\" args = \"module-zeroconf-discover\" }\n    { cmd = \"load-module\" args = \"module-zeroconf-publish\" }\n]\n```\n\nIt is possible to stream audio to a device that is posing as an AirPlay Receiver. To enable this functionality, load the RAOP Discover module:\n\n```\n$ pactl load-module module-raop-discover\n```\n\nIt is also possible to load this module automatically by creating a dedicated configuration file:\n\n```\n/etc/pipewire/pipewire.conf.d/raop-discover.conf (or ~/.config/pipewire/pipewire.conf.d/raop-discover.conf)\n```\n\n```\ncontext.modules = [\n   {\n       name = libpipewire-module-raop-discover\n       args = { }\n   }\n]\n```\n\nSome speakers' AirPlay implementations (like Sonos AirPlay 2 speakers) may require opening up ports 6001 and 6002 for incoming UDP traffic on your source device.\n\n"
+    },
+    {
+      "title": "Run PipeWire on top of native JACK",
+      "level": 4,
+      "content": "PipeWire can also run as a JACK client on top of the native JACK daemon if desired.\n\nSee JACK and PipeWire (PipeWire wiki) and JACK Bridge (PipeWire wiki) for more information and additional configuration (like available channels for example).\n\nTo use it install the pipewire-jack-client and start JACK. Pipewire should be bridged automatically.\n\nNote: It can manually be loaded (as explained by pactl(1)) like a PulseAudio module: pactl load-module module-jackdbus-detect before starting jack.\n\nIt can manually be loaded (as explained by pactl(1)) like a PulseAudio module: pactl load-module module-jackdbus-detect before starting jack.\n\n"
+    },
+    {
+      "title": "Use ALSA dmix devices as PipeWire sinks",
+      "level": 4,
+      "content": "It is possible to have a PipeWire server (or multiple, for each user) output to ALSA via ALSA dmix devices. This allows you to use ALSA as the primary audio output system while being able to use non-ALSA devices such as Bluetooth headphones.\n\nSuppose you have two cards, PCH and HDMI:\n\n```\n/proc/asound/cards\n```\n\n```\n0 [PCH            ]: HDA-Intel - HDA Intel PCH\n                      HDA Intel PCH at 0xdff40000 irq 146\n 1 [HDMI           ]: HDA-Intel - HDA ATI HDMI\n                      HDA ATI HDMI at 0xdfe60000 irq 147\n```\n\nand your PCMs look like:\n\n```\n/proc/asound/pcm\n```\n\n```\n00-00: ALC1220 Analog : ALC1220 Analog : playback 1 : capture 1\n00-02: ALC1220 Alt Analog : ALC1220 Alt Analog : capture 1\n01-03: HDMI 0 : HDMI 0 : playback 1\n01-07: HDMI 1 : HDMI 1 : playback 1\n01-08: HDMI 2 : HDMI 2 : playback 1\n01-09: HDMI 3 : HDMI 3 : playback 1\n01-10: HDMI 4 : HDMI 4 : playback 1\n01-11: HDMI 5 : HDMI 5 : playback 1\n```\n\nand suppose your ALSA configuration looks something like this:\n\n```\n/etc/asound.conf\n```\n\n```\nctl.!default {\n  type hw\n  card PCH\n}\n\npcm.!default {\n  type plug\n  slave.pcm \"dmix:PCH,0\"\n}\n\npcm.dhdmi {\n  type plug\n  slave.pcm \"dmix:HDMI,9\"\n}\n```\n\nIn this particular example, the dmix devices would be dmix:PCH,0 and dmix:HDMI,9.\n\nFirst of all, stop WirePlumber from monitoring and adding hardware ALSA devices by disabling the monitor.alsa feature:\n\n```\n/etc/wireplumber/wireplumber.conf.d/10-disable-alsa-monitor.conf (or ~/.config/wireplumber/wireplumber.conf.d/10-disable-alsa-monitor.conf)\n```\n\n```\nwireplumber.profiles = {\n  main = {\n    monitor.alsa = disabled\n  }\n}\n```\n\nNow, configure PipeWire to use dmix devices. The default configuration file (/usr/share/pipewire/pipewire.conf) contains a commented out example which you can use as a basis.\n\nAdd your own element to the context.objects array:\n\n```\n/etc/pipewire/pipewire.conf.d/alsa-dmix.conf (or ~/.config/pipewire/pipewire.conf.d/alsa-dmix.conf)\n```\n\n```\ncontext.objects = [\n    # We do not start with dmix, but with an input device.\n    # Do not forget to add an input device.\n    # On a friend's Laptop, I saw Zoom having a nervous\n    # breakdown and endlessly crying because no input device\n    # was configured! You have been warned.\n    { factory = adapter\n        args = {\n            factory.name           = api.alsa.pcm.source\n            node.name              = \"alsa-mic-internal\" # name of pulse device (mpv)\n            node.description       = \"Mic Internal\" # name of pulse device (pavucontrol)\n            media.class            = \"Audio/Source\"\n            api.alsa.path          = \"hw:PCH,0\"\n        }\n    }\n    # Okay, now we add our dmix PCMs\n    { factory = adapter\n        args = {\n            factory.name           = api.alsa.pcm.sink # sink for dmix\n            node.name              = \"alsa-dmix-internal\" # name of pulse device (mpv)\n            node.description       = \"PCM Internal\" # name of pulse device (pavucontrol)\n            media.class            = \"Audio/Sink\" # Sink for dmix\n            api.alsa.path          = \"dmix:PCH,0\"\n        }\n    }\n\n    { factory = adapter\n        args = {\n            factory.name           = api.alsa.pcm.sink # sink for dmix\n            node.name              = \"alsa-dmix-hdmi\" # name of pulse device (mpv)\n            node.description       = \"PCM HDMI\" # name of pulse device (pavucontrol)\n            media.class            = \"Audio/Sink\" # Sink for dmix\n            # remember this is a non-default dmix from /etc/asound.conf\n            api.alsa.path          = \"dmix:HDMI,9\"\n        }\n    }\n]\n```\n\nAs a user (non-root), check out the output of wpctl status, and set the default input(source) and output(sink) devices to your liking with wpctl set-default ID. ID is the number before sink/source names.\n\nNow, you can fully test your configuration.\n\n"
+    },
+    {
+      "title": "Switching between device profiles",
+      "level": 4,
+      "content": "Some hardware audio devices, like snd_hda_intel, function differently depending on which profile the device is running in. In the case of snd_hda_intel, there are separate profiles for HDMI and analog output.\n\nSwitching to HDMI with WirePlumber:\n\n```\n$ wpctl set-profile <device-ID> 3\n$ wpctl status\n```\n\n```\n...\n├─ Sinks:\n│  *   53. Built-in Audio Digital Stereo (HDMI) [vol: 1.00]\n...\n```\n\nSwitching to analog with WirePlumber:\n\n```\n$ wpctl set-profile <device-ID> 1\n$ wpctl status\n```\n\n```\n...\n├─ Sinks:\n│  *   51. Built-in Audio Analog Stereo        [vol: 0.60]\n...\n```\n\n"
+    },
+    {
+      "title": "WebRTC screen sharing",
+      "level": 3,
+      "content": "Most applications used to rely on X11 for capturing the desktop (or individual applications), for example when using WebRTC in web browsers (e.g. on Google Meet). On Wayland, the screen sharing mechanism is handled through the XDG Desktop Portal and PipeWire, which enables sharing content under Wayland with fine-grained access controls.\n\nFirefox (84+) and Chromium (110+) support this method by default, while on older versions of Chromium (73+), one needs to enable WebRTC PipeWire support by setting the corresponding (experimental) flag at the URL chrome://flags/#enable-webrtc-pipewire-capturer or via CLI argument --enable-features=WebRTCPipeWireCapturer.\n\nobs-studio (27+) supports this method by using the new PipeWire capture source.\n\n"
+    },
+    {
+      "title": "Video",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nAlthough the software is not yet production-ready, it is safe to play around with. Most applications that rely on GStreamer to handle e.g. video streams should work out-of-the-box using the PipeWire GStreamer plugin, see GStreamer#PipeWire. Applications like e.g. cheese are therefore already able to share video input using it.\n\nUsing pipewire-v4l2, it should also be possible to use the pw-v4l2 script to preload a library (/lib/pipewire-0.3/v4l2/libpw-v4l2.so) that intercepts v4l2 calls and routes video through pipewire.\n\n"
+    },
+    {
+      "title": "Pipewire module-filter-chain",
+      "level": 3,
+      "content": "Pipewire has an internal module called filter-chain that can create nodes to process audio input and output. See /usr/share/pipewire/filter-chain/ for examples including equalization, virtual surround sound, LADSPA plugins and channel mixing.\n\n"
+    },
+    {
+      "title": "LADSPA",
+      "level": 4,
+      "content": "You can install many LADSPA plugins from the official repositories and use them in Pipewire filter chains. To list plugin labels and available controls provided by a specific file use analyseplugin from the ladspa package:\n\n```\n$ analyseplugin /usr/lib/ladspa/lsp-plugins-ladspa.so\n```\n\n"
+    },
+    {
+      "title": "Systemwide parametric equalization",
+      "level": 4,
+      "content": "Copy /usr/share/pipewire/filter-chain/sink-eq6.conf to /etc/pipewire/pipewire.conf.d/ (or ~/.config/pipewire/pipewire.conf.d/).\n\nThen edit sink-eq6.conf to incorporate the desired parameters. For headphones, these can be obtained from Oratory1990's database or, if not listed there, the AutoEQ project.\n\nIf you require a pre-amp, modify eq_band_1 to apply a bq_highshelf filter at frequency 0Hz with a negative gain (gains from -120 to +20dB supported):\n\n```\nlabel = bq_highshelf\ncontrol = { \"Freq\" = 0 \"Q\" = 1.0 \"Gain\" = -7.5 }\n```\n\nFor more than 6 bands, add more entries to the nodes list and corresponding links connecting one filter \":Out\" to the next filter \":In\", for instance to increase to 11 bands (preamp + 10):\n\n```\n{ output = \"eq_band_6:Out\" input = \"eq_band_7:In\" }\n                    { output = \"eq_band_7:Out\" input = \"eq_band_8:In\" }\n                    { output = \"eq_band_8:Out\" input = \"eq_band_9:In\" }\n                    { output = \"eq_band_9:Out\" input = \"eq_band_10:In\" }\n                    { output = \"eq_band_10:Out\" input = \"eq_band_11:In\" }\n```\n\nRestart Pipewire, select \"Equalizer Sink\" as your default sound output device; this should then apply to all applications.\n\n"
+    },
+    {
+      "title": "EasyEffects",
+      "level": 3,
+      "content": "EasyEffects (former PulseEffects) is a GTK utility which provides a large array of audio effects and filters to individual application output streams and microphone input streams. Notable effects include an input/output equalizer, output loudness equalization and bass enhancement, input de-esser and noise reduction plug-in. See the GitHub page for a full list of effects.\n\nIn order to use EasyEffects, install easyeffects. See Community Presets for a collection of preset configurations. See AutoEq for collection of algorithmically generated EQ presets for headphones.\n\n"
+    },
+    {
+      "title": "NoiseTorch",
+      "level": 3,
+      "content": "NoiseTorch is an alternative way for noise suppression, packaged with noisetorchAUR. There also exists noisetorch-gitAUR.\n\nAfter starting it the module can be loaded for the selected microphone. It is possible to adjust the voice activation threshold, which should be set to the highest level, not filtering out any actual voice.\n\nYou can start audio processing with systemd automatically, see [4]. Note that the noisetorch binary path is different if installed from AUR.\n\n"
+    },
+    {
+      "title": "Noise suppression for voice",
+      "level": 3,
+      "content": "Install the noise-suppression-for-voice package.\n\nThen simply follow the instructions given on GitHub.\n\n"
+    },
+    {
+      "title": "JamesDSP",
+      "level": 3,
+      "content": "JamesDSP for Linux (available as jamesdspAUR) provides open-source sound effects for PipeWire and PulseAudio. It uses its own effects engine and without depending on LADSPA, Calf, etc. JamesDSP was initially published as an audio effects processor for Android devices.\n\n"
+    },
+    {
+      "title": "Using LADSPA, LV2 and VST plugins",
+      "level": 3,
+      "content": "If you want to choose between the full list of available LADSPA, LV2 and VST plugins, you can apply them using carla with pipewire-jack.\n\nStart Carla and go to Settings > Configure Carla > Engine. Make sure Audio driver is set to JACK and choose a process mode depending on your needs. You can also choose the process mode by running Carla with a specific command, for example carla-rack for the Continuous Rack mode.\n\nYou can connect application outputs to Carla manually, but if you want to pass multiple applications through Carla, it might be more convenient to create a single virtual device between applications and Carla and optionally use it as a default device. At the begin, create a new null sink named default_null_sink.\n\n```\n/etc/pipewire/pipewire.conf.d/10-default-null-sink.conf (or ~/.config/pipewire/pipewire.conf.d/10-default-null-sink.conf)\n```\n\n```\ncontext.objects = [\n  {\n    factory = adapter\n    args = {\n      factory.name = support.null-audio-sink\n      node.name = \"default_null_sink\"\n      media.class = Audio/Sink\n      audio.position = [ FL FR ]\n      monitor.channel-volumes = true\n      monitor.passthrough = true\n    }\n  }\n]\n```\n\nRestart PipeWire to apply changes.\n\nAlternatively, you can create a temporary virtual device with pw-cli(1) or, if pipewire-pulse is installed, with pactl(1). See the PipeWire wiki for details.\n\nIn the Rack tab, add whichever plugin you want. Make sure they are stereo type. You can change their order. In the Continuous Rack process mode, the one on top of the list will be the first to receive the audio stream, just like in EasyEffects. Afterwards go to the Patchbay tab and connect the default_null_sink L/R monitors to Carla inputs, then Carla outputs to the playbacks of your desired device (speakers, earphones, HDMI, etc). Save the configuration to a local file, for example ~/Documents/carla_sink_effects.carxp. Carla will automatically restore the connections after opening this file.\n\nYou can test the effects while a multimedia application is reproducing audio, i.e. watching a video on a website through Firefox. There are two methods to do it. The first one, inside Carla Patchbay tab, disconnecting all Firefox connections and linking its L/R outputs to default_null_sink playbacks. The second through pavucontrol, locating Firefox audio stream and redirecting it to default_null_sink (this should remember the connection to automatically redirect the application to the same sink on the next instance).\n\nTo run Carla with the Continuous Rack process mode and load the saved file at startup, create a systemd user service:\n\n```\n~/.config/systemd/user/jack-carla-rack.service\n```\n\n```\n[Unit]\nDescription=Load Carla Rack JACK host\n\n[Service]\nEnvironment=PIPEWIRE_LINK_PASSIVE=true\nType=exec\nExecStart=/usr/bin/carla-rack --no-gui %h/Documents/carla_sink_effects.carxp\n\n[Install]\nWantedBy=default.target\n```\n\nThen enable the jack-carla-rack.service user unit.\n\nNote that if you set the default_null_sink as the default device in system settings, all applications will be redirected to it and the volume keys will change its level, not the one on the speakers. If you want to control volume speakers, leave them as the default in system settings and redirect your desired application to default_null_sink inside pavucontrol (Pipewire compatibility layer will remember the connection on the next instance of the same application).\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with PipeWire/Troubleshooting.** This article or section is a candidate for merging with PipeWire/Troubleshooting.\n\nThis article or section is a candidate for merging with PipeWire/Troubleshooting.\n\n"
+    },
+    {
+      "title": "Microphone is not detected by PipeWire",
+      "level": 4,
+      "content": "PipeWire's alsa-monitor module uses alsa-card-profiles to detect devices by default. If this is not working for you, try to turn off api.alsa.use-acp, or optionally turn on api.alsa.use-ucm in wireplumber:\n\n```\n/etc/wireplumber/wireplumber.conf.d/50-alsa-config.conf (or ~/.config/wireplumber/wireplumber.conf.d/50-alsa-config.conf)\n```\n\n```\nmonitor.alsa.properties = {\n  # Use ALSA-Card-Profile devices. They use UCM or the profile\n  # configuration to configure the device and mixer settings.\n  # alsa.use-acp = true\n  # Use UCM instead of profile when available. Can be disabled\n  # to skip trying to use the UCM profile.\n  alsa.use-ucm = true\n}\n```\n\nWith pipewire-media-session:\n\n```\n/etc/pipewire/media-session.d/alsa-monitor.conf (or ~/.config/pipewire/media-session.d/alsa-monitor.conf)\n```\n\n```\n...\nrules = [\n    {\n        ...\n        actions = {\n        update-props = {\n            ...\n            api.alsa.use-acp = false\n...\n```\n\nThen, restart WirePlumber and check available devices:\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n```\n$ pw-record --list-targets\n```\n\n```\nAvailable targets (\"*\" denotes default): 62\n\t58: description=\"Built-in Audio\" prio=1872\n\t60: description=\"Built-in Audio\" prio=2000\n*\t62: description=\"Built-in Audio (Loopback PCM)\" prio=1984\n```\n\nAn alternative solution suggested in this PipeWire issue is to add the microphone manually. First of all, make sure the microphone is detected by ALSA.\n\n```\n$ arecord -l\n```\n\n```\n**** List of CAPTURE Hardware Devices ****\ncard card_number: card_name, device device_number: device_name\n  ...\n```\n\nChoose your microphone from the list, and to further test the microphone, run the following commands.\n\n```\n$ arecord --duration=5 --format=dat --device=hw:card_number,device_number test-mic.wav # record from the mic\n$ aplay test-mic.wav # play it\n```\n\nIf the microphone is working with arecord, but not detected by PipeWire, try to add a config file to manually add this device.\n\n```\n/etc/pipewire/pipewire.conf.d/microphone.conf (or ~/.config/pipewire/pipewire.conf.d/microphone.conf)\n```\n\n```\ncontext.objects = [\n    { factory = adapter\n        args = {\n            factory.name           = api.alsa.pcm.source\n            node.name              = \"microphone\"\n            node.description       = \"Undetected Microphone\"\n            media.class            = \"Audio/Source\"\n            api.alsa.path          = \"hw:card_number,device_number\"\n        }\n    }\n]\n```\n\nAnd then restart PipeWire to reload the config.\n\n"
+    },
+    {
+      "title": "Sound does not automatically switch when connecting a new device",
+      "level": 4,
+      "content": "To automatically switch to newly connected devices, create this file:\n\n```\n/etc/pipewire/pipewire-pulse.conf.d/switch-on-connect.conf (or ~/.config/pipewire/pipewire-pulse.conf.d/switch-on-connect.conf)\n```\n\n```\npulse.cmd = [\n    { cmd = \"load-module\" args = \"module-switch-on-connect\" }\n]\n```\n\nThen restart the pipewire-pulse.service with systemctl --user and check that module-switch-on-connect is loaded.\n\n"
+    },
+    {
+      "title": "No sound after connecting to Bluetooth device",
+      "level": 4,
+      "content": "As of 2020-12-07, if there is no sound after connecting a Bluetooth device, you might need to switch the default sink and/or move a sink input to the correct sink. Use pactl list sinks to list the available sinks and pactl set-default-sink to switch the default sink to the Bluetooth device. This can be automated via udev using a script similar to this one.\n\nSee this Reddit thread for a discussion of the issue. According to author of the script, the headset profile (HSP) might still have problems.\n\n"
+    },
+    {
+      "title": "No sound in mpv, vlc, totem, but sound works in web browser and GNOME speaker test",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nThe best tool to verify the condition of this issue is to use mpv on a file that is expected to work with installed codecs:\n\n```\n$ mpv --ao=alsa test_file.mpv\n$ mpv --ao=pcm test_file.mpv\n$ mpv --ao=jack test_file.mpv\n$ mpv --ao=pulse test_file.mpv\n$ mpv --ao=openal test_file.mpv\n```\n\nThis recipie applies if some or all of the above tests produce sound and the same test with pipewire option does not produce sound:\n\n```\n$ mpv --ao=pipewire test_file.mpv\n```\n\nGnome desktop speaker test and web browser 'youtube' produce valid sound outcomes.\n\nSwitching inputs, muting, unmuting, changing volume in Gnome does not resolve the issue.\n\nSink status reported by pactl list sinks as 'SUSPENDED' is of no concern, because status properly changes when running video through a web browser.\n\nUse of pactl info does not point to any obvious issues.\n\nInspection of relevant systemd unit logs does not point to any obvious issues.\n\nIt seems that a path from pipewire to hardware got muted or changed somehow. The original author does not know how to identify and point out at the issue using command line tooling.\n\nInstall the pavucontrol package. Run pavucontrol, select the appropriate source in the Configuration tab, select it again in the Output device tab and then use Mute button to mute and unmute the source while mpv --ao=pipewire test.mp4 video is running.\n\n"
+    },
+    {
+      "title": "Low volume",
+      "level": 4,
+      "content": "After replacing PulseAudio with Pipewire, sound may work fine, but after a reboot, the volume becomes intolerably low.\n\nOpen alsamixer, use F6 to select the proper soundcard, and make sure the ALSA volumes are at 100%. alsactl should maintain this setting after reboot.\n\n"
+    },
+    {
+      "title": "Increasing RLIMIT_MEMLOCK",
+      "level": 4,
+      "content": "```\nDec 13 11:11:11 HOST pipewire-pulse[99999]: Failed to mlock memory 0x7f4f659d8000 32832: This is not a problem but for best performance, consider increasing RLIMIT_MEMLOCK\n```\n\nInstall realtime-privileges and add your own user to the realtime group.\n\nAlternatively, increasing memlock from 64kB to 128kB seems enough to fix this. If you are running pipewire-pulse under systemd/User, add:\n\n```\nusername\tsoft\tmemlock\t64\nusername\thard\tmemlock\t128\n```\n\nto /etc/security/limits.d/username.conf\n\n"
+    },
+    {
+      "title": "Changing the default sample rate",
+      "level": 4,
+      "content": "By default PipeWire sets a fixed global sample rate of 48kHz. If you need to change it (e.g. you own a DAC supporting a higher value), you can set a new default:\n\n```\n/etc/pipewire/pipewire.conf (or ~/.config/pipewire/pipewire.conf)\n```\n\n```\n...\ncontext.properties = {\n    ...\n    default.clock.rate          = sample_rate\n    ...\n```\n\n"
+    },
+    {
+      "title": "Changing the allowed sample rate(s)",
+      "level": 4,
+      "content": "PipeWire can also change dynamically the output sample rates supported by your DAC. The sample rate follows the sample rate of the audio stream being played.\n\n```\n~/.config/pipewire/pipewire.conf\n```\n\n```\n...\ncontext.properties = {\n    ...\n    default.clock.allowed-rates = [ sample_rate_1 sample_rate_2 sample_rate_3 ... ]\n    ...\n```\n\nfor example, [ 44100 48000 88200 96000 ].\n\nAccording to the developer: \"PipeWire allows up to 16 different sample rates and will switch when possible\". That means, with configuration above, no resampling is done when supported. Since PipeWire 0.3.61 up to 32 different sample rates can be configured.\n\nConsult your hardware manual for supported values of your DAC. Supported rates by the kernel driver codec are listed with the following command.\n\n```\n$ grep -E 'Codec|Audio Output|rates' /proc/asound/card*/codec#*\n```\n\nIf your DAC does not report codec information, you can try to obtain supported rates like this:\n\n```\n$ grep -m1 -Hn \"\" /proc/asound/card?/stream? | tee /dev/tty | awk -F':' '{print $1}' | xargs grep 'Rates'\n```\n\nTo check which output sample rate is being used for a card run:\n\n```\n$ grep rate: /proc/asound/card?/pcm??/sub?/hw_params\n```\n\n```\n/proc/asound/card1/pcm0p/sub0/hw_params:rate: 96000 (96000/1)\n```\n\nIn pcm0p or pcm0c c is short for \"capture\" and p is for \"playback\".\n\nCommand:\n\n```\n$ pw-top\n```\n\nalso shows currently used sample rate for each card and audio stream.\n\n"
+    },
+    {
+      "title": "Sound quality (resampling quality)",
+      "level": 4,
+      "content": "If you used PulseAudio with resample-method = speex-float-10 or soxr-vhq, then you might consider setting resample.quality to 10 or the maximum 14:\n\n```\n/etc/pipewire/client.conf.d/resample.conf (or ~/.config/pipewire/client.conf.d/resample.conf)\n```\n\n```\nstream.properties = {\n    resample.quality = 10\n}\n```\n\nDo not forget to restart the pipewire.service and pipewire-pulse.socket user units (never forget pipewire-pulse.socket if you want your configuration changes to be applied).\n\nThere is a very little quality difference between 10 and 14, but the CPU load difference is 2-3x. And the latency difference between 4, 10, 14 is yet to be investigated by anybody. resample.quality = 14 on 44100→48000 Hz on Ryzen 2600 causes pipewire or pipewire-pulse processes to cause 4.0% one CPU core load.\n\nYou can compare resamplers here: https://src.infinitewave.ca/ (do not pay attention to anything above 18 KHz and over 120 dB). speex is listed as \"Xiph.org Speex\".\n\nPipeWire uses its own resampling algorithm called Spa. Like with SoX's sox, Speex's speexenc, PipeWire includes its standalone version: spa-resample. Usage:\n\n```\n$ spa-resample -q 14 -f s24 -r 48000 input16bit44100orAnythingElse.wav output24bit48000hz.wav\n```\n\nIt is probably somehow possible to use other resamplers by creating your own sink. Or just use a plugin in your music player (e.g., Qmmp has SoX plugin).\n\n"
+    },
+    {
+      "title": "External sound card not activated after reconnect",
+      "level": 4,
+      "content": "Check ~/.config/pipewire/media-session.d/default-profile if there is any entry with default profile \"off\" and remove it. If that does not help, remove all files from ~/.config/pipewire/media-session.d/ and restart the pipewire.service user unit.\n\n"
+    },
+    {
+      "title": "No Sound or pactl info shows Failure: Connection refused",
+      "level": 4,
+      "content": "It means applications are unable to connect to the PipeWire-Pulse service check if the pipewire-pulse.service user unit is running.\n\nIf that does not fix it, run strace -f -o /tmp/pipe.txt pactl info and pastebin /tmp/pipe.txt while seeking help on IRC (#pipewire on OFTC) or the mailing-lists.\n\n"
+    },
+    {
+      "title": "Low audio quality on Bluetooth",
+      "level": 4,
+      "content": "In case Bluetooth playback stutters, check the unit status of the pipewire.service user unit for errors similar as below:\n\n```\nFeb 17 18:23:01 HOST pipewire[249297]: (bluez_input.18:54:CF:04:00:56.a2dp-sink-60) client too slow! rate:512/48000 pos:370688 status:triggered\n```\n\nIf they appear, check the currently selected codec using pactl list sinks and try changing it by setting bluez5.codecs to one of sbc aac ldac aptx aptx_hd. You can also try mSBC support (fixes mic on Sony 1000XM3, i.e. Headphones WH-1000XM3 and Earbuds WF-1000XM3), and the SBC-XQ codec.\n\nWith wireplumber:\n\n```\n/etc/wireplumber/wireplumber.conf.d/51-bluez-config.conf (or ~/.config/wireplumber/wireplumber.conf.d/51-bluez-config.conf)\n```\n\n```\nmonitor.bluez.properties = {\n  bluez5.enable-sbc-xq = true\n  bluez5.enable-msbc = true\n  bluez5.codecs = [ sbc sbc_xq ]\n}\n```\n\nWith pipewire-media-session:\n\n```\n/etc/pipewire/media-session.d/bluez-monitor.conf (or ~/.config/pipewire/media-session.d/bluez-monitor.conf)\n```\n\n```\n...\nproperties = {\n  ...\n  bluez5.enable-msbc = true\n  bluez5.enable-sbc-xq = true\n  bluez5.codecs = [sbc sbc_xq]\n...\n```\n\nRestart PipeWire by restarting the pipewire.service user unit for the changes to take effect.\n\n"
+    },
+    {
+      "title": "Noticeable audio delay or audible pop/crack when starting playback",
+      "level": 4,
+      "content": "This is caused by node suspension when inactive.\n\nWith wireplumber, create a new file to overwrite the default configuration:\n\n```\n/etc/wireplumber/wireplumber.conf.d/51-disable-suspension.conf (or ~/.config/wireplumber/wireplumber.conf.d/51-disable-suspension.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        # Matches all sources\n        node.name = \"~alsa_input.*\"\n      },\n      {\n        # Matches all sinks\n        node.name = \"~alsa_output.*\"\n      }\n    ]\n    actions = {\n      update-props = {\n        session.suspend-timeout-seconds = 0\n      }\n    }\n  }\n]\n# bluetooth devices\nmonitor.bluez.rules = [\n  {\n    matches = [\n      {\n        # Matches all sources\n        node.name = \"~bluez_input.*\"\n      },\n      {\n        # Matches all sinks\n        node.name = \"~bluez_output.*\"\n      }\n    ]\n    actions = {\n      update-props = {\n        session.suspend-timeout-seconds = 0\n      }\n    }\n  }\n]\n```\n\nRestart pipewire.service and wireplumber.service to apply changes.\n\nInstead of disabling suspension entirely, you can also change the timeout value to the desired number of seconds of delay before source suspension.\n\nSome devices implement their own detection of silence and suspension. For them disabling node suspention alone won't work. It's possible to work around them by adding a small amount of noise, making it so the output never goes fully silent:\n\n```\n.../51-disable-suspension.conf\n```\n\n```\n...\n    session.suspend-timeout-seconds = 0,  # 0 disables suspend\n    dither.method = \"wannamaker3\", # add dither of desired shape\n    dither.noise = 2, # add additional bits of noise\n...\n```\n\nIt may be necessary to play with dither.noise and dither.method parameters to make it so the noise is sufficiently silent and simultaneously loud enough to prevent detection of silence. See PipeWire documentation.\n\nWith pipewire-media-session:\n\nDisable this by editing /etc/pipewire/media-session.d/*-monitor.conf depending on where the delay occurs and changing property session.suspend-timeout-seconds to 0 to disable or experiment with other values and see what works.\n\nAlternatively you can comment out the line suspend-node in /etc/pipewire/media-session.d/media-session.conf.\n\nRestart both pipewire.service and pipewire-pulse.service to apply these changes, or alternatively reboot.\n\n"
+    },
+    {
+      "title": "Audio cutting out when multiple streams start playing",
+      "level": 4,
+      "content": "This problem can typically be diagnosed by reading the journal of the pipewire-pulse.service user unit and finding lines similar to:\n\n```\npipewire-pulse[21740]: pulse-server 0x56009b9d5de0: [Nightly] UNDERFLOW channel:0 offset:370676 underrun:940\n```\n\nAccording to the official PipeWire troubleshooting guide, to solve this problem for wireplumber:\n\n```\n/etc/wireplumber/wireplumber.conf.d/50-alsa-config.conf (or ~/.config/wireplumber/wireplumber.conf.d/50-alsa-config.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        node.name = \"~alsa_output.*\"\n      }\n    ]\n    actions = {\n      update-props = {\n        api.alsa.period-size   = 1024\n        api.alsa.headroom      = 8192\n      }\n    }\n  }\n]\n```\n\nWith pipewire-media-session:\n\n```\n/etc/pipewire/media-session.d/alsa-monitor.conf (or ~/.config/pipewire/media-session.d/alsa-monitor.conf\n```\n\n```\napi.alsa.headroom = 1024\n```\n\nIf you experience audio stuttering because of kernel page locking or late scheduling see Gaming#Tweaking kernel parameters for response time consistency.\n\n"
+    },
+    {
+      "title": "Audio is distorted",
+      "level": 4,
+      "content": "- For microphones, try navigating to the card that is having issues after running alsamixer and use the arrow keys to reduce any \"Mic Boost\" or \"Internal Mic Boost\" options.\n- Follow #Changing the default sample rate, reducing the sample rate to 44100 (44.1 kHz).\n\n"
+    },
+    {
+      "title": "Audio problems after standby",
+      "level": 4,
+      "content": "If the sound is missing or otherwise garbled after waking the machine up from sleep, it might help to reinitialize ALSA:\n\n```\n# alsactl init\n```\n\n"
+    },
+    {
+      "title": "High latency with USB DACs (e.g. Schiit DACs)",
+      "level": 4,
+      "content": "Changing sample rates or formats might help reduce latency with some DACs such as Schiit Hel 2.[5]\n\nFor pipewire-media-session:\n\nCopy the default configuration file /usr/share/pipewire/media-session.d/alsa-monitor.conf into /etc/pipewire/media-session.d/ (or ~/.config/pipewire/media-session.d/). Then append a new rule-block similar to the following one:\n\n```\n/etc/pipewire/media-session.d/alsa-monitor.conf (or ~/.config/pipewire/media-session.d/alsa-monitor.conf)\n```\n\n```\n...\nrules = {\n    ...\n    {\n        matches = [\n            {\n                node.name = \"alsa_output.name-of-node\"\n            }\n        ]\n        actions = {\n            update-props = {\n                audio.format = \"S24_3LE\"\n                audio.rate = 96000\n                # Following value should be doubled until audio does not cut out or other issues stop occurring\n                api.alsa.period-size = 128\n...\n```\n\nFor wireplumber:\n\n```\n/etc/wireplumber/wireplumber.conf.d/52-update-rate-and-format.conf (or ~/.config/wireplumber/wireplumber.conf.d/52-update-rate-and-format.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        node.name = \"alsa_output.name-of-node\"\n      }\n    ]\n    actions = {\n      update-props = {\n        audio.format = \"S24_3LE\"\n        audio.rate = 96000\n        # Following value should be doubled until audio does not cut out or other issues stop occurring\n        api.alsa.period-size = 128\n      }\n    }\n  }\n]\n```\n\nalsa_output.name-of-node node can be obtained using pw-top.\n\nYour DAC might support a different format or sample rate. You can check what your DAC supports by querying ALSA:\n\nFirst get the card number of your DAC:\n\n```\n$ aplay -l\n```\n\n```\n...\ncard 3: S2 [Schiit Hel 2], device 0: USB Audio [USB Audio]\n  Subdevices: 0/1\n  Subdevice #0: subdevice #0\n...\n```\n\nSo in this example it would be card 3. Get all supported sample rates and formats:\n\n```\n$ cat /proc/asound/cardX/streamX\n```\n\n```\n...\nPlayback:\n  ...\n  Interface 1\n    Altset 1\n    Format: S16_LE\n    Channels: 2\n    Endpoint: 0x05 (5 OUT) (ASYNC)\n    Rates: 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000\n    Data packet interval: 125 us\n    Bits: 16\n    ...\n  Interface 1\n    Altset 2\n    Format: S24_3LE\n    Channels: 2\n    Endpoint: 0x05 (5 OUT) (ASYNC)\n    Rates: 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000\n    Data packet interval: 125 us\n    Bits: 24\n    ...\n  Interface 1\n    Altset 3\n    Format: S32_LE\n    Channels: 2\n    Endpoint: 0x05 (5 OUT) (ASYNC)\n    Rates: 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000\n    Data packet interval: 125 us\n    Bits: 32\n    ...\n...\n```\n\nIn this case S16_LE, S24_3LE, S32_LE are the supported formats and 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000 are the supported sample rates across all formats.\n\n"
+    },
+    {
+      "title": "No sound from USB DAC until 30% volume",
+      "level": 4,
+      "content": "Some USB DACs will have no sound output until a certain level of volume is reached [6]. Typically this is around 25% - 30% which then leads to an uncomfortably loud initial volume and the inability to maintain a low volume. The solution is to ignore hardware mixer volume control by setting api.alsa.soft-mixer to true.\n\nTo achieve this with wireplumber use:\n\n```\n/etc/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf (or ~/.config/wireplumber/wireplumber.conf.d/alsa-soft-mixer.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        device.name = \"~alsa_card.*\"\n      }\n    ]\n    actions = {\n      update-props = {\n        # Do not use the hardware mixer for volume control. It\n        # will only use software volume. The mixer is still used\n        # to mute unused paths based on the selected port.\n        api.alsa.soft-mixer = true\n      }\n    }\n  }\n]\n```\n\nThen, restart pipewire. Set your master volume in alsamixer and then save the settings by running alsactl store as root. You should now be able to use your volume mixer as normal.\n\n"
+    },
+    {
+      "title": "Realtime audio does not work",
+      "level": 4,
+      "content": "If RTKit error: org.freedesktop.DBus.Error.AccessDenied shows up in the status of the pipewire.service user unit, then the priority of the pipewire daemon was not changed to realtime. See [7] for this issue.\n\n"
+    },
+    {
+      "title": "Simultaneous output to multiple sinks on the same sound card",
+      "level": 4,
+      "content": "Create a copy of /usr/share/alsa-card-profile/mixer/profile-sets/default.conf so that changes persist across updates. Here we define a profile joining the two default mappings for Analog and HDMI.\n\n```\n/usr/share/alsa-card-profile/mixer/profile-sets/multiple.conf\n```\n\n```\n[General]\nauto-profiles = no\n\n[Mapping analog-stereo]\ndevice-strings = front:%f\nchannel-map = left,right\npaths-output = analog-output analog-output-lineout analog-output-speaker analog-output-headphones analog-output-headphones-2\npaths-input = analog-input-front-mic analog-input-rear-mic analog-input-internal-mic analog-input-dock-mic analog-input analog-input-mic analog-input-linein analog-input-aux analog-input-video analog-input-tvtuner analog-input-fm analog-input-mic-line analog-input-headphone-mic analog-input-headset-mic\npriority = 15\n\n[Mapping hdmi-stereo]\ndescription = Digital Stereo (HDMI)\ndevice-strings = hdmi:%f\npaths-output = hdmi-output-0\nchannel-map = left,right\npriority = 9\ndirection = output\n\n[Profile multiple]\ndescription = Analog Stereo Duplex + Digital Stereo (HDMI) Output\noutput-mappings = analog-stereo hdmi-stereo\ninput-mappings = analog-stereo\n```\n\nThen configure your session manager to use the new card-profile for matching devices. Identifying information can be found using pw-dump or wpctl.\n\nFor wireplumber:\n\n```\n/etc/wireplumber/wireplumber.conf.d/51-alsa-custom.conf (or ~/.config/wireplumber/wireplumber.conf.d/51-alsa-custom.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        device.nick = \"HDA Intel PCH\"\n      }\n    ]\n    actions = {\n      update-props = {\n        api.alsa.use-acp = true\n        api.acp.auto-profile = false\n        api.acp.auto-port = false\n        device.profile-set = \"multiple.conf\"\n        device.profile = \"multiple\"\n      }\n    }\n  }\n]\n```\n\nFor pipewire-media-session:\n\n```\n/etc/pipewire/media-session.d/alsa-monitor.conf (or ~/.config/pipewire/media-session.d/alsa-monitor.conf)\n```\n\n```\nrules = [\n    {\n        matches = [ { alsa.card_name = \"HDA Intel PCH\" } ]\n        actions = {\n            update-props = {\n                api.alsa.use-acp = true\n                device.profile-set = \"multiple.conf\"\n                device.profile = \"multiple\"\n                api.acp.auto-profile = false\n                api.acp.auto-port = false\n            }\n        }\n    }\n]\n```\n\n"
+    },
+    {
+      "title": "No notification sounds from Discord",
+      "level": 4,
+      "content": "This might cause by having the min.quantum too low, try setting it to more than 700. You can make an override for Discord specifically by appending the following rule to the pulse.rules section of pipewire-pulse.conf.\n\n```\n/etc/pipewire/pipewire-pulse.conf (or ~/.config/pipewire/pipewire-pulse.conf)\n```\n\n```\n...\npulse.rules = [\n  ...\n    {\n        # Discord notification sounds fix\n        matches = [ { application.process.binary = \"Discord\" } ]\n        actions = {\n            update-props = {\n                pulse.min.quantum      = 1024/48000     # 21ms\n            }\n        }\n    }\n...\n```\n\n"
+    },
+    {
+      "title": "FMOD games crashing under PipeWire",
+      "level": 4,
+      "content": "Some games that use an old version of the FMOD audio engine, like Pillars of Eternity, invoke pulseaudio --check and crash if the PulseAudio binary is not present. A workaround is to symlink /bin/pulseaudio to /bin/true.[8]\n\n```\n# ln -s /bin/true /bin/pulseaudio\n```\n\nNote that if you wish to reinstall PulseAudio, you need to remove the symlink.\n\n"
+    },
+    {
+      "title": "Auto-switching is not working",
+      "level": 4,
+      "content": "If auto-switching is not working it may be an issue with WirePlumber state. As suggested by this comment you can delete WirePlumber's local state and restart the daemon to see if that helps:\n\n```\n$ rm -r ~/.local/state/wireplumber/\n```\n\nThen restart the wireplumber.service user unit.\n\n"
+    },
+    {
+      "title": "Missing realtime priority/crackling under load after suspend",
+      "level": 4,
+      "content": "Due to a bug from 2011 in rtkit, suspend events cause PipeWire's realtime priority to be revoked and not restored. To disable the protection which causes this, edit rtkit-daemon.service:\n\n```\n/etc/systemd/system/rtkit-daemon.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/lib/rtkit-daemon --no-canary\n```\n\nThen restart the rtkit-daemon.service unit and pipewire.service user unit, along with the media session service.\n\n"
+    },
+    {
+      "title": "No sound during streaming to RAOP devices (Sonos etc.)",
+      "level": 4,
+      "content": "Set up mDNS hostname resolution using either Avahi or systemd-resolved.\n\n"
+    },
+    {
+      "title": "No sound devices show up in KDE Plasma",
+      "level": 4,
+      "content": "PipeWire clients (including the desktop environment) may rely on the XDG_RUNTIME_DIR environment variable to connect to the PipeWire daemon. [9] If you experience no sound devices immediately after login, it may be because this variable has manually been set to the wrong path.\n\nAlthough this be resolved by manually restarting PipeWire, other issues can still occur such as being unable to screen share in Chromium (with pipewire context failed). XDG_RUNTIME_DIR is automatically set by pam_systemd(8), so you should remove any instances of it being set in your initialization files.\n\n"
+    },
+    {
+      "title": "Device volume for SDDM and LightDM users is not restored on login",
+      "level": 4,
+      "content": "If you use SDDM or LightDM and notice that your audio volume level is not properly restored after logging in, mask PipeWire for the display manager's user, since WirePlumber running under the display manager can interfere with your user's WirePlumber session.\n\n```\n# systemctl --user -M user@ mask pipewire.socket\n```\n\nReplace user with sddm for SDDM or lightdm for LightDM.\n\nFor more details, see this Debian Wiki article.\n\n"
+    },
+    {
+      "title": "Terminal bell not working",
+      "level": 4,
+      "content": "From PipeWire's perspective, one must have the module x11.bell loaded. This shall be the configuration default (see also in config files mentioned above). Check if you have package pipewire-x11-bell installed. Also, your window manager might influence the terminal bell, e.g., for xfwm, check in the xfwm-terminal settings that \"Audible bell\" is activated. Now, restart pipewire service:\n\n```\n$ systemctl --user restart pipewire\n```\n\nYou can try if the terminal bell works with:\n\n```\n$ echo $'\\a'\n```\n\n"
+    },
+    {
+      "title": "OBS (etc.) display nothing, even if they ask for a window/screen",
+      "level": 4,
+      "content": "If you are sure that you have xdg-desktop-portal installed as well as either xdg-desktop-portal-gtk or xdg-desktop-portal-kde, check the running state of the daemons.\n\nIn OBS, if everything is working, you should see this in stdout:\n\n```\n...\ninfo: [pipewire] desktop selected, setting up screencast\ninfo: [pipewire] created stream 0x5632d7456850\ninfo: [pipewire] playing stream…\n```\n\nFor multi-monitor setups the slurp package will allow to capture of all the screens.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wiki — PipeWire Wiki on Freedesktop GitLab\n- Pipewire Update Blog Post — Blog post from January 2018 outlining the state of PipeWire at the time\n- PipeWire Late Summer Update 2020 — Blog post from September 2020\n\n"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "title": "Sharing PPP Connection",
+  "url": "https://wiki.archlinux.org/title/Sharing_PPP_Connection",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section is a candidate for merging with Internet Sharing.** This article or section is a candidate for merging with Internet Sharing.\n\nThis article or section is a candidate for merging with Internet Sharing.\n\n"
+    },
+    {
+      "title": "Requirements",
+      "level": 2,
+      "content": "Before proceeding, you must make sure:\n\n1. You must have a working PPP connection.\n1. You must have an extra Ethernet interface card in your computer with which to share your connection.\n\n"
+    },
+    {
+      "title": "Installing",
+      "level": 2,
+      "content": "The following packages must be installed for both Wired and Wireless sharing:\n\n- iptables: for controlling packets in your network.\n- dnsmasq: for acting as a DHCP and DNS caching server.\n- bridge-utils: for setting up a network bridge.\n\nDepending on whether you want to share a wireless or wired connection, you also have to install:\n\n- wired: iproute2 or net-tools (this article uses iproute2 since net-tools is deprecated).\n- wireless: iw or wireless_tools (this article uses iw since wireless_tools is deprecated).\n\n"
+    },
+    {
+      "title": "Sharing via wired ethernet",
+      "level": 2,
+      "content": "- Set the PPP connection up.\n\n```\n# ip addr add 192.168.0.254 dev eth0\n```\n\n- Set the kernel to router mode. This is done by running:\n\n```\n# sysctl net.ipv4.ip_forward=1\n```\n\n- Configure dnsmasq. Make the following changes to /etc/dnsmasq.conf (uncomment if necessary):\n\n```\n/etc/dnsmasq.conf\n```\n\n```\ndomain-needed\nbogus-priv\ninterface=eth0 # change to your chosen interface\ndhcp-range=192.168.0.1,192.168.0.100,12h\n```\n\n- Start the dnsmasq daemon.\n- Finally, set firewall to forward connections to and from the Internet for clients connecting to your WLAN. This is done by issuing:\n\n```\n# iptables -t nat -A POSTROUTING -o ppp0 -j MASQUERADE\n```\n\n- You are done! Happy surfing!\n\n"
+    },
+    {
+      "title": "Network bridge",
+      "level": 3,
+      "content": "Let us assume your PPP connection is on eth0, and you want to share the connection on eth1 and eth2.\n\n```\n# ip addr add 0.0.0.0 dev eth1  # remove IP from eth0\n# ip link set eth1 up           # ensure the interface is up\n```\n\n```\n# ip addr add 0.0.0.0 dev eth2  # remove IP from eth1\n# ip link set eth2 up           # ensure the interface is up\n```\n\n```\n# brctl addbr br0               # create br0 node\n# brctl addif br0 eth1          # add eth0 to bridge br0\n# brctl addif br0 eth2          # add eth1 to bridge br0\n```\n\n```\n# ip addr add 192.168.0.254 dev br0\n```\n\nchange your interface in dnsmasq.conf to br0:\n\n```\ninterface=br0\n```\n\nand restart the dnsmasq daemon.\n\nNow you should be able to connect to the internet using eth1 or eth2.\n\n"
+    },
+    {
+      "title": "Sharing via WLAN",
+      "level": 2,
+      "content": "Note: **unencrypted** \n\n- Set up the PPP connection.\n- Set up the WLAN connection: choose an SSID and select Ad-hoc as network type. In the following it is assumed that you are using the wlan0 interface.\n\n```\n# iw wlan0 set type ibss\n# iw wlan0 ibss join MyFreeWlan\n```\n\n```\n# ip addr add 192.168.0.254 dev wlan0\n```\n\n- Set the kernel to router mode. This is done by running:\n\n```\n# echo 1 > /proc/sys/net/ipv4/ip_forward\n```\n\n- Configure dnsmasq. Make the following changes to /etc/dnsmasq.conf (uncomment if necessary):\n\n```\netc/dnsmasq.conf\n```\n\n```\ndomain-needed\nbogus-priv\ninterface=wlan0    # change to your interface\ndhcp-range=192.168.0.1,192.168.0.100,12h\n```\n\n- Start the dnsmasq daemon.\n- Finally, set firewall to forward connections to and from the Internet for clients connecting to your WLAN. This is done by issuing:\n\n```\n# iptables -t nat -A POSTROUTING -o ppp0 -j MASQUERADE\n```\n\n- You are done! Happy surfing!\n\n"
+    },
+    {
+      "title": "Sharing script",
+      "level": 2,
+      "content": "A quick script for sharing eth0 over wlan0 on an ad-hoc network.\n\n```\nethoverwlan.sh\n```\n\n```\n#!/bin/bash\n\niw wlan0 set type ibss\niw wlan0 ibss join proxywlan\nip addr add 192.168.0.254 dev wlan0\nip link set wlan0 up\niptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE\necho 1 > /proc/sys/net/ipv4/ip_forward\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Simple stateful firewall\n- Router\n- Wireless network configuration\n- USB 3G Modem\n- Share your 3G Internet connection over wifi\n\n"
+    }
+  ]
+}

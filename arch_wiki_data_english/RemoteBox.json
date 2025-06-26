@@ -1,0 +1,36 @@
+{
+  "title": "RemoteBox",
+  "url": "https://wiki.archlinux.org/title/RemoteBox",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- VirtualBox\n- Category:Hypervisors\n- PhpVirtualBox\n\nRemoteBox is an open-source remote client for managing VirtualBox, written in Perl and GTK. It enabled administering a VirtualBox installation on a server, including its guests and interact with them as if they were running locally. While VirtualBox is installed server-side, RemoteBox runs on a client machine. It provides a complete GTK graphical interface with a look and feel very similar to that of VirtualBox's native GUI. If you are familiar with other virtualization software, such as VMWare ESX, then think of RemoteBox as the \"poor man's VI client\".\n\n"
+    },
+    {
+      "title": "Client-side",
+      "level": 3,
+      "content": "RemoteBox is the client application, which can be obtained by installing the remoteboxAUR package. For remote desktop operations an RDP client is also needed. RemoteBox includes presets for freerdp, rdesktop and krdc. As of this writing, freerdp-gitAUR 2.0.0.beta1 has been tested and found working. Alternatively VNC can be used with included presets for TigerVNC, vinagre, krdc and realvnc-vnc-viewerAUR.\n\n"
+    },
+    {
+      "title": "Server-side",
+      "level": 3,
+      "content": "The VM host needs a working VirtualBox installation. For remote desktop operations a non-free Oracle VM VirtualBox Extension Pack is needed for RDP support or alternatively an open-source virtualbox-ext-vnc can be used for VNC support. Also consider installing guest additions ISO for guests to be able to install or update the tools.\n\nVirtualBox installation includes the VirtualBox web service (vboxwebsrv) providing a HTTP(S) server offering API to clients such as RemoteBox. The service should not and also refuses to run as root. For improved security an additional user for running VMs and web service should be created. The user requires a password (to be used for remote login), a home directory (for VirtualBox settings and virtual machines configuration) and a shell (for RemoteBox to be able to login). The rest of this page assumes a vbox user with primary group vboxusers.\n\nThe provided service file /usr/lib/systemd/system/vboxweb.service serves as a template that can be custimized with a drop-in file as follows:\n\n```\n/etc/systemd/system/vboxweb.service.d/override.conf\n```\n\n```\n[Service]\nUser=vbox\nGroup=vboxusers\nPIDFile=/run/vboxwebsrv/vboxwebsrv.pid\nExecStart=\nExecStart=/usr/bin/vboxwebsrv --pidfile /run/vboxwebsrv/vboxwebsrv.pid --background --host 0.0.0.0\n```\n\nLogging can be enabled by editing the ExecStart line in the override file above to include the --logfile <log file location> directive. For increased verbosity you can also include the --verbose directive. Make sure the vbox user has permissions to write to the configured log file location.\n\nThe --host directive can be changed to localhost or the hostname to only bind the service locally, or be set to an IP of a single chosen interface. An alternative port from the default 18083 can be set with --port.\n\nYou also need to create a tmpfile rule for vboxwebsrv's PID file:\n\n```\n/etc/tmpfiles.d/vboxwebsrv.conf\n```\n\n```\nd /run/vboxwebsrv 0755 vbox vboxusers\n```\n\nTo test vboxweb.service immediately you need to first manually create the /run/vboxwebsrv directory:\n\n```\n# mkdir /run/vboxwebsrv\n# chown vbox:vboxusers /run/vboxwebsrv\n# chmod 755 /run/vboxwebsrv\n```\n\nNow the vboxweb.service can be started and/or enabled.\n\n"
+    },
+    {
+      "title": "Connecting RemoteBox to vboxwebsrv",
+      "level": 2,
+      "content": "Open RemoteBox and click the Connect button. Specify the following:\n\n```\nURL: http:<server IP>:18083\nUsername: vbox\nPassword: <vbox user password>\n```\n\nTo make it easier connecting during future sessions, after login go to File > Connection Profiles and create a new connection profile.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If you encounter a login problem connecting to the server, first check that the service is running. From the server console, check vboxweb.service unit status.\n\nIt should output that it is running. If not, check logging with journalctl and, if you configured --logfile, the vboxwebsrv's log file for any leads.\n\nEven with increased verbosity the VirtualBox web service might not give you any useful leads. In that case you can try to run the server manually as vbox from the command line with su or sudo.\n\n```\n[vbox]$ /usr/bin/vboxwebsrv --pidfile /run/vboxwebsrv/vboxwebsrv.pid --host 0.0.0.0\n```\n\nOmit the --background and --logfile directives. If the service starts, the problem could be permissions to the log file. Leave it running and check if you can connect with RemoteBox from the client. Also check the ~/.config/VirtualBox directory gets created and populated with configuration and/or log files.\n\nIf you still cannot connect, you can stop the service with Ctrl-c and start it with the --background directive. Next, using netstat or similar check whether vboxwebsrv is listening on port 18083. If you see a different port you can try connecting with RemoteBox on that port instead.\n\nAnother reason could be a firewall, either on your server, or even on your client.\n\nIf you are getting the following error message:\n\n```\nvboxwebsrv: error: failed to initialize COM! hrc=NS_ERROR_FAILURE\n```\n\nCheck that your home directory is writable for the user vbox.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- RemoteBox - Linux Server Configuration\n- RemoteBox home page\n- RemoteBox on SourceForge\n\n"
+    }
+  ]
+}

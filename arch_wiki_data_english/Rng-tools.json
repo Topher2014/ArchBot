@@ -1,0 +1,26 @@
+{
+  "title": "Rng-tools",
+  "url": "https://wiki.archlinux.org/title/Rng-tools",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- haveged\n- Trusted Platform Module\n- Random number generation\n\nThe rng-tools is a set of utilities related to random number generation in kernel. The main program is rngd, a daemon developed to check and feed random data from hardware device to kernel entropy pool.\n\nThis is mainly useful to increase the quantity of entropy in kernel to make /dev/random faster. By default, /dev/random is very slow since it only collects entropy from device drivers and other (slow) sources. rngd allows the use of faster entropy sources, mainly hardware random number generators (TRNG), present in modern hardware like recent AMD/Intel processors, Via Nano or even Raspberry Pi.\n\nWhile Linux itself uses the result from TRNG in /dev/random, if available, they are only used as a XOR after the entropy is collected by kernel. So /dev/random, by default, is slow even if you do have a TRNG. rngd feeds /dev/random itself, increasing the available entropy by far.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the rng-tools package. Start and enable rngd.service.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The configuration file is located in /etc/conf.d/rngd. There is only one option though, that is RNGD_OPTS, the parameters to be passed to the daemon when running it with the included rngd.service. The default parameter (\"\", or blank) should work in the majority of cases.\n\nBy default, rngd will try to automatically detect your TRNG and use it. This is reported to work for Raspberry Pi and Intel Ivy Bridge CPU using the lastest versions of rng-tools. If this does not work, you may manually pass the device file used by your TRNG, as in the below example:\n\n```\nRNGD_OPTS=\"-r /dev/my_hw_random_device\"\n```\n\n```\nRNGD_OPTS=\"-o /dev/random -r /dev/urandom\"\n```\n\nBy default rngd fills the entropy pool until at least 2048 bits of entropy are available. This is to avoid the TRNG to dominate the contents of the pool. You can override this setting if you really trust your TRNG. To do this, pass \"--fill-watermark=4096\" to RNGD_OPTS, for example (4096 is the maximum size of kernel's entropy pool by default, you should not pass a value greater than the maximum either). Doing so may increase the performance of /dev/random even further, at the expense of maybe lower random number quality. However, it should be noted that the default setting is already sufficient for the majority of user cases.\n\n"
+    },
+    {
+      "title": "Testing and usage",
+      "level": 2,
+      "content": "You may test if rngd is working before enabling its service by running:\n\n```\n# rngd -f\n```\n\nA simple test to see if everything is working as it should is to run (in another terminal) the following dd command:\n\n```\n$ dd if=/dev/random of=/dev/null bs=1024 count=1 iflag=fullblock\n```\n\nWithout rngd, the above command will take lots of time to run. With rngd working properly, the result should be almost instantaneous:\n\n```\n1+0 records in\n1+0 records out\n1024 bytes (1.0 kB, 1.0 KiB) copied, 0.0199623 s, 51.3 kB/s\n```\n\nA speed of around 50 kB/s in dd's output shows that everything is working properly. For comparison, without rngd you probably would get 0.0 kB/s (since the speed is too low).\n\nAnother interesting test is to run rngtest, to check the data using FIPS 140-2 tests:\n\n```\n$ rngtest -c 1000 </dev/random\n```\n\n```\nrngtest 5\nCopyright (c) 2004 by Henrique de Moraes Holschuh\nThis is free software; see the source for copying conditions.  There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n \nrngtest: starting FIPS tests...\nrngtest: bits received from input: 20000032\nrngtest: FIPS 140-2 successes: 999\nrngtest: FIPS 140-2 failures: 1\nrngtest: FIPS 140-2(2001-10-10) Monobit: 1\nrngtest: FIPS 140-2(2001-10-10) Poker: 0\nrngtest: FIPS 140-2(2001-10-10) Runs: 0\nrngtest: FIPS 140-2(2001-10-10) Long run: 0\nrngtest: FIPS 140-2(2001-10-10) Continuous run: 0\nrngtest: input channel speed: (min=301.394; avg=417.091; max=693.187)Kibits/s\nrngtest: FIPS tests speed: (min=64.656; avg=91.010; max=123.055)Mibits/s\nrngtest: Program run time: 47037492 microseconds\n```\n\nIt is normal for any random number generator to fail in a small number of tests in 1000 passes, however if the number of failures is too great (like 10), probably there is something wrong.\n\nAfter that, you can start/enable the rngd.service.\n\n"
+    }
+  ]
+}

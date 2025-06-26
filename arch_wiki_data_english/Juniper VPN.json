@@ -1,0 +1,111 @@
+{
+  "title": "Juniper VPN",
+  "url": "https://wiki.archlinux.org/title/Juniper_VPN",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Pulse Connect Secure (PCS), previously known as Juniper SSL VPN, is a commercial VPN solution targeted at businesses.\n\n"
+    },
+    {
+      "title": "AUR",
+      "level": 3,
+      "content": "Install the pulse-secureAUR package and start/enable pulsesecure.service.\n\nTo connect via the command line, run the command:\n\n```\n$ /opt/pulsesecure/bin/pulselauncher [-U signinUrl] [-r realm] [-l role] [-c cert] [-u username] [-p password]\n```\n\nNote that the login URL is different from the URL used in browsers. Check \"Note regarding Server/URL\" section below.\n\nTo use the pulseUi GUI client you need to additionally install webkit2gtk and gtkmm3. In the GUI client, the URL should be same as that used in browsers.\n\n- The pulse-secure VPN only functions properly when using NetworkManager. Additionally, DNS lookups will not work properly when using a separate Domain name resolution service. If you disable a separate DNS service to switch back to NetworkManager#DNS management, you may additionally need to remove /etc/resolv.conf to have NetworkManager correctly detect that it should manage DNS.\n- By default the directory that the GUI stores the connections does not exist and it cannot find the system certificates to verify hosts. Run the following commands to resolve these issues:\n\n```\n# mkdir -p /var/lib/pulsesecure/pulse\n# mkdir -p /etc/pki/ca-trust/extracted/openssl\n# ln -s /etc/ca-certificates/extracted/ca-bundle.trust.crt /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt\n```\n\n- If the installation of chromium embedded framework in the GUI client gets stuck, it can be installed using\n\n```\n# sudo /opt/pulsesecure/bin/setup_cef.sh install\n```\n\n"
+    },
+    {
+      "title": "OpenConnect",
+      "level": 3,
+      "content": "The OpenConnect VPN client also supports Pulse Connect Secure, however Host Checker support (required by some Pulse servers) is not yet implemented at the time of this writing (Spring 2022). See the initial announcement for more details.\n\nTo use, install openconnect. If your Juniper VPN setup does not require any input after connecting you can use this command in order to connect\n\n```\n# openconnect --protocol=pulse https://vpn.example.com/\n```\n\nIf you want NetworkManager support, install networkmanager-openconnect, or try the latest git version. The VPN connection can be created through the GUI or by using this command:\n\n```\n$ nmcli con add type vpn con-name \"Connection Name\" ifname \"*\" vpn-type openconnect -- vpn.data \"gateway=vpn.example.com,protocol=nc\"\n```\n\n"
+    },
+    {
+      "title": "MSJNC",
+      "level": 3,
+      "content": "The Mad Scientist's \"msjnc\" script requires multilib, then install lib32-zlib, net-tools, glib-perl, perl-libwww and gtk2-perl.\n\nAccess the Juniper VPN website you need to use. Log in and allow the installation to attempt and fail (due to non-32 bit Java). You should get an error similar to the following:\n\n```\nSetup failed.\nPlease install 32 bit Java and update alternatives links using update-alternatives command.\nFor more details, refer KB article KB25230\n```\n\nYou should now have the file ~/.juniper_networks/ncLinuxApp.jar present.\n\nHowever, if ncLinuxApp.jar is not downloaded, fetch it manually - see the following example URL: https://server/dana-cached/nc/ncLinuxApp.jar (note: you need to log in first).\n\nThen download the msjnc script, make it executable, and put it in your PATH.\n\n"
+    },
+    {
+      "title": "Automatic installation of ncsvc using msjnc",
+      "level": 4,
+      "content": "The first time you launch msjnc (before ncsvc is installed), it will extract ncLinuxApp.jar and prompt for your password in order to install the service. This requires sudo to be configured to allow all commands to your user.\n\nAfter the service is installed to ~/.juniper_networks/network_connect/ncsvc with suid, create a profile and connect.\n\n"
+    },
+    {
+      "title": "Manual installation of msjnc",
+      "level": 4,
+      "content": "Create these directories:\n\n```\n$ mkdir -p ~/.juniper_networks/network_connect\n$ mkdir -p ~/.juniper_networks/tmp\n```\n\nExtract the software:\n\n```\n$ unzip ~/.juniper_networks/ncLinuxApp.jar -d ~/.juniper_networks/tmp\n```\n\nCopy NC.jar to the network_connect directory:\n\n```\n$ cp ~/.juniper_networks/tmp/NC.jar ~/.juniper_networks/network_connect\n```\n\nInstall the service:\n\n```\n$ sh ~/.juniper_networks/tmp/installNC.sh ~/.juniper_networks/network_connect\n```\n\nLaunch msjnc, create a profile, and connect.\n\n"
+    },
+    {
+      "title": "Note regarding Server/URL",
+      "level": 4,
+      "content": "For the Server/URL, you may have to provide the URL that processes the login form rather than the login page itself. As an example, one company's login form is on /dana-na/auth/url_0/welcome.cgi but the form is actually processed by /dana-na/auth/url_0/login.cgi. You may have to inspect the html of the login page to find the form's action attribute.\n\n"
+    },
+    {
+      "title": "JVPN",
+      "level": 3,
+      "content": "The JVPN Perl script establishes a Juniper VPN connection and supports the following features:\n\n- Connection using Host Checker.\n- Automatic download of the required Juniper java and daemon files (ncsvc) when run as root.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 4,
+      "content": "Install the perl dependencies perl-term-readkey and perl-lwp-protocol-https. Once you have done so, you must choose whether to run jvpn as root (easiest method) or as a regular user and run the steps below accordingly.\n\n"
+    },
+    {
+      "title": "Running as root",
+      "level": 4,
+      "content": "Run the command:\n\n```\n# curl -L https://github.com/samm-git/jvpn/archive/v0.7.0.tar.gz | tar xz\n```\n\nThe command creates a file jvpn-0.7.0 in current directory.\n\nFinally, start the script with:\n\n```\n# ./jvpn.pl\n```\n\nOn first run, the script will download all the necessary files\n\n"
+    },
+    {
+      "title": "Running as a regular user",
+      "level": 4,
+      "content": "Use your web browser (no need for 32-bit Java) to connect to the VPN website and download the appropriate software. The files downloaded will be located in ~/.juniper_networks/network_connect/ (even if the VPN connection actually fails).\n\nThis step is considered more complex because you have to have a functional Java plugin in your browser (configured with appropriate security settings). During installation of Network Connect, the browser will request a root password to set the setuid flag on ncsvc (Juniper daemon).\n\nThen install jvpn into the folder by executing the following:\n\n```\n$ cd ~/.juniper_networks/network_connect\n$ curl -L https://github.com/samm-git/jvpn/archive/v0.7.0.tar.gz | tar xz --strip-components=1\n```\n\nNext, edit jvpn.ini (directions are included in the file).\n\nFinally, start the script with the following:\n\n```\n$ cd ~/.juniper_networks/network_connect\n$ ./jvpn.pl\n```\n\n"
+    },
+    {
+      "title": "Workarounds",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n"
+    },
+    {
+      "title": "64-bit Java (workaround 1)",
+      "level": 3,
+      "content": "Note: **not recommended** \n\n1) Install bin32-jreAUR. Make sure the PKGBUILD installs it to /opt/bin32-jre, rather than /opt/java, where it will conflict with the 64-bit JRE.\n\n2) Install jreAUR.\n\n3) Move the java binary to java.orig:\n\n```\n# mv /opt/java/jre/bin/java /opt/java/jre/bin/java.orig\n```\n\n4) Create a bash script java and make it executable:\n\n```\n# touch /opt/java/jre/bin/java\n# chmod 755 /opt/java/jre/bin/java\n```\n\n5) Finally, edit the bash script as per the below:\n\n```\n/opt/java/jre/bin/java\n```\n\n```\n#!/bin/bash\nif [ $3x = \"NCx\" ]\nthen\n    /opt/bin32-jre/jre/bin/java \"$@\"\nelse\n    /opt/java/jre/bin/java.orig \"$@\"\nfi\n```\n\n"
+    },
+    {
+      "title": "64-bit Java (workaround 2)",
+      "level": 3,
+      "content": "Note: **not recommended** \n\nAnother approach is to install an alternative version of Java and link the Java plugin for Firefox manually - this avoids the necessity of using a chroot environment. Follow the instructions below:\n\n1. install xterm.\n1. Install a custom 64-bit Java environment from java.com. Select the Linux x64 version. Once you have decided upon a location for the installation, extract the binary into that location and then mark it executable. Finally, run the binary to install Java.\n1. Install a custom 32-bit Java environment, also from java.com but this time, select the Linux (self-extracting) option. Extract the new binary to the same location created above, mark it executable, and run the binary. It will ask you whether you want to replace the files to 32 bit: Type \"A\" to overwrite all the 64-bit files with the 32-bit ones.\n1. Finally, link the library into the required location. The relevant library for Firefox is libnpjp2.so. To link it, use the following command ln -s location-of-custom-java-installation/lib/amd64/libnpjp2.so /usr/lib/mozilla/plugins/libnpjp2.so.\n\nFor more information, see the following guide from Southern Illinois University.\n\n"
+    },
+    {
+      "title": "Login succeeds but Network Connect will not launch",
+      "level": 3,
+      "content": "1. Firstly, verify your Java installation.\n1. Then navigate to ~/.juniper_networks/network_connect.\n1. Check that ncsvc is setuid root. Fix it if not.\n1. Run ldd ncsvc and see if there are any missing libraries.\n1. Follow the instructions from the Juniper forum to run it from command line. Use the -L 5 switch to log everything and use strace as root. Also try consulting ncsvc.log for any possible errors.\n\n"
+    },
+    {
+      "title": "Network Connect launched but the VPN does not work",
+      "level": 3,
+      "content": "Run ip route to to check if the route is present. Network connect has a diagnosis tool in the GUI. You can also checks the logs (also available in the GUI).\n\nOther cause for VPN not working can lie in DNS settings. Check whether they really are set (usually in /etc/resolv.conf) and that DNS cache does not intervene (stop systemd-resolved service if running).\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Network Connect launched and a configuration error message is displayed",
+      "level": 3,
+      "content": "Check that you have net-tools installed.\n\n"
+    },
+    {
+      "title": "ncapp.error Failed to connect/authenticate with IVE.",
+      "level": 3,
+      "content": "See this post on the Ubuntu forums. Note that in some cases, the policy will not permit a connection initiated from the command line. Instead, you have to install both bin32-jreAUR and bin32-firefox-binAUR and authenticate through the browser.\n\n"
+    },
+    {
+      "title": "Unauthorized new route has been added, disconnecting",
+      "level": 3,
+      "content": "When using the pulse-secureAUR client, VPN may not work with connman due to conflicting routing table strategies. Check ~/.pulse_secure/pulse/pulsesvc.log for such messages:\n\n```\nrmon.error Unauthorized new route to x.x.x.x/y.y.y.y has been added (conflicts with our route to z.z.z.z), disconnecting (routemon.cpp:598)\n```\n\nIf this is the case, using NetworkManager instead can fix the issue.\n\n"
+    },
+    {
+      "title": "After login, pulseUi displays 'Compliance: Security policies not met'",
+      "level": 3,
+      "content": "It seems that pulseUi uses NetworkManager internally while verifying connection in some cases. If this is the case, install NetworkManager and start NetworkManager.sevice.\n\n"
+    },
+    {
+      "title": "pulseUi does not remember connections",
+      "level": 3,
+      "content": "If pulseUI keeps forgetting your connections, make sure the directory /var/lib/pulsesecure/pulse/ exists. If it does not:\n\n```\n# mkdir -p /var/lib/pulsesecure/pulse/\n```\n\n"
+    }
+  ]
+}

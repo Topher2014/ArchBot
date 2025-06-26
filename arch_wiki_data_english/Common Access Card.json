@@ -1,0 +1,81 @@
+{
+  "title": "Common Access Card",
+  "url": "https://wiki.archlinux.org/title/Common_Access_Card",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Smartcards\n\nThis page explains how to setup Arch to use a US Department of Defense Common Access Card (CAC).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install ccid and opensc.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "If your card reader does not have a pin pad, append enable_pinpad = false to /etc/opensc.conf.\n\nSometimes opensc can struggle to identify the proper driver for CAC, instead it may choose PIV or something else. You can force the CAC driver by editing /etc/opensc.conf for card_drivers = cac and force_card_driver = cac\n\n"
+    },
+    {
+      "title": "Enable pcscd",
+      "level": 2,
+      "content": "Start and enable pcscd.socket.\n\n"
+    },
+    {
+      "title": "Configure browser",
+      "level": 2,
+      "content": "1. Go to: https://public.cyber.mil/pki-pke/pkipke-document-library/\n1. Download certs: \"PKI CA Certificate Bundles: PKCS#7 For DoD PKI Only - Version 5.13\" (ZIP Download)\n1. Unzip the DoD PKI zip\n1. Follow browser-specific instructions\n\n"
+    },
+    {
+      "title": "Load security device",
+      "level": 4,
+      "content": "Navigate to Edit > Preference > Advanced > Certificates > Security Devices and click \"Load\" to load a module using /usr/lib/opensc-pkcs11.so or /usr/lib/pkcs11/opensc-pkcs11.so.\n\n"
+    },
+    {
+      "title": "Import the DoD Certificates",
+      "level": 4,
+      "content": "Install the certificates from the mentioned zip-file in this order, by going to Edit > Preference > Advanced > Certificates > View Certificates > Authorities > Import (make sure to at-least check the box for \"Trust this CA to identify websites\"):\n\n1. Certificates_PKCS7_v5_13_DoD_der.p7b\n1. Certificates_PKCS7_v5_13_DoD_DoD_Root_CA_3_der.p7b\n1. Certificates_PKCS7_v5_13_DoD_DoD_Root_CA_4_der.p7b\n1. Certificates_PKCS7_v5_13_DoD_DoD_Root_CA_5_der.p7b\n1. Certificates_PKCS7_v5_13_DoD_DoD_Root_CA_6_der.p7b\n1. DOD_PKE_Chain.pem\n\n"
+    },
+    {
+      "title": "Chromium/Google Chrome",
+      "level": 3,
+      "content": "1. Add the CAC Module to the NSS DB.\n\nEnsure that your CAC is connected, that Chromium is closed and enter the following in a terminal: $ modutil -dbdir sql:$HOME/.pki/nssdb/ -add \"CAC Module\" -libfile /usr/lib/opensc-pkcs11.so\n\nUpon success you will see \"Module \"CAC Module\" added to database.\"\n\n2. Check if the CAC Module was successfully added with $ modutil -dbdir sql:$HOME/.pki/nssdb/ -list\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n3. Navigate (in a shell) to the location of the unzip DoD PKI files and install via:\n\n```\nfor n in $(ls * | grep Chrome); do certutil -d sql:$HOME/.pki/nssdb -A -t TC -n $n -i $n; done\n```\n\nor\n\nRe-open Chrome, Navigate to Settings > Show Advanced Settings > Manage Certificates > Authorities to load CA bundle from the PEM-formatted file from above.\n\n4. Verify the authority is in Chrome under Settings > Show Advanced Settings > Manage Certificates > Authorities then expand \"org-U.S. Government\" and you should see a number of \"DoD\" certificates listed.\n\n"
+    },
+    {
+      "title": "VMware/Omnissa Horizon Client",
+      "level": 2,
+      "content": "Please note that Omnissa purchased the horizon-view solution from VMware.\n\n"
+    },
+    {
+      "title": "Omnissa:",
+      "level": 3,
+      "content": "Install omnissa-horizon-clientAUR, and omnissa-horizon-usbAUR. To integrate CAC authentication with the VMware Horizon Client, create the directory /usr/lib/omnissa/horizon/pkcs11 and link the pkcs11 library:\n\n```\n# ln -s /usr/lib/pkcs11/opensc-pkcs11.so /usr/lib/omnissa/horizon/pkcs11/libopenscpkcs11.so\n```\n\nAlso create the following symlinks to enable ssl_3.4.0.\n\n```\n# ln -sf /usr/lib/libcrypto.so.3 /usr/lib/omnissa/libcrypto.so.3\n# ln -sf /usr/lib/libssl.so.3 /usr/lib/omnissa/libssl.so.3\n```\n\n"
+    },
+    {
+      "title": "VMware:",
+      "level": 3,
+      "content": "Install vmware-horizon-clientAUR, vmware-horizon-usbAUR, and vmware-horizon-smartcardAUR. Start and enable vmware-horizon-usb.service.\n\nTo integrate CAC authentication with the VMware Horizon Client, create the directory /usr/lib/vmware/view/pkcs11 and link the pkcs11 library:\n\n```\n# ln -s /usr/lib/pkcs11/opensc-pkcs11.so /usr/lib/vmware/view/pkcs11/libopenscpkcs11.so\n```\n\nAlso create the following symlinks to enable ssl_3.4.0\n\n```\n# ln -sf /usr/lib/libcrypto.so.3 /usr/lib/vmware/libcrypto.so.3\n# ln -sf /usr/lib/libssl.so.3 /usr/lib/vmware/libssl.so.3\n```\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 2,
+      "content": "Visit your favorite CAC secured web page and you should be asked for the Master Password for your certificate. Enter it and if you get in, you know it is working.\n\nIf some sites/pages seem to have a problem working correctly (e.g. outlook web access will not authenticate the session for DoD webmail) try using a private/incognito session to test validity of the cert chain and remove some variables.\n\nIf you would like to manually query the certificates on a PIN enabled CAC/SmartCard, use the following command:\n\n```\n$ p11tool --login --provider=/usr/lib/pkcs11/opensc-pkcs11.so --list-all-certs -d 100\n```\n\n"
+    },
+    {
+      "title": "opensc-tool",
+      "level": 3,
+      "content": "Most of this information was found in a blog post by Firas Kraïem\n\nVerify opensc can see your reader:\n\n```\n$ opensc-tool --list-readers\n```\n\n```\n# Detected readers (pcsc)\nNr.  Card  Features  Name\n0    Yes            Generic USB2.0-CRW [Smart Card Reader Interface] (20070818000000000) 00 00\n```\n\nList plugged in card:\n\n```\n$ opensc-tool --reader 0 --name\n```\n\n```\nPersonal Identity Verification Card\n```\n\nList plugged in card and drive in use:\n\n```\n$ opensc-tool --reader 0 --name -v\n```\n\n```\nConnecting to card in reader Generic USB2.0-CRW [Smart Card Reader Interface] (20070818000000000) 00 00...\nUsing card driver Personal Identity Verification Card.\nCard name: Personal Identity Verification Card\n```\n\n"
+    },
+    {
+      "title": "pcsc-tools",
+      "level": 3,
+      "content": "An other option is pcsc-tools. The program pcsc_scan may be helpful\n\n```\n$ pcsc_scan\n```\n\n```\nPC/SC device scanner\nV 1.4.21 (c) 2001-2011, Ludovic Rousseau <ludovic.rousseau@free.fr>\nCompiled with PC/SC lite version: 1.8.6\nUsing reader plug'n play mechanism\nScanning present readers...\n0: Dell Dell Smart Card Reader Keyboard 00 00\n\nThu Sep  5 10:41:53 2013\nReader 0: Dell Dell Smart Card Reader Keyboard 00 00\n  Card state: Card removed, \n\nThu Sep  5 10:41:58 2013\nReader 0: Dell Dell Smart Card Reader Keyboard 00 00\n  Card state: Card inserted, \n  ATR: 3B DB 96 00 80 1F 03 00 31 C0 64 B0 F3 10 00 07 90 00 80\n\nATR: 3B DB 96 00 80 1F 03 00 31 C0 64 B0 F3 10 00 07 90 00 80\n+ TS = 3B --> Direct Convention\n+ T0 = DB, Y(1): 1101, K: 11 (historical bytes)\n  TA(1) = 96 --> Fi=512, Di=32, 16 cycles/ETU\n    250000 bits/s at 4 MHz, fMax for Fi = 5 MHz => 312500 bits/s\n  TC(1) = 00 --> Extra guard time: 0\n  TD(1) = 80 --> Y(i+1) = 1000, Protocol T = 0 \n-----\n  TD(2) = 1F --> Y(i+1) = 0001, Protocol T = 15 - Global interface bytes following \n-----\n  TA(3) = 03 --> Clock stop: not supported - Class accepted by the card: (3G) A 5V B 3V \n+ Historical bytes: 00 31 C0 64 B0 F3 10 00 07 90 00\n  Category indicator byte: 00 (compact TLV data object)\n    Tag: 3, len: 1 (card service data byte)\n      Card service data byte: C0\n        - Application selection: by full DF name\n        - Application selection: by partial DF name\n        - EF.DIR and EF.ATR access services: by GET RECORD(s) command\n        - Card with MF\n    Tag: 6, len: 4 (pre-issuing data)\n     Data: B0 F3 10 00\n    Mandatory status indicator (3 last bytes)\n      LCS (life card cycle): 07 (Operational state (activated))\n      SW: 9000 (Normal processing.)\n+ TCK = 80 (correct checksum)\n\nPossibly identified card (using /usr/share/pcsc/smartcard_list.txt):\n3B DB 96 00 80 1F 03 00 31 C0 64 B0 F3 10 00 07 90 00 80\n\tDoD CAC, Oberthur ID One 128 v5.5 Dual\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- PIV Usage Guides[dead link 2023-09-16 ⓘ]\n\n"
+    }
+  ]
+}

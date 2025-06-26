@@ -1,0 +1,56 @@
+{
+  "title": "Home and End keys not working",
+  "url": "https://wiki.archlinux.org/title/Home_and_End_keys_not_working",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "A frequent problem in command line programs is that keys like Home and End do not work as expected. This is usually because the terminal emulator sends multi-character escape codes when such keys are pressed, which the running program (such as your shell) does not know how to interpret correctly. Usually this problem can be fixed by configuring the offending program to perform the correct action when receiving certain escape codes. Thus the solution varies from program to program.\n\nFirst you should check the common culprits that can affect the behavior of many programs.\n\n"
+    },
+    {
+      "title": "TERM",
+      "level": 2,
+      "content": "The number one cause of broken keys is overriding the TERM environment variable to something that conflicts with your shell. All modern terminals are smart enough to set their own TERM variable, so before you go delving into program configurations ensure that you are not incorrectly overriding it (for example, in your ~/.bashrc). Again, do not set TERM manually - let the terminal do it.\n\nIf you do not like the TERM value chosen by your terminal (e.g. 'xterm' when you want 'xterm-256color'), there is typically a way to configure your terminal to properly override it without changing the TERM variable.\n\nFor xterm and urxvt, it can be set in the X resources:\n\n```\n~/.Xresources\n```\n\n```\nXTerm*termName: xterm-256color\nURxvt*termName: rxvt-unicode\n```\n\nFor GNU Screen, it can be set in ~/.screenrc:\n\n```\n~/.screenrc\n```\n\n```\nterm screen-256color\n```\n\nFor Tmux, it can be set in ~/.tmux.conf (see tmux#Configuration):\n\n```\n~/.tmux.conf\n```\n\n```\nset -g default-terminal screen-256color\n```\n\n"
+    },
+    {
+      "title": "Shell prompt",
+      "level": 2,
+      "content": "Another possible reason for misbehaving Home and End keys is malformed custom shell prompt. The shell tries to calculate actual length of the prompt contained in PS1 environment variable, but if PS1 contains some escape sequences (e.g. for colored text), shell may assume that they are actual printable characters with non-zero length. This will obviously result in text rendering mistakes.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nTo avoid that, you should enclose your non-printable stuff in PS1 with \\[ and \\] so that shell can understand that it is actually non-printable. For example, this line in your .bashrc\n\n```\nPS1=\"\\e[32m\\u \\e[34m\\w \\e[37m\\$ \\e[0m\"\n```\n\nshould become this:\n\n```\nPS1=\"\\[\\e[32m\\]\\u \\[\\e[34m\\]\\w \\[\\e[37m\\]\\$ \\[\\e[0m\\]\"\n```\n\nFor more info, please refer to Bash/Prompt customization.\n\n"
+    },
+    {
+      "title": "Readline",
+      "level": 2,
+      "content": "Many command line applications use the Readline library to read input. So properly configuring Readline can fix Home and End in many cases. Readline maintains mappings for more obscure keys in /etc/inputrc and ~/.inputrc for global and per-user mappings, respectively.\n\nIn the default /etc/inputrc, there are several lines that attempt to handle common Home/End escape codes:\n\n```\n\"\\e[1~\": beginning-of-line\n\"\\e[4~\": end-of-line\n\"\\e[7~\": beginning-of-line\n\"\\e[8~\": end-of-line\n\"\\eOH\": beginning-of-line\n\"\\eOF\": end-of-line\n\"\\e[H\": beginning-of-line\n\"\\e[F\": end-of-line\n```\n\nIf your keys are not working, it could be because your particular terminal sends escape codes not in this list. First you need to find out what escape codes are being sent. To see them, you can use a Readline command called \"quoted-insert\" or run the command showkey --scancodes which outputs the value of a key verbatim. The default binding for quoted-insert is Ctrl+v.\n\nFor example, you could give the following series of inputs in your terminal:\n\n1. Ctrl+v\n1. Home\n1. Space\n1. Ctrl+v\n1. End\n\nAnd get as output:\n\n```\n^[[1~ ^[[4~\n```\n\nThe ^[ indicates an escape character in your shell, so this means that your Home key has an escape code of [1~ and you End key has an escape code of [4~. Since these escape codes are not listed in the default Readline configuration, you will need to add them:\n\n```\n\"\\e[1~\": beginning-of-line\n\"\\e[4~\": end-of-line\n```\n\nNote that Readline uses \\e to indicate an escape character.\n\n"
+    },
+    {
+      "title": "Terminfo",
+      "level": 2,
+      "content": "For programs that do not use Readline (e.g. ncurses), you can try editing your terminfo to change which escape codes are sent to the terminal for certain actions.\n\nFirst save your existing terminfo to a file\n\n```\n$ infocmp $TERM > terminfo.src\n```\n\nThen edit it to change the escape codes. For example change khome and kend:\n\n```\nkhome=\\E[1~, kend=\\E[4~,\n```\n\nThen compile the new terminfo (which saves it to your ~/.terminfo directory)\n\n```\n$ tic terminfo.src\n```\n\nAnd lastly specify the new terminfo in your shell's environment variables:\n\n```\nexport TERMINFO=~/.terminfo\n```\n\n"
+    },
+    {
+      "title": "Other applications",
+      "level": 2,
+      "content": "If the above steps do not resolve the issue, it is probably a program-specific problem rather than a system-wide one. You may have to consult the documentation for the given program on how to fix it. Below are fixes for common programs.\n\n"
+    },
+    {
+      "title": "Lynx",
+      "level": 3,
+      "content": "You can add key binds using the same quoted-insert characters as used for Readline, but use \\033 to represent an escape character:\n\n```\nlynx.cfg\n```\n\n```\nsetkey \"\\033[1~\" HOME\nsetkey \"\\033[4~\" END\n```\n\n"
+    },
+    {
+      "title": "URxvt/Rxvt",
+      "level": 3,
+      "content": "Add escape code binds to your X resources using the same escape sequence format as for Lynx:\n\n```\nURxvt.keysym.Home: \\033[1~\nURxvt.keysym.End: \\033[4~\nURxvt.keysym.KP_Home: \\033[1~\nURxvt.keysym.KP_End:  \\033[4~\n```\n\nWhere KP_Home and KP_End are the numpad Home and End keys. These binds might also fix programs running within URxvt e.g. nano.\n\nAnother solution is to add the following section to /etc/inputrc\n\n```\n# those two are for rxvt\n\"\\e[7~\":beginning-of-line\n\"\\e[8~\":end-of-line\n```\n\n"
+    },
+    {
+      "title": "Zsh",
+      "level": 3,
+      "content": "Use the terminfo(5) database to set the correct key bindings, see Zsh#Key bindings.\n\n"
+    },
+    {
+      "title": "lesskey source file",
+      "level": 4,
+      "content": "For less version 582 and later, is it possible to use a plain text configuration file under $XDG_CONFIG_HOME/lesskey or $HOME/.config/lesskey or $HOME/.lesskey.\n\n```\n$HOME/.config/lesskey\n```\n\n```\n#line-edit\n\\e[1~ home\n\\e[4~ end\n```\n\n"
+    }
+  ]
+}

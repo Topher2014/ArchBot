@@ -1,0 +1,91 @@
+{
+  "title": "Chrony",
+  "url": "https://wiki.archlinux.org/title/Chrony",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article describes how to set up and run chrony, an alternative NTP client and server that is roaming friendly and designed specifically for systems that are not online all the time.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the chrony package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The smallest useful configuration file (using IP addresses instead of a hostname) would look something like:\n\n```\n/etc/chrony.conf\n```\n\n```\nserver 1.2.3.4 offline\nserver 5.6.7.8 offline\nserver 9.10.11.12 offline\ndriftfile /var/lib/chrony/drift\nrtconutc\n\n# This sets the rtc, but throws out RTC drift tracking. rtcfile is the recommended alternative: see \"Real-Time Clock\" below.\nrtcsync\n```\n\nRefer to /usr/share/doc/chrony/README, which will point you to the right answer to any doubts you could still have. Documentation is also available online. See also the related man pages: chronyc(1), chrony.conf(5), chronyd(8).\n\n"
+    },
+    {
+      "title": "NTP Servers",
+      "level": 3,
+      "content": "The first thing you define in your /etc/chrony.conf is the servers your machine will synchronize to. NTP servers are classified in a hierarchical system with many levels called strata: the devices which are considered independent time sources are classified as stratum 0 sources; the servers directly connected to stratum 0 devices are classified as stratum 1 sources; servers connected to stratum 1 sources are then classified as stratum 2 sources and so on.\n\nIt has to be understood that a server's stratum cannot be taken as an indication of its accuracy or reliability. Typically, stratum 2 servers are used for general synchronization purposes: if you do not already know the servers you are going to connect to, you should use the pool.ntp.org servers (alternate link) and choose the server pool that is closest to your location.\n\nThe following lines tells chrony to pick 4 sources from the NTP pool (chrony has special handling of pools, so as to not confuse its tracking of server-side drift), and use a burst behavior on startup:\n\n```\npool 2.arch.pool.ntp.org iburst maxsources 4\n```\n\n"
+    },
+    {
+      "title": "Offline computers",
+      "level": 4,
+      "content": "If your computer is not connected to the internet on startup, it is recommended to use the offline option, to tell Chrony not to try and connect to the servers, until it has been given the go:\n\n```\npool 2.arch.pool.ntp.org iburst maxsources 4 offline\n```\n\nIt may also be a good idea to either use IP addresses instead of host names, or to map the hostnames to IP addresses in your /etc/hosts file, as DNS resolving will not be available until you have made a connection.\n\n"
+    },
+    {
+      "title": "Using NTS servers",
+      "level": 4,
+      "content": "Since version 4.0 [1], chrony supports Network Time Security (NTS), a cryptographically secured variety of NTP. To use it, add an NTS-secured server, and specify nts at the end, like so:\n\n```\nserver time.cloudflare.com iburst nts\n```\n\nYou can find a list of all known NTS-supporting servers here.\n\n"
+    },
+    {
+      "title": "Real-Time Clock",
+      "level": 3,
+      "content": "During boot the initial time is read from the hardware real-time clock (RTC) and the system time is then set, and synchronised over a period of minutes once the chrony daemon has been running for a while. If the hardware clock is out of sync then the initial system time can be some minutes away from the true time. Chrony.conf has three different mechanisms for handling the RTC:\n\n- The first mechanism is rtcsync, which simply writes the current time to the RTC periodically. This is the classical method used by ntpd, but turns off RTC drift tracking: this is bad for intermittently running desktops, which does a lot of time-keeping on the RTC.\n- The second mechanism is rtcautotrim, which overwrites the RTC time only if it goes above a difference threshold. This method can be used with rtcfile, which allows for keeping track of RTC error.\n- The final mechanism is to do nothing about the RTC, but record its error and drift in rtcfile. The RTC time will stay wrong, but the system time will become correct as chrony has an idea of how wrong it is. The rtctrim command in chronyc can still sync the RTC as needed:\n\n```\n# chronyc\nchronyc> trimrtc\n200 OK\nchronyc> quit\n```\n\nIn addition, rtconutc describes whether RTC runs on UTC.\n\n"
+    },
+    {
+      "title": "Example: intermittently running desktops",
+      "level": 4,
+      "content": "An intermittently running desktop would require the use of rtcfile to keep track of RTC error. A machine running Arch Linux for five years, accumulated a 300 s error within the RTC. After a reboot it took chrony a long time to adjust this difference using the above configuration. If we go for the below instead:\n\n```\n/etc/sysconfig/chronyd\n```\n\n```\nOPTIONS='-r -s'\n```\n\n```\n/etc/chrony.conf\n```\n\n```\ndumpdir /var/lib/chrony\nrtcfile /var/lib/chrony/rtc\n```\n\nThis keeps, interestingly, the RTC still out-of-date, but after each re-start, chrony adjusts the accumulated error of the RTC and the system time is quite synchronous to NTP even shortly after a start.\n\nRTC remains out-of-date because we forgot to add the rtcautotrim line telling chrony to adjust the RTC. If we do add it, both the RTC and the system time will become correct.\n\n"
+    },
+    {
+      "title": "Other interesting options",
+      "level": 3,
+      "content": "Usefulness:\n\n- makestep: allow chrony to change the time by abrupt sets instead of frequency adjustments. Doing so may surprise running programs, but helps to fix large errors. makestep 0.1 3 may be desirable for computers that are often offline: only the first three changes will be stepped, so surprises are limited to computer startup.\n\nPrecision:\n\n- server and pool: xleave and presend may help increase accuracy without any compatibility cost.\n- hwtimestamp: some network interface cards can timestamp its packages to account for delays in the network stack. Use hwtimestamp * to turn it on: this will not do anything on adapters without such support.\n- tempcomp: keep track of the relationship between software clock errors (usually due to motherboard crystal temperature changes) and a temperature sensor. For those desiring ultimate precision.\n\n"
+    },
+    {
+      "title": "Starting chronyd",
+      "level": 3,
+      "content": "The package provides chronyd.service, see systemd for details.\n\n- systemd-timesyncd.service is in conflict with chronyd, so you need to disable it first if you want to enable chronyd properly.\n\n"
+    },
+    {
+      "title": "Telling chronyd an internet connection has been made",
+      "level": 3,
+      "content": "If you are connected to the internet, run:\n\n```\n# chronyc\nchronyc> online\n200 OK\nchronyc> exit\n```\n\nYou may also be interested in the activity option to display status:\n\n```\n# chronyc activity\n200 OK\n3 sources online\n0 sources offline\n0 sources doing burst (return to online)\n0 sources doing burst (return to offline)\n0 sources with unknown address\n```\n\nChrony should now connect to the configured time servers and update your clock if needed. To tell chrony that you are not connected to the Internet anymore, execute the following:\n\n```\n# chronyc offline\n200 OK\n\n# chronyc activity\n200 OK\n0 sources online\n3 sources offline\n0 sources doing burst (return to online)\n0 sources doing burst (return to offline)\n0 sources with unknown address\n```\n\nThe online/offline status can be automatically handled by dispatcher services for networkmanager and connman, see below.\n\n"
+    },
+    {
+      "title": "Checking configured NTP servers",
+      "level": 3,
+      "content": "To check which NTP servers chrony is actually using, and how precise they are, you can use chronyc -N 'sources -a -v':\n\n```\n$ chronyc -N 'sources -a -v'\n\n  .-- Source mode  '^' = server, '=' = peer, '#' = local clock.\n / .- Source state '*' = current best, '+' = combined, '-' = not combined,\n| /             'x' = may be in error, '~' = too variable, '?' = unusable.\n||                                                 .- xxxx [ yyyy ] +/- zzzz\n||      Reachability register (octal) -.           |  xxxx = adjusted offset,\n||      Log2(Polling interval) --.      |          |  yyyy = measured offset,\n||                                \\     |          |  zzzz = estimated error.\n||                                 |    |           \\\nMS Name/IP address         Stratum Poll Reach LastRx Last sample               \n===============================================================================\n^+ ptbnts1.ptb.de                1   6   377    50    -38us[  -13us] +/- 8723us\n^* ptbnts2.ptb.de                1   6   377    49  +2061ns[  +27us] +/- 7538us\n^+ nts.ntp.se                    2   6   377    51   +594us[ +619us] +/-   15ms\n^+ nts.sth1.ntp.se               2   6   377    51   +655us[ +680us] +/-   15ms\n^+ nts.sth2.ntp.se               2   6   377    53   +991us[+1016us] +/-   15ms\n^+ time.cloudflare.com           3   6   377    49  -1250us[-1250us] +/-   10ms\n```\n\n"
+    },
+    {
+      "title": "Notifying network state",
+      "level": 2,
+      "content": "If you have specified your pools as offline in chrony.conf, you need to tell chrony that the network status has changed.\n\nYou can either use chronyc to notify chrony that your network configuration has changed, or you can use a dispatcher for your relevant network configuration manager.\n\n"
+    },
+    {
+      "title": "NetworkManager",
+      "level": 3,
+      "content": "chronyd can go into online/offline mode along with a network connection through the use of NetworkManager's dispatcher scripts. Create a symlink using the shipped upstream NetworkManager dispatcher:\n\n```\nln -s /usr/share/doc/chrony/examples/chrony.nm-dispatcher.onoffline /etc/NetworkManager/dispatcher.d/20-chrony-onoffline.sh\n```\n\nYou can alternatively install networkmanager-dispatcher-chronyAUR from the AUR.\n\n"
+    },
+    {
+      "title": "netctl",
+      "level": 3,
+      "content": "Install netctl-dispatcher-chronyAUR from the AUR. This adds a hook to netctl which is run automatically for any connection.\n\n"
+    },
+    {
+      "title": "dhcpcd",
+      "level": 3,
+      "content": "Create the following hook:\n\n```\n/etc/dhcpcd.exit-hook\n```\n\n```\nif $if_up; then\n\tchronyc online\nelif $if_down; then\n\tchronyc offline\nfi\n```\n\nSee dhcpcd-run-hooks(8)\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- System time (for more information on computer timekeeping)\n- https://chrony-project.org/\n- https://www.ntp.org/\n- https://support.ntp.org/bin/view/Main/WebHome\n- https://www.ntppool.org/en/\n- https://www.eecis.udel.edu/~mills/ntp/html/index.html\n- https://www.akadia.com/services/ntp_synchronize.html\n\n"
+    }
+  ]
+}

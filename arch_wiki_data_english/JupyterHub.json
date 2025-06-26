@@ -1,0 +1,91 @@
+{
+  "title": "JupyterHub",
+  "url": "https://wiki.archlinux.org/title/JupyterHub",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "JupyterHub is a multi-user web server for Jupyter notebooks. It consists of four subsystems:\n\n1. The main hub process.\n1. Authenticators which authenticate users.\n1. Spawners which start and monitor a single-user server for each connected user.\n1. An HTTP proxy which receives incoming requests and routes them to either the hub or the appropriate single-user server.\n\nSee the technical overview in the JupyterHub documentation for more details.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the jupyterhubAUR package. In most cases you will also need to install the jupyter-notebook package (some more advanced spawners may not require it). The jupyterlab package can also be installed to make the JupyterLab interface available.\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "Start/enable jupyterhub.service. With the default configuration you can access the hub by going to 127.0.0.1:8000 in your browser.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The JupyterHub configuration file is located at /etc/jupyterhub/jupyterhub_config.py. This is a Python script which modifies the configuration object c. The configuration file provided by the package shows the available configuration options and their default values.\n\nAny relative paths in the configuration are resolved from the working directory that the hub is run from. The systemd service provided by the package uses /etc/jupyterhub as the working directory. This means, for example, that the default database URL c.JupyterHub.db_url = 'sqlite:///jupyterhub.sqlite' corresponds to the file /etc/jupyterhub/jupyterhub.sqlite.\n\nAll configuration options can be overridden on the command line. For example, the configuration file setting c.Application.show_config = True could instead be set with the command line flag --Application.show_config=True. Note that the provided systemd service uses the command line to explicitly set the c.JupyterHub.pid_file and c.ConfigurableHTTPProxy.pid_file values to a suitable runtime directory so any values for them in the configuration file will be ignored.\n\n"
+    },
+    {
+      "title": "Authenticators",
+      "level": 2,
+      "content": "Authenticators control access to the hub and the single-user servers. The authenticators section of the documentation contains details about how authenticators work and how to write a custom authenticator. The authenticators wiki page has a list of authenticators; some of these are packaged and are described below.\n\nNote that user status is stored in cookies, encrypted by the cookie secret. If you switch to a different authenticator, or modify the settings of your chosen authenticator so that the list of allowed users might change, you should change the cookie secret. This logs out all current users and forces them to re-authenticate with your new settings. This can be performed by deleting the cookie secret file and restarting the hub which will automatically generate a new secret. With the default configuration, the cookie secret is stored at /etc/jupyterhub/jupyterhub_cookie_secret.\n\n"
+    },
+    {
+      "title": "PAM Authenticator",
+      "level": 3,
+      "content": "The PAM authenticator uses PAM to allow local users to log in to the hub. It is included with JupyterHub and is the default authenticator. Using it requires the hub to have read permissions to /etc/shadow (which contains hashed versions of user passwords) in order to authenticate users. By default /etc/shadow is owned by root and has file permissions of -rw------, so running the hub as root will meet this requirement. Some sources advocate removing all permissions from /etc/shadow so it cannot be read by compromised daemons, and granting processes which require access the DAC_OVERRIDE capability. If your /etc/shadow is set up like this, create a drop-in file for the service to grant this capability to JupyterHub:\n\n```\n/etc/systemd/system/jupyterhub.service.d/override.conf\n```\n\n```\n[Service]\nCapabilityBoundingSet=CAP_DAC_OVERRIDE\n```\n\nThe PAM authenticator relies on the Python package pamela. For basic troubleshooting this can be tested on the commandline. To attempt authentication as user testuser, run the following command:\n\n```\n# python -m pamela -a testuser\n```\n\n(If you run JupyterHub as a non-root user, run the command as that user instead of root). If the authentication succeeds, no output will be printed. If it failed an error message will be printed.\n\n"
+    },
+    {
+      "title": "PAM authentication as non-root user",
+      "level": 4,
+      "content": "If you run JupyterHub as a non-root user, you will need to give that user read permissions to the shadow file. The method recommended by the JupyterHub documentation is to create a shadow group, make the shadow file readable by this group, and add the JupyterHub user to this group.\n\nCreating the group, modifying the shadow file permissions and adding the user jupyterhub to the group can be accomplished with the following four commands:\n\n```\n# groupadd shadow\n# chgrp shadow /etc/shadow\n# chmod g+r /etc/shadow\n# usermod -aG shadow jupyterhub\n```\n\n"
+    },
+    {
+      "title": "Spawners",
+      "level": 2,
+      "content": "Spawners are responsible for starting and monitoring each user's notebook server. The spawners section of the documentation contains more details about how they work and how to write a custom spawner. The spawners wiki page has a list of spawners; some of these are packaged and are described below.\n\n"
+    },
+    {
+      "title": "LocalProcessSpawner",
+      "level": 3,
+      "content": "This is the default spawner included with JupyterHub. It runs each single-user server in a separate local process under their user account (this means each JupyterHub user must correspond to a local user account). It also requires JupyterHub to be run as root so it can spawn the processes under the different user accounts. The jupyter-notebook package must be installed for this spawner to work.\n\n"
+    },
+    {
+      "title": "SudoSpawner",
+      "level": 3,
+      "content": "The SudoSpawner uses an intermediate process created with sudo to spawn the single-user servers. This allows the JupyterHub process to be run as a non-root user. To use it install the jupyterhub-sudospawnerAUR package.\n\nTo use it, create a system user account (the following assumes the account is named jupyterhub) and a group whose membership will define which users can access the hub (here assumed to be called jupyterhub-users). First, we have to configure sudo to allow the jupyterhub user to spawn a server without a password. Create a drop-in sudo configuration file with visudo:\n\n```\n# visudo -f /etc/sudoers.d/jupyterhub-sudospawner\n```\n\n```\n# The command the hub is allowed to run.\nCmnd_Alias SUDOSPAWNER_CMD = /usr/bin/sudospawner\n\n# Allow the jupyterhub user to run this command on behalf of anybody\n# in the jupyterhub-users group.\njupyterhub ALL=(%jupyterhub-users) NOPASSWD:SUDOSPAWNER_CMD\n```\n\nThe default service file runs the hub as root. It also applies a number of hardening options to the service to restrict its capabilities. This hardening prevents sudo from working; to allow it, the NoNewPrivileges service option (plus any other options which implicitly set it, see systemd.exec(5) for a list of service options) needs to be off. Create a drop-in file to run the hub using the jupyterhub user instead:\n\n```\n/etc/systemd/system/jupyterhub.service.d/override.conf\n```\n\n```\n[Service]\nUser=jupyterhub\nGroup=jupyterhub\n\n# Required for sudo.\nNoNewPrivileges=false\n\n# Setting the following would implicitly set NoNewPrivileges.\nPrivateDevices=false\nProtectKernelTunables=false\nProtectKernelModules=false\nLockPersonality=false\nRestrictRealtime=false\nRestrictSUIDGID=false\nSystemCallFilter=\nSystemCallArchitectures=\n```\n\nIf you have previously run the hub as the root user, you will need to change the ownership of the user database and cookie secret files:\n\n```\n# chown jupyterhub:jupyterhub /etc/jupyterhub/{jupyterhub_cookie_secret,jupyterhub.sqlite}\n```\n\nIf you are using the PAMAuthenticator, you will need to configure your system to allow it to work as a non-root user.\n\nFinally, edit the JupyterHub configuration and change the spawner class to SudoSpawner:\n\n```\n/etc/jupyterhub/jupyterhub_config.py\n```\n\n```\nc.JupyterHub.spawner_class='sudospawner.SudoSpawner'\n```\n\nTo give a user access to the hub, add them to the jupyterhub-users group:\n\n```\n# usermod -aG jupyterhub-users <username>\n```\n\n"
+    },
+    {
+      "title": "systemdspawner",
+      "level": 3,
+      "content": "The systemdspawner uses systemd to manage each user's notebook which allows configuring resource limitations, better process isolation and sandboxing, and dynamically allocated users. To use it install the jupyterhub-systemdspawnerAUR package and set the spawner class in the configuration file:\n\n```\n/etc/jupyterhub/jupyterhub_config.py\n```\n\n```\nc.JupyterHub.spawner_class = 'systemdspawner.SystemdSpawner'\n```\n\nNote that as per systemdspawner's readme using it currently requires JupyterHub to be run as root.\n\n"
+    },
+    {
+      "title": "Services",
+      "level": 2,
+      "content": "A JupyterHub service is defined as a process which interacts with the Hub through its API. Services can either be run by the hub or as standalone processes.\n\n"
+    },
+    {
+      "title": "Idle culler",
+      "level": 3,
+      "content": "The idle culler service can be used to automatically shut down idle single-user servers. To use it, install the jupyterhub-idle-cullerAUR package. To run the service through the hub, add a service description to the c.JupyterHub.services configuration variable:\n\n```\n/etc/jupyterhub/jupyterhub_config.py\n```\n\n```\nimport sys\nc.JupyterHub.services = [\n    {\n        'name': 'idle-culler',\n        'admin': True,\n        'command': [\n            sys.executable,\n            '-m', 'jupyterhub_idle_culler',\n            '--timeout=3600'\n        ],\n    }\n]\n```\n\nSee the service documentation or the output of python -m jupyterhub_idle_culler --help for a description of command-line options and details of how to run the service as a standalone process.\n\n"
+    },
+    {
+      "title": "Running as non-root user",
+      "level": 3,
+      "content": "By default, the main hub process is run as the root user (the individual user servers are run under the corresponding local user as set by the spawner). To run as a non-root user, you need to use the SudoSpawner (the other spawners listed above require running as root). If you are using the PAM authenticator, you will also need to configure it for a non-root user.\n\n"
+    },
+    {
+      "title": "Using a reverse proxy",
+      "level": 3,
+      "content": "A reverse proxy can be used to redirect external requests to the JupyterHub instance. This can be useful if you want to serve multiple sites from one machine, or use an existing server to handle SSL. The using a reverse proxy section of the JupyterHub documentation has example configuration for using either nginx or Apache as a reverse proxy.\n\n"
+    },
+    {
+      "title": "Proxy other web services",
+      "level": 3,
+      "content": "The Jupyter Server Proxy extension allows you to run other web services such as Code Server or RStudio alongside JupyterHub and provide authenticated web access to them. To use it, install python-jupyter-server-proxyAUR and configure it with the /etc/jupyter/jupyter_notebook_config.py file. For instance, to proxy code-serverAUR:\n\n```\n/etc/jupyter/jupyter_notebook_config.py\n```\n\n```\nc.ServerProxy.servers = {\n  'code-server': {\n    'command': [\n      'code-server',\n        '--auth=none',\n        '--disable-telemetry',\n        '--disable-update-check',\n        '--bind-addr=localhost:{port}',\n        '--user-data-dir=.config/Code - OSS/',\n        '--extensions-dir=.vscode-oss/extensions/'\n    ],\n    'timeout': 20,\n    'launcher_entry': {\n      'title': 'VS Code'\n    }\n  }\n}\n```\n\nSee the documentation for more details about configuring the Jupyter Server Proxy.\n\n"
+    },
+    {
+      "title": "Access to GPUs",
+      "level": 3,
+      "content": "If you receive errors when accessing GPUs (for instance, if nvidia-smi reports it cannot communicate with the NVIDIA driver), you must consider the hardening that is shipped with the JupyterHub systemd unit file. To allow access to GPUs (and other hardware) broadly, you can add this to a drop-in file:\n\n```\n/etc/systemd/system/jupyterhub.service.d/override.conf\n```\n\n```\n[Service]\nPrivateDevices=false\n```\n\n"
+    }
+  ]
+}

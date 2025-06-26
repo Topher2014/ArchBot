@@ -1,0 +1,56 @@
+{
+  "title": "Install from SSH",
+  "url": "https://wiki.archlinux.org/title/Install_from_SSH",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article is intended to show users how to install Arch remotely via an SSH connection. Consider this approach when the host is located remotely or you wish to use the copy/paste ability of an SSH client to do the Arch install.\n\n"
+    },
+    {
+      "title": "On the remote (target) machine",
+      "level": 2,
+      "content": "Follow the steps from Installation guide#Pre-installation up to and including connecting to the internet (setting the keyboard layout and font can be skipped).\n\nAt that point, set the required root password to allow an SSH connection, since the default Arch password for root is empty:\n\n```\n# passwd\n```\n\nConfirm that PermitRootLogin yes is set in /etc/ssh/sshd_config. If it is not, set it and reload the OpenSSH daemon sshd.service to apply the changes.\n\n"
+    },
+    {
+      "title": "On the local machine",
+      "level": 2,
+      "content": "On the local machine, connect to the target machine via SSH with the following command:\n\n```\n$ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@ip.address.of.target\n```\n\n```\n$ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@archiso.local\n```\n\nFrom here one is presented with the live environment's welcome message and is able to administer the target machine as if sitting at the physical keyboard. At this point, if the intent is to simply install Arch from the live media, resume at Installation guide#Update the system clock. If the intent is to edit an existing Linux install that got broken, follow the Install from existing Linux wiki article.\n\n"
+    },
+    {
+      "title": "Installation on a headless server",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with Cloud-init#Archiso.** This article or section is a candidate for merging with Cloud-init#Archiso.\n\nThis article or section is a candidate for merging with Cloud-init#Archiso.\n\nThis section describes installation of Arch Linux on a headless server without a keyboard, mouse or display. It uses an additional drive with cloud-init NoCloud configuration to automatically configure OpenSSH authorized keys and optionally iwd connection(s).\n\n"
+    },
+    {
+      "title": "Prepare cloud-init configuration files",
+      "level": 3,
+      "content": "There are three required cloud-init configuration files: meta-data, user-data and network-config.\n\nThe meta-data file can be empty:\n\n```\n$ printf \"\" > meta-data\n```\n\nuser-data will contain the relevant configuration:\n\n```\nuser-data\n```\n\n```\n#cloud-config\nusers:\n  - name: root\n    ssh_authorized_keys:\n      - ssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n      - ssh-ed25519 YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\n```\n\nReplace ssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX with your public SSH key. To add multiple keys, simply repeat the statement as shown above.\n\nTo automatically connect to a Wi-Fi network, use the write_files: statement to create iwd network configuration files in the correct directory. For example:\n\n```\nuser-data\n```\n\n```\n#cloud-config\nusers:\n  - name: root\n    ssh_authorized_keys:\n      - ssh-ed25519 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n      - ssh-ed25519 YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY\n\nwrite_files:\n- content: |\n    [Security]\n    PreSharedKey=aafb192ce2da24d8c7805c956136f45dd612103f086034c402ed266355297295\n  path: /var/lib/iwd/spaceship.psk\n\nruncmd:\n- systemctl restart iwd.service\n```\n\ncloud-init creates network configuration that differs from one shipped in the ISO. I.e. mDNS responder and DHCPv6 client are not enabled. To avoid this, disable cloud-init's network configuration in network-config:\n\n```\nnetwork-config\n```\n\n```\nversion: 2\nconfig: disabled\n```\n\nOnce all three files are created they need to be placed on a drive with an ISO 9660 or FAT volume labeled CIDATA.\n\n"
+    },
+    {
+      "title": "Using an additional FAT formatted drive",
+      "level": 3,
+      "content": "Use a FAT formatted drive. Copy meta-data, user-data and network-config to the drive and change the file system's LABEL to CIDATA.\n\nYou will need to attach this drive to the headless machine in addition to the one with the official ISO.\n\n"
+    },
+    {
+      "title": "Using an additional ISO",
+      "level": 3,
+      "content": "Create a cloud-init.iso file using xorriso from libisoburn:\n\n```\n$ xorrisofs -output cloud-init.iso -volid CIDATA -joliet -rational-rock meta-data user-data network-config\n```\n\nPrepare the cloud-init data medium by burning cloud-init.iso to an optical disc or, if deployment options permit, use the ISO as is.\n\n"
+    },
+    {
+      "title": "Using a single USB flash drive",
+      "level": 3,
+      "content": "If the installation image is written to e.g. a USB flash drive, provided there is enough space on the drive, an additional partition to house cloud-init data can be created.\n\nInstall dosfstools, mtools and libisoburn.\n\nFirst create a 2 MiB FAT image with its LABEL set to CIDATA:\n\n```\n$ mkfs.fat -C -n CIDATA cloud-init.img 2048\n```\n\nCopy the meta-data and user-data files to the root of it:\n\n```\n$ mcopy -i cloud-init.img meta-data user-data network-config ::\n```\n\nRepack the official ISO to include the FAT image as a third partition:\n\n```\n$ xorriso -indev archlinux-version-x86_64.iso -outdev archlinux-version-x86_64-with-cidata.iso -append_partition 3 0x0c cloud-init.img -boot_image any replay\n```\n\nFinally follow USB flash installation medium#Using the ISO as is (BIOS and UEFI) to prepare the USB flash drive installation medium using the repacked ISO (archlinux-version-x86_64-with-cidata.iso).\n\n"
+    },
+    {
+      "title": "Using a single custom-built ISO",
+      "level": 3,
+      "content": "Alternatively, create a custom ISO using Archiso. This allows using only one drive regardless of type.\n\nUse the releng profile as basis. Place the cloud-init configuration files in airootfs/var/lib/cloud/seed/nocloud/ and build the ISO.\n\n"
+    },
+    {
+      "title": "Boot from the installation medium",
+      "level": 3,
+      "content": "Once finished, deploy the installation medium and the cloud-init data medium (if it is separate) to the headless machine using the appropriate method.\n\nPower up the headless machine and boot into a live Arch environment from the installation medium. Wait for a minute or so to allow the headless machine time to boot up and connect to the network.\n\nFrom your existing machine (with keyboard and display) SSH into the live Arch environment on the headless server and complete the installation as described in the Installation guide.\n\n"
+    }
+  ]
+}

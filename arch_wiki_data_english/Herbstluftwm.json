@@ -1,0 +1,81 @@
+{
+  "title": "Herbstluftwm",
+  "url": "https://wiki.archlinux.org/title/Herbstluftwm",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Window manager\n\nHerbstluftwm is a manual tiling window manager for X11 using Xlib.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "install the herbstluftwm package or herbstluftwm-gitAUR for the development version.\n\n"
+    },
+    {
+      "title": "From tty",
+      "level": 3,
+      "content": "Run herbstluftwm with xinit.\n\n"
+    },
+    {
+      "title": "Display manager",
+      "level": 3,
+      "content": "herbstluftwm includes herbstluftwm.desktop as Xsession which starts the window manager.\n\n"
+    },
+    {
+      "title": "From inside other window manager",
+      "level": 3,
+      "content": "If you are already inside a window manager session, you can replace that window manager with herbstluft by running herbstluftwm --replace.\n\n"
+    },
+    {
+      "title": "First steps",
+      "level": 2,
+      "content": "Read the herbstluftwm(1) and herbstclient(1) man pages, they contain a lot of information from an explanation of the binary tree in which the layout is kept to configuration file options and possible values.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Copy /etc/xdg/herbstluftwm/autostart file to ~/.config/herbstluftwm/autostart. You can edit that file for your needs. Make sure the autostart file is executable, else you will probably end up without keybindings!\n\nThe configuration of herbstluftwm can be updated on-the-fly by running herbstclient reload (See #Commands). Autostart is called on each reload, therefore within autostart you typically unmap all existing configuration first.\n\n"
+    },
+    {
+      "title": "Multi-Monitor Support",
+      "level": 3,
+      "content": "Herbstluftwm supports multiple monitors as a virtual concept; monitors in herbstluftwm do not have to match the real monitor configuration as reported by xrandr. It brings a lot of flexibility and gives the user more control over their monitor-arrangement. You can use herbstclient detect_monitors to automatically adapt to the physical setup. Otherwise, see the manpage on how to add, remove, resize and move monitors. Tags in a multi-monitor set-up are not \"owned\" by a monitor. This means that when one monitor switches to a tag that is active in another monitor, the two monitors will swap tags.\n\n"
+    },
+    {
+      "title": "Commands",
+      "level": 2,
+      "content": "Herbstclient is a very powerful tool, as it provides you with full control over your window manager from the command line.\n\nThere is a tab-completion for the parameters for herbstclient. Try herbstclient list_commands to show all parameters.\n\nRight now there is no error message if you use wrong parameters on a command, but only a non-zero return value. If you do not show the return value of a command anyway (e.g. in your $SHELL-prompt), you might want to echo $? to find the return value of the last command.\n\n"
+    },
+    {
+      "title": "Scripts and hooks",
+      "level": 2,
+      "content": "The main way to control herbstluftwm is though commands to herbstclient. Since herbstclient can be called from any script, you have great flexibility in controlling herbstluftwm this way. Furthermore, you can listen to window management events and react to them accordingly.\n\nHerbstluftwm includes a number of example scripts: /usr/share/doc/herbstluftwm/examples/ or https://github.com/herbstluftwm/herbstluftwm/tree/master/scripts\n\n"
+    },
+    {
+      "title": "Script to switch to the next empty tag",
+      "level": 3,
+      "content": "The following python script allows you to switch to the (next or previous) (full or empty) tag. Call it with the arguments (+1 or -1) and (full or empty). For example, if you save the script to herbst-move.py, then\n\n```\npython3 herbst-move.py +1 full\n```\n\nwill move you to the next full tag. I use the following key bindings.\n\n```\nhc keybind $Mod-Left  spawn herbst-move.py -1 empty\nhc keybind $Mod-Right spawn herbst-move.py +1 empty\nhc keybind $Mod-Up spawn herbst-move.py -1 full\nhc keybind $Mod-Down spawn herbst-move.py +1 full\n```\n\nAnd here is the script.\n\n```\n#!/usr/bin/env python3\ndef run(*cmd):\n    from subprocess import Popen, PIPE\n    proc = Popen(cmd, shell=False, stderr=PIPE, stdout=PIPE)\n    return proc.stdout.read()\n\nimport sys\ntag_offset, mode = sys.argv[1:]\ntag_offset = int(tag_offset)\nif mode == 'full':\n    ch = {'.'}\nelif mode == 'empty':\n    ch = {':', '!'}\nelse:\n    raise Exception('Unknown type ' + mode)\ntag_list = run('herbstclient', 'tag_status', '0').strip().decode('ascii').split('\\t')\ntag_curr = int(run('herbstclient', 'attr', 'tags.focus.index').strip())\ntag_next = (tag_curr + tag_offset) % len(tag_list)\nwhile (tag_next != tag_curr) and (tag_list[tag_next][0] in ch):\n    tag_next = (tag_next + tag_offset) % len(tag_list)\nif tag_next != tag_curr:\n    run('herbstclient', 'use_index', str(tag_next))\n```\n\n"
+    },
+    {
+      "title": "Script to cycle though paddings (or other settings)",
+      "level": 3,
+      "content": "Here is a ruby script to cycle through a set of paddings, although you can modify it to cycle though any collection of settings. The script knows the previous layout by looking for the presence of two dummy files in /tmp.\n\n```\n#!/usr/bin/ruby\n\nfile1 = \"/tmp/herbst-padding-1\"\nfile2 = \"/tmp/herbst-padding-2\"\n\npad1 = 'pad 0 0 0 0 0'\npad2 = 'pad 0 0 20 0 200'\npad3 = 'pad 0 0 0 0 150'\n\nfiles = [file1, file2].map{|f| File.exist? File.expand_path(f)}\n\nif files == [false, false]  # 0 files\n  system \"herbstclient #{pad2}\"\n  system \"touch #{file1}\"\nelsif files == [true, false]  # 1 file\n  system \"herbstclient #{pad1}\"\n  system \"touch #{file2}\"\nelse           # 2 files\n  system \"herbstclient #{pad3}\"\n  system \"rm #{file1} #{file2}\"\nend\n```\n\n"
+    },
+    {
+      "title": "Script to change decoration per-tag",
+      "level": 3,
+      "content": "The following Perl script demonstrates how to use hooks to react to window management events. It can be called in autostart (with backgrounding).\n\n```\n#!/usr/bin/perl\n# This script watches for tag changes and gives visual feedback\n\n## Configuration (fill with your tag names)\nmy %colors = (\n\tmain => '#DD0000',\n\tdevel => '#13B8E0',\n\twrite => '#96E013',\n\tadmin => '#C713E0'\n);\n\n## Apply tag color\n# Right now we change the active window's border color to the tag's color.\nsub redecorate\n{\n\tmy ($foo, $activity) = @_;\n\tsystem(\"herbstclient\", \"set\", \"window_border_active_color\",\n\t\t\"$colors{$activity}\");\n}\n\n## main routine\nuse v5.20;\n\n# set up a pipe for reading hooks\nopen HOOKS, \"herbstclient -i '(tag_changed|reload)'|\"\n\tor die \"can't fork: $!\";\n# process incoming messages\nOUTER:\nwhile (<HOOKS>) {\n\tchomp;\n\tfor ($_) {\n\t\tredecorate(split(/\\t/)) when /^tag_changed/;\n\t\tlast OUTER when /^reload/; # quit on reload\n\t}\n}\nclose HOOKS or die \"unfinished love story: $! $?\"; # happens on hlwm crash\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "- After installing, $mod+enter keybind does not start a terminal: the herbstluftwm autostart configuration file uses the xterm terminal by default. Make sure xterm is installed or edit the autostart file to use a different terminal.\n- To log out of herbstluftwm, use the command herbstclient quit or the default keybind of $mod+shift-q\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The herbstluftwm homepage\n- Arch Linux BBS thread\n- /usr/share/doc/herbstluftwm/examples/ - various scripts\n- /usr/share/doc/herbstluftwm/BUGS - bugs\n- A herbstluftwm thread on the CrunchBang Forums\n- Screenshots and configuration files: on Arch Linux Forum, on DotShare.it\n- #herbstluftwm - IRC channel at irc.libera.chat\n- User git repository #1 with autostart written in Perl and a few custom scripts\n- User git repository #2 with autostart and panel written in Python\n- Github Discussions\n- Herbstluftwm Subreddit\n\n"
+    }
+  ]
+}

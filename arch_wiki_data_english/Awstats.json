@@ -1,0 +1,71 @@
+{
+  "title": "Awstats",
+  "url": "https://wiki.archlinux.org/title/Awstats",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "From AWStats - Free log file analyzer for advanced statistics:\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the awstats package. When Apache HTTP Server is used as a web server, the mod_perlAUR package is required as well.\n\n"
+    },
+    {
+      "title": "Enable mod_perl for Apache",
+      "level": 3,
+      "content": "To enable mod_perl in Apache, you should add following line to Apache configuration (/etc/httpd/conf/httpd.conf):\n\n```\nLoadModule perl_module modules/mod_perl.so\n```\n\n"
+    },
+    {
+      "title": "Configure Apache to log for AWStats",
+      "level": 3,
+      "content": "By default AWStats requires Apache to record access logs as 'combined'. Unless you want a different behavior, you should set your access log format as 'combined'. To do so, your Apache configuration should look like this:\n\n```\n<VirtualHost *:80>\n    ServerAdmin zxc@returnfalse.net\n    DocumentRoot \"/srv/http/xxx\"\n    ServerName www.returnfalse.net\n    ErrorLog \"/var/log/httpd/returnfalse-error_log\"\n    CustomLog \"/var/log/httpd/returnfalse-access_log\" combined\n</VirtualHost>\n```\n\nThe important line here is:\n\n```\nCustomLog \"/var/log/httpd/returnfalse-access_log\" combined\n```\n\n"
+    },
+    {
+      "title": "Including AWStats configuration in Apache's configuration",
+      "level": 3,
+      "content": "If you set the log format, then next step is including AWStats configuration file in Apache. The package in the AUR has a default one, and it is working without any problem, if you enable the following lines in the Apache configuration (/etc/httpd/conf/httpd.conf):\n\n```\n<IfModule !mpm_prefork_module>\n    LoadModule cgid_module modules/mod_cgid.so\n</IfModule>\n<IfModule mpm_prefork_module>\n    LoadModule cgi_module modules/mod_cgi.so\n</IfModule>\n```\n\nBut in case you want to create your own configuration, you can use this (using mod_perl instead of cgid_module or cgi_module):\n\n```\nLoadModule perl_module modules/mod_perl.so\n\nAlias /awstatsclasses \"/usr/share/webapps/awstats/classes/\"\nAlias /awstatscss \"/usr/share/webapps/awstats/css/\"\nAlias /awstatsicons \"/usr/share/webapps/awstats/icon/\"\nScriptAlias /awstats/ \"/usr/share/webapps/awstats/cgi-bin/\"\n\n<Directory \"/usr/share/webapps/awstats\">\n    AddHandler perl-script .pl\n    AddHandler perl-script .cgi\n    PerlResponseHandler ModPerl::Registry\n    PerlOptions +ParseHeaders\n    \n    Options None\n    AllowOverride None\n    Require all granted\n</Directory>\n\nDirectoryIndex index.html index.htm awstats.pl\n```\n\nInclude this file (in AUR case, the path is /etc/httpd/conf/extra/httpd-awstats.conf) to Apache's main configuration:\n\n```\nInclude conf/extra/httpd-awstats.conf\n```\n\nNow if you have done all steps correctly, you should be able to see AWStats running on http://localhost/awstats/awstats.pl after restarting Apache's httpd.service unit.\n\nOne last thing, which is the actual aim, make AWStats read logs and convert them to stats.\n\n"
+    },
+    {
+      "title": "AWStats Configuration",
+      "level": 3,
+      "content": "The package comes with an script to update stats shown on AWStats. This script reads AWStats configuration files in /etc/awstats and updates the stats for the sites that are defined in these configuration files. Instead of creating these configuration files, you can use AWStats' configuration tool. Run:\n\n```\n# perl /usr/share/awstats/tools/awstats_configure.pl\n```\n\nand follow the instructions. If you successfully created a configuration file there is one thing that you should modify manually. Open the configuration file created by awstats_configure.pl with your favorite text editor. Then find the line on which LogFile variable is defined, and set it as the path that Apache logs accesses (which you set to be logged as 'combined' format before):\n\n```\n# LogFile=/var/log/httpd/returnfalse-access_log\n```\n\nNow you can run the script to test the results, e.g. if you have a /etc/awstats/awstats.apache.conf then run\n\n```\n# /usr/share/awstats/tools/awstats_buildstaticpages.pl config=apache -update -awstatsprog=/usr/share/webapps/awstats/cgi-bin/awstats.pl -dir=/srv/http/awstats\n```\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 2,
+      "content": "If your web server software is nginx, follow steps below:\n\n1. Install awstats as described above. It is necessary to get the folders and files owned by user http and group http with the following command:\n\n```\n# chown -R http:http /usr/share/webapps/awstats/\n```\n\n2. Use the awstats configuration tool to generate a site configuration file as described above. Make sure the following lines are set correctly:\n\n```\nLogFile=\"/var/log/nginx/access.log\"\nLogFormat=1\n```\n\n3. To make the Perl scripts of awstats work on nginx, create /etc/nginx/cgi-bin.php with the following code:\n\n```\n<?php\n$descriptorspec = array(\n   0 => array(\"pipe\", \"r\"),  // stdin is a pipe that the child will read from\n   1 => array(\"pipe\", \"w\"),  // stdout is a pipe that the child will write to\n   2 => array(\"pipe\", \"w\")   // stderr is a file to write to\n);\n$newenv = $_SERVER;\n$newenv[\"SCRIPT_FILENAME\"] = $_SERVER[\"X_SCRIPT_FILENAME\"];\n$newenv[\"SCRIPT_NAME\"] = $_SERVER[\"X_SCRIPT_NAME\"];\nif (is_executable($_SERVER[\"X_SCRIPT_FILENAME\"])) {\n   $process = proc_open($_SERVER[\"X_SCRIPT_FILENAME\"], $descriptorspec, $pipes, NULL, $newenv);\n   if (is_resource($process)) {\n       fclose($pipes[0]);\n       $head = fgets($pipes[1]);\n       while (strcmp($head, \"\\n\")) {\n           header($head);\n           $head = fgets($pipes[1]);\n       }\n       fpassthru($pipes[1]);\n       fclose($pipes[1]);\n       fclose($pipes[2]);\n       $return_value = proc_close($process);\n   } else {\n       header(\"Status: 500 Internal Server Error\");\n       echo(\"Internal Server Error\");\n   }\n} else {\n   header(\"Status: 404 Page Not Found\");\n   echo(\"Page Not Found\");\n}\n?>\n```\n\n4. Add these directives to the domain nginx configuration file:\n\n```\nlocation ^~ /awstatsicons {\n   alias /usr/share/webapps/awstats/icon/;\n   access_log off;\n}\nlocation ^~ /awstatscss {\n   alias /usr/share/webapps/awstats/examples/css/;\n   access_log off;\n}\nlocation ^~ /awstatsclasses {\n   alias /usr/share/webapps/awstats/examples/classes/;\n   access_log off;\n}\nlocation ~ ^/cgi-bin/.*\\.(cgi|pl|py|rb) {\n   gzip off;\n   fastcgi_pass  unix:/var/run/php-fpm/php-fpm.sock;\n   fastcgi_index cgi-bin.php;\n   fastcgi_param SCRIPT_FILENAME    /etc/nginx/cgi-bin.php;\n   fastcgi_param SCRIPT_NAME        /cgi-bin/cgi-bin.php;\n   fastcgi_param X_SCRIPT_FILENAME  /usr/share/webapps/awstats$fastcgi_script_name;\n   fastcgi_param X_SCRIPT_NAME      $fastcgi_script_name;\n   fastcgi_param QUERY_STRING       $query_string;\n   fastcgi_param REQUEST_METHOD     $request_method;\n   fastcgi_param CONTENT_TYPE       $content_type;\n   fastcgi_param CONTENT_LENGTH     $content_length;\n   fastcgi_param GATEWAY_INTERFACE  CGI/1.1;\n   fastcgi_param SERVER_SOFTWARE    nginx;\n   fastcgi_param REQUEST_URI        $request_uri;\n   fastcgi_param DOCUMENT_URI       $document_uri;\n   fastcgi_param DOCUMENT_ROOT      $document_root;\n   fastcgi_param SERVER_PROTOCOL    $server_protocol;\n   fastcgi_param REMOTE_ADDR        $remote_addr;\n   fastcgi_param REMOTE_PORT        $remote_port;\n   fastcgi_param SERVER_ADDR        $server_addr;\n   fastcgi_param SERVER_PORT        $server_port;\n   fastcgi_param SERVER_NAME        $server_name;\n   fastcgi_param REMOTE_USER        $remote_user;\n}\n```\n\n5. You can access the awstats page of your site at \"http://your_domain.com/cgi-bin/awstats.pl?config=your_domain.com\" Optionally, you may want to add this rewrite rule to the nginx site configuration file:\n\n```\nlocation ~ ^/awstats {\n   rewrite ^ http://your_domain.com/cgi-bin/awstats.pl?config=your_domain.com;\n}\n```\n\nWith this, you can access your awstats page simply by typing \"http://your_domain.com/awstats\" in the address bar of your browser.\n\n"
+    },
+    {
+      "title": "Caddy",
+      "level": 2,
+      "content": "If your web server software is caddy, install fcgiwrap to get FastCGI working, then change your Caddyfile using the template below as appropriate for your configuration.\n\n1. Install awstats as described above. It is necessary to get the folders and files owned by user http and group http with the following command:\n\n```\n# chown -R http:http /usr/share/webapps/awstats/\n```\n\n2. Use the awstats configuration tool to generate a site configuration file as described above. Make sure the following lines are set correctly:\n\n```\nLogFile=\"/var/log/caddy/site_combined.log\"\nLogFormat=1\n```\n\n3. Create your Caddyfile /etc/caddy/caddy.conf.d/sitename configuration file with these directives:\n\n```\nawstats.hostname.com {\n#basicauth /cgi-bin username password\nroot /usr/share/webapps/awstats\nlog / /var/log/caddy/site_combined.log \"{combined}\"\ngzip\n\nfastcgi /cgi-bin/ unix:/var/run/fcgiwrap.sock {\nenv SCRIPT_DIR /usr/share/webapps/awstats/cgi-bin/\nenv SCRIPT_FILENAME /usr/share/webapps/awstats/cgi-bin/awstats.pl\n        }\n}\nawstats.hostname.com/awstatsclasses {\n        root /usr/share/webapps/awstats/classes\n}\nawstats.hostname.com/awstatscss {\n        root /usr/share/webapps/awstats/css\n}\nawstats.hostname.com/awstatsicons/ {\n        root /usr/share/webapps/awstats/icon\n}\nawstats.hostname.com/js {\n\troot /usr/share/webapps/awstats/js\n}\n```\n\nYou should now be able to view your site at the following URL:\n\n```\nhttps://awstats.hostname.com/cgi-bin/awstats.pl?config=awstats.hostname.com\n```\n\n"
+    },
+    {
+      "title": "Generating Statistics",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nYou can generate the latest statistics of all your sites manually by issuing the following command:\n\n```\n/usr/share/awstats/tools/awstats_updateall.pl now -awstatsprog=/usr/share/webapps/awstats/cgi-bin/awstats.pl\n```\n\n"
+    },
+    {
+      "title": "systemd",
+      "level": 3,
+      "content": "This process can be automated via an (hourly) systemd timer script. You will first need to create the awstats-aw.service and awstats-aw.timer units:\n\n```\n/etc/systemd/system/awstats-aw.service\n```\n\n```\n[Unit]\nDescription=Update Awstats with all site configurations located in /etc/awstats/\n\n[Service]\nType=oneshot\nExecStart=/usr/share/awstats/tools/awstats_updateall.pl now -awstatsprog=/usr/share/webapps/awstats/cgi-bin/awstats.pl\nWorkingDirectory=/usr/share\n```\n\n```\n/etc/systemd/system/awstats-aw.timer\n```\n\n```\n[Unit]\nDescription=Run the awstats-aw.service every hour to update Awstats\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n```\n\nYou can then start the service and enable the timer.\n\n"
+    },
+    {
+      "title": "cron",
+      "level": 3,
+      "content": "This process can be automated by cron. See AWStats cron template: /usr/share/doc/awstats-7.5/cron.hourly However, if you are using logrotate, you have to make sure the cronjob starts right before logrotate runs. Otherwise, statistics will be lost because loratate will change the access log file name to a different name not accessible by awstats. A better way to deal with this is to use web server specific logrotate script normally located in /etc/logrotate.d to trigger the awstats calculation. An example of nginx logrotate script is provided here. Note the addition of a prerotate directive:\n\n```\n/var/log/nginx/*log {\n daily\n missingok\n notifempty\n create 640 http log\n compress\n sharedscripts\n prerotate\n   # Trigger awstats computation\n   /usr/share/awstats/tools/awstats_updateall.pl now -awstatsprog=/usr/share/webapps/awstats/cgi-bin/awstats.pl\n endscript\n postrotate\n    test ! -r /run/nginx.pid || kill -USR1 `cat /run/nginx.pid`\n endscript\n}\n```\n\n"
+    },
+    {
+      "title": "GeoIP (optional)",
+      "level": 2,
+      "content": "To add geo ip support, install Geo::IP module using cpan. (See Perl#CPAN.pm for more details.) Alternatively, install perl-geoip. Add the following line to each of the awstats site configuration files located in /etc/awstats/:\n\n```\nLoadPlugin=\"geoip GEOIP_STANDARD /usr/share/GeoIP/GeoIP.dat\"\n```\n\nIf you install geoip-database-extra you can also add these to your awstats site configuration:\n\n```\nLoadPlugin=\"geoip_city_maxmind GEOIP_STANDARD /usr/share/GeoIP/GeoIPCity.dat\"\nLoadPlugin=\"geoip_asn_maxmind GEOIP_STANDARD /usr/share/GeoIP/GeoIPASNum.dat+http://enc.com.au/itools/autnum.php?asn=\"\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- mod_perl Apache + Perl\n- AWStats user-contributed tools\n\n"
+    }
+  ]
+}

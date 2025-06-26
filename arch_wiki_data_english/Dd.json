@@ -1,0 +1,101 @@
+{
+  "title": "Dd",
+  "url": "https://wiki.archlinux.org/title/Dd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Disk cloning\n- USB flash installation media#Using basic command line utilities\n- Benchmarking#dd\n- Securely wipe disk#dd\n\ndd is a core utility whose primary purpose is to copy a file and optionally convert it during the copy process.\n\nSimilarly to cp, by default dd makes a bit-to-bit copy of the file, but with lower-level I/O flow control features.\n\nFor more information, see dd(1) or the full documentation.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "dd is part of the GNU coreutils. For other utilities in the package, please refer to Core utilities.\n\n"
+    },
+    {
+      "title": "Disk cloning and restore",
+      "level": 2,
+      "content": "The dd command is a simple, yet versatile and powerful tool. It can be used to copy from source to destination, block-by-block, regardless of their filesystem types or operating systems. A convenient method is to use dd from a live environment, as in a Live CD.\n\n"
+    },
+    {
+      "title": "Cloning a partition",
+      "level": 3,
+      "content": "From physical disk /dev/sda, partition 1, to physical disk /dev/sdb, partition 1:\n\n```\n# dd if=/dev/sda1 of=/dev/sdb1 bs=64K conv=noerror,sync status=progress\n```\n\n"
+    },
+    {
+      "title": "Cloning an entire hard disk",
+      "level": 3,
+      "content": "From physical disk /dev/sda to physical disk /dev/sdb:\n\n```\n# dd if=/dev/sda of=/dev/sdb bs=64K conv=noerror,sync status=progress\n```\n\nThis will clone the entire drive, including the partition table, boot loader, all partitions, UUIDs, and data.\n\n- bs= sets the block size. Defaults to 512 bytes, which is the \"classic\" block size for hard drives since the early 1980s, but is not the most convenient. Use a bigger value, 64K or 128K. Also, please read the note below, because there is more to this than just \"block sizes\" — it also influences how read errors propagate. See [1] and [2] for details and to figure out the best bs value for your use case.\n- noerror instructs dd to continue operation, ignoring all read errors. Default behavior for dd is to halt at any error.\n- sync fills input blocks with zeroes at the end of the block if there were any read errors somewhere in the block, so data offsets stay in sync (see below for detailed explanation of read error behavior with sync if you are suspecting possible read errors).\n- status=progress shows periodic transfer statistics which can be used to estimate when the operation may be complete.\n\nThe dd utility technically has an \"input block size\" (IBS) and an \"output block size\" (OBS). When you set bs, you effectively set both IBS and OBS. Normally, if your block size is, say, 1 MiB, dd will read 1024×1024 bytes and write as many bytes. But if a read error occurs, things will go wrong. Many people seem to think that dd will \"fill up read errors with zeroes\" if you use the noerror,sync options, but this is not what happens. dd will, according to documentation, fill up the OBS to IBS size after completing its read, which means adding zeroes at the end of the block. This means, for a disk, that effectively the whole 1 MiB would become messed up because of a single 512 byte read error in the beginning of the read: 12ERROR89 would become 128900000 instead of 120000089.\n\nIf you are positive that your disk does not contain any errors, you could proceed using a larger block size, which will increase the speed of your copying several fold. For example, changing bs from 512 to 64K changed copying speed from 35 MB/s to 120 MB/s on a simple Celeron 2.7 GHz system. But keep in mind that read errors on the source disk will end up as block errors on the destination disk, i.e. a single 512-byte read error will mess up the whole 64 KiB output block.\n\n- To regain unique UUIDs of an ext2/3/4 filesystem, use tune2fs /dev/sdXY -U random on every partition. For swap partitions, use mkswap -U random /dev/sdXY instead.\n- If you are cloning a GPT disk, you can use sgdisk to randomize the disk and partition GUIDs and regain their uniqueness.\n- Partition table changes from dd are not registered by the kernel. To notify of changes without rebooting, use a utility like partprobe (part of GNU Parted).\n\n"
+    },
+    {
+      "title": "Backing up the partition table",
+      "level": 3,
+      "content": "See fdisk#Backup and restore partition table or gdisk#Backup and restore partition table.\n\n"
+    },
+    {
+      "title": "Create disk image",
+      "level": 3,
+      "content": "Boot from a live medium and make sure no partitions are mounted from the source hard drive.\n\nThen mount the external hard drive and backup the drive:\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64M status=progress | lz4 -z  > /path/to/backup.img.lz4\n```\n\nIf necessary (e.g. when the resulting files will be stored on a FAT32 file system), split the disk image into multiple parts (see also split(1)):\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64M status=progress | lz4 -z | split -a3 -b2G - /path/to/backup.img.lz4\n```\n\nIf there is not enough disk space locally, you may send the image through ssh:\n\n```\n# dd if=/dev/sda conv=sync,noerror bs=64M status=progress | lz4 -z | ssh user@local dd of=backup.img.lz4\n```\n\nFinally, save extra information about the drive geometry necessary in order to interpret the partition table stored within the image. The most important of which is the sector size.\n\n```\n# fdisk -l /dev/sda > /path/to/list_fdisk.info\n```\n\n- You may wish to use a block size (bs=) that is equal to the amount of cache on the HDD you are backing up. For example, bs=512M works for an 512 MiB cache. The 64 MiB mentioned in this article is better than the default bs=512 bytes, but it may run faster with a larger bs=.\n- The above examples use lz4(1) which uses multiple cores for compression, but you can exchange it for any other compression program.\n\n"
+    },
+    {
+      "title": "Restore system",
+      "level": 3,
+      "content": "To restore your system:\n\n```\n# lz4 -dc /path/to/backup.img.lz4 | dd of=/dev/sda status=progress\n```\n\nWhen the image has been split, use the following instead:\n\n```\n# cat /path/to/backup.img.lz4* | lz4 -dc | dd of=/dev/sda status=progress\n```\n\n"
+    },
+    {
+      "title": "Backup and restore MBR",
+      "level": 2,
+      "content": "Before making changes to a disk, you may want to backup the partition table and partition scheme of the drive. You can also use a backup to copy the same partition layout to numerous drives.\n\nThe MBR is stored in the first 512 bytes of the disk. It consists of 4 parts:\n\n1. The first 440 bytes contain the bootstrap code (boot loader).\n1. The next 6 bytes contain the disk signature.\n1. The next 64 bytes contain the partition table (4 entries of 16 bytes each, one entry for each primary partition).\n1. The last 2 bytes contain a boot signature.\n\nTo save the MBR as mbr_file.img:\n\n```\n# dd if=/dev/sdX of=/path/to/mbr_file.img bs=512 count=1\n```\n\nYou can also extract the MBR from a full dd disk image:\n\n```\n# dd if=/path/to/disk.img of=/path/to/mbr_file.img bs=512 count=1\n```\n\nTo restore (be careful, this destroys the existing partition table and with it access to all data on the disk):\n\n```\n# dd if=/path/to/mbr_file.img of=/dev/sdX bs=512 count=1\n```\n\nIf you only want to restore the boot loader, but not the primary partition table entries, just restore the first 440 bytes of the MBR:\n\n```\n# dd if=/path/to/mbr_file.img of=/dev/sdX bs=440 count=1\n```\n\nTo restore only the partition table, one must use:\n\n```\n# dd if=/path/to/mbr_file.img of=/dev/sdX bs=1 skip=446 count=64\n```\n\n"
+    },
+    {
+      "title": "Remove boot loader",
+      "level": 3,
+      "content": "To erase the MBR bootstrap code (may be useful if you have to do a full reinstall of another operating system), only the first 440 bytes need to be zeroed:\n\n```\n# dd if=/dev/zero of=/dev/sdX bs=440 count=1\n```\n\n"
+    },
+    {
+      "title": "Extra scenario in addition to disk-related scenes",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nAs some readers might have already realised, the dd(1) core utility has a different command-line syntax compared to other utilities. Moreover, while supporting some unique features not found in other commodity utilities, several default behaviours it has are either less-ideal or potentially error-prone if applied to specific scenarios. For that reason, users may want to use some alternatives that are better in some aspects in lieu of the dd core utility.\n\nThat said, it is still worth to note that since dd is a core utility, which is installed by default on Arch and many other systems, it is preferable to some alternatives or more specialised utilities if it is inconvenient to install a new package on your system.\n\nTo cover the two aspects that are addressed above, this section is dedicated to summarising the features of the dd(1) core utility that are rarely found in other commodity utilities — in a form that resembles the pacman/Rosetta article but with the quantity of examples being cut down to examine the features of dd (as denoted by i.e. or To-clause in \"Tip:\" box under subsection), either in practice or pseudocode.\n\n"
+    },
+    {
+      "title": "Patching a binary file, block-by-block in-place",
+      "level": 3,
+      "content": "It is not an uncommon practice to use dd as a feature-limited binary file patcher in an automated shell script as it supports:\n\n- seeking the output file by a given offset before writing.\n- writing to an output file (without truncating the size of the output file by adding the conv=notrunc option).\n\nHere is an example to modify the timestamp part of the first member in a cpio(5) § Portable ASCII Format archive, which starts at the 49th byte of the file (or with an offset of 0x30 if you prefer hex notation):\n\n```\n$ touch a-randomly-chosen-file\n$ bsdtar -cf example-modify-ts.cpio --format odc -- a-randomly-chosen-file\n```\n\n```\n$ printf '%011o' \"$(date -d \"2019-12-21 00:00:00\" +%s)\" | dd conv=notrunc of=example-modify-ts.cpio seek=48 oflag=seek_bytes\n```\n\n- the input file of dd is a pipe connected with a program that utilize splice(2) system call, and the user want to avoid unnecessary userspace I/O of dd for a better performance\n- or, to avoid frequently fork(2) in a shell script loop to reduce the performance penalty\n\n```\n$ zsh\n```\n\n```\n$ local +xr openToWriteFD\n$ zmodload zsh/system\n$ sysopen -wu openToWriteFD example-modify-ts.cpio\n$ sysseek -u $openToWriteFD 48\n$ printf '%011o' \"$(date -d \"2019-12-21 00:00:00\" +%s)\" >&${openToWriteFD}\n...\n$ : finally close the fd {openToWriteFD}>&-\n```\n\n"
+    },
+    {
+      "title": "Printing volume label of a VFAT filesystem image",
+      "level": 3,
+      "content": "To read the filesystem volume label of an VFAT image file, which should be in total length of 11 bytes that padded by ASCII spaces, with an offset of 0x047:\n\n```\n$ truncate -s 36M empty-hole.img\n$ mkfs.fat -F 32 -n LabelMe empty-hole.img\n```\n\n```\n$ dd iflag=skip_bytes,count_bytes count=11 skip=$((0x047)) if=empty-hole.img | sed -e 's% *$%%'\n```\n\n- The former skip_bytes instruct dd to seek (or skip if input is not seekable) on input file by offset in quatity of byte instead of number of blocks before starting to read(2) from it.\n- The later count_bytes allow user to specifiy the total quantity of blocks to copy from input file in byte, instead of a number of blocks. It could be confusing since specifying this option could still subject to partial read(2), think it like a fractional value of input block count to better understand this behaviour.\n\n```\n$ socat -u -,seek=$((0x047)),readbytes=11 - < empty-hole.img | sed -e 's% *$%%'\n```\n\n"
+    },
+    {
+      "title": "Sponge between piped commands",
+      "level": 3,
+      "content": "In the following example, to avoid unnecessary long-lasting TCP connection on input end if the output end blocks longer than expected, one may put a dd between two commands with an output block size certainly larger than input while still reasonably smaller than available memory:\n\n```\n$ curl -qgsfL http://example.org/mirrors/ftp.archlinux.org/mirrored.md5deep | dd ibs=128k obs=200M | poor-mirroring-script-that-perform-mirroring-on-input-paths-line-by-line-wo-buffer-entire-list-first\n```\n\n"
+    },
+    {
+      "title": "Transfering data with size limitation",
+      "level": 3,
+      "content": "It is a general practice to use dd in a data streaming shell script for limiting total length of data that a piped command may consume. For example, to inspect an ustar header block (tar(5) § POSIX ustar Archives) using a shell script function in a streaming manner:\n\n```\nhexdump-field() {\n  set -o pipefail\n  printf '%s[%d]:\\n' $1 $2\n  dd count=${2}B status=none | hexdump -e $2'/1 \"%3.2x\"' -e '\" | \" '$2'/1 \"%_p\" \"\\n\"'\n}\n\ninspect-tar-header-block() {\n  local -a hdrstack=(\n    name 100\n    mode 8\n    uid 8\n    gid 8\n    size 12\n    mtime 12\n    checksum 8\n    typeflag 1\n    linkname 100\n    magic 6\n    version 2\n    uname 32\n    gname 32\n    devmajor 8\n    devminor 8\n    prefix 155\n    pad 12\n  )\n  set - ${hdrstack[@]}\n  while test $# -gt 0; do\n    hexdump-field $1 $2 || return\n    shift 2\n  done\n}\n```\n\n```\n$ bsdtar -cf - /dev/tty /dev/null 2>&- | dd count=1 skip=1 status=none | inspect-tar-header-block\n```\n\n- a shell with builtin seeking capability (as already mentioned as alternative in a previous subsection.)\n- or, a Bourne-like shell (e.g. bash), with help of xxd(1) § s for one-off lseek(2) on shell-opened file descriptor,\n\n```\n$ bash\n```\n\n```\n$ exec 9<dummy-but-rather-large.img\n$ xxd -g 0 -l 0 -s $((0x47ffff)) <&9\n$ pv -qSs 104857601200 <&9 | program-that-process-load-of-data-but-does-not-limit-read-length-as-desired-nor-support-offset-read\n$ exec 9<&-\n```\n\n"
+    },
+    {
+      "title": "Writing a bootable disk image to block device, optionally display progress information",
+      "level": 3,
+      "content": "See USB flash installation medium#Using basic command line utilities for examples of commodity utilities include the potential least adapted dd for that case.\n\n"
+    },
+    {
+      "title": "Partial read: copied data is smaller than requested",
+      "level": 3,
+      "content": "Files created with dd can end up with a smaller size than requested if a full input block is not available for the moment, as per documentation:\n\nOn Linux, the underlying read(2) system call may returns early (i.e. partial read) when reading from a pipe(7), or when reading a device file like /dev/urandom and /dev/random (e.g. due to hardcoded limitation of underlying kernel device driver) Which make the total size of copied data smaller than expected when bs in conjunction of count=n option is used, where n limited the maximum number of (potential partial) input block(s) to copy to output.\n\nIt is possible, but not guaranteed, that dd will warn you about such kind of issue:\n\n```\ndd: warning: partial read (X bytes); suggest iflag=fullblock\n```\n\nThe solution is to do as the warning says, add iflag=fullblock option in addition to the input file option to the dd command. For example, to create a new file filled up with random data in total length of 40 mebibytes:\n\n```\n$ dd if=/dev/urandom of=new-file-filled-by-urandom.bin bs=40M count=1 iflag=fullblock\n```\n\nWhen reading from a pipe, an alternative to iflag=fullblock is to limit bs to the PIPE_BUF constant value as defined in linux/limits.h to make the pipe(7) I/O atomic. For example, to prepare a text file filled up will random alphanumeric string in total length of 5 mebibytes:\n\n```\n$ LC_ALL=C tr -dc '[:alnum:]' </dev/urandom | dd of=passtext-5m.txt bs=4k count=1280\n```\n\nSince the output file is not a pipe, one may prefer to use ibs and obs options to set block size separately for the (input) pipe and the (output) on-disk file. For example, to set a more efficient block size for output file:\n\n```\n$ LC_ALL=C tr -dc '[:alnum:]' </dev/urandom | dd of=passtext-5m.txt ibs=4k obs=64k count=1280\n```\n\n"
+    },
+    {
+      "title": "Total transfered bytes count readout is wrong",
+      "level": 3,
+      "content": "The total transferred bytes count readout may be greater than actual if an error is encountered on writing to output (i.e. partial write, caused by e.g. SIGPIPE, faulty medium, or accidentally disconnected the target network block device), like in following proof of concept where the second dd obviously will not read more than 512200 bytes, but the first dd instance still report an inaccurate bytes count 512400 bytes:\n\n```\n$ yes 'x' | dd bs=4096 count=512400B | dd ibs=1 count=512200 status=none >/dev/null\n125+1 records in\n125+1 records out\n512400 bytes (512 kB, 500 KiB) copied, 10.7137 s, 47.8 kB/s\n```\n\nWhen resuming an interrupted transfer like the above PoC, it is recommended to only rely on the readout of number of whole output blocks already copied, as denoted by the number before \"+\" sign.\n\n- use ddrescue to rerun the transfer instead, to deal with partial reads on a potential faulty medium more flexibly.\n- use dd_rescue(1) to rerun the transfer with direct I/O, in case of writing to nbd with a poor network connectivity.\n- avoid writing to faulty medium.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- dd(1p): POSIX specification of dd core utility in manpage form\n\n"
+    }
+  ]
+}

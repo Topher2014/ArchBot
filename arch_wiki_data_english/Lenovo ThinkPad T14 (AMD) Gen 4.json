@@ -1,0 +1,91 @@
+{
+  "title": "Lenovo ThinkPad T14 (AMD) Gen 4",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T14_(AMD)_Gen_4",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nTouchpad |  | Yes\nKeyboard |  | Yes\nGPU |  | Yes\nWebcam | 174f:11a8 | Yes\nEthernet | 10EC:8168 | Yes\nBluetooth |  | Yes\nAudio |  | Yes\nWi-Fi | 17CB:1103 | Yes\nFingerprint reader | 27c6:6594 | Yes\nTPM |  | Yes\nNFC |  | Yes\n\n"
+    },
+    {
+      "title": "S3 Sleep",
+      "level": 3,
+      "content": "Option to enable S3 sleep is not available in the BIOS. As a result, only s2idle is available.\n\n"
+    },
+    {
+      "title": "Unreliable/High latency",
+      "level": 3,
+      "content": "There is an active thread in Lenovo forums regarding this issue. Possible workaround is to disable power saving mode by adding following lines and restarting NetworkManager service.\n\n```\n/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf\n```\n\n```\n[connection]\nwifi.powersave = 2\n```\n\nThere seems to be another issue where after some suspend/wakeup cycles the Wi-Fi card gets into a weird state where it drops almost all outgoing transmissions. This results in authentication timing out and network speeds being unusable. Removing the PCIe device using the sysfs interface and reading it seems to solve this issue:\n\n```\n# lspci | grep Qualcomm\n02:00.0 Network controller: Qualcomm Technologies, Inc QCNFA765[...]\n# echo 1 > /sys/bus/pci/devices/0000:02:00.0/remove\n# echo 1 > /sys/bus/pci/rescan\n```\n\n"
+    },
+    {
+      "title": "Failure to resume from hibernation",
+      "level": 3,
+      "content": "The ath11k_pci driver is experimental and it fails to recover the device after resuming from hibernation. There is an active bug report. The patch to fix was pending public review but has been reported to be reverted.\n\nSee Lenovo ThinkPad T14s (AMD) Gen 3#Network / Wi-Fi for a fix that unloads the ath11k_pci module before sleep and loads it again after resume.\n\n"
+    },
+    {
+      "title": "WAN",
+      "level": 2,
+      "content": "You need to FCC Unlock the Fibocom L860R aka \"Intel XMM7560 LTE Advanced Pro Modem\" before it can be used. To do this, you need to install thinkpad-l860-gl-fcc-unlock-binAUR. However, this tool refuses to unlock Lenovo p14s gen4 because this model is not yet certified/has not yet passed RF testing.\n\nAs of 2023-11-24 it shows the following message when trying to FCC unlock the modem:\n\n```\nDPR_Fcc_unlock_service[40670]: WWAN is not supported in this machine\n```\n\nFortunately, it is a very simple executable that only checks what is inside /sys/class/dmi/id/product_family before allowing an FCC unlock. If you want to use your Fibocom L860R you need to create:\n\n```\n/etc/ModemManager/fcc-unlock.d/8086\\:7560\n```\n\n```\n/usr/bin/echo ThinkPad X1 Carbon Gen 10 > product_family\n/usr/bin/chmod 600 product_family\n/usr/bin/mount -o bind product_family /sys/class/dmi/id/product_family\n/opt/fcc_lenovo/DPR_Fcc_unlock_service\n/usr/bin/umount /sys/class/dmi/id/product_family\nexit 0\n```\n\nDo not forget to make the file executable.\n\nThat way /opt/fcc_lenovo/DPR_Fcc_unlock_service will think that your laptop is a Thinkpad X1 Carbon Gen 10 and it will happily unlock the modem for you to use. Since the file is saved in /etc/ModemManager/fcc-unlock.d/ ModemManager will FCC unlock your modem automatically every time you initialize a connection to your provider.\n\n"
+    },
+    {
+      "title": "Fan",
+      "level": 2,
+      "content": "The fan is relatively loud and triggers from simple web browsing.\n\n- A first solution is thinkfan from Fan speed control, but its not yet perfect as the lowest level maps to too high RPM.\n- From the fan-controll page: see gentoo link for an example, and add the proposed experimental=1\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 2,
+      "content": "Fingerprint reader works out of the box with fprint. Multiple fingers can be enrolled and any one of those fingers can be used to authorize.\n\n"
+    },
+    {
+      "title": "Infrared camera and emitter",
+      "level": 2,
+      "content": "On models with an infrared camera, howdy can be used to enable face unlock. On some models, the IR emitter is not enabled automatically, in that case, follow the workaround from Howdy#IR emitter does not work\n\n"
+    },
+    {
+      "title": "Speakers",
+      "level": 2,
+      "content": "Speakers work out of the box. How ever, they won't have the same sound quality as on Windows due to the missing Dolby Atmos Convolver.\n\nTo enable Dolby Atmos Convolver install EasyEffects, go to Effects > Add Convolver > Import Impulse\n\nThe quality difference is massive, converting the speakers from sounding tinny and cheap to something actually enjoyable.\n\nYou can download the \"Movie\", \"Music\", and \"Dynamic\" presets here:\n\nhttps://stuff.kurz.pw/arch/P14s_G4/Speakers/\n\nThey were created on a P14s G4 AMD (identical to T14) with Windows 11.\n\n"
+    },
+    {
+      "title": "Thunderbolt 3 compatibility",
+      "level": 2,
+      "content": "Tested with a Lenovo Thunderbolt 3 Dock (40AC) it simply worked out-of-the box (using the USB-C connector right next to the RJ45 port), resulting in new pcie devices appearing on lspci etc. So yes, this laptop actually has Thunderbolt 3 compatibility. As with the speaker profiles this test was done on an (identically build) P14s.\n\nDepending on BIOS configuration thunderbolt devices might need activation before being usable, e.g. using bolt. For that run boltctl list first to retrieve the devices UUID. After that use boltctl enroll --policy=auto <uuid> to enable the device.\n\n"
+    },
+    {
+      "title": "NFC",
+      "level": 2,
+      "content": "Install and start neardAUR. Detected NFC tags should appear as D-Bus objects. Use the scripts from the test directory for reading NFC tags.\n\n"
+    },
+    {
+      "title": "Hang on splash",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nRemove quiet splash from the kernel parameters.\n\n"
+    },
+    {
+      "title": "Mic LED always on",
+      "level": 3,
+      "content": "See Lenovo ThinkPad T14 (AMD) Gen 3#Mute Mic LED always on.\n\n"
+    },
+    {
+      "title": "OLED screen not allowing 90Hz",
+      "level": 3,
+      "content": "If only 60Hz is allowed in display settings, add `amdgpu.dcdebugmask=0x8000` to the kernel parameters. This fixes a regression in Linux 6.13 that populates the screen's EDID info with a manufacturer's preferred settings.\n\n"
+    },
+    {
+      "title": "Display brightness resets",
+      "level": 3,
+      "content": "On models with 2.8K OLED pannel, display brightness resets if the screen is blanked and unblanked. This is fixed in linux-6.6 and above.\n\n"
+    },
+    {
+      "title": "Display stays off after lid close",
+      "level": 3,
+      "content": "If your display stays off after closing and then opening the lid, there are few things to note:\n\n- the laptop is not crashed, it is just the display that does not turn itself on again\n\n- you need to \"re-initialize\" the display in some way, e.g. connecting the laptop via the HDMI port to an external display and then disconnecting\n\n- or switching resolution or (even better) just the refresh rate. This is how this solution works.\n\nInstall acpid and then edit the following file and add the lines starting with XDG_Session:\n\n/etc/acpi/handler.sh\n\n```\nbutton/lid)\n       case \"$3\" in\n           close)\n               logger 'LID closed'\n               ;;\n           open)\n               logger 'LID opened'\n               XDG_SESSION_TYPE=wayland XDG_RUNTIME_DIR=/run/user/1000 kscreen-doctor output.eDP-1.mode.1 output.eDP-1.enable\n               XDG_SESSION_TYPE=wayland XDG_RUNTIME_DIR=/run/user/1000 kscreen-doctor output.eDP-1.mode.0 output.eDP-1.enable\n               ;;\n           *)\n               logger \"ACPI action undefined: $3\"\n               ;;\n   esac\n```\n\nIf you have the 2.8k OLED display this will switch the display to 2880x1800 @ 60Hz and then to 2880x1800 @ 90 Hz every time you open the lid. That way your display gets re-initialized. Note that this solution is only for Wayland. If you are still using X, you will need other environment variables.\n\n"
+    },
+    {
+      "title": "Smartcard reader hang",
+      "level": 3,
+      "content": "Sometimes the built in smartcard reader stops responding (LIBUSB_ERROR_TIMEOUT). Fix is to power-cycle the card reader by suspend or by toggling power of the internal usb port using uhubctlAUR.\n\n"
+    }
+  ]
+}

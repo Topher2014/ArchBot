@@ -1,0 +1,81 @@
+{
+  "title": "HP EliteBook 850 G3",
+  "url": "https://wiki.archlinux.org/title/HP_EliteBook_850_G3",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\n- Missing \"Accessibility\" section\n\nTable content:\nHardware | PCI/USB ID | Working?\nGPU (Intel) | 8086:1916 | Yes\nGPU (AMD) | 1002:6604 | Yes\nEthernet | 8086:156f | Yes\nWireless | 8086:24f3 | Yes\nCellular | 03f0:9d1d | Yes\nBluetooth | 8087:0a2b | Yes\nNFC |  | No\nAudio | 8086:9d70 | Yes\nWebcam | 04f2:b51d | Yes\nMemory Card Reader | 10ec:522a | Yes\nTouch-pad |  | Yes\nFingerprint Reader | 138a:003f | No\nFan Control |  | Yes\nTPM |  | Yes\nSmart Card Reader |  | No\nBattery |  | Partial\nHP Docking |  | Yes\n\n"
+    },
+    {
+      "title": "General",
+      "level": 2,
+      "content": "The HP Elitebook 850 G3 is a business grade workstation laptop released in 2017, the laptop is very durable and the ecosystem of HP devices are a well fit for a neat portable system. Most of the internal parts are cross compatible with the generation 4 (G4) Elitebooks and can easily be upgraded and be swapped in and out for wanted/remove unwanted features.\n\n"
+    },
+    {
+      "title": "UEFI / Secure Boot",
+      "level": 3,
+      "content": "Secure Boot and TPM backed disk encryption is tested and works. Enrolling custom keys for secure boot is supported but is not tested, proceed with caution.\n\n"
+    },
+    {
+      "title": "AMD Graphics",
+      "level": 3,
+      "content": "The AMD Radeon R7 M365X is supported by both radeon and AMDGPU drivers, but AMDGPU driver performs better. Read AMDGPU to configure the driver in your system.\n\n"
+    },
+    {
+      "title": "Fan Control",
+      "level": 3,
+      "content": "Fan control requires additional software to be configured. Install nbfc-linuxAUR read Fan speed control for more information.\n\n```\n# sudo nbfc config -s \"HP EliteBook 850 G3\"\n```\n\n"
+    },
+    {
+      "title": "Cellular",
+      "level": 3,
+      "content": "NetworkManager uses ModemManager for mobile broadband connection support.\n\nSetting up usb_modeswitch does not set up the modem properly. Add the following udev rule & script to manually configure the modem to operational mode,\n\n```\n/etc/udev/rules.d/99-hp-modem.rules\n```\n\n```\nACTION==\"add\", ATTR{idVendor}==\"03f0\", ATTR{idProduct}==\"9d1d\", RUN+=\"/usr/local/bin/hp-modem-setup.sh\"\n```\n\n```\n/usr/local/bin/hp-modem-setup.sh\n```\n\n```\n#!/bin/bash\n\necho 0 > /sys/bus/usb/devices/1-3/bConfigurationValue\necho 2 > /sys/bus/usb/devices/1-3/bConfigurationValue\necho 1 > /sys/bus/usb/devices/1-3/bConfigurationValue\necho 3 > /sys/bus/usb/devices/1-3/bConfigurationValue\n```\n\nGive executable permissions to the modem set up script, reload udev and trigger an usb even to set up the device:\n\n```\n# udevadm trigger --action=add /sys/bus/usb/devices/1-3\n```\n\nConfirm that the modem is set up by running:\n\n```\n$ mmcli -L\n```\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 3,
+      "content": "To enable synaptics intertouch on Synaptics TM3140-001 for a better touch pad experience:\n\n```\n# modprobe -r psmouse\n# modprobe psmouse synaptics_intertouch=1\n```\n\nIf all works well you can make the changes persistent in next boot by adding the driver parameter to Kernel parameters.\n\n"
+    },
+    {
+      "title": "Keyboard Pointer",
+      "level": 3,
+      "content": "The keyboard nipple/pointer is tested and works, both the rows of touch-pad mouse click buttons works.\n\n"
+    },
+    {
+      "title": "Battery",
+      "level": 3,
+      "content": "Setting charging thresholds on the fly is unsupported. HP Intelligent charging can be used on windows to change battery health configurations on the fly while powered on. However battery health configurations (Maximize for Duration/Health, Let HP Manage..) could be set in the firmware setup. Maybe a UEFI variable + reboot mechanism of some sort can be developed as a workaround.\n\n"
+    },
+    {
+      "title": "HP Docking",
+      "level": 3,
+      "content": "The docking port on the right side of the device below the sim card slot is and older docking standard that is now discontinued. To recognize whether the device is docked or not the path to the device can be found out by running:\n\n```\n$ find /sys/devices/platform -name dock -print -exec cat {} \\;\n```\n\nA list of tested docks are listed,\n\nTable content:\nDock | Working?\nHP UltraSlim Docking Station (B9C87AA#ABA) | Yes\n\n"
+    },
+    {
+      "title": "Systemd + Udev",
+      "level": 4,
+      "content": "Below commands guides on how to setup docked and mobile targets with udev on a systemd configured system to aid with other tasks in the system. This can flexibly be used to for example mount file systems when docked or de/activate other systemd units that match the device profile when docked / mobile.\n\n```\n/etc/systemd/system/docked.target\n```\n\n```\n[Unit]\nDescription=Laptop Docked Target\n```\n\n```\n/etc/systemd/system/mobile.target\n```\n\n```\n[Unit]\nDescription=Laptop Mobile Target\n```\n\n```\n/etc/udev/rules.d/99-dock-detect.rules\n```\n\n```\n# trigger an action(a) when the SMSC USB5534 hub in the dock is added\n\nSUBSYSTEM==\"usb\", ACTION==\"add\",    ATTR{idVendor}==\"0424\", ATTR{idProduct}==\"5434\",      RUN+=\"/bin/systemctl start docked.target\"\nSUBSYSTEM==\"usb\", ACTION==\"remove\", DEVPATH==\"/devices/pci0000:00/0000:00:14.0/usb2/2-4\", RUN+=\"/bin/systemctl stop  docked.target\"\n\nSUBSYSTEM==\"usb\", ACTION==\"add\",    ATTR{idVendor}==\"0424\", ATTR{idProduct}==\"5434\",      RUN+=\"/bin/systemctl stop  mobile.target\"\nSUBSYSTEM==\"usb\", ACTION==\"remove\", DEVPATH==\"/devices/pci0000:00/0000:00:14.0/usb2/2-4\", RUN+=\"/bin/systemctl start mobile.target\"\n```\n\nHere is an example use case where hpfall can be deactivated when the system is docked.\n\n```\n# sudo systemctl edit hpfall.service\n```\n\n```\n### Anything between here and the comment below will become the contents of the drop-in file\n\n[Unit]\nRequires=mobile.target\nBindsTo=mobile.target\n\n[Install]\nWantedBy=multi-user.target mobile.target\n\n### Edits below this comment will be discarded\n```\n\n"
+    },
+    {
+      "title": "HPFall (HP 3D DriveGaurd)",
+      "level": 3,
+      "content": "The laptop built to work with hard drives has an accelerometer to unload the drive head to prevent damage to the hard drive. If you have a harddrive the same feature is implemented by hpfall and is tested and works, follow the guide in hpfall to configure. The accelerometer can also be used for other purposes, values can be read using the jstest utility from the joyutils.\n\n```\n$ jstest /dev/input/js0\n```\n\n"
+    },
+    {
+      "title": "NFC",
+      "level": 3,
+      "content": "The NFC device on the board is unsupported by the NFC software/firmware stack.\n\n"
+    },
+    {
+      "title": "Fingerprint",
+      "level": 3,
+      "content": "The fingerprint device \"Validity Sensors, Inc. VFS495 Fingerprint Reader\" does not work, as the firmware is proprietary and it's functionality is obscure to be integrated to the linux pam components. There are reverse engineered drivers that work with older kernels and older versions of libcrypto and other dependencies but later versions of packages seems to break commonly linked resources.\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\n- Super+PowerButton to switch power profiles\n- Super+AudioButton to switch main audio output/input source\n- Fn+F1 to toggle fan speed modes\n\nTable content:\nKey(s) | Control Action | Status (assuming appropriate software)\nFn+F1 | Suspend | Sleep / Suspend the device to RAM by default, can be configured for hybrid sleep if set up.\nFn+F3 | Keyboard Backlight | Toggle keyboard backlight levels. (Off, Low, High)\nFn+F4 | Monitor Modes | Switch between monitor modes. (Extended, Mirrored, Joined, etc.)\nFn+F5,Fn+F6 | Brightness Control | Main / In-built monitor brightness control, down and up respectively.\nFn+F8, Fn+F9 | Volume Control | Volume up/down control respectively on the main audio output source.\nFn+F10 | Mute Audio Input | Toggle to mute the main audio input source. (Turn on/off mic)\nFn+PrintScreen | Screen Capture | Triggers screen snipping/capture.\nRadioButton | Radio Control | Toggles all radio devices on/off. (Cellular, Wifi, & Bluetooth)\nAudioButton | Audio Mute | Toggles all audio outputs on/off.\n\n"
+    }
+  ]
+}

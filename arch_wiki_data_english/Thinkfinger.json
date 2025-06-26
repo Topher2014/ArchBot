@@ -1,0 +1,76 @@
+{
+  "title": "Thinkfinger",
+  "url": "https://wiki.archlinux.org/title/Thinkfinger",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Fingerprint-gui\n- Fprint\n\nThinkFinger is a driver for the SGS Thomson Microelectronics fingerprint reader found in older IBM/Lenovo ThinkPads.\n\nThinkWiki has a list of various fingerprint readers found in ThinkPads. Newer models using different readers might not work with ThinkFinger.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the thinkfingerAUR package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The uinput module needs to be loaded.\n\n"
+    },
+    {
+      "title": "TF-Tool",
+      "level": 3,
+      "content": "Use tf-tool to test ThinkFinger. You will have to run this as root because a direct access to the USB devices is needed. Run tf-tool --acquire to generate a file at /etc/pam_thinkfinger/test.bir and tf-tool --verify to see if it identifies you correctly. tf-tool --add-user <username> acquires and stores your fingerprint in /etc/pam_thinkfinger/<username>.bir, which is needed for an authentication with PAM.\n\n"
+    },
+    {
+      "title": "PAM",
+      "level": 2,
+      "content": "See PAM.\n\n"
+    },
+    {
+      "title": "/etc/pam.d/login",
+      "level": 3,
+      "content": "Change the file /etc/pam.d/login to look like this if you want to use your fingerprint to authenticate yourself on logon:\n\n```\n/etc/pam.d/login\n```\n\n```\n#%PAM-1.0\nauth\t\tsufficient\tpam_thinkfinger.so\nauth\t\trequired\tpam_unix.so use_first_pass nullok_secure\naccount\t\trequired\tpam_unix.so\npassword\trequired\tpam_unix.so\nsession\t\trequired\tpam_unix.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/su",
+      "level": 3,
+      "content": "Change this file to confirm the su command with a finger-swipe:\n\n```\n/etc/pam.d/su\n```\n\n```\n#%PAM-1.0\nauth            sufficient      pam_rootok.so\nauth\t\tsufficient \tpam_thinkfinger.so\nauth\t\trequired\tpam_unix.so nullok_secure try_first_pass\naccount\t\trequired\tpam_unix.so\nsession\t\trequired\tpam_unix.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/sudo",
+      "level": 3,
+      "content": "Change this file to confirm the sudo command with a finger-swipe:\n\n```\n/etc/pam.d/su\n```\n\n```\n#%PAM-1.0\nauth\t\tsufficient \tpam_thinkfinger.so\nauth\t\trequired\tpam_unix.so nullok_secure try_first_pass\nauth\t\trequired\tpam_nologin.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/xscreensaver",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nXScreensaver is a bit tricky. First, configure PAM with a file /etc/pam.d/xscreensaver containing:\n\n```\n/etc/pam.d/xscreensaver\n```\n\n```\nauth            sufficient      pam_thinkfinger.so\n auth            required        pam_unix_auth.so try_first_pass\n```\n\nThis still will not work because Xscreensaver cannot read/write from /dev/misc/uinput and /dev/bus/usb*. A udev rule must be written to authorize a new group read/write access.\n\nFirst, create a new group, let us say fingerprint:\n\n```\n# groupadd fingerprint\n```\n\nAdd the user you want to be able to unlock Xscreensaver with the fingerprint reader to the group:\n\n```\n# gpasswd -a <user> fingerprint\n```\n\nLogout and login again for the changes to take effect.\n\nNext, search for uinput and bus/usb in your udev rules directory:\n\n```\n$ grep -in uinput /etc/udev/rules.d/*\n\n/etc/udev/rules.d/udev.rules:222:KERNEL==\"uinput\",  NAME=\"misc/%k\", SYMLINK+=\"%k\"\n/etc/udev/rules.d/udev.rules:263:KERNEL==\"uinput\", NAME=\"input/%k\"\n```\n\n```\n$ grep -in \"bus/usb\" /etc/udev/rules.d/*\n\n/etc/udev/rules.d/udev.rules:318:SUBSYSTEM==\"usb_device\", ACTION==\"add\", PROGRAM=\"/bin/sh -c 'K=%k; K=$${K#usbdev};printf bus/usb/%%03i/%%03i $${K%%%%.*} $${K#*.}'\", NAME=\"%c\", MODE=\"0664\"\n/etc/udev/rules.d/udev.rules:320:SUBSYSTEM==\"usb\", ACTION==\"add\", ENV{DEVTYPE}==\"usb_device\", NAME=\"bus/usb/$env{BUSNUM}/$env{DEVNUM}\", MODE=\"0664\"\n```\n\nCopy the lines you found with grep in the previous step to a new udev rules file:\n\n```\n/etc/udev/rules.d/99fingerprint.rules\n```\n\n```\nKERNEL==\"uinput\",  NAME=\"misc/%k\", SYMLINK+=\"%k\", MODE=\"0660\", GROUP=\"fingerprint\"\nSUBSYSTEM==\"usb_device\", ACTION==\"add\", PROGRAM=\"/bin/sh -c 'K=%k; K=$${K#usbdev};printf bus/usb/%%03i/%%03i $${K%%%%.*} $${K#*.}'\", NAME=\"%c\", MODE=\"0664\", GROUP=\"fingerprint\"\nSUBSYSTEM==\"usb\", ACTION==\"add\", ENV{DEVTYPE}==\"usb_device\", NAME=\"bus/usb/$env{BUSNUM}/$env{DEVNUM}\", MODE=\"0664\", GROUP=\"fingerprint\"\n```\n\nThe difference between the rules in /etc/udev/rules.d/99fingreprint.rules and those in /etc/udev/rules.d/udev.rules should only be the addition of MODE=\"0664\", GROUP=\"fingerprint\" or MODE=\"0660\", GROUP=\"fingerprint\" at the end of the lines.\n\nAfter adding the custom udev rules, you should give your user permissions to access their own fingerprint file:\n\n```\n$ chown $USERNAME:root /etc/pam_thinkfinger/$USERNAME.bir\n$ chmod 400 /etc/pam_thinkfinger/$USERNAME.bir\n$ chmod o+x /etc/pam_thinkfinger\n```\n\nAs a last step, you need to remove the root setuid from /usr/bin/xscreensaver, otherwise Xscreensaver will not be able to unlock with the fingerprint reader:\n\n```\n# chmod -s /usr/bin/xscreensaver\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/gdm",
+      "level": 3,
+      "content": "Edit /etc/pam.d/gdm and add the following line to the top:\n\n```\n/etc/pam.d/gdm\n```\n\n```\nauth\t\tsufficient \tpam_thinkfinger.so\n```\n\nThen modify auth required pam_unix.so to look like this:\n\n```\n/etc/pam.d/gdm\n```\n\n```\nauth\t\trequired\tpam_unix.so use_first_pass nullok_secure\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/xdm",
+      "level": 3,
+      "content": "Edit /etc/pam.d/xdm to look like this:\n\n```\n/etc/pam.d/xdm\n```\n\n```\n#%PAM-1.0\nauth            sufficient      pam_thinkfinger.so\nauth            required        pam_unix.so use_first_pass nullok_secure\nauth            required        pam_nologin.so\nauth            required        pam_env.so\naccount         required        pam_unix.so\npassword        required        pam_unix.so\nsession         required        pam_unix.so\nsession         required        pam_limits.so\n```\n\n"
+    },
+    {
+      "title": "/etc/pam.d/slim",
+      "level": 3,
+      "content": "Append the following to /etc/pam.d/slim:\n\n```\n/etc/pam.d/slim\n```\n\n```\n#%PAM-1.0\n...\nauth            sufficient      pam_thinkfinger.so\nauth            requisite       pam_nologin.so\nauth            required        pam_env.so\nauth            required        pam_unix.so\naccount         required        pam_unix.so\nsession         required        pam_limits.so\nsession         required        pam_unix.so\npassword        required        pam_unix.so\n```\n\nNow restart SLiM and you may use the fingerprinter to login.\n\n"
+    },
+    {
+      "title": "Alternative fingerprint reader software",
+      "level": 2,
+      "content": "Fprint is an alternative fingerprint reader software that works with some of the newer ThinkPad fingerprint readers.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://www.thinkwiki.org/wiki/Talk:How_to_enable_the_fingerprint_reader\n- https://thinkfinger.sourceforge.net/\n- https://bbs.archlinux.org/viewtopic.php?id=36134\n- https://www.thinkwiki.org/wiki/How_to_enable_the_fingerprint_reader_with_ThinkFinger\n- https://www.thinkwiki.org/index.php?title=Installing_Ubuntu_6.06_on_a_ThinkPad_T43#Fingerprint_Reader\n\n"
+    }
+  ]
+}

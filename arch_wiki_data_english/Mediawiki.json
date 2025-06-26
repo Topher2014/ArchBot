@@ -1,0 +1,71 @@
+{
+  "title": "Mediawiki",
+  "url": "https://wiki.archlinux.org/title/Mediawiki",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "MediaWiki is a free and open source wiki software written in PHP, originally developed for Wikipedia. It also powers this wiki (see Special:Version and the gitlab.archlinux.org repository).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "To run MediaWiki you need three things:\n\n- the mediawiki package, which pulls in PHP\n- a web server, such as Apache HTTP Server, nginx or lighttpd\n- a database system – one of MariaDB, PostgreSQL, SQLite or MySQL\n\nTo install MediaWiki on XAMPP, see mw:Manual:Installing MediaWiki on XAMPP\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The steps to achieve a working MediaWiki configuration involve editing the PHP settings and adding the MediaWiki configuration snippets.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "MediaWiki requires the iconv and the intl extensions, so you need to uncomment extension=iconv and extension=intl in /etc/php/php.ini.\n\nOptional dependencies:\n\n- For thumbnail rendering, install either ImageMagick or php-gd. If you choose the latter, you also need to uncomment extension=gd.\n\nEnable the API for your DBMS:\n\n- If you use MariaDB, uncomment extension=mysqli.\n- If you use PostgreSQL, install php-pgsql and uncomment extension=pgsql.\n- If you use SQLite, install php-sqlite and uncomment extension=pdo_sqlite.\n\nSecond, tweak the session handling or you might get a fatal error (PHP Fatal error: session_start(): Failed to initialize storage module[...]) by finding the session.save_path path. A good choice can be /var/lib/php/sessions or /tmp/.\n\n```\n/etc/php/php.ini\n```\n\n```\nsession.save_path = \"/var/lib/php/sessions\"\n```\n\nYou will need to create the directory if it does not exist and then restrict its permissions:\n\n```\n# mkdir -p /var/lib/php/sessions/\n# chown http:http /var/lib/php/sessions\n# chmod go-rwx /var/lib/php/sessions\n```\n\nIf you use PHP's open_basedir and want to allow file uploads, you need to include /var/lib/mediawiki/ (mediawiki symlinks images/ to /var/lib/mediawiki/).\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 4,
+      "content": "Follow Apache HTTP Server#PHP.\n\nCopy /etc/webapps/mediawiki/apache.example.conf to /etc/httpd/conf/extra/mediawiki.conf and edit it as needed.\n\nAdd the following line to /etc/httpd/conf/httpd.conf:\n\n```\nInclude conf/extra/mediawiki.conf\n```\n\nRestart the httpd.service daemon.\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nTo get MediaWiki working with Nginx, create the following file:\n\n```\n/etc/nginx/mediawiki.conf\n```\n\n```\nlocation / {\n   index index.php;\n   try_files $uri $uri/ @mediawiki;\n}\nlocation @mediawiki {\n   rewrite ^/(.*)$ /index.php;\n}\nlocation ~ \\.php$ {\n   include /etc/nginx/fastcgi_params;\n   fastcgi_pass unix:/var/run/php-fpm/php-fpm.sock;\n   fastcgi_index index.php;\n   fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;\n   try_files $uri @mediawiki;\n}\nlocation ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg)$ {\n   try_files $uri /index.php;\n   expires max;\n   log_not_found off;\n}\n# Restrictions based on the .htaccess files\nlocation ~ ^/(cache|includes|maintenance|languages|serialized|tests|images/deleted)/ {\n   deny all;\n}\nlocation ~ ^/(bin|docs|extensions|includes|maintenance|mw-config|resources|serialized|tests)/ {\n   internal;\n}\nlocation ^~ /images/ {\n   try_files $uri /index.php;\n}\nlocation ~ /\\. {\n   access_log off;\n   log_not_found off; \n   deny all;\n}\nlocation /rest.php {\n   try_files $uri $uri/ /rest.php?$args;\n}\n```\n\nEnsure that php-fpm is installed and php-fpm.service is started.\n\nInclude a server directive, similar to this\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nserver {\n  listen 80;\n  server_name mediawiki;\n  root /usr/share/webapps/mediawiki;\n  index index.php;\n  charset utf-8;\n# For correct file uploads\n  client_max_body_size    100m; # Equal or more than upload_max_filesize in /etc/php/php.ini\n  client_body_timeout     60;\n  include mediawiki.conf;\n\n}\n```\n\nFinally, restart nginx.service and php-fpm.service daemons.\n\n"
+    },
+    {
+      "title": "Lighttpd",
+      "level": 4,
+      "content": "You should have Lighttpd installed and configured. \"mod_alias\" and \"mod_rewrite\" in server.modules array of lighttpd is required. Append to the lighttpd configuration file the following lines\n\n```\n/etc/lighttpd/lighttpd.conf\n```\n\n```\nalias.url += (\"/mediawiki\" => \"/usr/share/webapps/mediawiki/\")\nurl.rewrite-once += (\n                \"^/mediawiki/wiki/upload/(.+)\" => \"/mediawiki/wiki/upload/$1\",\n                \"^/mediawiki/wiki/$\" => \"/mediawiki/index.php\",\n                \"^/mediawiki/wiki/([^?]*)(?:\\?(.*))?\" => \"/mediawiki/index.php?title=$1&$2\"\n)\n```\n\nRestart the lighttpd.service daemon.\n\n"
+    },
+    {
+      "title": "Database",
+      "level": 3,
+      "content": "Set up a database server as explained in the article of your DBMS: MariaDB, PostgreSQL, SQLite or MySQL.\n\nIf you have set a non-empty root password for the database server, MediaWiki can automatically create the database during the next step. (See MariaDB#Reset the root password for how to set this password retrospectively for MariaDB.) Otherwise the database needs to be created manually - see upstream instructions.\n\n"
+    },
+    {
+      "title": "LocalSettings.php",
+      "level": 3,
+      "content": "Open the wiki URL (usually http://your_server/mediawiki/index.php) in a browser and do the initial configuration. Follow upstream instructions.\n\nThe generated LocalSettings.php file is offered for download, save it to /etc/webapps/mediawiki/LocalSettings.php.\n\nSince 1.38.0 it has a symbolic link included in /usr/share/webapps/mediawiki/LocalSettings.php.\n\n```\n# chown root:http /etc/webapps/mediawiki/LocalSettings.php\n# chmod 640 /etc/webapps/mediawiki/LocalSettings.php\n```\n\nThis file defines the specific settings of your wiki. Whenever you upgrade the mediawiki package, it will not be replaced.\n\n"
+    },
+    {
+      "title": "LDAP Auth",
+      "level": 4,
+      "content": "Use PluggableAuth and LDAP Stack. Pay attention to \"Compatibility Matrix\" section. Currently LDAP works only with PluggableAuth-5.7.\n\nYou need to install and add to config ldap stack extensions and PluggableAuth:\n\n- Extension:PluggableAuth\n- Extension:LDAPProvider\n- Extension:LDAPAuthentication2\n- Extension:LDAPAuthorization\n- Extension:LDAPUserInfo\n- Extension:LDAPGroups\n\nThen set up at least 3 variables:\n\n- $LDAPProviderDomainConfigProvider - whole ldap config (can be in json file)\n- $wgPluggableAuth_Config - list of auth plugins\n\n```\n$wgPluggableAuth_Config = array(\n       array('plugin' => 'LDAPAuthentication2'),\n       array('plugin' => 'LDAPAuthorization'),\n);\n```\n\n- and $LDAPProviderDefaultDomain\n\nDo not forget to run php maintenance/update.php after configuration.\n\n"
+    },
+    {
+      "title": "Upgrading",
+      "level": 2,
+      "content": "See mw:Manual:Upgrading, and do not forget to run:\n\n```\n# cd /usr/share/webapps/mediawiki\n# php maintenance/run.php update\n```\n\n"
+    },
+    {
+      "title": "Unicode",
+      "level": 3,
+      "content": "Check that PHP, Apache HTTP Server and MariaDB all use UTF-8. Otherwise you may face strange bugs because of encoding mismatch.\n\n"
+    },
+    {
+      "title": "VisualEditor",
+      "level": 3,
+      "content": "The VisualEditor MediaWiki extension provides a rich-text editor for MediaWiki. Follow mw:Extension:VisualEditor to install it.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "title": "Saitek Cyborg R.A.T.3 Mouse",
+  "url": "https://wiki.archlinux.org/title/Saitek_Cyborg_R.A.T.3_Mouse",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Mad Catz produces a series of gaming mice, for example the Saitek Cyborg R.A.T.3 Mouse (7 buttons USB wired) or the R.A.T9 (7 buttons USB wireless). The mice do not work properly in X without some reconfiguration. This article explains how to make it work with any desktop manager.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "No driver installation is required. The mouse should be detected at boot or whenever it is hot-plugged.\n\n"
+    },
+    {
+      "title": "Issues",
+      "level": 2,
+      "content": "After being plugged, the mouse seems to work, but you may experience different issues :\n\n- You cannot move windows around when grabbing the window's title bar. (happens with Openbox and other Window manager)\n- You cannot click on buttons.\n- You cannot get the focus on windows.\n- You cannot open menus, even with keyboard shortcuts.\n- Display does not refresh (using Xcompmgr)\n- Closing certain windows restores functionality until the mouse locks into a new window.\n\n"
+    },
+    {
+      "title": "The Disable Button Solution",
+      "level": 2,
+      "content": "The issues are caused by an interaction between R.A.T Mode button and the X Server. To restore proper functionality, the 'Mode' button must be disabled, as follows:\n\nWith root privileges, create the file /etc/X11/xorg.conf.d/50-vmmouse.conf (see xorg) with the following content :\n\n```\nSection \"InputDevice\"\n    Identifier     \"Mouse0\"\n    Driver         \"evdev\"\n    Option         \"Name\" \"Saitek Cyborg R.A.T.3 Mouse\"\n    Option         \"Vendor\" \"06a3\"\n    Option         \"Product\" \"0ccc\"\n    Option         \"Protocol\" \"auto\"\n    Option         \"Device\" \"/dev/input/event4\"\n    Option         \"Emulate3Buttons\" \"no\"\n    Option         \"Buttons\" \"7\"\n    Option         \"ZAxisMapping\" \"4 5\"\n    Option         \"ButtonMapping\" \"1 2 3 4 5 6 7 0 0 0 0 0 0 0\"\n    Option         \"Resolution\" \"3200\"\nEndSection\n```\n\nAfter restarting your X server, the mouse should be fully functional, including the two lateral buttons. You may restart the X server by restarting the display manager service, for example sddm.service, lightdm.service etc... If not, or if you need more information about configuring gaming mice, see All Mouse Buttons Working.\n\n"
+    },
+    {
+      "title": "RAT7 or RAT9 Partial Fix",
+      "level": 2,
+      "content": "This is the configuration file that will get your R.A.T. 7 or R.A.T. 9 mouse working properly under Linux.\n\n- Does not fix the change-profile button for RAT9, this profile needs more adjustment or just do not push it.\n\n/etc/X11/xorg.conf.d/910-rat.conf:\n\n```\nSection \"InputClass\"\n  Identifier \"Mouse Remap\"\n  MatchProduct \"Mad Catz Mad Catz M.M.O.7 Mouse|M.M.O.7\"\n  MatchIsPointer \"true\"\n  MatchUSBID \"0738:1713\"\n  Driver \"evdev\"\n  Option \"Buttons\" \"24\"\n  Option \"ButtonMapping\" \"1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 0 21 22 23 24\"\n  Option \"AutoReleaseButtons\" \"20\"\n  Option \"ZAxisMapping\" \"4 5 6 7\"\n# Option \"Resolution\" \"3200\"\n# Option \"ConstantDeceleration\" \"2\"\nEndSection\n```\n\nYou can define different keystrokes applied to each mouse button by defining them in ~/.xbindkeysrc eg.:\n\n```\n# pressing mouse button 7 sends keystroke: 2\n\"xvkbd  -text 2\"\n       m:0x0 + b:7\n# pressing mouse button 8 sends keystroke: Space\n\"xvkbd  -text \"\\[SPACE]\"\"\n       m:0x0 + b:8\n# pressing mouse button 9 sends keystroke: F8\n\"xvkbd  -text \"\\[F8]\"\"\n       m:0x0 + b:9\n# pressing mouse button 10 sends keystroke: CursorLeft\n\"xvkbd  -text \"\\[Left]\"\"\n       m:0x0 + b:10\n# pressing mouse button 11 sends keystroke: Shift+F2\n\"xvkbd  -text \"\\[Shift]\\[F2]\"\"\n       m:0x0 + b:11\n```\n\nA very good article on setting up the Mad Catz M.M.O.7 mouse with Linux is written here.\n\n"
+    },
+    {
+      "title": "Manual Button Mapping Fix",
+      "level": 2,
+      "content": "Please note that there are two different versions of the R.A.T.3 mouse which are Saitek and Madcatz, this must be input correctly into the \"MatchProduct\" or you will run into the same issues.\n\nFirst find out the ID and the Name of the mouse :\n\n```\nxinput list | grep \"id\"\n```\n\nIn you should see your mouse labeled as \"Madcatz Mad Catz R.A.T.3 Mouse\" or \"Saitek Cyborg R.A.T.3 Mouse\". Note the device id number and then input the following command :\n\n```\nxinput query-state ID\n```\n\n(Where ID corresponds to the ID number of your mouse)\n\nNote which 'mode' color is currently active (red/blue/purple) and which button numbers correspond to the current 'mode' by being either \"up\" or \"down\". Change the mouse 'mode' and and retype the above command, noting which buttons change state to match the 'mode'.\n\nExample:\n\n```\nU = up\nD = down\n                        U U U U U D D U U D D D  U  U \nOption \"ButtonMapping\" \"1 2 3 4 5 0 0 8 9 0 0 0 13 14\"\n```\n\nWhere buttons 10, 11, and 12 have been identified as 'mode' buttons, so they can be disabled by with zeros.\n\nWhen you have identified which button numbers correspond to the mouse 'modes', you should be able to edit your xorg.conf file and disable them by inserting a zero in the appropriate point in the button sequence.\n\nOpen in your chosen editor:\n\n```\n/etc/X11/xorg.conf   or\n/etc/X11/xorg.conf.d/910-rat-xx.conf\n```\n\nCreate a block that overwrites the mode buttons as listed for your mouse model in chapter Mouse Configurations:\n\nMadCatz R.A.T.3:\n\n```\n# RAT3 mouse\nSection \"InputClass\"\n Identifier \"Mouse Remap\"\n MatchProduct \"Madcatz Mad Catz R.A.T.3 Mouse\"\n MatchDevicePath \"/dev/input/event*\"\n Option \"ButtonMapping\" \"1 2 3 4 5 6 7 8 9 0 0 0 13 14 15 16 17 18\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Use extra mouse buttons with Wine/Games",
+      "level": 2,
+      "content": "Install evrouterAUR and add your user to input group and relogin to activate changes.\n\n```\n# gpasswd -a <user> input\n```\n\nEdit the evrouter configuration file and change the `eventX` number to the event number the mouse uses with\n\n```\n$ evrouter --dump /dev/input/event*\n```\n\nThen assign any hotkeys to any mouse button. Preferably use not often used keystrokes to not interfere with others already used as in the example Right Shift + F-key.\n\n```\n~/.evrouterrc\n```\n\n```\n# 10\n\"Mad Catz Mad Catz M.M.O.7 Mouse\" \"/dev/input/event9\" none key/277 \"XKey/Shift_R+F1\"\n# 11\n\"Mad Catz Mad Catz M.M.O.7 Mouse\" \"/dev/input/event9\" none key/278 \"XKey/Shift_R+F2\"\n```\n\nStart with:\n\n```\n$ evrouter /dev/input/event*\n```\n\nStop with:\n\n```\n$ evrouter -q && rm -f /tmp/.evrouter*\n```\n\n"
+    },
+    {
+      "title": "R.A.T. configuration software",
+      "level": 2,
+      "content": "Saitek/Mad Catz does not provide any official configuration software for Linux.\n\nThere is however open an source project which allows you to configure DPI settings for each and mode here.\n\nIt might however require some tweaking for certain R.A.T. mice, such as adding your mouse ID to the list of supported IDs.\n\n"
+    },
+    {
+      "title": "Mouse Configurations",
+      "level": 2,
+      "content": "It is recommended that you put those settings in a single file for each model you use, eg. /etc/X11/xorg.conf.d/920-rat-mmo7.conf.\n\n"
+    },
+    {
+      "title": "Mad Catz R.A.T. 5",
+      "level": 3,
+      "content": "```\nSection \"InputClass\"\n   Identifier \"Mad Catz R.A.T. 5\"\n   MatchProduct \"Mad Catz Mad Catz R.A.T.5 Mouse\"\n   MatchDevicePath \"/dev/input/event*\"\n   Option \"Buttons\" \"21\"\n   Option \"ButtonMapping\" \"1 2 3 4 5 0 0 9 8 7 6 10 0 0 0 0 0 0 0 0 0\"\n   Option \"ZAxisMapping\" \"4 5 11 10\"\n   Option \"AutoReleaseButtons\" \"13 14 15\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Mad Catz M.M.O.7",
+      "level": 3,
+      "content": "```\nSection \"InputClass\"\n Identifier \"Mouse Remap 7\"\n MatchProduct \"Mad Catz Mad Catz M.M.O.7 Mouse|M.M.O.7\"\n MatchIsPointer \"true\"\n MatchUSBID \"0738:1713\"\n Driver \"evdev\"\n Option \"Buttons\" \"24\"\n Option \"ButtonMapping\" \"1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 0 21 22 23 24\"\n Option \"AutoReleaseButtons\" \"20\"\n Option \"ZAxisMapping\" \"4 5 6 7\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Mad Catz R.A.T. TE",
+      "level": 3,
+      "content": "```\nSection \"InputClass\"\n   Identifier     \"Mouse Remap\"\n   MatchProduct   \"Mad Catz Mad Catz R.A.T.TE\"\n   MatchDevicePath \"/dev/input/event*\"\n   Option         \"ButtonMapping\" \" 1 2 3 4 5 6 7 8 9 10 11 12 0 0 0\"\n   Option        \"ZAxisMapping\" \"4 5 6 7\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Mad Catz M.M.O. TE",
+      "level": 3,
+      "content": "```\nSection \"InputClass\"\n Identifier \"Mouse Remap TE\"\n MatchProduct \"Mad Catz Mad Catz M.M.O.TE\"\n MatchIsPointer \"true\"\n MatchUSBID \"0738:1714\"\n Driver \"evdev\"\n Option \"Buttons\" \"24\"\n Option \"ButtonMapping\" \"1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24\"\n Option \"AutoReleaseButtons\" \"20\"\n Option \"ZAxisMapping\" \"4 5\"    \n Option \"ConstantDeceleration\" \"2\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Saitek Cyborg R.A.T.3",
+      "level": 3,
+      "content": "```\n# RAT3 mouse\nSection \"InputClass\"\n Identifier \"Mouse Remap\"\n MatchProduct \"Saitek Cyborg R.A.T.3 Mouse\"\n MatchDevicePath \"/dev/input/event*\"\n Option \"ButtonMapping\" \"1 2 3 4 5 0 0 8 9 0 0 0 13 14\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://ubuntuforums.org/showthread.php?t=2126385\n- https://askubuntu.com/questions/92546/cyborg-r-a-t-3-gaming-mouse-stops-working-after-a-while-and-or-misbehaves\n\n"
+    }
+  ]
+}

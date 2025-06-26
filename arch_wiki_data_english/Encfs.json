@@ -1,0 +1,81 @@
+{
+  "title": "Encfs",
+  "url": "https://wiki.archlinux.org/title/Encfs",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- gocryptfs\n- eCryptfs\n- Data-at-rest encryption\n\nEncFS is a userspace stackable cryptographic file-system similar to eCryptfs, and aims to secure data with the minimum hassle. It uses FUSE to mount an encrypted directory onto another directory specified by the user. It does not use a loopback system like some other comparable systems such as TrueCrypt and dm-crypt.\n\nEncFS is definitely the simplest software if you want to try disk encryption on Linux.\n\nAdvantages of EncFS: Firstly, it does not require any root privileges to implement; any user can create a repository of encrypted files. Secondly, one does not need to create a single file and create a file-system within that; it works on existing file-system without modifications.\n\nDisadvantages: The encrypted files are not stored in their own file, someone who obtains access to the system can still see the underlying directory structure, the number of files, their sizes and when they were modified. They cannot see the contents, however.\n\nThis particular method of securing data is obviously not perfect, but there are situations in which it is useful.\n\nFor more details on how EncFS compares to other disk encryption solution, see Data-at-rest encryption#Comparison table.\n\n"
+    },
+    {
+      "title": "Comparison to eCryptFS",
+      "level": 2,
+      "content": "eCryptFS is implemented in kernelspace and therefore a little bit harder to configure. You have to remember various encryption options (used cyphers, key type, etc...). With EncFS this is not the case, because it stores the encryption metadata information in a per-directory configuration file (.encfs6.xml). So you do not have to remember anything (except the passphrase).\n\nThe performance of both depends on the type of disk activity. While eCryptFS can perform faster in some cases because there is less overhead by context switching (between kernel and userspace), EncFS has advantages in other cases because the encryption metadata is centralized and not stored in the individual files' headers. For more information benchmark examples are provided by the EncFS project.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the encfs package.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "To create a secured repository, type:\n\n```\n$ encfs ~/.encrypted ~/origin\n```\n\nNote that absolute paths must be used. This will be followed by a prompt about whether you want to go with the default options, expert configuration or a paranoid preset. The first is a fairly secure default setup. The second allows specifying algorithms and other options. After entering a key for the encryption, the encoded file-system will be created and mounted. The encoded files are stored, in this example, at ~/.encrypted, and their unencrypted versions in ~/origin.\n\nTo unmount the file-system, type:\n\n```\n$ fusermount -u ~/name\n```\n\nTo remount the file-system, issue the first command, and enter the key used to encode it. Once this has been entered, the file-system will be mounted again.\n\n"
+    },
+    {
+      "title": "Changing the password",
+      "level": 3,
+      "content": "To change the password of a directory encrypted by EncFS, the following command can be used:\n\n```\n$ encfsctl passwd ~/.name\n```\n\nIn this example, ~/.name is the path to the directory which contains the encoded files. The tool will ask for your current password and afterwards, you will be able to set a new one.\n\n"
+    },
+    {
+      "title": "Gnome Encfs Manager",
+      "level": 3,
+      "content": "The Gnome Encfs Manager is an easy to use manager and mounter for encfs stashes featuring per-stash configuration, Gnome Keyring support, a tray menu inspired by Cryptkeeper but using the AppIndicator API and lots of unique features.\n\nBoth gnome-encfs-manager-binAUR and a slightly more up to date gnome-encfs-manager-bzrAUR are available.\n\n"
+    },
+    {
+      "title": "Mount using encfsui",
+      "level": 3,
+      "content": "A bash script encfsui provides a simple zenity gui around the EncFS command line utility to mount and unmount an encrypted directory. It includes a desktop launcher. Install it from encfsuiAUR.\n\n"
+    },
+    {
+      "title": "Mount via fstab",
+      "level": 3,
+      "content": "Adding an entry in /etc/fstab will allow you to mount the encfs volume with a simple mount /target/path and you will be prompted for your password.\n\n```\n/etc/fstab\n```\n\n```\nencfs#/path/to/encfs/data  /mnt/decrypted  fuse  noauto,user  0  0\n```\n\nThe noauto option prevents an attempt to mount the volume at boot, which could delay the boot process while it waits for a password to be entered. user can be omitted if only the root user should be able to mount the volume.\n\n"
+    },
+    {
+      "title": "Mount at login using pam_encfs",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nInstall pam_encfsAUR. See also:\n\n- https://web.archive.org/web/20160505055352/http://pam-encfs.googlecode.com/svn/trunk/README\n- https://web.archive.org/web/20160428084352/http://pam-encfs.googlecode.com/svn/trunk/pam_encfs.conf\n- https://wiki.edubuntu.org/EncryptedHomeFolder\n- https://code.google.com/archive/p/pam-encfs/\n\n"
+    },
+    {
+      "title": "Single password",
+      "level": 4,
+      "content": "Note: **secure password** \n\n"
+    },
+    {
+      "title": "/etc/pam.d/",
+      "level": 4,
+      "content": "Note that when you are using try_first_pass parameter to pam_unix.so then you will have to set EncFS to use same password as you are using to login (or vice-versa) and you will be entering just single password. Without this parameter you will need to enter two passwords.\n\nPut encfs line to /etc/pam.d/system-login as follows:\n\n```\n...\nauth       sufficient pam_encfs.so\n...\n```\n\nThis section tells how to make encfs automount when you are logging in by virtual terminal.\n\nEdit the file /etc/pam.d/login:\n\n```\n#%PAM-1.0\n\nauth\t\trequired\tpam_securetty.so\nauth\t\trequisite\tpam_nologin.so\nauth\t\tsufficient\tpam_encfs.so\nauth\t\trequired\tpam_unix.so nullok try_first_pass\n#auth\t\trequired\tpam_unix.so nullok\nauth\t\trequired\tpam_tally.so onerr=succeed file=/var/log/faillog\n# use this to lockout accounts for 10 minutes after 3 failed attempts\n#auth\t\trequired\tpam_tally.so deny=2 unlock_time=600 onerr=succeed file=/var/log/faillog\naccount\t\trequired\tpam_access.so\naccount\t\trequired\tpam_time.so\naccount\t\trequired\tpam_unix.so\n#password\trequired\tpam_cracklib.so difok=2 minlen=8 dcredit=2 ocredit=2 retry=3\n#password\trequired\tpam_unix.so md5 shadow use_authtok\nsession\t\trequired\tpam_unix.so\nsession\t\trequired\tpam_env.so\nsession\t\trequired\tpam_motd.so\nsession\t\trequired\tpam_limits.so\nsession\t\toptional\tpam_mail.so dir=/var/spool/mail standard\nsession\t\toptional\tpam_lastlog.so\nsession\t\toptional\tpam_loginuid.so\n-session\toptional\tpam_ck_connector.so nox11\n#Automatic unmount (optional):\n#session\trequired\tpam_encfs.so\n```\n\nThis section explains how to make encfs automount when you are logging in by GDM.\n\nEdit the file /etc/pam.d/gdm-password.\n\nInsert (do not overwrite) the following into the bottom of gdm-password:\n\n```\n#%PAM-1.0\nauth            requisite       pam_nologin.so\nauth            required        pam_env.so\nauth            sufficient      pam_encfs.so\nauth            required        pam_unix.so try_first_pass\nauth            optional        pam_gnome_keyring.so\naccount         required        pam_unix.so\nsession         required        pam_limits.so\nsession         required        pam_unix.so\nsession         optional        pam_gnome_keyring.so auto_start\npassword        required        pam_unix.so\nsession         required        pam_encfs.so\n```\n\nSave and exit.\n\nEdit /etc/security/pam_encfs.conf :\n\nRecommended: comment out the line\n\n```\nencfs_default --idle=1\n```\n\nThis flag will unmount your encrypted folder after 1 minute of inactivity. If you are automounting this on login, you probably would like to keep this mounted for as long as you are logged in.\n\nAt the bottom, comment any existing demo entries and add:\n\n```\n#USERNAME       SOURCE                                  TARGET PATH                 ENCFS Options           FUSE Options\narchie          /home/archie/EncryptedFolder          /home/archie/DecryptedFolder    -v                    allow_other\n```\n\nAlso, if you see the following line, remove allow_root from the options. Otherwise, it will be in conflict with allow_other defined above.\n\n```\nfuse_default allow_root,nonempty\n```\n\nNext, edit /etc/fuse.conf: Uncomment:\n\n```\nuser_allow_other\n```\n\nTo test your config, open a new virtual terminal (e.g. Ctrl+Alt+F4) and login. You should see pam successfuly mount your EncFS folder.\n\n"
+    },
+    {
+      "title": "Mount at login using pam_mount",
+      "level": 3,
+      "content": "Install and configure pam_mount as explained on its wiki page. EncFS mounts can be specified in pam_mount's configuration file as follows:\n\n```\n/etc/security/pam_mount.conf.xml\n```\n\n```\n<volume fstype=\"fuse\" path=\"encfs#/path/to/encfs/encrypted/data\" mountpoint=\"/path/to/decrypted/data/mountpoint\" options=\"nonempty\" />\n```\n\nThe EncFS mounts need to have the same password than your user account. The nonempty option makes it possible to mount the encrypted file system even when the mount point is non-empty. You may remove this option if this is not the desired behaviour.\n\nIt is possible to mount multiple EncFS folders at login specifying multiple consecutive <volume> entries in the configuration file.\n\n"
+    },
+    {
+      "title": "Backup encrypted directory",
+      "level": 3,
+      "content": "An encrypted directory may be backed up and restored to another location like it is. This is possible, because the configuration file for the encryption options/metadata is actually stored in the directory itself in plaintext in the hidden .encfs6.xml file. This poses no direct problem, because the password is not in it.\n\nHowever, if you - for example - store the backup on a remote location (e.g. in the cloud) or a portable device, you might feel uncomfortable about it. In this case it also is no problem to manually move the file out of the directory before creating the backup. You can even move it permanently and still mount and access the files, if you pass its location to encfs via the ENCFS6_CONFIG environment variable. For the #Usage example above:\n\n```\n$ mv ~/.name/.encfs6.xml ~/.\n$ ENCFS6_CONFIG=~/.encfs6.xml encfs ~/.name ~/name\n```\n\n"
+    },
+    {
+      "title": "Backup plaintext directory",
+      "level": 3,
+      "content": "The following example assumes you want to create an encrypted backup of an existing plaintext directory ~/mythesis which contains the file thesis.txt.\n\nFirst, we create the encrypted backup of the existing plaintext directory:\n\n```\n$ encfs --reverse ~/mythesis /tmp/thesisbackup\n```\n\nNote the directory order is reversed to normal usage in this case. Using the --reverse option has two effects: Firstly, the configuration file is now stored in the plaintext directory and /tmp/thesisbackup only contains it in encrypted form. Secondly, the files in /tmp/thesisbackup are not persistent. They will vanish once it is unmounted (no, this is not due to usage of the /tmp mountpoint).\n\nFor the second reason, now is the time to copy the encrypted files to the desired backup location, before unmounting the temporary encfs directory again:\n\n```\n$ cp -R /tmp/thesisbackup/* /mnt/usbstick/\n$ fusermount -u /tmp/thesisbackup\n```\n\nand done.\n\nTo restore (or view) the backup, we need access to the encryption options in plaintext, which has to be passed to encfs with the environment variable ENCFS6_CONFIG (we use a different directory in order not to mess up the existing ~/mythesis):\n\n```\n$ ENCFS6_CONFIG=~/mythesis/.encfs6.xml encfs ~/mnt/usbstick/thesisbackup ~/restoremythesis\n```\n\nIf you now list the restore location, it will contain two files:\n\n```\n$ ls -la ~/restoremythesis\n... \n-rw-r--r--  1 student student    1078  3. Jan 12:33 .encfs6.xml\n-rw-r--r--  1 student student      42  3. Jan 12:33 thesis.txt\n...\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- EncFS - project homepage\n- Security audit of EncFS by Taylor Hornby (January 14, 2014).\n- EncFS micro-how-to by Anthony Thyssen.\n\n"
+    }
+  ]
+}

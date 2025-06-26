@@ -1,0 +1,106 @@
+{
+  "title": "QEMU/Troubleshooting",
+  "url": "https://wiki.archlinux.org/title/QEMU/Troubleshooting",
+  "sections": [
+    {
+      "title": "Mouse cursor is jittery or erratic",
+      "level": 2,
+      "content": "If the cursor jumps around the screen uncontrollably, entering this on the terminal before starting QEMU might help:\n\n```\n$ export SDL_VIDEO_X11_DGAMOUSE=0\n```\n\nIf this helps, you can add this to your ~/.bashrc file.\n\n"
+    },
+    {
+      "title": "No visible Cursor",
+      "level": 2,
+      "content": "Add -display default,show-cursor=on to QEMU's options to see a mouse cursor.\n\nIf that still does not work, make sure you have set your display device appropriately, for example: -vga qxl.\n\nAnother option to try is -usb -device usb-tablet as mentioned in #Mouse integration. This overrides the default PS/2 mouse emulation and synchronizes pointer location between host and guest as an added bonus.\n\n"
+    },
+    {
+      "title": "Two different mouse cursors are visible",
+      "level": 2,
+      "content": "Apply the tip #Mouse integration.\n\n"
+    },
+    {
+      "title": "Keyboard issues when using VNC",
+      "level": 2,
+      "content": "When using VNC, you might experience keyboard problems described (in gory details) here. The solution is not to use the -k option on QEMU, and to use gvncviewer from gtk-vnc. See also this message posted on libvirt's mailing list.\n\n"
+    },
+    {
+      "title": "Keyboard seems broken or the arrow keys do not work",
+      "level": 2,
+      "content": "Should you find that some of your keys do not work or \"press\" the wrong key (in particular, the arrow keys), you likely need to specify your keyboard layout as an option. The keyboard layouts can be found in /usr/share/qemu/keymaps/.\n\n```\n$ qemu-system-x86_64 -k keymap disk_image\n```\n\n"
+    },
+    {
+      "title": "Could not read keymap file",
+      "level": 2,
+      "content": "```\nqemu-system-x86_64: -display vnc=0.0.0.0:0: could not read keymap file: 'en'\n```\n\nis caused by an invalid keymap passed to the -k argument. For example, en is invalid, but en-us is valid - see /usr/share/qemu/keymaps/.\n\n"
+    },
+    {
+      "title": "Guest display stretches on window resize",
+      "level": 2,
+      "content": "To restore default window size, press Ctrl+Alt+u.\n\n"
+    },
+    {
+      "title": "ioctl(KVM_CREATE_VM) failed: 16 Device or resource busy",
+      "level": 2,
+      "content": "If an error message like this is printed when starting QEMU with -enable-kvm option:\n\n```\nioctl(KVM_CREATE_VM) failed: 16 Device or resource busy\nfailed to initialize KVM: Device or resource busy\n```\n\nthat means another hypervisor is currently running. It is not recommended or possible to run several hypervisors in parallel.\n\n"
+    },
+    {
+      "title": "libgfapi error message",
+      "level": 2,
+      "content": "The error message displayed at startup:\n\n```\nFailed to open module: libgfapi.so.0: cannot open shared object file: No such file or directory\n```\n\nInstall glusterfs or ignore the error message as GlusterFS is a optional dependency.\n\n"
+    },
+    {
+      "title": "Kernel panic on LIVE-environments",
+      "level": 2,
+      "content": "If you start a live-environment (or better: booting a system) you may encounter this:\n\n```\n[ end Kernel panic - not syncing: VFS: Unable to mount root fs on unknown block(0,0)\n```\n\nor some other boot hindering process (e.g. cannot unpack initramfs, cant start service foo). Try starting the virtual machine with the -m VALUE switch and an appropriate amount of RAM, if the ram is to low you will probably encounter similar issues as above/without the memory-switch.\n\n"
+    },
+    {
+      "title": "Windows 7 guest suffers low-quality sound",
+      "level": 2,
+      "content": "Using the hda audio driver for Windows 7 guest may result in low-quality sound. Changing the audio driver to ac97 by passing the -soundhw ac97 arguments to QEMU and installing the AC97 driver from Realtek AC'97 Audio Codecs[dead link 2025-01-22 ⓘ] in the guest may solve the problem. See Red Hat Bugzilla – Bug 1176761 for more information.\n\n"
+    },
+    {
+      "title": "Could not access KVM kernel module: Permission denied",
+      "level": 2,
+      "content": "If you encounter the following error:\n\n```\nlibvirtError: internal error: process exited while connecting to monitor: Could not access KVM kernel module: Permission denied failed to initialize KVM: Permission denied\n```\n\nSystemd 234 assigns a dynamic ID for the kvm group (see FS#54943). To avoid this error, you need edit the file /etc/libvirt/qemu.conf and change the line with group = \"78\" to group = \"kvm\".\n\n"
+    },
+    {
+      "title": "\"System Thread Exception Not Handled\" when booting a Windows virtual machine",
+      "level": 2,
+      "content": "Windows 8 or Windows 10 guests may raise a generic compatibility exception at boot, namely \"System Thread Exception Not Handled\", which tends to be caused by legacy drivers acting strangely on real machines. On KVM machines this issue can generally be solved by setting the CPU model to core2duo.\n\n"
+    },
+    {
+      "title": "Certain Windows games/applications crashing/causing a bluescreen",
+      "level": 2,
+      "content": "Occasionally, applications running in the virtual machine may crash unexpectedly, whereas they would run normally on a physical machine. If, while running dmesg -wH as root, you encounter an error mentioning MSR, the reason for those crashes is that KVM injects a General protection fault (GPF) when the guest tries to access unsupported Model-specific registers (MSRs) - this often results in guest applications/OS crashing. A number of those issues can be solved by passing the ignore_msrs=1 option to the KVM module, which will ignore unimplemented MSRs.\n\n```\n/etc/modprobe.d/kvm.conf\n```\n\n```\n...\noptions kvm ignore_msrs=1\n...\n```\n\nCases where adding this option might help:\n\n- GeForce Experience complaining about an unsupported CPU being present.\n- StarCraft 2 and L.A. Noire reliably blue-screening Windows 10 with KMODE_EXCEPTION_NOT_HANDLED. The blue screen information does not identify a driver file in these cases.\n\n"
+    },
+    {
+      "title": "High interrupt latency and microstuttering",
+      "level": 2,
+      "content": "This problem manifests itself as small pauses (stutters) and is particularly noticeable in graphics-intensive applications, such as games.\n\n- One of the causes is CPU power saving features, which are controlled by CPU frequency scaling. Change this to performance for all processor cores.\n- Another possible cause is PS/2 inputs. Switch from PS/2 to Virtio inputs, see PCI passthrough via OVMF#Passing keyboard/mouse via Evdev.\n\n"
+    },
+    {
+      "title": "QXL video causes low resolution",
+      "level": 2,
+      "content": "QEMU 4.1.0 introduced a regression where QXL video can fall back to low resolutions, when being displayed through spice. [1] For example, when KMS starts, text resolution may become as low as 4x10 characters. When trying to increase GUI resolution, it may go to the lowest supported resolution.\n\nAs a workaround, create your device in this form:\n\n```\n-device qxl-vga,max_outputs=1...\n```\n\n"
+    },
+    {
+      "title": "Virtual machine not booting when using a Secure Boot enabled OVMF",
+      "level": 2,
+      "content": "OVMF_CODE.secboot.4m.fd and OVMF_CODE.secboot.fd files from edk2-ovmf are built with SMM support. If S3 support is not disabled in the virtual machine, then the virtual machine might not boot at all.\n\nAdd the -global ICH9-LPC.disable_s3=1 option to the qemu command.\n\nSee FS#59465 and https://github.com/tianocore/edk2/blob/master/OvmfPkg/README for more details and the required options to use Secure Boot in QEMU.\n\n"
+    },
+    {
+      "title": "Virtual machine not booting into Arch ISO",
+      "level": 2,
+      "content": "When trying to boot the virtual machine for the first time from an Arch ISO image, the boot process hangs. Adding console=ttyS0 to kernel boot options by pressing e in the boot menu you will get more boot messages and the following error:\n\n```\n:: Mounting '/dev/disk/by-label/ARCH_202204' to '/run/archiso/bootmnt'\nWaiting 30 seconds for device /dev/disk/by-label/ARCH_202204 ...\nERROR: '/dev/disk/by-label/ARCH_202204' device did not show up after 30 seconds...\n   Falling back to interactive prompt\n   You can try to fix the problem manually, log out when you are finished\nsh: can't access tty; job control turned off\n```\n\nThe error message does not give a good clue as to what the real issue is. The problem is with the default 128MB of RAM that QEMU allocates to the virtual machine. Increasing the limit to 1024MB with -m 1024 solves the issue and lets the system boot. You can continue installing Arch Linux as usual after that. Once the installation is complete, the memory allocation for the virtual machine can be decreased. The need for 1024MB is due to RAM disk requirements and size of the installation media. See this message on the arch-releng mailing list and this forum thread.\n\n"
+    },
+    {
+      "title": "Guest CPU interrupts are not firing",
+      "level": 2,
+      "content": "If you are writing your own operating system by following the OSDev wiki, or are simply getting stepping through the guest architecture assembly code using QEMU's gdb interface using the -s flag, it is useful to know that many emulators, QEMU included, usually implement some CPU interrupts leaving many hardware interrupts unimplemented. One way to know if your code is firing an interrupt, is by using:\n\n```\n-d int\n```\n\nto enable showing interrupts/exceptions on stdout.\n\nTo see what other guest debugging features QEMU has to offer, see:\n\n```\nqemu-system-x86_64 -d help\n```\n\nor replace x86_64 for your chosen guest architecture.\n\n"
+    },
+    {
+      "title": "KDE with sddm does not start spice-vdagent at login automatically",
+      "level": 2,
+      "content": "Remove or comment out X-GNOME-Autostart-Phase=WindowManager from /etc/xdg/autostart/spice-vdagent.desktop. [2]\n\n"
+    }
+  ]
+}

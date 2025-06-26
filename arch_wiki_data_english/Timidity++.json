@@ -1,0 +1,71 @@
+{
+  "title": "Timidity++",
+  "url": "https://wiki.archlinux.org/title/Timidity%2B%2B",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "TiMidity++ is a software synthesizer that can play MIDI files without a hardware synthesizer. It can either render to the sound card in real time, or it can save the result to a file, such as a PCM .wav file.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the timidity++ package.\n\nYou should also install a SoundFont or Gravis UltraSound (GUS) patch files to be able to produce sound. See MIDI#List of SoundFonts.\n\nIf you use pipewire, install pipewire-alsa since TiMidity++ sometimes depends on ALSA.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "To configure your preferred SoundFont, add the following lines to timidity.cfg(5) based on your choice.\n\nFor FreePats:\n\n```\n/etc/timidity/timidity.cfg\n```\n\n```\nsoundfont /usr/share/soundfonts/freepats-general-midi.sf2\n```\n\nFor Fluid:\n\n```\n/etc/timidity/timidity.cfg\n```\n\n```\nsoundfont /usr/share/soundfonts/FluidR3_GM.sf2\n```\n\n"
+    },
+    {
+      "title": "Daemon",
+      "level": 3,
+      "content": "If you intended to use TiMidity++ as an ALSA sequencer client, you should add yourself to the audio user group first. As with most group changes, you will typically need to restart your user session (e.g. log out and log in again), so that the new group is visible in the output of the groups command.\n\nStart/enable the timidity.service user unit. Note that starting the service may fail if you have changed your audio group membership but not yet restarted your session.\n\nIf you are using PulseAudio, that may also cause the service to fail. You may want to add the following command as an autostart program in your desktop environment. Or, if you just want to start TiMidity++ in daemon mode once, you can use the following command which will make console output viewable:\n\n```\n$ timidity -iA\n```\n\n"
+    },
+    {
+      "title": "Play files",
+      "level": 3,
+      "content": "There are two ways to use TiMidity++. Either as MIDI player or as daemon adding MIDI support to ALSA.\n\n"
+    },
+    {
+      "title": "Standalone mode",
+      "level": 4,
+      "content": "You can simply use TiMidity++ to play MIDI files:\n\n```\n$ timidity example.mid\n```\n\nAdd option -in for a text-based interface. There are many other options to TiMidity++. See timidity(1) or use -h to get help.\n\n"
+    },
+    {
+      "title": "Daemon mode",
+      "level": 4,
+      "content": "If you are runing TiMidity++ as a daemon (ALSA sequencer client), it will provide MIDI output support for other programs such as rosegarden, aplaymidi, vkeybd, etc.\n\nThis will give you four output software MIDI ports (in addition of hardware MIDI ports on your system, if any):\n\n```\n$  aconnect -o\n```\n\n```\nclient 128: 'TiMidity' [type=user]\n    0 'TiMidity port 0 '\n    1 'TiMidity port 1 '\n    2 'TiMidity port 2 '\n    3 'TiMidity port 3 '\n```\n\nYou can now play MIDI files using aplaymidi:\n\n```\n$ aplaymidi filename.mid --port 128:0\n```\n\nAnother example is vkeybd, a virtual MIDI keyboard for X.\n\nYou can install vkeybdAUR.\n\n```\n$ vkeybd --addr 128:0\n```\n\nOption --addr 128:0 connects the input (readable) software MIDI port provided by vkeybd to the first output (writable) ALSA port provided by Timidity. Alternatively you can use aconnect, patchageAUR or kaconnect. As a result when you play around with the keys on the vkeybd TiMidity++ plays the appropriate notes.\n\n"
+    },
+    {
+      "title": "Connect to virtual MIDI device",
+      "level": 4,
+      "content": "Once you have the TiMidity++ daemon running and it is working with aplaymidi, you can connect it to a virtual MIDI device that will work in programs such as rosegarden or scala.\n\nLoad the snd-virmidi kernel module and (optionally) configure your system to load the module at boot.\n\nUse aconnect to verify the port numbers:\n\n```\n$ aconnect -o\n```\n\n```\nclient 14: 'Midi Through' [type=kernel]\n     0 'Midi Through Port-0'\n client 20: 'Virtual Raw MIDI 1-0' [type=kernel]\n     0 'VirMIDI 1-0     '\n client 21: 'Virtual Raw MIDI 1-1' [type=kernel]\n     0 'VirMIDI 1-1     '\n client 22: 'Virtual Raw MIDI 1-2' [type=kernel]\n     0 'VirMIDI 1-2     '\n client 23: 'Virtual Raw MIDI 1-3' [type=kernel]\n     0 'VirMIDI 1-3     '\n client 128: 'TiMidity' [type=user]\n     0 'TiMidity port 0 '\n     1 'TiMidity port 1 '\n     2 'TiMidity port 2 '\n     3 'TiMidity port 3 '\n```\n\nNow create the connection:\n\n```\n$ aconnect 20:0 128:0\n```\n\nYou should now have a working MIDI output device on your system (/dev/snd/midiC1D0).\n\n"
+    },
+    {
+      "title": "Convert files",
+      "level": 3,
+      "content": "TiMidity++ can also convert MIDI files into other formats. The following command saves the resulting sound to a WAV file:\n\n```\n$ timidity input.mid -Ow -o out.wav\n```\n\nTo convert to another formats, you can use FFmpeg. This will convert it to mp3:\n\n```\n$ timidity input.mid -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 256k out.mp3\n```\n\n"
+    },
+    {
+      "title": "How to make DOSBox use TiMidity++",
+      "level": 3,
+      "content": "First of all, you need to write a configuration file. Input the following in DOSBox to create a configuration file:\n\n```\nconfig -writeconf dosbox.conf\n```\n\nyou can replace dosbox.conf by any name that you want, add a dot in front of it if you want to hide it.\n\nMake sure you started TiMidity++ as daemon as the instructions above, use the aconnect command.\n\nEdit this configuration file with any editor, go to the section:\n\n```\ndosbox.conf\n```\n\n```\n[midi]\nmpu401=intelligent\ndevice=default\nconfig=\n```\n\nput the ALSA connection port into the back of config=, in default:\n\n```\nconfig=128:0\n```\n\nRestart DOSBox within a terminal so you can see its debug messages, by no accident you should see a successful initiation on port 128:0.\n\n"
+    },
+    {
+      "title": "TiMidity++ does not play MIDI files",
+      "level": 3,
+      "content": "It may be that your SoundFile is not set up correctly. Just run:\n\n```\n$ timidity example.mid\n```\n\nIf you find a line like this in the terminal output, your SoundFile is not set up properly.\n\n```\nNo instrument mapped to tone bank 0, program XX - \\\nthis instrument will not be heard\n```\n\nMake sure you have installed some samples and your SoundFile is added to /etc/timidity/timidity.cfg. See Configuration for more details.\n\n"
+    },
+    {
+      "title": "Daemon mode plays sound out of pace",
+      "level": 3,
+      "content": "TiMidity++'s ALSA output module (default) may cause this issue in ALSA server mode. Try another output option, for example, libao:\n\n```\n$ timidity -iA -OO\n```\n\nAnd test it using aplaymidi. If this does not work, you may want to configure JACK and set TiMidity++'s output to jack.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- USB MIDI keyboards\n\n"
+    }
+  ]
+}

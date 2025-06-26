@@ -1,0 +1,86 @@
+{
+  "title": "Lean Theorem Prover",
+  "url": "https://wiki.archlinux.org/title/Lean_Theorem_Prover",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "The Lean theorem prover is a proof assistant developed principally by Leonardo de Moura at Microsoft Research. The Lean mathematical library, mathlib, is a community-driven effort to build a unified library of mathematics formalized in the Lean proof assistant.\n\n"
+    },
+    {
+      "title": "Lean 4 using elan",
+      "level": 3,
+      "content": "elan is a tool to manage installs of the lean theorem prover. It facilitates maintaining several concurrent versions of lean. In addition, as lean 4 is under heavy development, using it often requires installing nightly builds, which is made easy using elan. elan installs lean in subdirectories of $HOME/.elan/toolchains, and does not require root access.\n\nInstall the elan-leanAUR package.\n\nTo install the latest stable version of lean 4, use\n\n```\n$ elan toolchain install leanprover/lean4:stable\n```\n\nHowever, many applications (including using mathlib4) require development versions of lean4. For instance, the build of lean that mathlib4 is using can be found in the file [1]. To install the desired build, run\n\n```\n$ elan toolchain install leanprover/lean4:build\n```\n\nwhere build should be replaced with the desired build.\n\nThe installed versions of lean can be listed with\n\n```\n$ elan show\n```\n\nand a default can be selected with\n\n```\n$ elan default build\n```\n\nWhen using lean 4, the default build can be overridden for a given project by cd-ing to the project directory and creating a file\n\n```\nlean-toolchain\n```\n\n```\nbuild\n```\n\nReplace build with the appropriate build identifier.\n\nTo get the path to an executable in the current lean build, use\n\n```\n$ elan which name_of_executable\n```\n\n"
+    },
+    {
+      "title": "Lean 3 via the AUR",
+      "level": 3,
+      "content": "Install lean-community-binAUR or lean-communityAUR.\n\nTo install mathlib, you must first install python-mathlibtoolsAUR, which will install 'leanproject'.\n\nTo install mathlib, you must create a lean project:\n\n```\n$ cd /path/to/project\n$ leanproject new name_of_project\n```\n\nwhich will download mathlib to /path/to/project/name_of_project/_target/deps/mathlib.\n\n"
+    },
+    {
+      "title": "Project Management",
+      "level": 2,
+      "content": "In this section, we will describe how to create and contribute to Lean 4 projects, including mathlib4.\n\n"
+    },
+    {
+      "title": "Structure of a project",
+      "level": 3,
+      "content": "A Lean 4 project will contain several files that are used to manage the project.\n\n- lakefile.lean: contains information on how to build the project, as well as a list of dependencies.\n- lean-toolchain: a single-line file specifying the build to be used for the project.\n- lake-manifest.json: an automatically generated file that contains information on the specific version of each of the installed dependencies. If you have a lake-manifest.json file, running lake update will download the versions of the dependencies specified in lake-manifest.json. This is useful to avoid incompatible dependency versions.\n- .lake (or, in earlier versions of lean 4, lake-packages): this is where dependencies are installed.\n- build: directory where built lean files are stored.\n- Lean files, containing the lean code.\n\n"
+    },
+    {
+      "title": "Creating a project",
+      "level": 3,
+      "content": "To create a project, install elan and a lean build, as described in the Lean 4 using elan section above.\n\nNext, run\n\n```\n$ lake new path/to/project\n```\n\nThis will create a default lakefile.lean and lean-toolchain file.\n\nThis will not download mathlib, which you may want to do. Mathlib is the official math library of the Lean project, and contains a lot of definitions, lemmas and theorems that you may need for your project. If you want to add mathlib to your project, you must add it as a dependency in the lakefile. See below for details.\n\n"
+    },
+    {
+      "title": "Managing a project",
+      "level": 3,
+      "content": "If you are working with an existing project, for instance one you have downloaded from the internet (e.g. github), you do not need to install lean separately, as long as you have elan installed, see the Lean 4 using elan section above. As long as the appropriate lean-toolchain file is present in the project, you can simply run\n\n```\n$ lake update\n```\n\nwhich will download the required version of Lean, as well as all the dependencies for the project.\n\nDependencies can be added by editing the lakefile.lean file. For example, to add mathlib as a dependency, add the line\n\n```\nlakefile.lean\n```\n\n```\nrequire mathlib from git \"https://github.com/leanprover-community/mathlib4.git\"\n```\n\nto lakefile.lean. Next run\n\n```\n$ lake update\n```\n\nto download mathlib, and\n\n```\n$ lake exe cache get\n```\n\nto download the pre-compiled library (see section Caches and oleans below).\n\n"
+    },
+    {
+      "title": "Contributing to Mathlib",
+      "level": 3,
+      "content": "If you wish to participate in the ongoing effort to formalize much of mathematics, you may want to make contributions to Mathlib, which is the official math library of the Lean project.\n\nTo do so, you will first need to download mathlib:\n\n```\n$ git clone https://github.com/leanprover-community/mathlib4.git\n```\n\nand cd to the downloaded directly and run\n\n```\n$ lake update\n$ lake exe cache get\n```\n\nIf you wish to submit your work, you will need to get a branch on the mathlib Git server, and submit a pull request. To get a branch, contact the community on the leanprover Zulip chat, introduce yourself and your project, and ask for a branch.\n\n"
+    },
+    {
+      "title": "Automatically generating documentation",
+      "level": 3,
+      "content": "It is possible to automatically generate documentation, in the same style as the mathlib documentation. This is done using the doc-gen4 package. To install it, add it to your lakefile.lean:\n\n```\nlakefile.lean\n```\n\n```\nmeta if get_config? env = some \"dev\" then require «doc-gen4» from git \"https://github.com/leanprover/doc-gen4\"@\"main\"\n```\n\n(the \"dev\" part of the code ensures that the doc can only be built when running lake with -Kenv=dev, as below, so as to avoid generating the doc when merely trying to build the package) and download it:\n\n```\n$ lake -Kenv=dev update\n```\n\nThe documentation can be generated using\n\n```\n$ lake -Kenv=dev build NameOfProject:docs\n```\n\nwhere NameOfProject should be replaced by the name of your project. This will generate the documentation and place it in the build/doc directory. You can then navigate through the documentation by opening build/doc/index.html in a browser.\n\nThe documentation also includes a search function. To search for a term in the documentation, use\n\n```\nfile:///path/to/doc/find/index.html?pattern='search_term'#doc\n```\n\n"
+    },
+    {
+      "title": "Install lean-mode",
+      "level": 4,
+      "content": "To use lean with emacs, you must install the lean-mode package. To install it from the MELPA repository, add:\n\n```\n.emacs\n```\n\n```\n(require 'package)\n(add-to-list 'package-archives\n  '(\"melpa\" . \"https://melpa.org/packages/\"))\n(package-initialize)\n(package-refresh-contents)\n```\n\nto your Emacs configuration file open emacs, and type\n\n```\nM-x package-install RET\nlean-mode RET\n```\n\nOpening a file in emacs with the .lean extension will now automatically be opened in Lean mode.\n\n"
+    },
+    {
+      "title": "Keybindings",
+      "level": 4,
+      "content": "A list of keybindings is available at https://github.com/leanprover/lean-mode.\n\n"
+    },
+    {
+      "title": "Automatic unicode input",
+      "level": 4,
+      "content": "Lean uses unicode symbols as part of its language. lean-mode can handle this input easily by translating standard text to unicode characters, for instance, typing \\R will resolve to the unicode character ℝ. To do this, the Lean input method needs to be selected. This can be done automatically by adding the following to your Emacs configuration file:\n\n```\n.emacs\n```\n\n```\n(add-hook 'lean-mode-hook\n  (lambda () (set-input-method \"Lean\")))\n```\n\n"
+    },
+    {
+      "title": "Viewing goal in separate buffer",
+      "level": 4,
+      "content": "Keeping track of the \"goal\" is very useful when writing proofs in Lean. The goal can be seen directly in emacs using the C-c C-b keybinding, which will open a new buffer in which the goal is shown. This buffer can also be opened automatically when editing a .lean file by adding:\n\n```\n.emacs\n```\n\n```\n(add-hook 'lean-mode-hook 'lean-toggle-show-goal)\n```\n\nto your Emacs configuration file.\n\n"
+    },
+    {
+      "title": "Install lean.nvim",
+      "level": 4,
+      "content": "To use lean with Neovim, you must install the lean.nvim plugin. This can be done easily using vim-plug byadding the following to your Neovim Configuration file:\n\n```\ninit.vim\n```\n\n```\ncall plug#begin()\n\n...\n\nPlug 'Julian/lean.nvim'\nPlug 'neovim/nvim-lspconfig'\nPlug 'nvim-lua/plenary.nvim'\n\n...\n\ncall plug#end()\n```\n\nopen nvim, and type\n\n```\n:PlugInstall\n```\n\nIf you are using lean 3, you will also need to install lean-language-serverAUR. (The language server is built into lean 4, so it is not necessary for lean 4 installs).\n\nNext, create a configuration file at $XDG_CONFIG_HOME/nvim/plugin/lean.lua:\n\n```\n$XDG_CONFIG_HOME/nvim/plugin/lean.lua\n```\n\n```\nrequire('lean').setup{\n abbreviations = { builtin = true },\n mappings = true,\n}\n```\n\nabbreviatons enables abbreviating unicode characters, and mappings enables a number of useful keybindings, see https://github.com/Julian/lean.nvim/ for a full list. More configuration options are available at https://github.com/Julian/lean.nvim/.\n\n"
+    },
+    {
+      "title": "Caches and oleans",
+      "level": 3,
+      "content": "In order to use the theorems and lemmas in mathlib, mathlib needs to be built (i.e. compiled). This is a long process. To avoid this, the mathlib community provides a repository of pre-compiled mathlib files (also called \"oleans\"). To download them using lean 4, use\n\n```\n$ lake exe cache get\n```\n\nand using lean 3, use\n\n```\n$ leanproject get-cache\n```\n\nWhen using lean 4, a simple way of ensuring that the project always uses the same version as mathlib is to link the mathlib lean-toolchain file to the project directory:\n\n```\n$ ln -sf lake-packages/mathlib/lean-toolchain ./\n$ lake update\n```\n\n"
+    },
+    {
+      "title": "Lean documentation",
+      "level": 2,
+      "content": "A good resource to learn theorem proving in lean 4 is [2]. Of particular note, a succinct \"cheatsheet\" for useful commands for theorem proving in lean 4 is available from [3].\n\nThe documentation for mathlib in lean 4 is available at [4].\n\nSince the documentation is still rather sparse, it is often more productive to address questions to the lean community directly. The most popular forum for this is the leanprover Zulip chat.\n\n"
+    }
+  ]
+}

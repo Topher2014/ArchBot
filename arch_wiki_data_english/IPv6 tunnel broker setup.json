@@ -1,0 +1,46 @@
+{
+  "title": "IPv6 tunnel broker setup",
+  "url": "https://wiki.archlinux.org/title/IPv6_tunnel_broker_setup",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article introduces a method for obtaining an IPv6 address using 6in4, also known as SIT.\n\nThe following sections will use the tunnel service provided by Hurricane Electric as a setup example. Hurricane Electric offers a free tunnel broker service to add IPv6 connectivity to an IPv4-only host. Read the \"Tunnel Broker\" section of their FAQ for a list of prerequisites.\n\n"
+    },
+    {
+      "title": "Registering for a tunnel",
+      "level": 2,
+      "content": "Registering for a tunnel on its website.\n\n"
+    },
+    {
+      "title": "Setting up Hurricane Electric tunnel",
+      "level": 2,
+      "content": "There is some ways you can achieve this, such as using the ip command to test the tunnel manually, a custom systemd unit, or using a Network Manager like #systemd-networkd.\n\n"
+    },
+    {
+      "title": "Custom systemd unit",
+      "level": 3,
+      "content": "Create the following systemd unit, replacing bold text with the IP addresses you got from Hurricane Electric:\n\n```\n/etc/systemd/system/he-ipv6.service\n```\n\n```\n[Unit]\nDescription=he.net IPv6 tunnel\nAfter=network.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/ip tunnel add he-ipv6 mode sit remote server_IPv4_address local client_IPv4_address ttl 255\nExecStart=/usr/bin/ip link set he-ipv6 up mtu 1480\nExecStart=/usr/bin/ip addr add client_IPv6_address dev he-ipv6\nExecStart=/usr/bin/ip -6 route add ::/0 dev he-ipv6\nExecStop=/usr/bin/ip -6 route del ::/0 dev he-ipv6\nExecStop=/usr/bin/ip link set he-ipv6 down\nExecStop=/usr/bin/ip tunnel del he-ipv6\n\n[Install]\nWantedBy=multi-user.target\n```\n\nThen start/enable he-ipv6.service.\n\n"
+    },
+    {
+      "title": "systemd-networkd",
+      "level": 3,
+      "content": "If systemd-networkd handles your network connections, it is probably a better idea to let it handle tunnel broker too (instead of using a .service file).\n\n```\n/etc/systemd/network/he-tunnel.netdev\n```\n\n```\n[Match]\n \n[NetDev]\nName=he-ipv6\nKind=sit\nMTUBytes=1480\n \n[Tunnel]\n# IPv6 Tunnel Endpoints|Server IPv4 Address\nRemote=216.66.80.30\n# Local IPv4 | NAT-Address\nLocal=192.168.0.2\nTTL=255\n```\n\n```\n/etc/systemd/network/he-tunnel.network\n```\n\n```\n[Match]\nName=he-ipv6\n \n[Network]\n# IPv6 Tunnel Endpoints|Client IPv6 Address>/64\nAddress=2001:470:NNNN:NNNN::2/64\n# IPv6 Tunnel Endpoints|Server IPv6 Address\nGateway=2001:470:NNNN:NNNN::1\nDNS=2001:4860:4860::8888\nDNS=2001:4860:4860::8844\n\n[Route]\n# IPv6 Tunnel Endpoints|Server IPv6 Address\nGateway=2001:470:NNNN:NNNN::1\nDestination=::/0\n\n[RoutingPolicyRule]\n# IPv6 Tunnel Endpoints|Client IPv6 Address>/64\nFrom=2001:470:NNNN:NNNN::2/64\n\n[RoutingPolicyRule]\n# Routed IPv6 Prefixes|Routed 64>/64 - OR - Routed IPv6 Prefixes|Routed 48>/48\nFrom=2001:470:NNNN::/48\n```\n\nReplace all NNNN to your own address.\n\nAnd, add this line to [Network] section of your default Internet connection .network file:\n\n```\n/etc/systemd/network/DEVICE.network\n```\n\n```\nTunnel=he-ipv6\n```\n\n"
+    },
+    {
+      "title": "Updating via cron job",
+      "level": 3,
+      "content": "The simplest way of using tunnelling with a dynamic IPv4 IP is to set up a cron job that is going to periodically update your current address. The example URL and an Update Key can be found in the Advanced tab of the Tunnel Details page.\n\nTo check if the update works, run the following command (replace USERNAME, UPDATEKEY and TUNNELID by the details of your account and tunnel):\n\n```\n$ wget -O - https://USERNAME:UPDATEKEY@ipv4.tunnelbroker.net/nic/update?hostname=TUNNELID\n```\n\nIf it works, create a cron job by opening crontab -e and adding a new line:\n\n```\n*/10 * * * * wget -q -O /dev/null https://USERNAME:UPDATEKEY@ipv4.tunnelbroker.net/nic/update?hostname=TUNNELID\n```\n\n"
+    },
+    {
+      "title": "Updating via ddclient",
+      "level": 3,
+      "content": "Alternatively this can be configured by installing ddclient and configuring /etc/ddclient.conf:\n\n```\nprotocol=dyndns2\nuse=web\nweb=checkip.dns.he.net\nserver=ipv4.tunnelbroker.net\nssl=yes\nlogin=USERNAME\npassword=UPDATEKEY\nTUNNELID\n```\n\nAnd finally start/enable ddclient.service.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wikipedia:6in4\n\n"
+    }
+  ]
+}

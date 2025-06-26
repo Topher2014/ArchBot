@@ -1,0 +1,56 @@
+{
+  "title": "Openfire",
+  "url": "https://wiki.archlinux.org/title/Openfire",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Prosody\n\nFrom Wikipedia:\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The instructions assume being executed on a remote Arch Linux server, since that will be the regular use-case.\n\nInstall the openfire package.\n\n"
+    },
+    {
+      "title": "Create database",
+      "level": 3,
+      "content": "Openfire can create its own flat file database (which is a list of mysql commands, executed and kept in RAM), that should be considered as an alternative because the java program does not support unix sockets out of the box. Check if TCP/IP is disabled:\n\n```\n$ grep -n skip-networking /etc/mysql/my.cnf\n```\n\n```\n50:skip-networking\n```\n\n( comment out the option / use bind-address = 127.0.0.1 instead to allow loopback TCP/IP or alternatively #Add unix socket support )\n\nA working MySQL server needs to be installed to create an external database for Openfire like this:\n\n```\nmysql\n```\n\n```\n> CREATE DATABASE openfire_db;\n> CREATE USER 'openfire_usr'@'localhost';\n> GRANT ALL PRIVILEGES ON openfire_db.* TO 'openfire_usr'@'localhost' IDENTIFIED BY 'password';\n> quit;\n```\n\n"
+    },
+    {
+      "title": "Starting the server",
+      "level": 3,
+      "content": "The Openfire admin interface will listen on port 9090 and 9091 of your server by default. Adding <inteface>127.0.0.1</inteface>\" can probably (untested) be used to temporarily secure the server if the ports are not properly firewalled.\n\n```\n/etc/openfire/openfire.xml\n```\n\n```\n<adminConsole>\n        <!-- Disable either port by setting the value to -1 -->\n        <port>9090</port>\n        <securePort>9091</securePort>\n        <inteface>127.0.0.1</inteface>\n    </adminConsole>\n```\n\nstart openfire.service on the remote server. Test if the admin interface is accessible locally with curl:\n\n```\n$ curl -v 127.0.0.1:9090 && echo Yay, it works!\n```\n\n"
+    },
+    {
+      "title": "Remote server firewall rules",
+      "level": 3,
+      "content": "A list of ports can be found on the index page of the administration interface or with netstat -tulpen | grep java. Assuming no enabled components need UDP (like jingle media proxy?) and you do not want the admin web interface exposed to the world, the following iptables rules should suffice to make Openfire work:\n\n```\n$ openfire_ports=(5222:5223 7070 7443 5269 5275:5276 5262:5263 7777 5229);\n$ for port in $openfire_ports; do \n    echo iptables -A INPUT -p tcp --dport $port -j ACCEPT; done;\n```\n\n```\niptables -A INPUT -p tcp --dport 5222:5223 -j ACCEPT\niptables -A INPUT -p tcp --dport 7070 -j ACCEPT\niptables -A INPUT -p tcp --dport 7443 -j ACCEPT\niptables -A INPUT -p tcp --dport 5269 -j ACCEPT\niptables -A INPUT -p tcp --dport 5275:5276 -j ACCEPT\niptables -A INPUT -p tcp --dport 5262:5263 -j ACCEPT\niptables -A INPUT -p tcp --dport 7777 -j ACCEPT\niptables -A INPUT -p tcp --dport 5229 -j ACCEPT\n```\n\n"
+    },
+    {
+      "title": "First remote connect",
+      "level": 3,
+      "content": "The server should not be accessible from the client yet:\n\n```\n$ curl -v example.com:9090 && echo Oh no, it works!\n```\n\nStart an ssh tunnel from your PC to your server:\n\n```\n$ ssh -L -N 9090:localhost:9090 yourserver.example.com -p22\n```\n\nNow connecting to the remote web interface should work - use a web-browser to access 127.0.0.1:9090, which should start setup and guide through the process.\n\nDatabase for setup:\n\n```\njdbc:mysql://localhost:3306/openfire_db?rewriteBatchedStatements=true\n```\n\n( use and the username / password as created earlier )\n\nAfter the setup is complete, log in with the user name admin (just \"admin\". Not as the previous web form suggests \"the email address for admin\").\n\n"
+    },
+    {
+      "title": "Default settings of special interest",
+      "level": 3,
+      "content": "Openfire is configured \"ready to go\" by default. Before the server is exposed to the world, the following settings should be checked to make sure this is really what the instance is supposed to do / allow.\n\n- Server > Server Settings > Registration & Login: New users accounts can automatically be created by everyone through applications that support it Anonymous login without accounts is allowed\n- Server > Server Settings > Offline Messages: Each user can store up to 100kb of data\n- Server > Server Settings > File Transfer Settings: Openfire acts as a file transfer proxy\n\n- New users accounts can automatically be created by everyone through applications that support it\n- Anonymous login without accounts is allowed\n\n- Each user can store up to 100kb of data\n\n- Openfire acts as a file transfer proxy\n\n"
+    },
+    {
+      "title": "Add unix socket support",
+      "level": 3,
+      "content": "Connecting to database via unix socket with a java application requires a jdbc driver with an implementation of socketFactory. [MariaDB] Connector/J supports auth over socket since version 1.4. and can be install via mariadb-jdbcAUR, which also requires jnaAUR (Java Native Access) to work with unix sockets. Install both.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n```\n/etc/systemd/system/openfire.service.d/override.conf\n```\n\n```\n[Service]\n#override ExecStart\nExecStart=\n# added the 2 AUR packages to class path\nExecStart=/usr/bin/java -server -DopenfireHome=/usr/share/openfire -Dopenfire.lib.dir=/usr/lib/openfire -cp \"/usr/lib/openfire/startup.jar:/usr/share/java/mariadb-jdbc/mariadb-java-client.jar:/usr/share/java/jna.jar\" -jar /usr/lib/openfire/startup.jar\n```\n\nInstead this works for now (but is kind of ugly):\n\n```\n# ln /usr/share/java/mariadb-jdbc/mariadb-java-client.jar /usr/lib/openfire/\n# ln /usr/share/java/jna.jar /usr/lib/openfire/\n```\n\nIf openfire setup was already completed using a TCP/IP connection to the same database, switch to the new driver by changing the xml configuration:\n\n```\n/etc/openfire/openfire.xml\n```\n\n```\n<driver>org.mariadb.jdbc.Driver</driver>  \n      <serverURL>jdbc:mariadb://localhost:3306/openfire_db?localSocket=/run/mysqld/mysqld.sock&writeBatchedStatements=true</serverURL>\n```\n\nWhen using the setup interface instead, choose \"MySQK\" and enter the values of driver and serverURL into the \"JDBC Driver Class\" and \"Database URL\" fields of the web form respectively.\n\nRestart the openfire.service - it can be necessary to start the setup interface again (#Configuration (from PC)) afterwards.\n\n"
+    },
+    {
+      "title": "Using multiple domains",
+      "level": 3,
+      "content": "Openfire does not support multiple domains / vhosts like prosody does, but it works with an LDAP-server that provides authentication for multiple domains.\n\nUsers from different domains can then login and communicate normally, but this is messy; side-effects may include but are not limited to:\n\n- unlisted users\n- need to create users manually\n- users from other domains showing up as members of default domain\n- users from other domains conflicting with same name users from other domains\n- SSL certificate errors (separate certificates for different domains not possible)\n\n"
+    },
+    {
+      "title": "Test installation on local PC",
+      "level": 3,
+      "content": "For a large local LAN make sure the PC that is supposed to run the Openfire server is safe / behind a firewall - as soon as it is started, the admin interfaces becomes available to anyone who has access to port 9090 and 9091.\n\nFor a local server on a PC, the integrated Database of Openfire will suffice under most circumstances. If an unusual amount of traffic is expected and the PC lacks RAM, a MySQL database can be used instead (See #Create database).\n\nInstall openfire and start the openfire.service.\n\nOpen 127.0.0.1:9090 in a web browser to complete the setup process, then log in as admin and review the settings.\n\n"
+    }
+  ]
+}

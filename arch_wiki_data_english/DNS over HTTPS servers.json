@@ -1,0 +1,96 @@
+{
+  "title": "DNS over HTTPS servers",
+  "url": "https://wiki.archlinux.org/title/DNS_over_HTTPS_servers",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- DNS over HTTPS\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nDNS, since its inception, has been unencrypted on UDP/53, and later TCP/53, making it susceptible to snooping attacks. For additional information on the available protocols that can be used to address this vulnerability, see Domain name resolution#Privacy and security. This article covers two of the three available protocols for DNS servers with the necessary proxy configuration to provide both DNS over HTTPS (DoH) and DNS over TLS (DoT). Multiple DoH utilities are available in the AUR including corednsAUR, dns-over-https, doh-proxyAUR, and python-doh-proxyAUR. Which of the available solutions is appropriate, depends on the needs of your network.\n\ncorednsAUR provides both a caching, non-authoritative DNS server, and DoH services (citation needed).\n\ndns-over-https, doh-proxyAUR, and python-doh-proxyAUR all provide an HTTP listener for proxying behind your existing HTTPS server, and a stub resolver to forward regular queries on UDP/53 to a secure DNS server. Additionally, both doh-proxyAUR and python-doh-proxyAUR provide a standalone HTTPS/2 server.\n\n"
+    },
+    {
+      "title": "coreDNS",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with CoreDNS#Configuration.** This article or section is a candidate for merging with CoreDNS#Configuration.\n\nThis article or section is a candidate for merging with CoreDNS#Configuration.\n\nInstall the corednsAUR package.\n\nYou can use coreDNS as DoH/DoT/gRPC DNS server and/or DoT proxy. Default configuration file should be located at /etc/coredns/Corefile.\n\nThe example of simple configuration file looks like this:\n\n```\n/etc/coredns/Corefile\n```\n\n```\nprotocol://domain:port {\n    forward domain forward_to\n    tls_servername domain_of_dot_server\n    tls cert_path key_path\n}\n```\n\nFirst string is listener, you can use next protocols: dns:// for plain DNS protocol, http:// for DNS over HTTPS, tls:// for DNS over TLS and grpc:// for gRPC (see [1]). If you leave protocol empty (e.g. example.com:53), dns:// will be choose as default. The domain is for matching queried domains, you can use specific one (e.g. dns: //example.com: 53) or use . (e.g. dns: //.: 53) to match all domains. And by :port you can set listening port, you can leave it empty and will be chosen 53 port.\n\nforward string is for where DNS query will be forward. Use . for domain to match all domains. In forward_to set upstream DNS server where to send queries, you can specify tls:// protocol for DoT server. If you using upstream DoT server, you need to set tls_servername for TLS negotiation.\n\ntls string mandatory if you use DoH, DoT or gRPC protocols. Put here certificate and private key paths in given order.\n\nExample of configuration simple DoT proxy listening 53 port and using Cloudflare DoT server\n\n```\n/etc/coredns/Corefile\n```\n\n```\n. {\n    forward . tls://1.1.1.1 {\n        tls_servername cloudflare-dns.com \n    }\n}\n```\n\nAlso, you can use several instances and forward plugins:\n\n```\n/etc/coredns/Corefile\n```\n\n```\nhttps://.:443 {\n    forward . 127.0.0.1 {\n    forward example1.com 8.8.8.8\n    tls cert.pem key.pem\n}\n\ntls://example2.com:853 {\n    tls cert.pem key.pem\n    forward . tls://9.9.9.9 {\n        tls_servername dns.quad9.net\n    }\n}\n```\n\nStart/enable the coredns.service unit.\n\n"
+    },
+    {
+      "title": "dns-over-https",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with DNS-over-HTTPS.** This article or section is a candidate for merging with DNS-over-HTTPS.\n\nThis article or section is a candidate for merging with DNS-over-HTTPS.\n\nAt first, install dns-over-https and after setting will not forget to enable and start needed service.\n\n"
+    },
+    {
+      "title": "Stub resolver",
+      "level": 4,
+      "content": "You can start using it right after install with default settings. Defaults ports for listening is 53 and 5380, if one of them is already binded, it will be ignored. Start/enable doh-client.service.\n\nConfiguration file locate at /etc/dns-over-https/doh-client.conf. You can change desired ports at section listen. There are many included third-parted DoH servers in configuration file, you need just uncomment one you needed or write unspecified. You can use several resolvers as well. One of them will be chosen randomly for each request. To force dns-over-https use resolvers in the required order set upstream_selector to weighted_round_robin or lvs_weighted_round_robin and change weight value at resolvers in use.\n\n"
+    },
+    {
+      "title": "DoH proxy",
+      "level": 4,
+      "content": "Configuration file for use as doh server locate at /etc/dns-over-https/doh-server.conf. At upstream section can set desired upstream resolver and its protocol for use. You can use dns-over-https as standalone service or together with HTTPS services like nginx or apache.\n\nFor standalone use you need to set port to 443 and specify proper cert and key:\n\n```\n/etc/dns-over-https/doh-server.conf\n```\n\n```\nlisten = [\n    \"127.0.0.1:443\",\n]\n...\ncert = \"\"\nkey = \"\"\n```\n\nIf you want use HTTP server for caching or using along with other HTTPS services leave empty cert and key strings in doh-server.conf and use next examples for configuration desired HTTP server. Note that there using default dns-over-https port.\n\nnginx:\n\n```\n/etc/nginx/nginx/site-available/doh\n```\n\n```\nserver {\n  listen       443 ssl http2 default_server;\n  listen       [::]:443 ssl http2 default_server;\n  server_name  MY_SERVER_NAME;\n\n  ssl_certificate /path/to/your/server/certificates/fullchain.pem;\n  ssl_certificate_key /path/to/your/server/certificates/privkey.pem;\n  location /dns-query {\n    proxy_pass       http://localhost:8053/dns-query; \n    proxy_set_header Host      $host;\n    proxy_set_header X-Real-IP $remote_addr;\n  }\n}\n```\n\ncaddy:\n\n```\n/etc/caddy/Caddyfile\n```\n\n```\nMY_SERVER_NAME {\n        reverse_proxy * localhost:8053\n        tls my@email.address\n        try_files {path} {path}/index.php /index.php?{query}\n}\n```\n\napache:\n\n```\n/etc/httpd/conf/vhosts/doh.conf\n```\n\n```\n<VirtualHost *:443>\n    ServerName MY_SERVER_NAME\n    Protocols h2 http/1.1\n    ProxyPass /dns-query http://[::1]:8053/dns-query\n    ProxyPassReverse /dns-query http://[::1]:8053/dns-query\n</VirtualHost>\n```\n\nAfter setting up, start/enable doh-server.service.\n\n"
+    },
+    {
+      "title": "doh-proxy",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "python-doh-proxy",
+      "level": 3,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nInstall python-doh-proxyAUR.\n\n"
+    },
+    {
+      "title": "Stub resolver",
+      "level": 4,
+      "content": "If you intend to provide encrypted queries to your local network for legacy applications, configure the stub resolver:\n\n```\n/etc/conf.d/doh-stub\n```\n\n```\nLISTENPORT=54\nADDR=127.0.0.1\nDOMAIN=mydomain.tld\nNS=127.0.0.1\nPORT=443\n```\n\nIf you do not have a way to provide a secure forward DNS lookoup to your real DNS server, you should configure both DOMAIN and NS to use one of the upstream providers (CloudFlare, OpenDNS, etc., instead of localhost). If you only need to provide lookups to localhost, this is fine. If you need to provide them for the entire network, the you could listen on 53 directly if you do not have a local caching or authoritative DNS server - you would also want to use the real IP address instead of the loopback adapter in this case.\n\n"
+    },
+    {
+      "title": "DoH proxy",
+      "level": 4,
+      "content": "If you have an existing HTTP server and wish to proxy DNS lookups with it, setup the HTTP proxy to listen on port 8080:\n\n```\n/etc/conf.d/doh-httpproxy\n```\n\n```\nNS=127.0.0.1\nPORT=8080\nADDR=127.0.0.1\n```\n\nOptionally, you can utilize either the doh-proxy service or an upstream DoH provider to forward queries.\n\n"
+    },
+    {
+      "title": "DoH proxy",
+      "level": 4,
+      "content": "If you do not have an existing http server, you can configure the HTTPS/2 lisener:\n\n```\n/etc/conf.d/doh-proxy\n```\n\n```\nNS=127.0.0.1\nUPSTREAMPORT=54\nADDR=127.0.0.1\nLISTENPORT=443\nCERT=/etc/ssl/private/fullchain.pem\nKEY=/etc/ssl/private/privkey.pem\n```\n\nAgain, adjust as necessary, but be certain that the upstream server has a way to perform secure queries, or you will be creating a loop.\n\n"
+    },
+    {
+      "title": "BIND",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with BIND#Configuration.** This article or section is a candidate for merging with BIND#Configuration.\n\nThis article or section is a candidate for merging with BIND#Configuration.\n\nBIND 9.18 natively supports serving both DNS over HTTPS and DNS over TLS. See BIND#Configuration for details.\n\n"
+    },
+    {
+      "title": "As resolver, with TLS proxy",
+      "level": 4,
+      "content": "Typical: If using ISC bind as the current DNS provider, and you will be providing both forwarding services for legacy clients and DoH to modern clients, you will likely want to configure named to forward all non-local queries to your stub resolver, comment out any forwarding lines an forward to the stub resolver (omit forward only if you would like to fall back to roots):\n\n```\n/etc/named.conf\n```\n\n```\noptions {\n...\n    //forwarders { 8.8.8.8; 8.8.4.4; };\n    forwarders { 127.0.0.1 port 54; };\n    forward only;\n...\n};\n...\n```\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf you want to forward to an external TLS proxy (via stunnel), do the same but use only TCP/54 (see stunnel configuration below):\n\n```\n/etc/named.conf\n```\n\n```\noptions {\n...\n    //forwarders { 8.8.8.8; 8.8.4.4; };\n    forwarders { 127.0.0.1 port 54; };\n    forward only;\n...\n};\n...\nserver 127.0.0.1 {\n    tcp-only yes;\n};\n...\n```\n\nOptional: If using ISC bind as the current DNS provider, and you will be providing both forwarding services for legacy clients and DoH to modern clients, you might want to configure named to listen on an alternate port, for example TCP|UDP/54, rather than the default of 53 so that your stub resolver will listen on the standard port. Comment out any existing 'listen' lines and add the following (omit the v6 line if not needed):\n\n```\n/etc/named.conf\n```\n\n```\n...\n    //listen-on { any; };\n    listen-on port 54 { any; };\n    listen-on-v6 port 54 { any; };\n...\n```\n\n"
+    },
+    {
+      "title": "Unbound",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Unbound#Configuration.** This article or section is a candidate for merging with Unbound#Configuration.\n\nThis article or section is a candidate for merging with Unbound#Configuration.\n\nYou can easily set up DoT server by adding to your configuration file port 853 to listening and specify certificate and key paths:\n\n```\n/etc/unbound/unbound.conf\n```\n\n```\nserver:\n...\ninterface: 127.0.0.1@853\ntls-service-pem: /etc/unbound/public.pem\ntls-service-key: /etc/unbound/private.pem\n...\n```\n\nDoH server setup is same as DoT, but needed port is 443:\n\n```\n/etc/unbound/unbound.conf\n```\n\n```\nserver:\n...\ninterface: 127.0.0.1@443\ntls-service-pem: /etc/unbound/public.pem\ntls-service-key: /etc/unbound/private.pem\n...\n```\n\n"
+    },
+    {
+      "title": "Apache httpd proxy configuration",
+      "level": 3,
+      "content": "Configure a proxy in your primary httpd.conf or appropriate vhost listening on 443:\n\n```\n/etc/httpd/conf/vhosts/yourhost.conf\n```\n\n```\n...\n    ProxyPass /dns-query http://[127.0.0.1]:8080/dns-query\n    ProxyPassReverse /dns-query http://[127.0.0.1]:8080/dns-query\n...\n```\n\n"
+    },
+    {
+      "title": "DoT Proxy",
+      "level": 4,
+      "content": "With Nginx stream module you can setup proxy to upstream DNS. Note that you can use local dns as well as third parties.\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\n...\nstream {\n    upstream dns {\n        zone dns 64k;\n        server 8.8.8.8:53;\n    }\n    \n    server {\n        listen 853 ssl;\n        ssl_certificate /etc/nginx/ssl/certs/public.pem;\n        ssl_certificate_key /etc/nginx/ssl/private/private.pem;\n        proxy_pass dns;\n    }\n}\n...\n```\n\n"
+    },
+    {
+      "title": "DoH Proxy",
+      "level": 4,
+      "content": "For DoH implementation you need for use additional NJS scripts. You need to get it from this GitHub's page, put it to /etc/nginx/njs.d/ and be sure package nginx-mod-njs is installed.\n\nAt first you need to setup stream service, which will be get DNS request from nginx's HTTP/2 service, process it with js_filter to find DNS packets and pass it to upstream DNS server.\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\n...\nstream {\n    upstream dns {\n        zone dns 64k;\n        server 1.1.1.1:53;\n        \n    server {\n        listen 127.0.0.1:8053;\n        js_filter doh_filter_request;\n        proxy_ssl on;\n        proxy_pass dns;\n        }\n}\n...\n```\n\nThen, setup HTTP/2 service to listen DNS requests at URI /dns-query and relay them to stream service. Note that to a need change certificates to valid\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\n...\nupstream dohloop {\n   zone dohloop 64k;\n   server 127.0.0.1:8053;\n}\n\nserver {\n    listen 443 ssl http2;\n    ssl_certificate /etc/nginx/ssl/certs/public.pem;\n    ssl_certificate_key /etc/nginx/ssl/private/private.pem;\n\n    location /dns-query {\n        proxy_http_version 1.0;\n        proxy_pass http://dohloop;\n   }\n}\n...\n```\n\nYou can use both DoT and DoH services at same time, caching and multiple upstream DNS. For more examples see these configuration files\n\n"
+    },
+    {
+      "title": "DNS over TLS configuration via stunnel",
+      "level": 2,
+      "content": "Note: **This article or section is a candidate for merging with stunnel#DNS over TLS.** This article or section is a candidate for merging with stunnel#DNS over TLS.\n\nThis article or section is a candidate for merging with stunnel#DNS over TLS.\n\nConfigure stunnel to listen on TCP/853 for TLS connections, and forward to your local DNS provider:\n\n```\n/etc/stunnel/conf.d/DoT.conf\n```\n\n```\n[dns]\naccept = 853\nconnect = 127.0.0.1:53\ncert = /etc/ssl/private/fullchain.pem\nkey = /etc/ssl/private/privkey.pem\n```\n\nConfigure stunnel to listen on TCP/54 and forward to an upstream secure provider:\n\n```\n/etc/stunnel/conf.d/DoT-Remote.conf\n```\n\n```\n[dnsovertls]\nclient = yes\naccept = 54\nconnect = 10.10.10.1:853\nverifyChain = yes\nCAPath = /etc/ssl/certs\ncheckHost = <your_host_name>\n```\n\n"
+    },
+    {
+      "title": "DNS over HTTPS server Docker images",
+      "level": 2,
+      "content": "See https://hub.docker.com/r/satishweb/doh-server.\n\n"
+    }
+  ]
+}

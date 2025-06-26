@@ -1,0 +1,96 @@
+{
+  "title": "WirePlumber",
+  "url": "https://wiki.archlinux.org/title/WirePlumber",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- PipeWire\n\nWirePlumber is a powerful session and policy manager for PipeWire. Based on a modular design, with Lua plugins that implement the actual management functionality, it is highly configurable and extendable.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the wireplumber package. Any conflicting PipeWire Session Managers will be uninstalled.\n\nWirePlumber uses systemd user units to manage the server.\n\n"
+    },
+    {
+      "title": "Configuration file layout",
+      "level": 3,
+      "content": "WirePlumber's configuration comprises global PipeWire-flavored JSON objects such as context and alsa_monitor that are modified to change its behavior. The configuration files are read from ~/.config/wireplumber/ (user configuration), /etc/wireplumber/ (global configuration), and then /usr/share/wireplumber/ (stock configuration).\n\nWirePlumber starts by reading the main configuration file. This is a JSON-like file that sets up the PipeWire context, SPA plugins, modules, and components.\n\nThe single-instance configuration file at /usr/share/wireplumber/wireplumber.conf is the default configuration, which includes the functionality of all the other configurations within one process. See the documentation for the ALSA objects, \"access\" objects and Bluetooth objects.\n\n"
+    },
+    {
+      "title": "Modifying the configuration",
+      "level": 3,
+      "content": "The recommended way to configure WirePlumber is to add an SPA-JSON file to the appropriate wireplumber.conf.d/ directory within /etc/wireplumber/ or ~/.config/wireplumber/. Some things to consider are:\n\n- If there is an existing config you want to override, copy it from /usr/share/wireplumber/ to the destination while keeping its name the same. Configuration files with the same name but in a lower priority location will be ignored. [1]\n- Otherwise, if you are adding a new config, you should start it with a number bigger than 50 (e.g. 51-my-config.conf), as the default configuration is mostly done at or below 50 in the alphanumeric ordering.\n\n"
+    },
+    {
+      "title": "Obtain interface name for rules matching",
+      "level": 3,
+      "content": "In the configuration, you need to specify matches rules with a property from an object of the interface you want to configure.\n\nUse the command wpctl status to show all objects managed by WirePlumber. Find the ID assigned to the target interface. Then use command wpctl inspect ID to get a needed property.\n\nExample, if you target interface is HD Audio Controller Analog Stereo and consider following output:\n\n```\n$ wpctl status\n```\n\n```\nPipeWire 'pipewire-0' [0.3.56, user@hostname, cookie:1163266174]\n\nAudio\n ├─ Devices:\n │      42. HD Audio Controller                 [alsa]\n │     105. USB PnP Audio Device                [alsa]\n │\n ├─ Sinks:\n │  *   48. HD Audio Controller Analog Stereo   [vol: 0.50]\n │\n ├─ ...\n │\n ├─ Sources:\n │  *  101. USB PnP Audio Device Mono           [vol: 0.74]\n │\n └─ ...\n```\n\nthe interface ID is 48.\n\nThen use inspect command to view object detail, listed all properties in that object:\n\n```\n$ wpctl inspect 48\n```\n\n```\nid 48, type PipeWire:Interface:Node\n    ...\n    device.api = \"alsa\"\n    device.class = \"sound\"\n  * device.id = \"42\"\n    device.profile.description = \"Analog Stereo\"\n    device.profile.name = \"analog-stereo\"\n    ...\n  * factory.id = \"18\"\n    factory.mode = \"merge\"\n    factory.name = \"api.alsa.pcm.sink\"\n    ...\n  * media.class = \"Audio/Sink\"\n  * node.description = \"HD Audio Controller Analog Stereo\"\n  * node.name = \"alsa_output.pci-0000_08_00.4.analog-stereo\"\n  * node.nick = \"ALC1220 Analog\"\n    ...\n  * object.path = \"alsa:pcm:1:front:1:playback\"\n  * object.serial = \"49\"\n    ...\n```\n\nChoose device.name or node.name property to use with the matches rules in the configuration.\n\nAvoid using device.id, it is dynamic and changes often.\n\nMultiple properties in matches rules is possible, see the alsa_monitor.rules section in the documentation for the WirePlumber ALSA configuration.\n\n- You can determine the Endpoint class of this object from the media.class property.\n- For ALSA, node objects are Sinks or Sources / device objects correspond to the card.\n- Since v0.4.9, ALSA nodes use the PCM name to populate node.nick, which is useful at least on HDA cards using UCM, where all outputs (analog, HDMI, etc.) are exposed as Node on a single profile.\n\n- The command pw-top shows the PipeWire Device and Node currently in use.\n- Similar inspection command from PipeWire is pw-cli info ID.\n\n"
+    },
+    {
+      "title": "Changing a device/node property",
+      "level": 3,
+      "content": "To change a device or node property, such as its description or nick, you must create an SPA-JSON file and add it into /etc/wireplumber/ or ~/.config/wireplumber/ under the proper path and name.\n\nFor instance, to change the description of an ALSA node, you would create a file such as:\n\n```\n/etc/wireplumber/wireplumber.conf.d/51-device-rename.conf (or ~/.config/wireplumber/wireplumber.conf.d/51-device-rename.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        node.name = \"alsa_output.pci-0000_00_1f.3.output_analog-stereo\"\n      }\n    ]\n    actions = {\n      update-props = {\n        node.description = \"Laptop\"\n      }\n    }\n  }\n]\n```\n\nIf instead you wish to change something on a Bluetooth node or device, you could create a file such as:\n\n```\n/etc/wireplumber/wireplumber.conf.d/52-bluez-rename.conf (or ~/.config/wireplumber/wireplumber.conf.d/52-bluez-rename.conf)\n```\n\n```\nmonitor.bluez.rules = [\n  {\n    matches = [\n      {\n        node.name = \"bluez_output.02_11_45_A0_B3_27.a2dp-sink\"\n      }\n    ]\n    actions = {\n      update-props = {\n        node.nick = \"Headphones\"\n      }\n    }\n  }\n]\n```\n\nThe properties that you can change as well as the matching rules to select devices or nodes are documented at ALSA configuration and Bluetooth configuration.\n\n"
+    },
+    {
+      "title": "Disable a device/node",
+      "level": 3,
+      "content": "Since WirePlumber v0.4.7, users could now disable any devices or nodes by property device.disabled or node.disabled:\n\n```\n/etc/wireplumber/wireplumber.conf.d/51-alsa-disable.conf (or ~/.config/wireplumber/wireplumber.conf.d/51-alsa-disable.conf)\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        device.name = \"alsa_card.pci-0000_08_00.4\"\n      }\n    ]\n    actions = {\n      update-props = {\n         device.disabled = true\n      }\n    }\n  }\n]\n```\n\nFor the name of alsa_card.* in your system, see #Obtain interface name for rules matching.\n\n"
+    },
+    {
+      "title": "Setting node priority",
+      "level": 3,
+      "content": "To change which sink or source is automatically selected, you need to set its priority.driver and priority.session values:\n\n```\n/etc/wireplumber/wireplumber.conf.d/52-set-priorities.conf\n```\n\n```\nmonitor.alsa.rules = [\n  {\n    matches = [\n      {\n        node.name = \"alsa_output.usb-Generic_USB_Audio-00.HiFi__Speaker__sink\"\n      }\n    ]\n    actions = {\n      update-props = {\n        priority.driver = 100\n        priority.session = 100\n      }\n    }\n  }\n]\n```\n\nThis example sets the priority of the speaker output sink of the on-board audio on the Asus B650E-F motherboard to 100, lowered from the original value of 1000. Consequently, the other output sinks, such as the S/PDIF output of the onboard audio device or the plugged in headphones, will be selected by default due to their higher priorities, instead of the analog speaker output.\n\n"
+    },
+    {
+      "title": "Simultaneous output to multiple sinks on the same sound card",
+      "level": 3,
+      "content": "See PipeWire#Simultaneous output to multiple sinks on the same sound card.\n\n"
+    },
+    {
+      "title": "Simultaneous output to transient devices",
+      "level": 3,
+      "content": "You may wish to output sound to onboard and external devices simultaneously - even when the external devices are not always plugged in. To accomplish this we create a virtual node that will always be present, regardless of what hardware is plugged in. We then link the transient hardware (in this example USB headphones) to the virtual node whenever they are plugged in.\n\nFirst create a script that will run during login (this is usually easiest done via your window manager's Startup function).\n\n```\n/usr/local/sbin/create-virtual-sink.sh\n```\n\n```\n#!/bin/bash\n\n# Create a new sink called Simultaneous Output\npw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name=\"Simultaneous Output\" node.description=\"Simultaneous Output\" media.class=Audio/Sink object.linger=true audio.position=[FL FR] }'\n\n# Connect the normal permanent sound card output to the new sink\npw-link \"Simultaneous Output:monitor_FL\" alsa_output.pci-0000_05_04.0.analog-stereo:playback_FL\npw-link \"Simultaneous Output:monitor_FR\" alsa_output.pci-0000_05_04.0.analog-stereo:playback_FR\n\n# Switch the default output to the new virtual sink\nwpctl set-default `wpctl status | grep \"\\. Simultaneous Output\" | egrep '^ │( )*[0-9]*' -o | cut -c6-55 | egrep -o '[0-9]*'`\n```\n\nIn the above example, initially the only output device is our 'normal' on-board soundcard (alsa_output.pci-0000_05_04.0.analog-stereo). You can find the designator for your card by running wpctl status and wpctl inspect.\n\nRun the following script when your USB headphones are inserted in order to link them to the virtual sink:\n\n```\nlink-virtual-sink-headphones.sh\n```\n\n```\n#!/bin/bash\n# link the virtual sync to your headphones should run when detected by UDEV\n\n# wait a second for the drivers to load\nsleep 1s\n\n# link the headphones to your virtual sink\nsudo -u user1 env XDG_RUNTIME_DIR=/run/user/1000 pw-link \"Simultaneous Output:monitor_FL\" alsa_output.usb-Kingston_HyperX_Cloud_Flight_S_000000000001-00.analog-stereo:playback_FL\nsudo -u user1 env XDG_RUNTIME_DIR=/run/user/1000 pw-link \"Simultaneous Output:monitor_FR\" alsa_output.usb-Kingston_HyperX_Cloud_Flight_S_000000000001-00.analog-stereo:playback_FR\n\n# finish and return the code for success\nexit 0\n```\n\nIdeally you would run this script automatically when your headphones are inserted. The instructions on the udev page describe how you would create a custom rule for that. (Although note that you cannot run this script directly - because udev will not load drivers until after any specified script has run. So you will have to have an intermediate script with some nohup trickery or something like that). You will also need to modify the above script so that the XDG_RUNTIME_DIR matches your user id number and user1 will need to be replaced with your username.\n\nYou can add any arbitrary number of devices to this virtual sink in the same manner.\n\nIf you are having trouble keeping track what devices are connected where, the qpwgraph tool is excellent for getting a visual representation of which devices are connected to each other.\n\n"
+    },
+    {
+      "title": "Delete corrupt settings",
+      "level": 3,
+      "content": "If the settings of WirePlumber are corrupted it is possible to delete all user settings:\n\n```\n$ systemctl --user stop wireplumber.service\n$ rm -r ~/.local/state/wireplumber # deletes settings\n$ systemctl --user start wireplumber.service\n```\n\n"
+    },
+    {
+      "title": "Keyboard volume control",
+      "level": 3,
+      "content": "See Keyboard shortcuts#Xorg to bind the following commands to your volume keys: XF86AudioRaiseVolume, XF86AudioLowerVolume, XF86AudioMute and XF86AudioMicMute.\n\nTo raise the volume, with a limit of 150%:\n\n```\n$ wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+\n```\n\nTo lower the volume:\n\n```\n$ wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-\n```\n\nTo mute/unmute the volume:\n\n```\n$ wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle\n```\n\nTo mute/unmute the microphone:\n\n```\n$ wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle\n```\n\n"
+    },
+    {
+      "title": "Show volume level",
+      "level": 3,
+      "content": "To get the volume level and mute status of the default sink:\n\n```\n$ wpctl get-volume @DEFAULT_AUDIO_SINK@\n```\n\n```\nVolume: 0.45\n```\n\n"
+    },
+    {
+      "title": "Disable Bluetooth profile auto-switching",
+      "level": 3,
+      "content": "See PipeWire#Automatic profile selection.\n\n"
+    },
+    {
+      "title": "Keep Bluetooth running after logout / Headless Bluetooth",
+      "level": 3,
+      "content": "Since 0.4.8 the requirement to support.logind has to be disabled for the bluez seat-monitoring.\n\n```\n~/.config/wireplumber/wireplumber.conf.d/80-disable-logind.conf\n```\n\n```\nwireplumber.profiles = {\n  main = {\n    monitor.bluez.seat-monitoring = disabled\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Disable audio stack integration",
+      "level": 3,
+      "content": "If you do not want PipeWire/Wireplumber to take over control of your audio devices because you are opting for a different audio solution (e.g. PulseAudio/JACK/ALSA) but still want it to be available for screen sharing/video purposes you can make use of the wireplumber@.service template unit to enable a different set of default profiles. Wireplumber ships with a profile configuration that enables only the video parts and disables audio integration (including Bluetooth audio) by enabling the video-only template user unit.\n\nDisable wireplumber.service user unit and enable wireplumber@video-only.service user unit.\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Since WirePlumber only exists to manage PipeWire sessions, WirePlumber-related fixes may be found in PipeWire#Troubleshooting.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Documentation — Official documentation\n- WirePlumber, the PipeWire session manager — Blog post by George Kiagiadakis (Collabora) from May 2020, detailing how WirePlumber works\n\n"
+    }
+  ]
+}

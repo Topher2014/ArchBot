@@ -1,0 +1,131 @@
+{
+  "title": "Kerberos",
+  "url": "https://wiki.archlinux.org/title/Kerberos",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Active Directory Integration\n- identity management\n\nKerberos is a network authentication system. See krb5 documentation.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the krb5 package on your clients and server.\n\nIt is highly recommended to use a time synchronization daemon to keep client/server clocks in sync.\n\nIf hostname resolution has not been configured, you can manually add your clients and server to the hosts(5) file of each machine. Note that the FQDN (myclient.example.com) must be the first hostname after the IP address in the hosts file.\n\n"
+    },
+    {
+      "title": "Domain creation",
+      "level": 3,
+      "content": "Edit /etc/krb5.conf to configure your domain:\n\n```\n/etc/krb5.conf\n```\n\n```\n[libdefaults]\n    default_realm = EXAMPLE.COM\n\n[realms]\n    EXAMPLE.COM = {\n        admin_server = $ADDRESS\n        # use \"kdc = ...\" if the kerberos SRV records aren't in DNS (see Advanced section)\n        kdc = $ADDRESS\n        # This breaks krb4 compatibility but increases security\n        default_principal_flags = +preauth\n    }\n\n[domain_realm]\n    example.com  = EXAMPLE.COM\n    .example.com = EXAMPLE.COM\n\n[logging]\n    kdc          = SYSLOG:NOTICE\n    admin_server = SYSLOG:NOTICE\n    default      = SYSLOG:NOTICE\n```\n\nWhere $ADDRESS is IP address or domain name, where kerberos lives, like 10.0.0.120 or kerberos.example.com.\n\nThis file's format is described in the MIT Kerberos documentation\n\nCreate the database:\n\n```\n# kdb5_util -r EXAMPLE.COM create -s\n```\n\n```\nLoading random data                                                             \nInitializing database '/var/lib/krb5kdc/principal' for realm 'EXAMPLE.COM',                  \nmaster key name 'K/M@EXAMPLE.COM'\nYou will be prompted for the database Master Password.                          \nIt is important that you NOT FORGET this password.                              \nEnter KDC database master key: ***\nRe-enter KDC database master key to verify: ***\n```\n\nFinally, start/enable krb5-kdc.service and krb5-kadmind.service.\n\n"
+    },
+    {
+      "title": "Add principals",
+      "level": 3,
+      "content": "Start the Kerberos administration tool, using local authentication\n\n```\n# kadmin.local\n```\n\n```\nAuthenticating as principal root/admin@EXAMPLE.COM with password.\nkadmin.local:\n```\n\nAdd a user principal to the Kerberos database:\n\n```\nkadmin.local: addprinc myuser@EXAMPLE.COM\n```\n\n```\nWARNING: no policy specified for myuser@EXAMPLE.COM; defaulting to no policy\nEnter password for principal \"myuser@EXAMPLE.COM\": ***\nRe-enter password for principal \"myuser@EXAMPLE.COM\": ***\nPrincipal \"myuser@EXAMPLE.COM\" created.\n```\n\nAdd the KDC principal to the Kerberos database:\n\n```\nkadmin.local: addprinc -randkey host/kerberos.example.com\n```\n\n```\nWARNING: no policy specified for host/kerberos.example.com@EXAMPLE.COM; defaulting to no policy\nPrincipal \"host/kerberos.example.com@EXAMPLE.COM\" created.\n```\n\nFinally, Add the KDC principal to the server's keytab:\n\n```\nkadmin.local: ktadd host/kerberos.example.com\n```\n\n```\nEntry for principal host/kerberos.example.com with kvno 2, encryption type aes256-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\nEntry for principal host/kerberos.example.com with kvno 2, encryption type aes128-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\n```\n\nQuit the Kerberos administration tool:\n\n```\nkadmin.local: quit\n```\n\nYou should now be able to get a Kerberos ticket:\n\n```\n$ kinit\n```\n\n```\nPassword for myuser@EXAMPLE.COM: ***\n```\n\n```\n$ klist\n```\n\n```\nTicket cache: FILE:/tmp/krb5cc_1000\nDefault principal: myuser@EXAMPLE.COM\n\nValid starting       Expires              Service principal\n08/30/2017 14:26:09  08/31/2017 14:26:09  krbtgt/EXAMPLE.COM@EXAMPLE.COM\n```\n\n"
+    },
+    {
+      "title": "Firewall",
+      "level": 3,
+      "content": "Add ALLOW rules to your firewall for any applicable ports/protocols:\n\n- 88, TCP and UDP for Kerberos v5\n- 749, TCP and UDP for kadmin if you plan to configure it\n- 750, TCP and UDP for Kerberos v4 if you need backwards compatibility\n\n"
+    },
+    {
+      "title": "DNS records",
+      "level": 3,
+      "content": "This is not necessary if you specify the kerberos and kadmin server in each machine's krb5.conf\n\n```\ndb.example.com\n```\n\n```\nkerberos.example.com.           A     1.2.3.4\n_kerberos.example.com.          TXT   \"EXAMPLE.COM\"\n_kerberos._udp.example.com.     SRV   0 0  88 kerberos.example.com.\n_kerberos-adm._udp.example.com. SRV   0 0 749 kerberos.example.com.\n```\n\nDo not forget reverse DNS.\n\n"
+    },
+    {
+      "title": "Client configuration",
+      "level": 2,
+      "content": "Edit the client's /etc/krb5.conf to match your server's configuration. You can copy this file from the server, or just set the required realm information.\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 3,
+      "content": "You should now be able to get a Kerberos ticket on the client:\n\n```\n$ kinit\n```\n\n```\nPassword for myuser@EXAMPLE.COM: ***\n```\n\n```\n$ klist\n```\n\n```\nTicket cache: FILE:/tmp/krb5cc_1000\nDefault principal: myuser@EXAMPLE.COM\n\nValid starting       Expires              Service principal\n08/30/2017 15:36:10  08/31/2017 15:36:10  krbtgt/EXAMPLE.COM@EXAMPLE.COM\n```\n\n"
+    },
+    {
+      "title": "Configuring kadmin",
+      "level": 2,
+      "content": "You will need /etc/krb5.conf configured on the kadmin client, and the server's firewall configured for kadmin.\n\n"
+    },
+    {
+      "title": "Configuring kadmin ACL",
+      "level": 3,
+      "content": "Create a principal for administration:\n\n```\nkadmin.local:  add_principal myuser/admin@EXAMPLE.COM\n```\n\n```\nWARNING: no policy specified for myuser/admin@EXAMPLE.COM; defaulting to no policy\nEnter password for principal \"myuser/admin@EXAMPLE.COM\": ***\nRe-enter password for principal \"myuser/admin@EXAMPLE.COM\": ***\nPrincipal \"myuser/admin@EXAMPLE.COM\" created.\n```\n\nAdd the user to the kadmin ACL file:\n\n```\n/var/lib/krb5kdc/kadm5.acl\n```\n\n```\nmyuser/admin@EXAMPLE.COM *\n```\n\nThis file's format is described in the MIT Kerberos documentation\n\nConfigure kdc.conf:\n\n```\n/var/lib/krb5kdc/kdc.conf\n```\n\n```\n[kdcdefaults]\n    kdc_ports = 750,88\n\n[realms]\n    EXAMPLE.COM = {\n        database_name = /var/lib/krb5kdc/principal\n        acl_file = /var/lib/krb5kdc/kadm5.acl\n        key_stash_file = /var/lib/krb5kdc/.k5.EXAMPLE.COM\n        kdc_ports = 750,88\n        max_life = 10h 0m 0s\n        max_renewable_life = 7d 0h 0m 0s\n    }\n```\n\nThis file's format is described in the MIT Kerberos documentation\n\nRestart krb5-kdc.service and krb5-kadmind.service.\n\nYou can now use kadmin as your own user, authenticating with kerberos:\n\n```\n$ kadmin\n```\n\n```\nAuthenticating as principal myuser/admin@EXAMPLE.COM with password.\nPassword for myuser/admin@EXAMPLE.COM: ***\nkadmin:\n```\n\n"
+    },
+    {
+      "title": "Service principals and keytabs",
+      "level": 2,
+      "content": "First, ensure you have configured krb5.conf on all involved machines.\n\nA kerberos principal has three components, formatted as `primary/instance@REALM`. For user principals, the primary is your username and the instance is omitted or is a role (eg. \"admin\"): `myuser@EXAMPLE.COM` or `myuser/admin@EXAMPLE.COM`. For hosts, the primary is \"host\" and the instance is the server FQDN: `host/myserver.example.com@EXAMPLE.COM`. For services, the primary is the service abbreviation and the instance is the FQDN: `nfs/myserver.example.com@EXAMPLE.COM`. The realm can often be omitted, the local computer's default realm is usually assumed.\n\n"
+    },
+    {
+      "title": "With remote kadmin",
+      "level": 3,
+      "content": "This is the easier method, but requires you to have configured kadmin.\n\nOpen kadmin as root (so we can write the keytab) on the client, authenticating with your admin principal:\n\n```\nclient# kadmin -p myuser/admin\n```\n\n```\nAuthenticating as principal myuser/admin with password.\nPassword for myuser/admin@EXAMPLE.COM:\nkadmin:\n```\n\nAdd a principal for any services you will be using, eg. \"host\" for SSH authentication or \"nfs\" for NFS:\n\n```\nkadmin: addprinc -randkey host/kbclient.example.com\n```\n\n```\nWARNING: no policy specified for host/kbclient.example.com@EXAMPLE.COM; defaulting to no policy\nPrincipal \"host/kbclient.example.com@EXAMPLE.COM\" created.\n```\n\nSave each key to the local keytab:\n\n```\nkadmin: ktadd host/kbclient.example.com\n```\n\n```\nEntry for principal host/kbclient.example.com with kvno 2, encryption type aes256-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\nEntry for principal host/kbclient.example.com with kvno 2, encryption type aes128-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\n```\n\n"
+    },
+    {
+      "title": "Without remote kadmin",
+      "level": 3,
+      "content": "Start kadmin on the Kerberos server, using either unix or kerberos authentication:\n\n```\n# kadmin.local\n```\n\n```\nAuthenticating as principal root/admin@EXAMPLE.COM with password.\nkadmin.local:\n```\n\nAdd a principal for any services you will be using, eg. \"host\" for SSH authentication or \"nfs\" for NFS:\n\n```\nkadmin.local: addprinc -randkey host/kbclient.example.com\n```\n\n```\nWARNING: no policy specified for host/kbclient.example.com@EXAMPLE.COM; defaulting to no policy\nPrincipal \"host/kbclient.example.com@EXAMPLE.COM\" created.\n```\n\nSave each key to a new keytab to be transferred to the client:\n\n```\nkadmin.local: ktadd -k kbclient.keytab host/kbclient.example.com\n```\n\n```\nEntry for principal host/kbclient.example.com with kvno 2, encryption type aes256-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\nEntry for principal host/kbclient.example.com with kvno 2, encryption type aes128-cts-hmac-sha1-96 added to keytab FILE:/etc/krb5.keytab.\n```\n\nFinally, copy kbclient.keytab from the server to the client using SCP or similar, then put it in place with correct permissions:\n\n```\n# install -b -o root -g root -m 600 kbclient.keytab /etc/krb5.keytab\n```\n\nFinally, delete kbclient.keytab from the server and client.\n\n"
+    },
+    {
+      "title": "Cross-Realm Trust",
+      "level": 2,
+      "content": "Set up a second server as shown above, then create the cross-realm principal on both KDCs. Cross-realm principals must be created with strong passwords, not -randkey, and the same password must be used on both KDCs. The principal must have the same key version number (kvno) in both KDCs.\n\nTo grant EXAMPLE.COM principals access to EXAMPLE.ORG resources, you would use the following principal:\n\n```\nkadmin# addprinc krbtgt/EXAMPLE.ORG@EXAMPLE.COM\n```\n\nThe [capaths] section of krb5.conf can be used to further control cross-realm trust relationships.\n\n"
+    },
+    {
+      "title": "SSH authentication",
+      "level": 2,
+      "content": "Use the instructions in Service principals and keytabs to create a principal for the \"host\" service for both client and server, then put the client's keys in the client's keytab and the server's keys in the server's keytab.\n\nModify your SSH server configuration to enable GSSAPI authentication:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n# GSSAPI Options\nGSSAPIAuthentication yes\nGSSAPICleanupCredentials yes\n```\n\nAnd modify your client configuration to send GSSAPI requests:\n\n```\n/etc/ssh/ssh_config\n```\n\n```\nHost *\n  GSSAPIAuthentication yes\n  GSSAPIDelegateCredentials yes\n```\n\nGet a ticket-granting ticket on the client before using ssh:\n\n```\n$ kinit myuser@EXAMPLE.COM\n```\n\n```\nPassword for myuser@EXAMPLE.COM: ***\n```\n\nPass the -v option to ssh to watch what's happening:\n\n```\n$ ssh sshserver.example.com -v\n```\n\n```\ndebug1: Authentications that can continue: publickey,gssapi-with-mic,password\ndebug1: Next authentication method: gssapi-with-mic\ndebug1: Delegating credentials\ndebug1: Delegating credentials\ndebug1: Authentication succeeded (gssapi-with-mic).\nAuthenticated to sshserver.example.com ([192.168.100.136]:22).\ndebug1: channel 0: new [client-session]\ndebug1: Requesting no-more-sessions@openssh.com\ndebug1: Entering interactive session.\ndebug1: pledge: network\ndebug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0\nLast login: Wed Aug 30 15:52:41 2017 from 192.168.100.1\n```\n\nAnd you should now see a host ticket on the client:\n\n```\nclient$ klist\n```\n\n```\nTicket cache: FILE:/tmp/krb5cc_1000\nDefault principal: myuser@EXAMPLE.COM\n\nValid starting       Expires              Service principal\n08/30/2017 15:37:40  08/31/2017 15:37:40  krbtgt/EXAMPLE.COM@EXAMPLE.COM\n08/30/2017 15:53:04  08/31/2017 15:37:40  host/sshserver.example.com@EXAMPLE.COM\n```\n\n"
+    },
+    {
+      "title": "Authorize other principals",
+      "level": 3,
+      "content": "To allow a different kerberos principal to authenticate to a user account, add the principal name to the target account's .k5login file. For example, to allow robert@EXAMPLE.COM to SSH to alice's account:\n\n```\n/home/alice/.k5login\n```\n\n```\nrobert@EXAMPLE.COM\n```\n\n"
+    },
+    {
+      "title": "NFS security",
+      "level": 2,
+      "content": "First, configure your NFS server. Also see NFS/Troubleshooting. Configuring a time synchronization daemon on both the clients and the server is strongly recommended. Clock drift will cause this to break, and the error message will not be helpful.\n\nUse the instructions in #Service principals and keytabs to create a principal for the \"nfs\" service for both client and server, then put the client's keys in the client's keytab and the server's keys in the server's keytab.\n\n"
+    },
+    {
+      "title": "NFS server",
+      "level": 3,
+      "content": "Add a Kerberos export option. If necessary, multiple options can be specified using a colon as a delimiter with the preferred setting first, e.g. sec=krb5p:krb5i.\n\n- sec=krb5p uses kerberos for authentication, integrity, and encryption.\n- sec=krb5i uses kerberos for authentication and integrity checking, but still transmits data unencrypted.\n- sec=krb5 uses kerberos for authentication only, and transmits the data unauthenticated and unencrypted.\n- sec=sys is the default and does not provide any cryptographic security.\n\n```\n/etc/exports\n```\n\n```\n/srv/export *(rw,async,no_subtree_check,no_root_squash,sec=krb5p)\n```\n\nAnd reload the exports:\n\n```\n# exportfs -arv\n```\n\n"
+    },
+    {
+      "title": "NFS client",
+      "level": 3,
+      "content": "Mount the exported directory:\n\n```\n# mount nfsserver:/srv/export /mnt/\n```\n\nYou can add -vv for verbose information, and may need -t nfs4 and -o sec=krb5p or your chosen security option.\n\nCheck that it worked with the mount command:\n\n```\nmount | grep nfs\n```\n\n```\nnfsserver:/srv/export on /mnt type nfs4 (rw,relatime,vers=4.1,rsize=131072,wsize=131072,namlen=255,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=krb5,clientaddr=192.168.100.139,local_lock=none,addr=192.168.100.136)\n```\n\n"
+    },
+    {
+      "title": "Browsers",
+      "level": 2,
+      "content": "Some browsers have support for Kerberos protocol but disable it by default. Here are the instructions how to enable it:\n\n"
+    },
+    {
+      "title": "Chromium",
+      "level": 3,
+      "content": "Chromium needs to be run with a command line parameter that specifies a list of sites where Kerberos authentication is allowed. The easiest way is to add persistent flag to the configuration file:\n\n```\n/etc/chromium/policies/managed/test_policy.json\n```\n\n```\n{\n  \"AuthServerAllowlist\": \"*.mycompany.com\",\n  \"DisableAuthNegotiateCnameLookup\": true\n}\n```\n\n"
+    },
+    {
+      "title": "Firefox",
+      "level": 3,
+      "content": "To configure Firefox with trusted sites visit about:config and set network.negotiate-auth.trusted-uris property to FOO.COM (Note: for Firefox there is no \"*.\"; for Chrome, there is).\n\n"
+    },
+    {
+      "title": "Cannot set GSSAPI authentication names",
+      "level": 3,
+      "content": "```\nCannot set GSSAPI authentication names, aborting\n```\n\nYour realm is missing either the kadmin/admin or kadmin/changepw principal.\n\nFor clients, invalid arguments/options may happen on first setup if rpc-gssd is not loaded. Loading it is usually acomplished by enabling and starting nfs-client.target, but after first setup this target will need a restart.\n\n"
+    },
+    {
+      "title": "SSH authentication fails while connecting to a server requiring GSSAPI with KeyExchange",
+      "level": 3,
+      "content": "If any of the following errors are encountered:\n\n```\n$ ssh -v -o GSSAPIDelegateCredentials=yes -o GSSAPIAuthentication=yes <user>@<IP address>\nUnable to negotiate with <IP address> port 22: no matching key exchange method found. Their offer: gss-group14-sha1-...\n```\n\n```\n$ ssh -v -o GSSAPIDelegateCredentials=yes -o GSSAPIKeyExchange=yes -o GSSAPIAuthentication=yes <user>@<IP address>\ncommand-line: line 0: Bad configuration option: gssapikeyexchange\n```\n\nit means that package openssh is not configured with GSSAPI patch for OpenSSH. You can install openssh-gssapiAUR or follow this example[dead link 2025-04-05 ⓘ].\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- RHEL7: Configure a Kerberos KDC\n- RHEL7: Configure a system to authenticate using Kerberos\n\n"
+    }
+  ]
+}

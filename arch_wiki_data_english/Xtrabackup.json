@@ -1,0 +1,46 @@
+{
+  "title": "Xtrabackup",
+  "url": "https://wiki.archlinux.org/title/Xtrabackup",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Percona XtraBackup is an high performance, low-profile and non-blocking open-source backup utility for InnoDB and XtraDB databases.\n\nCurrently is the only open-source tool that performs backups on MySQL servers that does not lock your database during it. Backups are online, and queries and transactions continue to run without interruption ('hot backups').\n\nIt can back up data from InnoDB, XtraDB, and MyISAM tables on MySQL 5.0 and 5.1 servers, and it has many advanced features like partial, remote, compressed and incremental backups, multi-threaded file copying for performance and Point-in-time recovery.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install xtrabackup.\n\n"
+    },
+    {
+      "title": "Usage Examples",
+      "level": 2,
+      "content": "XtraBackup is really a set of three tools:\n\nIn all of the below examples, the following is assumed:\n\n- You are backing up a server whose data is stored in /var/lib/mysql/, which is the standard location for Arch Linux\n- You are storing the backups in /data/backups/mysql\n- You have a my.cnf file in a standard location, such as /etc/my.cnf, with at least the following contents:\n\n```\n[mysqld]\ndatadir=/var/lib/mysql/\n[xtrabackup]\ntarget_dir=/data/backups/mysql/\n```\n\n"
+    },
+    {
+      "title": "xtrabackup",
+      "level": 3,
+      "content": "Making the backup copies the InnoDB data and log files to the destination and preparing the backup makes the data files consistent and ready to use.\n\n- Make a backup:\n\n```\n# xtrabackup --backup\n```\n\nPrepare the backup:\n\n```\n# xtrabackup --prepare\n```\n\nPrepare again, to create fresh InnoDB log files:\n\n```\n# xtrabackup --prepare\n```\n\nThe exit status of a successful xtrabackup is 0. In the second --prepare step, you should see InnoDB print messages similar to “Log file ./ib_logfile0 did not exist: new to be created”, followed by a line indicating the log file was created.\n\nYou might want to set the --use-memory option to something similar to the size of your buffer pool, if you are on a dedicated server that has enough free memory. The complete documentation of the tool is here.\n\n"
+    },
+    {
+      "title": "innobackupex",
+      "level": 3,
+      "content": "- Copying all your MySQL data from the specified directory in your my.cnf.\n\nIt will put the backup in a timestamped subdirectory of /data/backups/ by default (in this example, /data/backups/2010-03-13_02-42-44).\n\n```\n# innobackupex /data/backups\n```\n\n```\n# 100313 02:43:07  innobackupex: completed OK!\n```\n\n- If you take the backup from a replica (“slave”), then you might need to see the position relative to the primary (“master”) at the point of the backup:\n\n```\n# innobackupex --slave-info /data/backups\n```\n\nSee the full documentation of this tool here.\n\n"
+    },
+    {
+      "title": "tar4ibd",
+      "level": 3,
+      "content": "The tar4ibd binary is a specially patched version of tar that understands how to handle InnoDB/XtraDB data files correctly.\n\nThe syntax is the same as tar. The only consideration you must have is including the -i option if you are extracting a file with GNU tar. If not, only a part of your data will be extracted.\n\n"
+    },
+    {
+      "title": "Setting up a slave with Xtrabackup",
+      "level": 3,
+      "content": "Xtrabackup is also can be used to clone one slave to another, or just setup new slave from the master. And it is done in a non-blocking way (almost for MyISAM setups) for the cloned server.\n\nAssuming the previous scenario, first execute\n\n```\n# innobackupex --stream=tar /tmp/ --slave-info | ssh user@DESTSERVER \"tar xfi - -C /var/lib/mysql\"\n```\n\nWhen it finishes, on your destination server run\n\n```\n# innobackupex --apply-log --use-memory=2G  /var/lib/mysql\n```\n\nand you will have ready the database directory.\n\nCopy my.cnf from the original server and start mysqld on the new slave.\n\nLook at the content of the file xtrabackup_slave_info that will be created on the slave:\n\n```\n# cat /var/lib/mysql/xtrabackup_slave_info\nCHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000834', MASTER_LOG_POS=50743116\n```\n\nand execute that statement on a mysql console and start the slave:\n\n```\nmysql> CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000834', MASTER_LOG_POS=50743116;\nmysql> START SLAVE;\n```\n\nYou should check that everything went OK with:\n\n```\nmysql> SHOW SLAVE STATUS \\G\n...\nSlave_IO_Running: Yes\nSlave_SQL_Running: Yes\n...\nSeconds_Behind_Master: 1643\n...\n```\n\n```\nmysql> STOP SLAVE;\n```\n\n"
+    },
+    {
+      "title": "More Resources",
+      "level": 2,
+      "content": "- Percona's documentation of Xtrabackup\n- XtraBackup in Launchpad\n- Xtrabackup's Home page\n\n"
+    }
+  ]
+}

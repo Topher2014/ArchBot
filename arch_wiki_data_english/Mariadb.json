@@ -1,0 +1,171 @@
+{
+  "title": "Mariadb",
+  "url": "https://wiki.archlinux.org/title/Mariadb",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- phpMyAdmin\n- Adminer\n- JDBC and MySQL\n- Open Database Connectivity\n\nMariaDB is a reliable, high performance and full-featured database server which aims to be an 'always Free, backward compatible, drop-in' replacement of MySQL. Since 2013 MariaDB is Arch Linux's default implementation of MySQL.[1]\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "MariaDB is the default implementation of MySQL in Arch Linux, provided with the mariadb package.\n\n- If the database (in /var/lib/mysql) resides on a Btrfs file system, you should consider disabling Copy-on-Write for the directory before creating any database.\n- If the database resides on a ZFS file system, you should consult ZFS#Databases before creating any database.\n\nInstall mariadb, and run the following command before starting the mariadb.service:\n\n```\n# mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql\n```\n\nNow mariadb.service can be started and/or enabled.\n\nTo simplify administration, you might want to install a front-end.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "By default both root user and the user running the server can administer the database.\n\nTo administer the server, run mariadb as the user running the server:\n\n```\n[mysql]$ mariadb\n```\n\nOr as root:\n\n```\n# mariadb\n```\n\n"
+    },
+    {
+      "title": "Add user",
+      "level": 3,
+      "content": "Creating a new user takes two steps: create the user; grant privileges. In the below example, the user monty with some_pass as password is being created, then granted full permissions to the database mydb:\n\n```\n# mariadb -u root -p\n```\n\n```\nMariaDB> CREATE USER 'monty'@'localhost' IDENTIFIED BY 'some_pass';\nMariaDB> GRANT ALL PRIVILEGES ON mydb.* TO 'monty'@'localhost';\nMariaDB> quit\n```\n\n"
+    },
+    {
+      "title": "Configuration files",
+      "level": 3,
+      "content": "MariaDB configuration options are read from the following files in the given order (according to mysqld --help --verbose | head -10 output):\n\n```\n/etc/my.cnf /etc/my.cnf.d/ ~/.my.cnf\n```\n\nCreate a configuration file in /etc/my.cnf.d/ with a .cnf extension to ensure that upgrades preserve your configuration.\n\nDepending on the scope of the changes you want to make (system-wide, user-only...), use the corresponding file. See this entry of the Knowledge Base for more information.\n\n"
+    },
+    {
+      "title": "Enable auto-completion",
+      "level": 3,
+      "content": "The MariaDB client completion feature is disabled by default. To enable it system-wide edit /etc/my.cnf.d/client.cnf, and add auto-rehash under client-mariadb. Note that this must not be placed under mysqld. Completion will be enabled next time you run the MariaDB client.\n\n"
+    },
+    {
+      "title": "Using UTF8MB4",
+      "level": 3,
+      "content": "- The mariadb package already uses utf8mb4 as charset and utf8mb4_unicode_ci as collation. Users using the default (character) settings may want to skip this section.\n- UTF8MB4 is recommended over UTF-8 since it allows full Unicode support [2] [3].\n\nAppend the following values to the main configuration file located at /etc/my.cnf.d/my.cnf:\n\n```\n[client]\ndefault-character-set = utf8mb4\n\n[mariadb]\ncollation_server = utf8mb4_unicode_ci\ncharacter_set_server = utf8mb4\n\n[mariadb-client]\ndefault-character-set = utf8mb4\n```\n\nRestart mariadb.service to apply the changes. Changing the character set does not change existing table formats, only newly created tables, and the protocol interaction that fetches data.\n\nSee #Maintenance to optimize and check the database health.\n\n"
+    },
+    {
+      "title": "Using a tmpfs for tmpdir",
+      "level": 3,
+      "content": "The directory used by MariaDB for storing temporary files is named tmpdir. For example, it is used to perform disk based large sorts, as well as for internal and explicit temporary tables.\n\nCreate the directory with appropriate permissions:\n\n```\n# mkdir -pv /var/lib/mysqltmp\n# chown mysql:mysql /var/lib/mysqltmp\n```\n\nAdd the following tmpfs mount to your /etc/fstab file:\n\n```\ntmpfs   /var/lib/mysqltmp   tmpfs   rw,gid=mysql,uid=mysql,size=100M,mode=0750,noatime   0 0\n```\n\nAdd to your /etc/my.cnf.d/server.cnf file under the mysqld group:\n\n```\ntmpdir      = /var/lib/mysqltmp\n```\n\nStop mariadb.service, mount /var/lib/mysqltmp/ and start mariadb.service.\n\n"
+    },
+    {
+      "title": "Time zone tables",
+      "level": 3,
+      "content": "Although time zone tables are created during the installation, they are not automatically populated. They need to be populated if you are planning on using CONVERT_TZ() in SQL queries.\n\nTo populate the time zone tables with all the time zones:\n\n```\n$ mariadb-tzinfo-to-sql /usr/share/zoneinfo | mariadb -u root -p mysql\n```\n\nOptionally, you may populate the table with specific time zone files:\n\n```\n$ mariadb-tzinfo-to-sql timezone_file timezone_name | mariadb -u root -p mysql\n```\n\n"
+    },
+    {
+      "title": "Improve initial security",
+      "level": 3,
+      "content": "The mariadb-secure-installation command will interactively guide you through a number of recommended security measures, such as removing anonymous accounts and removing the test database:\n\n```\n# mariadb-secure-installation\n```\n\n"
+    },
+    {
+      "title": "Listen only on the loopback address",
+      "level": 3,
+      "content": "By default, MariaDB will listen on the 0.0.0.0 address, which includes all network interfaces. In order to restrict MariaDB to listen only to the loopback address, add the following line in /etc/my.cnf.d/server.cnf:\n\n```\n[mariadb]\nbind-address = localhost\n```\n\nThis will bind to both 127.0.0.1 and ::1, and enable MariaDB to receive connections both in IPv4 and IPv6.\n\n"
+    },
+    {
+      "title": "Enable access locally only via Unix sockets",
+      "level": 3,
+      "content": "By default, MariaDB is accessible via both Unix sockets and the network. If MariaDB is only needed for the localhost, you can improve security by not listening on TCP port 3306, and only listening on Unix sockets instead. To do this, add the following line in /etc/my.cnf.d/server.cnf:\n\n```\n[mariadb]\nskip-networking\n```\n\nYou will still be able to log in locally as before, but only using Unix sockets.\n\n"
+    },
+    {
+      "title": "Grant remote access",
+      "level": 3,
+      "content": "To allow remote access to the MariaDB server, ensure that MariaDB has networking enabled and is listening on the appropriate interface.\n\nGrant any MariaDB user remote access (example for root):\n\n```\n# mariadb -u root -p\n```\n\nCheck current users with remote access privileged:\n\n```\nSELECT User, Host FROM mysql.user WHERE Host <> 'localhost';\n```\n\nNow grant remote access for your user (here root):\n\n```\nGRANT ALL PRIVILEGES ON *.* TO 'root'@'192.168.1.%' IDENTIFIED BY 'my_optional_remote_password' WITH GRANT OPTION;\n```\n\nYou can change the '%' wildcard to a specific host if you like. The password can be different from user's main password.\n\n"
+    },
+    {
+      "title": "Configure access to home directories",
+      "level": 3,
+      "content": "For security reasons, the systemd service file contains ProtectHome=true, which prevents MariaDB from accessing files under the /home, /root and /run/user hierarchies. The datadir has to be in an accessible location and owned by the mysql user and group.\n\nYou can modify this behavior by creating a supplementary service file as described here.\n\n"
+    },
+    {
+      "title": "Upgrade databases on major releases",
+      "level": 3,
+      "content": "Upon a major version release of mariadb (for example mariadb-10.3.10-1 to mariadb-10.9.4-1), it is wise to upgrade the system database to make new server features available:\n\n```\n# mariadb-upgrade -u root -p\n```\n\nTo upgrade from 10.3.x to 10.9.x:\n\n- perform a clean shutdown of the 10.3.x server\n- upgrade the package\n- run mariadb-upgrade (from the new package version) against the new running daemon\n\nIf the (new) daemon is not starting, see #Unable to run mariadb-upgrade because MariaDB cannot start.\n\n"
+    },
+    {
+      "title": "Checking, optimizing and repairing databases",
+      "level": 3,
+      "content": "mariadb-clients ships with mariadb-check which can be used to check, repair, and optimize tables within databases from the shell. See mariadb-check(1) for more. Several command tasks are shown:\n\nTo check all tables in all databases:\n\n```\n$ mariadb-check --all-databases -u root -p -c\n```\n\nTo analyze all tables in all databases:\n\n```\n$ mariadb-check --all-databases -u root -p -a\n```\n\nTo repair all tables in all databases:\n\n```\n$ mariadb-check --all-databases -u root -p -r\n```\n\nTo optimize all tables in all databases:\n\n```\n$ mariadb-check --all-databases -u root -p -o\n```\n\n"
+    },
+    {
+      "title": "Backup",
+      "level": 2,
+      "content": "There are various tools and strategies to back up your databases.\n\nIf you are using the default InnoDB storage engine, a suggested way of backing up all your bases online while provisioning for point-in-time recovery (also known as \"roll-forward\", when you need to restore an old backup and replay the changes that happened since that backup) is to execute the following command:\n\n```\n$ mariadb-dump --single-transaction --flush-logs --events --routines --master-data=2 --all-databases -u root -p > all_databases.sql\n```\n\nThis will prompt for MariaDB's root user's password, which was defined during database #Configuration.\n\nSpecifying the password on the command line is strongly discouraged, as it exposes it to discovery by other users through the use of ps aux or other techniques. Instead, the aforementioned command will prompt for the specified user's password, concealing it away.\n\n"
+    },
+    {
+      "title": "Compression",
+      "level": 3,
+      "content": "As SQL tables can get pretty large, it is recommended to pipe the output of the aforementioned command in a compression utility like xz(1):\n\n```\n$ mariadb-dump --single-transaction --flush-logs --events --routines --master-data=2 --all-databases -u root -p | xz -z > all_databases.sql.xz\n```\n\nDecompressing the backup thus created and reloading it in the server is achieved by doing:\n\n```\n$ xzcat all_databases.sql.xz | mariadb -u root -p\n```\n\nThis will recreate and repopulate all the databases previously backed up (see this or this).\n\n"
+    },
+    {
+      "title": "Non-interactive",
+      "level": 3,
+      "content": "If you want to setup non-interactive backup script for use in cron jobs or systemd timers, see option files and this illustration for mariadb-dump.\n\nBasically you should add the following section to the relevant configuration file:\n\n```\n[mariadb-dump]\nuser=mysqluser\npassword=secret\n```\n\nMentioning a user here is optional, but doing so will free you from having to mention it on the command line. If you want to set this for all tools, including mariadb-client, use the [client] group.\n\n"
+    },
+    {
+      "title": "Example script",
+      "level": 4,
+      "content": "The database can be dumped to a file for easy backup. The following shell script will do this for you, creating a db_backup.xz file in the same directory as the script, containing your database dump:\n\n```\n#!/bin/sh\n\nTHISDIR=$(dirname $(readlink -f \"$0\"))\n\nmariadb-dump --single-transaction --flush-logs --events --routines --master-data=2 --all-databases \\\n | xz -z > $THISDIR/db_backup.xz\necho 'purge master logs before date_sub(now(), interval 7 day);' | mariadb\n```\n\nSee also the official mariadb-dump page in the MariaDB manuals.\n\n"
+    },
+    {
+      "title": "Holland Backup",
+      "level": 3,
+      "content": "A python-based software package named Holland Backup allows to automate all of the backup work. It supports direct mysqldump, LVM snapshots to tar files (mysqllvm), LVM snapshots with mysqldump (mysqldump-lvm), and xtrabackup methods to extract the data. The Holland framework supports a multitude of options and is highly configurable to address almost any backup situation.\n\nThe main hollandAUR and holland-commonAUR packages provide the core framework; one of the sub-packages (holland-mysqldumpAUR, holland-mysqllvmAUR and/or holland-xtrabackupAUR must be installed for full operation. Example configurations for each method are in the /usr/share/doc/holland/examples/ directory and can be copied to /etc/holland/backupsets/, as well as using the holland mk-config command to generate a base configuration for a named provider.\n\n"
+    },
+    {
+      "title": "Unable to run mariadb-upgrade because MariaDB cannot start",
+      "level": 3,
+      "content": "Try run MariaDB in a standalone:\n\n```\n# mariadbd-safe --datadir=/var/lib/mysql/\n```\n\nAnd then run:\n\n```\n# mariadb-upgrade -u root -p\n```\n\n"
+    },
+    {
+      "title": "Reset the root password",
+      "level": 3,
+      "content": "1. Stop mariadb.service.\n1. Start the MariaDB server with safety features: # mariadbd-safe --skip-grant-tables --skip-networking &\n1. Connect to it: # mariadb -u root\n1. Change root password: MariaDB [mysql]> FLUSH PRIVILEGES; MariaDB [mysql]> ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password'; MariaDB [mysql]> exit\n1. Kill running mariadbd* processes: # kill $(cat /var/lib/mysql/$HOSTNAME.pid)\n1. Start mariadb.service.\n\n```\n# mariadbd-safe --skip-grant-tables --skip-networking &\n```\n\n```\n# mariadb -u root\n```\n\n```\nMariaDB [mysql]> FLUSH PRIVILEGES;\nMariaDB [mysql]> ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';\nMariaDB [mysql]> exit\n```\n\n```\n# kill $(cat /var/lib/mysql/$HOSTNAME.pid)\n```\n\n"
+    },
+    {
+      "title": "Check and repair all tables",
+      "level": 3,
+      "content": "Check and auto repair all tables in all databases, see more:\n\n```\n# mariadb-check -A --auto-repair -u root -p\n```\n\n"
+    },
+    {
+      "title": "Optimize all tables",
+      "level": 3,
+      "content": "Forcefully optimize all tables, automatically fixing table errors that may come up.\n\n```\n# mariadb-check -A --auto-repair -f -o -u root -p\n```\n\n"
+    },
+    {
+      "title": "OS error 22 when running on ZFS",
+      "level": 3,
+      "content": "If using MySQL databases on ZFS, the error InnoDB: Operating system error number 22 in a file operation may occur.\n\nA workaround is to disable aio_writes in /etc/my.cnf.d/my.cnf:\n\n```\n/etc/my.cnf.d/my.cnf\n```\n\n```\n[mariadb]\ninnodb_use_native_aio = 0\n```\n\n"
+    },
+    {
+      "title": "Cannot login through CLI, but phpmyadmin works well",
+      "level": 3,
+      "content": "This may happen if you are using a long (>80) password. mariadb CLI cannot handle that many characters in readline mode. So, if you are planning to use the recommended password input mode:\n\n```\n$ mariadb -u user -p\n```\n\n```\nPassword:\n```\n\nConsider changing the password to smaller one.\n\n```\n$ mariadb -u user -p\"some-very-strong-password\"\n```\n\n"
+    },
+    {
+      "title": "MariaDB binary logs are taking up huge disk space",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nBy default, mariadbd creates binary log files at /var/lib/mysql/mysql-bin.XXXXXX with the numbers ascending. These logs are useful for replication master server or data recovery, but these binary logs can easily eat up large amounts of disk space. If you do not plan to use replication or data recovery features, you may disable binary logging by commenting out these lines in /etc/my.cnf.d/my.cnf then restart:\n\n```\n#log-bin=mysql-bin\n#binlog_format=mixed\n```\n\nOr, if you want to keep these logs but keep their size in check and old logs deleted, you can set these limits then restart:\n\n```\nlog-bin=mysql-bin\nexpire_logs_days = 10\nmax_binlog_size  = 100M\n```\n\nAlternatively, there exists a MariaDB command to manually purge logs older than a specific one. For example, you may see a file named mysql-bin.000023 and want to delete every log older than it. As long as the log-bin=mysql-bin setting is in effect, you would run:\n\n```\n# mariadb -u root -p\"PASSWORD\" -e \"PURGE BINARY LOGS TO 'mysql-bin.000023;\"\n```\n\n"
+    },
+    {
+      "title": "OpenRC fails to start MariaDB",
+      "level": 3,
+      "content": "To use MariaDB with OpenRC you need to add the following lines to the [mariadb] section in the MySQL configuration file, located at /etc/my.cnf.d/my.cnf.\n\n```\nuser = mysql\nbasedir = /usr\ndatadir = /var/lib/mysql\npid-file = /run/mysqld/mysql.pid\n```\n\nYou should now be able to start MariaDB using:\n\n```\n# rc-service mysql start\n```\n\n"
+    },
+    {
+      "title": "Changed limits warning on max_open_files/table_open_cache",
+      "level": 3,
+      "content": "Increase the number of file descriptors by creating a systemd drop-in, e.g.:\n\n```\n/etc/systemd/system/mariadb.service.d/limit_nofile.conf\n```\n\n```\n[Service]\nLimitNOFILE=8192\n```\n\n"
+    },
+    {
+      "title": "10.4 to 10.5 upgrade crash: \"InnoDB: Upgrade after a crash is not supported. The redo log was created with MariaDB 10.4.x\"",
+      "level": 3,
+      "content": "Before MariaDB 10.5, redo log was unnecessarily split into multiple files.[4]\n\nDo NOT ever remove the old binary logs /var/lib/mysql/ib_logfile* out of the way.\n\nTo resolve this, install MariaDB 10.4. Start it and let it undergo a clean shutdown. After that happens you can upgrade to 10.5 again. Same applies if another version of MariaDB was specified.\n\n"
+    },
+    {
+      "title": "Table 'mysql.xxx' does not exist in engine",
+      "level": 3,
+      "content": "Symptom: When running mariadb-upgrade or mariadb-check, it return one or more error like these:\n\n```\nTable 'mysql.xxx' does not exist in engine\n```\n\nWhere \"xxx\" usually is the system table inside the mysql database.\n\nSteps to fix this,\n\n1. Create backup directory outside of MariaDB ${DATADIR}</nowiki>, for example in $HOME/mariadb_backup.\n1. Copy the offending files from ${DATADIR}/mysql/xxx.{frm,ibd}</nowiki> to backup directory. The xxx.ibd may not exist.\n1. Drop the tables with DROP TABLE mysql.xxx on the mariadb prompt.\n1. Run the mariadb-check. On success, the file xxx.frm and xxx.ibd should be created again.\n1. Re-run mariadb-upgrade if necessary. You may need the --force option.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- MariaDB Official Website\n- MariaDB knowledge Base\n- MySQL Performance Tuning Scripts and Know-How\n\n"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "title": "HP Spectre x360 4231",
+  "url": "https://wiki.archlinux.org/title/HP_Spectre_x360_4231",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nVideo | 8086:1926 | Yes\nWi-Fi | 8086:095a | Yes\nBluetooth | 8087:0a2a | Yes\nAudio | 8086:9d70 | Yes\nTouchpad | PS/2 | Yes\nTouchscreen | 06cb:16f9 | Yes\nWebcam | 1bcf:2c7d | Yes\nCard Reader | 10ec:5227 | Yes\nFingerprint Reader | 04f3:0c26 | Yes\n\nThis article covers hardware specific configuration of this laptop, some minor issues remain after customization. These can be performed after an installation of Arch Linux has been finished and the machine rebooted into it.\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Hardware options",
+      "level": 3,
+      "content": "The HP Spectre x360 name has been used for a number of models over the years. While the overall look & feel of the brick has not changed, some hardware configuration changed a lot.\n\nThis model was released in November 2015 to replace the 13-4100.\n\nSpecifications:\n\n- Intel i7 Skylake 6560U with Intel Iris 540 graphics (compared to i7 6500 with Intel HD 520 graphics on a 4100)\n- OLED touch screen running at 2560x1440 (compared to LED 1920x1080 on a 4100)\n- 500 GB M.2 SDD\n- 8 GB RAM\n\nThis model has now been succeeded by the HP Spectre x360 13-w023dx.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Installing Arch is straight forward for everything (disable Secure Boot, F10 for BIOS, F9 for boot options) but one thing: you may have to disable a BIOS option called \"fast boot\". While this option is activated in BIOS the machine may boot into Windows no matter what you select. After you installed Arch, you may activate that option again: no difference in boot performance could be observed with the option activated or deactivated.\n\n"
+    },
+    {
+      "title": "Brightness / backlight",
+      "level": 3,
+      "content": "/sys/class/backlight/intel_backlight exists but is not working as of kernel 4.6 and 4.7rc6. Proposed kernel parameters (such as acpi_os) do not remedy the issue. It may be helpful to know that OLED displays by their nature do not have backlight. xrandr offers some neat feature to change brightness of your screen. Depending on your driver (modesetting driver included in Xorg or xf86-video-intel, see Intel graphics) your screen is named eDP-1 or eDP1. Use xrandr to determine the correct name if in doubt. The following statement changes brightness to 50%.\n\n```\n$ xrandr --output eDP1 --brightness .5\n```\n\nWhile this may probably work on non-OLED displays as well, it will not reduce power consumption on non-OLED displays at all. Without in-depth tests and measurements done, it seems like lowering brightness from the default 100% to something more regular 50% extends battery life by some hours.\n\nSince the hotkeys are performing updates on /sys/class/backlight/intel_backlight you may use inotify to enable brightness adjustment using the hotkeys (see Backlight#sysfs modified but no brightness change). The following script does the job:\n\n```\n#!/bin/sh\n\npath=/sys/class/backlight/intel_backlight\n\nluminance() {\n    read -r level < \"$path\"/actual_brightness\n    bc <<< \"scale=10;$level/$max\"\n}\n\nread -r max < \"$path\"/max_brightness\nxrandr --output eDP1 --brightness \"$(luminance)\"\n\ninotifywait -me modify --format '' \"$path\"/actual_brightness | while read; do\n    echo $(luminance)\n    xrandr --output eDP1 --brightness \"$(luminance)\"\ndone\n```\n\nThe script requires package bc to actually calculate the brightness factor. If you store the script at /usr/share/bin/brightness (see Arch filesystem hierarchy), you may use the following file at ~/.config/autostart/brightness.desktop to run the script at login to gnome:\n\n```\n[Desktop Entry]\nName=brightness\nGenericName=brightness\nComment=adjust brightness using hotkeys \nExec=/usr/local/bin/brightness\nTerminal=false\nType=Application\nX-GNOME-Autostart-enabled=true\n```\n\nWhile all this fixes brightness issues on the brick quite well, there are still some issues to be solved:\n\n- Chromium and some other programs reset brightness to 100% upon their first start since reboot.\n- Hotkeys are not working prior to login.\n\n"
+    },
+    {
+      "title": "Gnome scaling",
+      "level": 3,
+      "content": "The screen natively runs at 2560x1440. Gnome by default assumes a scaling factor of 2 since the screen resolution at y-axis is greater than 1200 [1]. With this, at first glance all controls are quite over sized. xrandr offers some nice workaround:\n\n```\n$ xrandr --output eDP1 --scale 1.25x1.25\n$ xrandr --output eDP1 --panning 3200x1800\n```\n\nThose commands should be executed in two steps tho. Gnome does not adjust size for sure each time. Setting those changes in an autostart script after login is not very reliable if some other programs are started at the same time. Even adding some sleep does not improve reliability to an acceptable level. Testing will be continued since this is a perfect resolution.\n\n"
+    },
+    {
+      "title": "Video driver",
+      "level": 3,
+      "content": "As mentioned in Intel graphics some people recommend to stay with the modesetting driver included in Xorg. As of Xorg 1.18.2, Mesa before 12.0 the performance of this driver is inacceptable when it comes to simple tasks like web browsing, scrolling documents or anything alike. On this machine installing xf86-video-intel improves performance a lot.\n\n"
+    },
+    {
+      "title": "Issue: Airplane mode after login",
+      "level": 2,
+      "content": "- Wi-Fi is working. The hotkey for the airplane mode works. Although something strange is going on with the hotkey: Booting to console leads to some spam of ^@ for like 10 seconds. After this it suddenly stops and you can log in. Booting to GDM makes the hotkey for airplane mode work. Nothing special. You can login immediately. Right after login to Gnome the hotkey is spammed and thus airplane mode turned off and on for like 7 seconds. dmesg shows some hard faults caused by Wi-Fi module being unexpectedly unavailable but nothing else suspicious. If you wait in GDM for a while, the spam hotkey spam will not happen after login. I.e. the timer is running already while you are in GDM.\n- The solution described at [2] seems to work.\n\n- Booting to console leads to some spam of ^@ for like 10 seconds. After this it suddenly stops and you can log in.\n- Booting to GDM makes the hotkey for airplane mode work. Nothing special. You can login immediately.\n- Right after login to Gnome the hotkey is spammed and thus airplane mode turned off and on for like 7 seconds. dmesg shows some hard faults caused by Wi-Fi module being unexpectedly unavailable but nothing else suspicious.\n- If you wait in GDM for a while, the spam hotkey spam will not happen after login. I.e. the timer is running already while you are in GDM.\n\n"
+    }
+  ]
+}

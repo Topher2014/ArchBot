@@ -1,0 +1,101 @@
+{
+  "title": "Laptop Mode Tools",
+  "url": "https://wiki.archlinux.org/title/Laptop_Mode_Tools",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- acpid\n- systemd\n- CPU frequency scaling\n- Laptop\n- Powertop\n- TLP\n\nLaptop Mode Tools is a laptop power saving package for Linux systems. It is the primary way to enable the Laptop Mode feature of the Linux kernel, which lets your hard drive spin down. In addition, it allows you to tweak a number of other power-related settings using a simple configuration file.\n\nCombined with acpid and CPU frequency scaling, LMT provides most users with a complete notebook power management suite.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the laptop-mode-toolsAUR package or the laptop-mode-tools-gitAUR package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Configuration is handled through:\n\n- /etc/laptop-mode/laptop-mode.conf - primary configuration file.\n- /etc/laptop-mode/conf.d/* - dozens of feature-specific \"modules\".\n\nEach module can be explicitly enabled, disabled, or set to auto by changing the CONTROL_* argument of any file in conf.d/. LMT will attempt enable any modules where CONTROL_* is set to auto if ENABLE_AUTO_MODULES is set in /etc/laptop-mode/laptop-mode.conf. There are two exceptions to the above rule: auto-hibernate.conf and battery-level-polling.conf use an ENABLE_* variable instead of CONTROL_*.\n\nTo quickly check which modules are enabled, disabled or auto, run:\n\n```\n$ grep -r '^\\(CONTROL\\|ENABLE\\)_' /etc/laptop-mode/conf.d\n```\n\nFinally, enable laptop-mode.service.\n\n"
+    },
+    {
+      "title": "Hard disks",
+      "level": 3,
+      "content": "For this you need to have hdparm and/or sdparm installed. See Hdparm.\n\nSpinning down the hard drive through hdparm -S values saves power and makes everything a lot more quiet. LMT can also establish hdparm -B values. The maximum hard drive power saving is 1 and the minimum is 254. For example, set this value to 254 when on AC and 20 when on battery. If you find that normal activity hangs often while waiting for the disk to spin up, it might be a good idea to set it to a higher value (e.g. 128) which will make it spin down less often. hdparm -S and hdparm -B values are configured in /etc/laptop-mode/laptop-mode.conf.\n\nWith the CONTROL_MOUNT_OPTIONS variable (default on), laptop-mode-tools automatically remounts your partitions, appending commit=600,noatime in the mount options. This keeps the journaling program jbd2 from accessing your disk every few seconds, instead the disk journal gets updated every 10 minutes.\n\n"
+    },
+    {
+      "title": "Solid state drives",
+      "level": 4,
+      "content": "From the official, upstream FAQ:\n\nQuestion: I have a solid-state disk (SSD) in my machine. Should I enable any of the disk-related parts of laptop-mode-tools, or are they irrelevant?\n\nAnswer: They may be relevant, because (a) laptop mode will reduce the number of writes, which improves the lifetime of an SSD, and (b) laptop mode makes writes bursty, which enables power saving mechanisms like ALPM to kick in. However, your mileage may vary depending on the specific hardware involved. For some hardware, you will get no gain at all, for some the gain may be substantial.\n\n"
+    },
+    {
+      "title": "CPU frequency",
+      "level": 3,
+      "content": "For this you need to have a CPU frequency driver installed. See CPU frequency scaling.\n\n```\n# cpufreq.conf\n# ThinkPad T40/T42/T60 Example\n#\nCONTROL_CPU_FREQUENCY=1\nBATT_CPU_MAXFREQ=fastest\nBATT_CPU_MINFREQ=slowest\nBATT_CPU_GOVERNOR=ondemand\nBATT_CPU_IGNORE_NICE_LOAD=1\nLM_AC_CPU_MAXFREQ=fastest\nLM_AC_CPU_MINFREQ=slowest\nLM_AC_CPU_GOVERNOR=ondemand\nLM_AC_CPU_IGNORE_NICE_LOAD=1\nNOLM_AC_CPU_MAXFREQ=fastest\nNOLM_AC_CPU_MINFREQ=slowest\nNOLM_AC_CPU_GOVERNOR=ondemand\nNOLM_AC_CPU_IGNORE_NICE_LOAD=0\nCONTROL_CPU_THROTTLING=0\n```\n\n"
+    },
+    {
+      "title": "Intel SATA",
+      "level": 4,
+      "content": "Enable the Intel SATA AHCI controller Aggressive Link Power Management feature to set the disk link into a very low power mode in the absence of disk IO.\n\n```\n# intel-sata-powermgmt.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_INTEL_SATA_POWER=1\nBATT_ACTIVATE_SATA_POWER=1\nLM_AC_ACTIVATE_SATA_POWER=1\nNOLM_AC_ACTIVATE_SATA_POWER=0\n```\n\n"
+    },
+    {
+      "title": "USB autosuspend",
+      "level": 4,
+      "content": "```\n# runtime-pm.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_RUNTIME_AUTOSUSPEND=1\nBATT_SUSPEND_RUNTIME=1\nLM_AC_SUSPEND_RUNTIME=1\nNOLM_AC_SUSPEND_RUNTIME=1\nAUTOSUSPEND_TIMEOUT=2\n```\n\n"
+    },
+    {
+      "title": "LCD brightness",
+      "level": 4,
+      "content": "Available brightness values for certain laptops can be obtained by running following command:\n\n```\n$ cat /proc/acpi/video/VID/LCD/brightness\n```\n\nFor ThinkPad T40/T42 notebooks, minimum and maximum brightness values can be obtained by running:\n\n```\n$ cat /sys/class/backlight/acpi_video0/brightness\n$ cat /sys/class/backlight/acpi_video0/max_brightness\n```\n\n```\n# lcd-brightness.conf\n# ThinkPad T40/T42 Example\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 0\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nBRIGHTNESS_OUTPUT=\"/sys/class/backlight/thinkpad_screen/brightness\"\n```\n\nFor ThinkPad T60 notebooks, minimum and maximum brightness values can be obtained by running:\n\n```\n$ cat /sys/class/backlight/thinkpad_screen/max_brightness\n$ cat /sys/class/backlight/thinkpad_screen/brightness\n```\n\n```\n# lcd-brightness.conf\n# ThinkPad T60 Example\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 0\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 7\"\nBRIGHTNESS_OUTPUT=\"/sys/class/backlight/acpi_video0/brightness\"\n```\n\nFor most (probably all) Asus ROG & TUF notebooks with Intel CPUs, a maximum brightness value can be obtained by running:\n\n```\n# cat /sys/class/backlight/intel_backlight/max_brightness\n```\n\n```\n# lcd-brightness.conf\n# Asus TUF Dash F15 2022 Example\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 32000\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 96000\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 96000\"\nBRIGHTNESS_OUTPUT=\"/sys/class/backlight/intel_backlight/brightness\"\n```\n\nAsus notebooks talk to the kernel though an Asus specific module and as such standard keyboard brightness commands will not work. A maximum brightness levels can be obtained by running:\n\n```\n# cat /sys/class/leds/asus::kbd_backlight/max_brightness\n```\n\n```\n# kbd-backlight.conf\n# Asus TUF Dash F15 2022 Example\n#\nDEBUG=0\nCONTROL_BRIGHTNESS=1\nBATT_BRIGHTNESS_COMMAND=\"echo 1\"\nLM_AC_BRIGHTNESS_COMMAND=\"echo 3\"\nNOLM_AC_BRIGHTNESS_COMMAND=\"echo 3\"\nBRIGHTNESS_OUTPUT=\"/sys/class/leds/asus::kbd_backlight/max_brightness\"\n```\n\n"
+    },
+    {
+      "title": "Terminal blanking",
+      "level": 4,
+      "content": "```\n# terminal-blanking.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_TERMINAL=1\nTERMINALS=\"/dev/tty1\"\nBATT_TERMINAL_BLANK_MINUTES=1\nBATT_TERMINAL_POWERDOWN_MINUTES=2\nLM_AC_TERMINAL_BLANK_MINUTES=10\nLM_AC_TERMINAL_POWERDOWN_MINUTES=10\nNOLM_AC_TERMINAL_BLANK_MINUTES=10\nNOLM_AC_TERMINAL_POWERDOWN_MINUTES=10\n```\n\n"
+    },
+    {
+      "title": "Ethernet",
+      "level": 4,
+      "content": "```\n# ethernet.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_ETHERNET=1\nLM_AC_THROTTLE_ETHERNET=0\nNOLM_AC_THROTTLE_ETHERNET=0\nDISABLE_WAKEUP_ON_LAN=1\nDISABLE_ETHERNET_ON_BATTERY=1\nETHERNET_DEVICES=\"eth0\"\n```\n\n"
+    },
+    {
+      "title": "Wireless LAN",
+      "level": 4,
+      "content": "Wireless interface power management settings are hardware-dependent, and thus a bit trickier to configure. Depending on the wireless chipset, the settings are managed in one of the following three files:\n\n1. /etc/laptop-mode/conf.d/wireless-power.conf for a generic method of saving power (using \"iwconfig wlan0 power on/off\"). This applies to most chipsets (that is, anything but Intel chipsets listed below).\n1. /etc/laptop-mode/conf.d/wireless-ipw-power.conf for Intel chipsets driven by the old ipw driver. This apply to IPW3945, IPW2200 and IPW2100. It currently (as of LMT 1.55-1) uses iwpriv for IPW3945, and a combination of iwconfig and iwpriv settings for IPW2100 and IPW220. See /usr/share/laptop-mode-tools/modules/wireless-ipw-power for details. (note that the ipw3945 is not used anymore, see below)\n1. /etc/laptop-mode/conf.d/wireless-iwl-power.conf for Intel chipsets driven by modules iwl4965, iwl3945 and iwlagn (this latter supports chipsets 4965, 5100, 5300, 5350, 5150, 1000, and 6000)\n\nNote that activating the three of them should not be much of a problem, since LMT detects the module used by the interface and acts accordingly.\n\nThe supported modules for each configuration file, indicated above, are taken directly from LMT. However, this seems to be a bit out-of-date, since the current 2.6.34 kernel does not provide the ipw3945 and iwl4965 modules anymore (3945 chipset uses iwl3945 instead, and 4965 uses the generic module iwlagn). This is only brought here for information, as this does not (or should not) affect the way LMT works.\n\nThere is a known issue with some chipsets running with the iwlagn module (namely, the 5300 chipset, and maybe others). On those chipsets, the following settings of /etc/laptop-mode/conf.d/wireless-iwl-power.conf:\n\n```\nIWL_AC_POWER\nIWL_BATT_POWER\n```\n\nare ignored, because the /sys/class/net/wlan*/device/power_level file does not exist. Instead, the standard method (with iwconfig wlan0 power on/off) is automatically used.\n\n"
+    },
+    {
+      "title": "AC97",
+      "level": 4,
+      "content": "```\n# ac97-powersave.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_AC97_POWER=1\n```\n\n"
+    },
+    {
+      "title": "Intel HDA",
+      "level": 4,
+      "content": "```\n# intel-hda-powersave.conf\n# ThinkPad T40/T42/T60 Example\n#\nDEBUG=0\nCONTROL_INTEL_HDA_POWER=1\nBATT_INTEL_HDA_POWERSAVE=1\nLM_AC_INTEL_HDA_POWERSAVE=1\nNOLM_AC_INTEL_HDA_POWERSAVE=0\nINTEL_HDA_DEVICE_TIMEOUT=10\nINTEL_HDA_DEVICE_CONTROLLER=0\n```\n\n"
+    },
+    {
+      "title": "Laptop-mode-tools is not picking up events",
+      "level": 3,
+      "content": "Install acpid and enable acpid.service.\n\nIf that does not help, go through the laptop-mode configuration files and make sure that the service you want to enable is set to 1. Many services (including cpufreq control) are by default set to \"auto\", which may not enable them.\n\nIssues with bluetooth not working when booting up with battery are fixed with disabling runtime-pm.\n\n"
+    },
+    {
+      "title": "USB Mouse sleeping after 5 seconds when on battery",
+      "level": 3,
+      "content": "First find the ID of your device (it should look like 046d:c534):\n\n```\n$ lsusb\n```\n\nPut this value into the AUTOSUSPEND_DEVID_BLACKLIST variable in /etc/laptop-mode/conf.d/runtime-pm.conf, for example:\n\n```\n/etc/laptop-mode/conf.d/runtime-pm.conf\n```\n\n```\n...\nAUTOSUSPEND_DEVID_BLACKLIST=\"046d:c534\"\n...\n```\n\nMultiple IDs can be seperated with spaces.\n\n"
+    },
+    {
+      "title": "KDE shows black screen",
+      "level": 4,
+      "content": "When laptop mode is enabled, KDE fails to start. The reason is that the default KDE display manager (SDDM) starts before the NVIDIA driver. To prevent this from happening you need to remove the nomodeset kernel parameter.\n\n"
+    },
+    {
+      "title": "Slower Boot after enabling laptop-mode.service",
+      "level": 4,
+      "content": "As described before, laptop-mode-tools affects the NVIDIA driver. Adding the nvidia-drm.modeset=1 kernel parameter reduces boot time dramatically.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Laptop Mode Tools wiki\n- FAQ\n- Mailing List\n\n"
+    }
+  ]
+}

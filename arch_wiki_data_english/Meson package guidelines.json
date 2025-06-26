@@ -1,0 +1,71 @@
+{
+  "title": "Meson package guidelines",
+  "url": "https://wiki.archlinux.org/title/Meson_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nFrom Meson's official website:\n\nWritten in Python, Meson features multi-platform support, support several programming languages, cross compilation, and more.\n\nMeson does not build software directly, but rather sets up a back-end build system. While it is commonly used with ninja, other build systems can be used. It is commonly used to replace GNU Build System.\n\nThis document covers standards and guidelines on writing PKGBUILDs for software that uses Meson.\n\n"
+    },
+    {
+      "title": "Requirements",
+      "level": 3,
+      "content": "meson has to be included to the PKGBUILD's makedepends array.\n\n```\nmakedepends=(meson other_deps)\n```\n\n"
+    },
+    {
+      "title": "prepare()",
+      "level": 3,
+      "content": "Meson has a utility to manage subprojects and can download them all in advance. Running this command in the prepare() stage allows the build() and other stages to be executed completely offline.\n\nExample:\n\n```\nprepare() {\n  meson subprojects download --sourcedir=source\n}\n```\n\n"
+    },
+    {
+      "title": "build()",
+      "level": 3,
+      "content": "Configuring and building is normally done using meson binary, but it can also be done by using Arch Linux's arch-meson wrapper script.\n\nBoth meson and arch-meson commands include in the usage syntax options, source directory and build directory:\n\n- options: must include at least --prefix /usr, but make sure to check other options with meson setup --help; also check software-specific build options.\n- source directory (or \"sourcedir\"): where the software's source code is stored, e.g. ., $pkgname or $pkgname-$pkgver.\n- build directory (or \"builddir\"): where the build files will stored by Meson; commonly named build or _build, but it is discretionary.\n\n"
+    },
+    {
+      "title": "Using meson binary directly",
+      "level": 4,
+      "content": "This method uses meson setup, which is the similar to the ./configure command used by the GNU Build System.\n\nThe --prefix=/usr command-line flag must always be passed to meson setup because Arch Linux packages must not install files to /usr/local, according Arch package guidelines#Package etiquette. The --buildtype=plain built-in option can be set to another value, if you know what you are doing.\n\nExample:\n\n```\nbuild() {\n  meson setup --prefix=/usr --buildtype=plain source build\n  meson compile -C build\n}\n```\n\nmeson compile is a wrapper for supported back-end build systems, which currently defaults to ninja[1]\n\n"
+    },
+    {
+      "title": "Using arch-meson wrapper script",
+      "level": 4,
+      "content": "arch-meson is a wrapper script included in meson package which has the advantage of setting some of Meson built-in options that would probably be used in an Arch package, saving packager's time and code in the PKGBUILD. Quoting the description written in arch-meson, it is a \"Highly opinionated wrapper for Arch Linux packaging\".\n\nExample:\n\n```\nbuild() {\n  arch-meson source build\n  meson compile -C build\n}\n```\n\n"
+    },
+    {
+      "title": "Setting software-specific build options",
+      "level": 4,
+      "content": "While Meson has some built-in build options (e.g. --prefix), the software being packaged could have other build options which the packager should consider. Valid software-specific build options, if present, are normally found in a file named meson.options (supported since Meson 1.1) or meson_options.txt. Look for option(settings) in these files, then read the settings.\n\nTo use a software-specific build option, use the notation -D key=value, where key is the build option name set in the project and value is a valid value, like e.g. true.\n\nFor instance, gtranslator has the following build options:\n\n```\nmeson_options.txt\n```\n\n```\noption('gtk_doc', type: 'boolean', value: false, description: 'use gtk-doc to build documentation')\n```\n\nSo, to build its documentation, one must run Meson appending -D gtk_doc=true build option, resulting in a command line like e.g.\n\n```\narch-meson $pkgname-$pkgver build -Dgtk_doc=true\n```\n\n"
+    },
+    {
+      "title": "check()",
+      "level": 3,
+      "content": "If the software being packaged provides test suite, consider running it in the PKGBUILD's check() function. This can be accomplished with meson test command.\n\nExample:\n\n```\ncheck() {\n  meson test -C build\n}\n```\n\nwhere build is the same build directory name used in the above #build() step.\n\nSee meson test --help and Unit tests in Meson docs for more info.\n\n"
+    },
+    {
+      "title": "package()",
+      "level": 3,
+      "content": "Packaging normally requires running only meson install, but check if another installation command is required (e.g. an uncommon license). Use the same build directory as above and set the --destdir flag:\n\n```\npackage() {\n  meson install -C build --destdir \"$pkgdir\"\n}\n```\n\n"
+    },
+    {
+      "title": "ERROR: Function does not take positional arguments",
+      "level": 3,
+      "content": "Example of error output:\n\n```\ndata/meson.build:21:5: ERROR: Function does not take positional arguments.\n```\n\nError present since Meson 0.60, which promoted from warning to error the use of positional arguments. One very common example of this error is to add invalid arguments to i18n.merge_file(). For instance, aisleriot had:\n\n```\ni18n.merge_file(\n  'sol.metainfo.xml',\n  input: desktop_in,\n  output: '@BASENAME@',\n  type: 'desktop',\n  po_dir: po_dir,\n  install: true,\n  install_dir: desktopdatadir,\n)\n```\n\nwhere 'sol.metainfo.xml' is the now invalid argument that should be removed. For the fix applied in the upstream, see this commit.\n\nMeasures to be taken in this case:\n\n1. Patch the meson.build reported in the error to fix the build, and the publish the updated PKGBUILD (if that is case)\n1. Contribute to the upstream repository with your patch, to fix it for everyone and to avoid having patches in the source array in the next versions.\n\n"
+    },
+    {
+      "title": "Template",
+      "level": 2,
+      "content": "To sum up the above instructions and to provide a single copy-and-paste point, see the template below:\n\n```\nmakedepends=(meson)\n\nbuild() {\n  arch-meson $pkgname-$pkgver build\n  meson compile -C build\n}\n\ncheck() {\n  meson test -C build --print-errorlogs\n}\n\npackage() {\n  meson install -C build --destdir \"$pkgdir\"\n}\n```\n\n"
+    },
+    {
+      "title": "Example packages",
+      "level": 2,
+      "content": "This is a small list of packages that use Meson. See other packages in the list \"Required by\" in meson package's page.\n\n- gstreamer\n- gnome-desktop\n- switchboard\n- cinnamon-desktop\n- networkmanager\n- xorg-server\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Meson official website\n- List of Meson built-in options\n- Meson source code repository in GitHub\n- Meson article on Wikipedia\n- meson(1)\n\n"
+    }
+  ]
+}

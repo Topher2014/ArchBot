@@ -1,0 +1,161 @@
+{
+  "title": "Postfix Dovecot DSpam Clamav OpenSSL SQLgrey MySQL",
+  "url": "https://wiki.archlinux.org/title/Postfix_Dovecot_DSpam_Clamav_OpenSSL_SQLgrey_MySQL",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Courier MTA\n- OpenDKIM\n- Postfix\n- SOGo\n- Dovecot\n\nNote: **This article or section is a candidate for merging with Postfix.** This article or section is a candidate for merging with Postfix.\n\nThis article or section is a candidate for merging with Postfix.\n\nThis article describes how to set up a virtual user mail system, i.e. where the senders and recipients do not correspond to the Linux system users.\n\nRoughly, the components used in this article are Postfix as the mail server, Dovecot as the IMAP server, Roundcube as the webmail interface and PostfixAdmin as the administration interface to manage it all.\n\nIn the end, the provided solution will allow you to use the best currently available security mechanisms, you will be able to send mails using SMTP and SMTPS and receive mails using POP3, POP3S, IMAP and IMAPS. Additionally, configuration will be easy thanks to PostfixAdmin and users will be able to login using Roundcube.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Before you start, you must have both a working MySQL server as described in MySQL and a working Postfix server as described in Postfix.\n\nInstall the postfix-mysql, dovecot, and roundcubemail packages.\n\n"
+    },
+    {
+      "title": "User",
+      "level": 3,
+      "content": "For security reasons, a new user should be created to store the mails:\n\n```\n# groupadd -g 5000 vmail\n# useradd -u 5000 -g vmail -s /usr/bin/nologin -d /home/vmail -m vmail\n```\n\nA gid and uid of 5000 is used in both cases so that we do not run into conflicts with regular users. All your mail will then be stored in /home/vmail. You could change the home directory to something like /var/mail/vmail but be careful to change this in any configuration below as well.\n\n"
+    },
+    {
+      "title": "Database",
+      "level": 3,
+      "content": "You will need to create an empty database and corresponding user. In this article, the user postfix_user will have read/write access to the database postfix_db using hunter2 as password. You are expected to create the database and user yourself, and give the user permission to use the database, as shown in the following code.\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE DATABASE postfix_db;\nGRANT ALL ON postfix_db.* TO 'postfix_user'@'localhost' IDENTIFIED BY 'hunter2';\nFLUSH PRIVILEGES;\n```\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nNow you can go to the PostfixAdmin's setup page, let PostfixAdmin create the needed tables and create the users in there.\n\n"
+    },
+    {
+      "title": "PostfixAdmin",
+      "level": 4,
+      "content": "See PostfixAdmin.\n\n"
+    },
+    {
+      "title": "SSL certificate",
+      "level": 3,
+      "content": "You will need a SSL certificate for all encrypted mail communications (SMTPS/IMAPS/POP3S). If you do not have one, create one:\n\n```\n# cd /etc/ssl/private/\n# openssl req -new -x509 -nodes -newkey rsa:4096 -keyout vmail.key -out vmail.crt -days 1460 #days are optional\n# chmod 400 vmail.key\n# chmod 444 vmail.crt\n```\n\nAlternatively, create a free trusted certificate using Let's Encrypt. The private key will be in /etc/letsencrypt/live/yourdomain/privkey.pem, the certificate in /etc/letsencrypt/live/yourdomain/fullchain.pem. Either change the configuration accordingly, or symlink the keys to /etc/ssl/private:\n\n```\n# ln -s /etc/letsencrypt/live/yourdomain/privkey.pem /etc/ssl/private/vmail.key\n# ln -s /etc/letsencrypt/live/yourdomain/fullchain.pem /etc/ssl/private/vmail.crt\n```\n\n"
+    },
+    {
+      "title": "Postfix",
+      "level": 3,
+      "content": "Before you copy & paste the configuration below, check if relay_domains has already been set. If you leave more than one active, you will receive warnings during runtime.\n\nAlso follow Postfix#Secure SMTP (receiving) pointing to the files you created in #SSL certificate.\n\n"
+    },
+    {
+      "title": "Setting up Postfix",
+      "level": 4,
+      "content": "To /etc/postfix/main.cf append:\n\n```\nrelay_domains = $mydestination\nvirtual_alias_maps = proxy:mysql:/etc/postfix/virtual_alias_maps.cf\nvirtual_mailbox_domains = proxy:mysql:/etc/postfix/virtual_mailbox_domains.cf\nvirtual_mailbox_maps = proxy:mysql:/etc/postfix/virtual_mailbox_maps.cf\nvirtual_mailbox_base = /home/vmail\nvirtual_mailbox_limit = 512000000\nvirtual_minimum_uid = 5000\nvirtual_transport = virtual\nvirtual_uid_maps = static:5000\nvirtual_gid_maps = static:5000\nlocal_transport = virtual\nlocal_recipient_maps = $virtual_mailbox_maps\ntransport_maps = lmdb:/etc/postfix/transport\n\nsmtpd_sasl_auth_enable = yes\nsmtpd_sasl_type = dovecot\nsmtpd_sasl_path = /var/run/dovecot/auth-client\nsmtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination\nsmtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination\nsmtpd_sasl_security_options = noanonymous\nsmtpd_sasl_tls_security_options = $smtpd_sasl_security_options\nsmtpd_tls_security_level = may\nsmtpd_tls_auth_only = yes\nsmtpd_tls_received_header = yes\nsmtpd_tls_cert_file = /etc/ssl/private/vmail.crt\nsmtpd_tls_key_file = /etc/ssl/private/vmail.key\nsmtpd_sasl_local_domain = $mydomain\nsmtpd_tls_loglevel = 1\nsmtp_tls_security_level = may\nsmtp_tls_loglevel = 1\n```\n\n- In the configuration above virtual_mailbox_domains is a list of the domains that you want to receive mail for. This CANNOT contain the domain that is set in mydestination. That is why we left mydestination to be localhost only.\n\n- virtual_mailbox_maps will contain the information of virtual users and their mailbox locations. We are using a hash file to store the more permanent maps, and these will then override the forwards in the MySQL database.\n\n- virtual_mailbox_base is the base directory where the virtual mailboxes will be stored.\n\nThe virtual_uid_maps and virtual_gid_maps are the real system user IDs that the virtual mails will be owned by. This is for storage purposes.\n\n"
+    },
+    {
+      "title": "Create the file structure",
+      "level": 4,
+      "content": "Those new additional settings reference a lot of files that do not even exist yet. We will create them with the following steps.\n\nIf you were setting up your database with PostfixAdmin and created the database schema through PostfixAdmin, you can create the following files. Do not forget to change the password:\n\n```\n/etc/postfix/virtual_alias_maps.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = alias\nselect_field = goto\nwhere_field = address\n```\n\n```\n/etc/postfix/virtual_mailbox_domains.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = domain\nselect_field = domain\nwhere_field = domain\n```\n\n```\n/etc/postfix/virtual_mailbox_maps.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = mailbox\nselect_field = maildir\nwhere_field = username\n```\n\nFor alias domains functionality adjust the following files:\n\n```\n/etc/postfix/main.cf\n```\n\n```\nvirtual_alias_maps = proxy:mysql:/etc/postfix/virtual_alias_maps.cf,proxy:mysql:/etc/postfix/virtual_alias_domains_maps.cf\nvirtual_alias_domains = proxy:mysql:/etc/postfix/virtual_alias_domains.cf\n```\n\n```\n/etc/postfix/virtual_alias_domains_maps.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\nquery = SELECT goto FROM alias,alias_domain WHERE alias_domain.alias_domain = '%d' and alias.address = CONCAT('%u', '@', alias_domain.target_domain) AND alias.active = '1' AND alias_domain.active='1'\n```\n\n```\n/etc/postfix/virtual_alias_domains.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\nquery = SELECT alias_domain FROM alias_domain WHERE alias_domain='%s' AND active = '1'\n```\n\n```\n/etc/postfix/virtual_alias_maps.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = domains\nselect_field = virtual\nwhere_field = domain\n```\n\n```\n/etc/postfix/virtual_mailbox_domains.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = forwardings\nselect_field = destination\nwhere_field = source\n```\n\n```\n/etc/postfix/virtual_mailbox_maps.cf\n```\n\n```\nuser = postfix_user\npassword = hunter2\nhosts = localhost\ndbname = postfix_db\ntable = users\nselect_field = concat(domain,'/',email,'/')\nwhere_field = email\n```\n\nRun postmap on transport to generate its db:\n\n```\n# postmap /etc/postfix/transport\n```\n\n"
+    },
+    {
+      "title": "Dovecot",
+      "level": 3,
+      "content": "Instead of using the provided Dovecot example configuration file, we will create our own /etc/dovecot/dovecot.conf. Please note that the user and group here might be vmail instead of postfix!\n\n```\n/etc/dovecot/dovecot.conf\n```\n\n```\nprotocols = imap pop3\nauth_mechanisms = plain\npassdb {\n    driver = sql\n    args = /etc/dovecot/dovecot-sql.conf\n}\nuserdb {\n    driver = sql\n    args = /etc/dovecot/dovecot-sql.conf\n}\n \nservice auth {\n    unix_listener auth-client {\n        group = postfix\n        mode = 0660\n        user = postfix\n    }\n    user = root\n}\n\nmail_home = /home/vmail/%d/%n\nmail_location = maildir:~\n\nssl_cert = </etc/ssl/private/vmail.crt\nssl_key = </etc/ssl/private/vmail.key\n```\n\nNow we create /etc/dovecot/dovecot-sql.conf, which we just referenced in the configuration above. Use the following contents and check if everything is set accordingly to your system's configuration.\n\nIf you used PostfixAdmin, then you add the following:\n\n```\n/etc/dovecot/dovecot-sql.conf\n```\n\n```\ndriver = mysql\nconnect = host=localhost dbname=postfix_db user=postfix_user password=hunter2\n# It is highly recommended to not use deprecated MD5-CRYPT. Read more at http://wiki2.dovecot.org/Authentication/PasswordSchemes\ndefault_pass_scheme = SHA512-CRYPT\n# Get the mailbox\nuser_query = SELECT '/home/vmail/%d/%n' as home, 'maildir:/home/vmail/%d/%n' as mail, 5000 AS uid, 5000 AS gid, concat('dirsize:storage=',  quota) AS quota FROM mailbox WHERE username = '%u' AND active = '1'\n# Get the password\npassword_query = SELECT username as user, password, '/home/vmail/%d/%n' as userdb_home, 'maildir:/home/vmail/%d/%n' as userdb_mail, 5000 as  userdb_uid, 5000 as userdb_gid FROM mailbox WHERE username = '%u' AND active = '1'\n# If using client certificates for authentication, comment the above and uncomment the following\n#password_query = SELECT null AS password, ‘%u’ AS user\n```\n\nWithout having used PostfixAdmin you can use:\n\n```\n/etc/dovecot/dovecot-sql.conf\n```\n\n```\ndriver = mysql\nconnect = host=localhost dbname=postfix_db user=postfix_user password=hunter2\n# It is highly recommended to not use deprecated MD5-CRYPT. Read more at http://wiki2.dovecot.org/Authentication/PasswordSchemes\ndefault_pass_scheme = SHA512-CRYPT\n# Get the mailbox\nuser_query = SELECT '/home/vmail/%d/%n' as home, 'maildir:/home/vmail/%d/%n' as mail, 5000 AS uid, 5000 AS gid, concat('dirsize:storage=',  quota) AS quota FROM users WHERE email = '%u'\n# Get the password\npassword_query = SELECT email as user, password, '/home/vmail/%d/%n' as userdb_home, 'maildir:/home/vmail/%d/%n' as userdb_mail, 5000 as  userdb_uid, 5000 as userdb_gid FROM users WHERE email = '%u'\n# If using client certificates for authentication, comment the above and uncomment the following\n#password_query = SELECT null AS password, ‘%u’ AS user\n```\n\n"
+    },
+    {
+      "title": "DH parameters",
+      "level": 4,
+      "content": "With v2.3 you are required to provide ssl_dh = /path/to/dh.pem yourself.\n\nTo generate a new DH parameters file (this will take a long time):\n\n```\n# openssl dhparam -out /etc/dovecot/dh.pem 4096\n```\n\nthen add the file to /etc/dovecot/dovecot.conf\n\n```\nssl_dh = </etc/dovecot/dh.pem\n```\n\n"
+    },
+    {
+      "title": "PostfixAdmin",
+      "level": 3,
+      "content": "See PostfixAdmin.\n\nNote: To match the configuration in this file, config.inc.php should contain the following.\n\n```\n# /etc/webapps/postfixadmin/config.inc.php\n   ...\n   $CONF['domain_path'] = 'YES';\n   $CONF['domain_in_mailbox'] = 'NO';\n   ...\n```\n\n"
+    },
+    {
+      "title": "Roundcube",
+      "level": 3,
+      "content": "See Roundcube.\n\nMake sure that both extension=pdo_mysql and extension=iconv are uncommented in your php.ini file. Also check the .htaccess for access restrictions. Assuming that localhost is your current host, navigate a browser to http://localhost/roundcube/installer/ and follow the instructions.\n\nRoundcube needs a separate database to work. You should not use the same database for Roundcube and PostfixAdmin. Create a second database roundcube_db and a new user named roundcube_user.\n\nWhile running the installer ...\n\n- For the address of the IMAP host, i.e. imap_host, use ssl://localhost/ or tls://localhost/ and not just localhost.\n- Use port 993. Likewise with SMTP.\n- For the address of the SMTP host, i.e. smtp_host, use tls://localhost/ and port 587 if you used STARTTLS. Use ssl://localhost/ with port 465 if you used SMTPS. If there is a failure to establish a session, try using tls://yourservername instead, replacing yourservername with the name of your server.\n- See #Postfix for an explanation on that.\n- Make sure the resulting configuration file has $config['smtp_user'] = '%u'; and $config['smtp_pass'] = '%p'; lines in it or you will not be able to send email.\n\nThe post install process is similar to any other webapp like PhpMyAdmin or PostFixAdmin. The configuration file is in /etc/webapps/roundcubemail/config/config.inc.php which works as an override over defaults.inc.php.\n\n"
+    },
+    {
+      "title": "Apache configuration",
+      "level": 4,
+      "content": "If you are using Apache, copy the example configuration file to your webserver configuration directory.\n\n```\n# cp /etc/webapps/roundcubemail/apache.conf /etc/httpd/conf/extra/httpd-roundcubemail.conf\n```\n\nAdd the following line in\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nInclude conf/extra/httpd-roundcubemail.conf\n```\n\n"
+    },
+    {
+      "title": "Roundcube: Change Password Plugin",
+      "level": 4,
+      "content": "To let users change their passwords from within Roundcube, do the following:\n\nEnable the password plugin by adding this line to\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['plugins'] = ['password'];\n```\n\nConfigure the password plugin and make sure you alter the settings accordingly:\n\n```\n/usr/share/webapps/roundcubemail/plugins/password/config.inc.php\n```\n\n```\n<?php\n\n$config['password_driver'] = 'sql';\n$config['password_db_dsn'] = 'mysql://<postfix_database_user>:<password>@localhost/<postfix_database_name>';\n// If you are not using dovecot specify another algorithm explicitly e.g 'sha256-crypt'\n$config['password_algorithm'] = 'dovecot';\n// For dovecot salted passwords only (above must be set to 'dovecot')\n// $config['password_algorithm_prefix'] = 'true';\n// $config['password_dovecotpw'] = '/usr/bin/doveadm pw';\n// $config['password_dovecotpw_method'] = 'SHA512-CRYPT';\n// $config['password_dovecotpw_with_method'] = true;\n$config['password_query'] = 'UPDATE mailbox SET password=%P WHERE username=%u';\n```\n\nMake sure this file is readable only by the http user and group since it contains sensitive information:\n\n```\n# chown http:http /usr/share/webapps/roundcubemail/plugins/password/config.inc.php\n# chmod o-r /usr/share/webapps/roundcubemail/plugins/password/config.inc.php\n```\n\n"
+    },
+    {
+      "title": "Fire it up",
+      "level": 2,
+      "content": "All necessary daemons should be started in order to test the configuration. Start both postfix and dovecot.\n\nNow for testing purposes, create a domain and mail account in PostfixAdmin. Try to login to this account using Roundcube. Now send yourself a mail.\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nNow lets see if Postfix is going to deliver mail for our test user.\n\n```\nnc servername 25\nhelo testmail.org\nmail from:<test@testmail.org>\nrcpt to:<cactus@virtualdomain.tld>\ndata\nThis is a test email.\n.\nquit\n```\n\n"
+    },
+    {
+      "title": "Error response",
+      "level": 3,
+      "content": "```\n451 4.3.0 <lisi@test.com>:Temporary lookup failure\n```\n\nMaybe you have entered the wrong user/password for MySQL or the MySQL socket is not in the right place.\n\nThis error will also occur if you neglect to run newaliases at least once before starting postfix. MySQL is not required for local only usage of postfix.\n\n```\n550 5.1.1 <email@spam.me>: Recipient address rejected: User unknown in virtual mailbox table.\n```\n\nDouble check content of mysql_virtual_mailboxes.cf and check the main.cf for mydestination\n\n"
+    },
+    {
+      "title": "See that you have received a email",
+      "level": 3,
+      "content": "Now type $ find /home/vmailer.\n\nYou should see something like the following:\n\n```\n/home/vmailer/virtualdomain.tld/cactus@virtualdomain.tld\n/home/vmailer/virtualdomain.tld/cactus@virtualdomain.tld/tmp\n/home/vmailer/virtualdomain.tld/cactus@virtualdomain.tld/cur\n/home/vmailer/virtualdomain.tld/cactus@virtualdomain.tld/new\n/home/vmailer/virtualdomain.tld/cactus@virtualdomain.tld/new/1102974226.2704_0.bonk.testmail.org\n```\n\nThe key is the last entry. This is an actual email, if you see that, it is working.\n\n"
+    },
+    {
+      "title": "Optional Items",
+      "level": 2,
+      "content": "Although these items are not required, they definitely add more completeness to your setup\n\n"
+    },
+    {
+      "title": "Quota",
+      "level": 3,
+      "content": "To enable mailbox quota support by dovecot, do the following:\n\n- First add the following lines to /etc/dovecot/dovecot.conf\n\n```\ndict {\n\tquotadict = mysql:/etc/dovecot/dovecot-dict-sql.conf.ext\n}\nservice dict {\n\tunix_listener dict {\n\t\tgroup = vmail\n\t\tmode = 0660\n\t\tuser = vmail\n\t}\n\tuser = root\n}\nservice quota-warning {\n\texecutable = script /usr/local/bin/quota-warning.sh\n\tuser = vmail\n\tunix_listener quota-warning {\n\t\tgroup = vmail\n\t\tmode = 0660\n\t\tuser = vmail\n\t}\n}\t\nmail_plugins=quota\nprotocol pop3 {\n\t mail_plugins = quota\n\t pop3_client_workarounds = outlook-no-nuls oe-ns-eoh\n\t pop3_uidl_format = %08Xu%08Xv\n}\nprotocol lda {\n\tmail_plugins = quota\n\tpostmaster_address = postmaster@yourdomain.com\n}\nprotocol imap {\n\tmail_plugins = $mail_plugins imap_quota\n\tmail_plugin_dir = /usr/lib/dovecot/modules\n}\nplugin {\n       quota = dict:User quota::proxy::quotadict\n       quota_rule2 = Trash:storage=+10%%\n       quota_warning = storage=100%% quota-warning +100 %u\n       quota_warning2 = storage=95%% quota-warning +95 %u\n       quota_warning3 = storage=80%% quota-warning +80 %u\n       quota_warning4 = -storage=100%% quota-warning -100 %u # user is no longer over quota\n}\n```\n\n- Create a new file /etc/dovecot/dovecot-dict-sql.conf.ext with the following code:\n\n```\nconnect = host=localhost dbname=yourdb user=youruser password=yourpassword\nmap {\n\tpattern = priv/quota/storage\n\ttable = quota2\n\tusername_field = username\n\tvalue_field = bytes\n}\nmap {\n\tpattern = priv/quota/messages\n\ttable = quota2\n\tusername_field = username\n\tvalue_field = messages\n}\n```\n\n- Create a warning script /usr/local/bin/quota-warning.sh and make sure it is executable. This warning script works with postfix lmtp configuration as well.\n\n```\n#!/bin/sh\nBOUNDARY=\"$1\"\nUSER=\"$2\"\nMSG=\"\"\nif [[ \"$BOUNDARY\" = \"+100\" ]]; then\n    MSG=\"Your mailbox is now overfull (>100%). In order for your account to continue functioning properly, you need to remove some emails NOW.\"\nelif [[ \"$BOUNDARY\" = \"+95\" ]]; then\n    MSG=\"Your mailbox is now over 95% full. Please remove some emails ASAP.\"\nelif [[ \"$BOUNDARY\" = \"+80\" ]]; then\n    MSG=\"Your mailbox is now over 80% full. Please consider removing some emails to save space.\"\nelif [[ \"$BOUNDARY\" = \"-100\" ]]; then\n    MSG=\"Your mailbox is now back to normal (<100%).\"\nfi\n \ncat << EOF | /usr/lib/dovecot/dovecot-lda -d $USER -o \"plugin/quota=maildir:User quota:noenforcing\"\nFrom: postmaster@yourdomain.com\nSubject: Email Account Quota Warning\n\nDear User,\n\n$MSG\n\nBest regards,\nYour Mail System\nEOF\n```\n\n- Edit the user_query line and add iterat_query in dovecot-sql.conf as following:\n\n```\nuser_query = SELECT '/home/vmail/%d/%n' as home, 'maildir:/home/vmail/%d/%n' as mail, 5000 AS uid, 5000 AS gid, concat('*:bytes=', quota) AS quota_rule FROM mailbox WHERE username = '%u' AND active = '1'\n iterate_query = SELECT username AS user FROM mailbox\n```\n\n- Set up LDA as described above under SpamAssassin. If you are not using SpamAssassin, the pipe should look like this in /etc/postfix/master.cf :\n\n```\ndovecot    unix  -       n       n       -       -       pipe\n flags=DRhu user=vmail:vmail argv=/usr/lib/dovecot/deliver -f ${sender} -d ${recipient}\n```\n\nAs above activate it in Postfix main.cf\n\n```\nvirtual_transport = dovecot\n```\n\n- You can set up quota per each mailbox in postfixadmin. Make sure the relevant lines in config.inc.php look like this:\n\n```\n$CONF['quota'] = 'YES';\n$CONF['quota_multiplier'] = '1024000';\n```\n\nRestart postfix and dovecot services. If things go well, you should be able to list all users' quota and usage by the this command:\n\n```\ndoveadm quota get -A\n```\n\nYou should be able to see the quota in roundcube too.\n\n"
+    },
+    {
+      "title": "Autocreate and autosubscribe folders in Dovecot",
+      "level": 3,
+      "content": "To automatically create the \"usual\" mail hierarchy, modify your /etc/dovecot/dovecot.conf as follows, editing to your specific needs.\n\n```\nnamespace inbox {\n  type = private\n  separator = /\n  prefix =\n  inbox = yes\n}\nnamespace inbox {\n  mailbox Drafts {\n    auto = subscribe\n    special_use = \\Drafts\n  }\n  mailbox Junk {\n   auto = subscribe\n   special_use = \\Junk\n }\n mailbox Trash {\n   auto = subscribe\n   special_use = \\Trash\n }\n mailbox Sent {\n   auto = subscribe\n   special_use = \\Sent\n }\n}\n```\n\n"
+    },
+    {
+      "title": "Dovecot public folder and global ACLs",
+      "level": 3,
+      "content": "In this section we enable IMAP namespace public folders combined with global and per-folder ACLs.\n\nFirst, add the following lines to /etc/dovecot/dovecot.conf:\n\n```\n### ACLs\nmail_plugins = acl\nprotocol imap {\n  mail_plugins = $mail_plugins imap_acl\n}\nplugin {\n acl = vfile\n # With global ACL files in /etc/dovecot/dovecot-acls file (v2.2.11+):\n acl = vfile:/etc/dovecot/dovecot-acl\n}\n\n### Public Mailboxes\nnamespace {\n type = public\n separator = /\n prefix = public/\n location = maildir:/home/vmail/public:INDEXPVT=~/public\n subscriptions = no\n list = children\n}\n```\n\nCreate the root directory /home/vmail/public and the folders you want to publicly share, for example (the period is required!) /home/vmail/public/.example-1.\n\nChange the ownership of all files in the root directory:\n\n```\n$ chown -R vmail:vmail /home/vmail/public\n```\n\nFinally, create and modify your global ACL file to allow users access to these folders:\n\n```\n/etc/dovecot/dovecot-acl\n```\n\n```\npublic/* user=admin@example.com lrwstipekxa\n```\n\nIn the above example, user admin@example.com has access to, and can do anything to, all the public folders. Edit to fit your specific needs.\n\n- lrwstipekxa are the permissions being granted. Visit the Dovecot wiki for further details.\n- Make sure the user subscribes to the folders in the client they are using.\n\n"
+    },
+    {
+      "title": "Fighting Spam",
+      "level": 3,
+      "content": "To use SpamAssassin, you must set it up with a SQL database. Otherwise user scores and filter data won't be saved as users are virtual and don't have home directories where to save these.\n\nAs an alternative to SpamAssassin, consider rspamd. Out of the box, it delivers an amazing amount of spam reduction, greylisting, etc and includes a nifty webui. See also [1].\n\n"
+    },
+    {
+      "title": "Alternative vmail folder structure",
+      "level": 3,
+      "content": "Instead of having a directory structure like /home/vmail/example.com/user@example.com you can have cleaner subdirectories (without the additional domain name) by replacing select_field and where_field with:\n\n```\nquery = SELECT CONCAT(SUBSTRING_INDEX(email,'@',-1),'/',SUBSTRING_INDEX(email,'@',1),'/') FROM users WHERE email='%s'\n```\n\n"
+    },
+    {
+      "title": "IMAP/POP3 client failing to receive mails",
+      "level": 3,
+      "content": "If you get similar errors, take a look into /var/log/mail.log or run journalctl -xn --unit postfix.service as root to find out more.\n\nIt may turn out that the Maildir /home/vmail/mail@domain.tld is just being created if there is at least one email waiting. Otherwise there would not be any need for the directory creation before.\n\n"
+    },
+    {
+      "title": "Roundcube not able to delete emails or view any 'standard' folders",
+      "level": 3,
+      "content": "Ensure that the Roundcube config.inc.php file contains the following:\n\n```\n$config['default_imap_folders'] = ['INBOX', 'Drafts', 'Sent', 'Junk', 'Trash'];\n$config['create_default_folders'] = true;\n$config['protect_default_folders'] = true;\n```\n\n"
+    },
+    {
+      "title": "LMTP / Sieve",
+      "level": 3,
+      "content": "Is LMTP not connecting to sieve? Ensure that your server is not routing the messages locally. This can be set in /etc/postfix/main.cf:\n\n```\nmydestination =\n```\n\n"
+    },
+    {
+      "title": "Are your emails sent to gmail users ending up in their junk/spam folders?",
+      "level": 3,
+      "content": "Google gmail (and most other large email providers) will send your emails straight into your recipients junk / spam folder if you have not implemented SPF / DKIM / DMARC policies. (Hint: Rspamd, via the link above, shows you how to set this up, and will DKIM sign your emails.)\n\n"
+    },
+    {
+      "title": "Sending and receiving mails broken, logs mentioning \"transport_maps lookup failure\" along with \"unsupported dictionary type: hash\"",
+      "level": 3,
+      "content": "Postfix 3.9.0 removed support for the \"hash\" transport map type. To fix this, stop postfix.service and edit /etc/postfix/main.cf by replacing all instances of hash: with lmdb:. Then save the file, delete /etc/postfix/transport.db and regenerate it with the new format using postmap /etc/postfix/transport. After that, you can start postfix.service.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gentoo:Complete Virtual Mail Server\n\n"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "title": "NFS/Kerberos",
+  "url": "https://wiki.archlinux.org/title/NFS/Kerberos",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Kerberos is one of the few security mechanisms available for NFS. It provides strong per-user authentication, strong data encryption, and (with NFSv4) removes the requirement for matching UIDs/GIDs between client and server.\n\nNFSv4 is recommended for Kerberos. Although it is possible to enable Kerberos in NFSv3, it will not provide 100% coverage as the auxiliary NFSv3 protocols (e.g. the \"mount\" protocol) remain insecure, and the lack of idmapping in NFSv3 severely reduces the usability of Kerberos as well.\n\n"
+    },
+    {
+      "title": "Prerequisites",
+      "level": 2,
+      "content": "Kerberos requires a KDC (Key Distribution Center) service to be running somewhere. The krb5-kdc.service that comes with MIT Kerberos (krb5) is a good option for small setups that do not warrant the complexity of Active Directory or FreeIPA. The second option is Heimdal, found on some BSDs and as heimdalAUR on Arch.\n\nNFSv4 idmapping becomes much more important to have with Kerberos. Both the server and the clients should have the same idmapping domain configured:\n\n```\n/etc/idmapd.conf\n```\n\n```\n[General]\nDomain = example.com\n```\n\n"
+    },
+    {
+      "title": "Server configuration",
+      "level": 2,
+      "content": "Each NFS server needs a Kerberos principal for nfs/server.fqdn to be created on the KDC, and its keys added to the server's /etc/krb5.keytab.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nIt is recommended to also have the standard host/ principal there as well, for other purposes.\n\n```\nfileserv# kadmin -p frob/admin\nPassword for frob/admin@EXAMPLE.COM: *********\nkadmin:  addprinc -nokey nfs/fs.example.com\nkadmin:  ktadd nfs/fs.example.com\n```\n\ngssproxy.service must be enabled and started on the server.\n\ngssproxy comes pre-configured with NFS server support (the /etc/gssproxy/24-nfs-server.conf file is part of the standard package) and does not need any tweaking, other than placing the NFS service keytab in the standard location.\n\nYour /etc/exports should offer the Kerberos authentication flavors in the sec= option:\n\n```\n/home    *(rw,sec=krb5p)\n/usr     10.147.0.0/16(rw,sec=krb5p:krb5i:krb5:sys) *(rw,sec=krb5p)\n```\n\nThe available flavors are:\n\n- krb5p provides 'privacy' (Kerberos-based encryption). It is sufficiently secure to be used over Internet, but might provide poor throughput over a LAN – consider using krb5 inside RPC-with-TLS instead.\n- krb5i provides 'integrity' (Kerberos-based MAC) but not encryption. It might be useful for serving static data as it still protects against packet tampering.\n- krb5 provides only authentication, without data integrity or encryption. It is a good choice if you have RPC-over-TLS enabled via xprtsec= or if Kerberos is being run over an otherwise \"secure\" LAN (e.g. over a WireGuard tunnel), but certainly not in the clear over public networks.\n- sys is the traditional UID-based (non-Kerberos) NFS security mode.\n\n"
+    },
+    {
+      "title": "Client configuration",
+      "level": 2,
+      "content": "In addition to users, each NFS client should have a machine Kerberos principal in /etc/krb5.keytab, which will be used in situations where user Kerberos tickets are not yet available – in particular, it will be needed to actually mount the filesystem at boot time before any users have logged in yet (or if mounting is done via autofs). More generally, all operations done \"as root\" will be authenticated as the machine principal.\n\nUnlike in the server case, the client machine does not need an nfs/ principal specifically – it is enough to have the generic host/the.fqdn principal. (See the rpc.gssd manual page for what it looks for.)\n\nThe client must have rpc-gssd.service active (i.e. the rpc.gssd daemon).\n\nOptions used when mounting the filesystems are very similar to the options used in /etc/exports; you can specify one or more flavors using the sec= option. Although the client will automatically use the strongest mode offered, it is nevertheless recommended to explicitly require e.g. sec=krb5p to prevent downgrade attacks.\n\nOnce the filesystem has been mounted, root may already access it (using the machine's Kerberos credentials), but every non-root user needs their own Kerberos tickets to be present. This means either having the user manually run kinit for themselves, or setting up pam-krb5 to acquire tickets during login (which only works for password-based logins), or using gssproxy or k5start(1) (from kstartAUR) to acquire tickets from a keytab file.\n\n"
+    }
+  ]
+}

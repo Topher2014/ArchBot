@@ -1,0 +1,86 @@
+{
+  "title": "Booster",
+  "url": "https://wiki.archlinux.org/title/Booster",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Kernel modules\n- Minimal initramfs\n- Boot debugging\n- mkinitcpio\n- dracut\n- Clevis\n\nBooster is a fast initramfs generator similar to mkinitcpio and dracut. Booster is inspired by the \"distri\" project and aims to create a small and fast init image.\n\nBooster provides the /usr/bin/booster user-space tool, responsible for initramfs image generation. The generated images are located at /boot/ by default.\n\n"
+    },
+    {
+      "title": "Install",
+      "level": 2,
+      "content": "Install booster. The package installation hook will generate initramfs images, one per installed kernel (e.g. for linux, linux-lts). The images are located under /boot directory:\n\n```\n$ ls -lh /boot/booster*\n```\n\n```\n-rwxr-xr-x 1 root root 4.0M Dec 16 16:20 /boot/booster-linux.img\n```\n\nOr the image can be built manually:\n\n```\n$ booster build mybooster.img\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Booster's generator configuration file is located at /etc/booster.yaml. If there is no configuration file then the default configuration (host-specific images, no network) is used.\n\nThe configuration file helps to override the default behaviour. See booster(1) § CONFIG FILE for detailed information.\n\n"
+    },
+    {
+      "title": "Early module loading",
+      "level": 3,
+      "content": "You can load some modules at initramfs stage forcibly.\n\nFor example, if you need Kernel_mode_setting#Early_KMS_start to avoid graphical session run before NVIDIA GPU is initialized, use the following configuration setting:\n\n```\n/etc/booster.yaml\n```\n\n```\nmodules_force_load: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm\n```\n\nAnd then regenerate booster images.\n\n"
+    },
+    {
+      "title": "Encryption",
+      "level": 3,
+      "content": "Booster supports LUKS based full-disk encryption out-of-the-box like Clevis. The generator does not need any extra configuration. Yet, for the initramfs you need to append information about the LUKS partition where the root resides. This is done with either rd.luks.uuid=LUKSUUID or rd.luks.name=LUKSUUID=LUKSNAME kernel parameter that need to be specified in the boot loader configuration file. LUKSUUID specifies the UUID of the encrypted LUKS partition that needs to be unlocked by Booster. The booster(1) § UUID parameters manual recommends that the UUID does not contain any quotes. LUKSNAME specifies name of the unlocked partition (as in /dev/mapper/LUKSNAME). See booster(1) § BOOT TIME KERNEL PARAMETERS for related options.\n\nNo image rebuild is required. Once the boot loader configuration is done, reboot the computer. After that you will see a Enter passphrase for YOURROOT: prompt at boot time asking for a password for the encrypted root partition.\n\n"
+    },
+    {
+      "title": "systemd style binding",
+      "level": 4,
+      "content": "Booster also supports partitions bound with systemd such as systemd-fido2 and systemd-tpm2.\n\nIf you use `systemd-fido2` then please install libfido2 package and add fido2-assert to the image using following configuration:\n\n```\n/etc/booster.yaml\n```\n\n```\nextra_files: fido2-assert\n```\n\nRegenerate the booster images. Booster will detect this configuration during boot and use the present YubiKey to unlock the drive.\n\n```\n/etc/booster.yaml\n```\n\n```\nmodules_force_load: usbhid,hid_sensor_hub\nextra_files: fido2-assert\n```\n\n"
+    },
+    {
+      "title": "Regenerate booster images",
+      "level": 3,
+      "content": "Once you are done with configuring Booster, you need to update Booster images at /boot. An image can be generated manually with booster build booster-foo.img or using a convenience script /usr/lib/booster/regenerate_images that iterates over all installed kernels and generates a Booster image for each of them.\n\n"
+    },
+    {
+      "title": "Removing modules",
+      "level": 3,
+      "content": "You can remove modules from initramfs via the - sign. An example to choose every modules manually and doing as same as Mkinitcpio/Minimal initramfs to improve boot performance is\n\n```\n/etc/booster.yaml\n```\n\n```\nmodules: -*,btrfs,nvme\n```\n\n"
+    },
+    {
+      "title": "Stripping modules",
+      "level": 3,
+      "content": "You can reduce size of by initramfs by stripping modules.\n\n```\n/etc/booster.yaml\n```\n\n```\nstrip: true\n```\n\n"
+    },
+    {
+      "title": "Boot loader configuration",
+      "level": 2,
+      "content": "Once the image is generated it is time to configure the boot loader.\n\n"
+    },
+    {
+      "title": "Microcode updates",
+      "level": 3,
+      "content": "Unlike mkinitcpio and dracut, Booster does not support including microcode updates into generated images; see Microcode#Microcode in a separate initramfs file for details on how to configure your boot loader to additionally load the appropriate microcode image.\n\n"
+    },
+    {
+      "title": "rEFInd",
+      "level": 3,
+      "content": "If the configuration relies on automatic detection already, no additional configuration change is necessary. rEFInd supports initrd files named booster*.\n\nIf you specify the initramfs path manually, either in refind.conf or in manual boot stanzas, make sure to use the correct files names. I.e. booster-linux.img instead of initramfs-linux.img.\n\n"
+    },
+    {
+      "title": "systemd-boot",
+      "level": 3,
+      "content": "To enable the new initramfs image with systemd-boot simply create a new boot loader entry like this one:\n\n```\n/boot/loader/entries/booster.conf\n```\n\n```\ntitle Arch Linux with booster\nlinux /vmlinuz-linux\ninitrd /intel-ucode.img\ninitrd /booster-linux.img\noptions root=UUID=08f83949-bcbb-47bb-bc17-089aaa59e17e rw\n```\n\nWhere the root filesystem is referenced by UUID=08f83949-bcbb-47bb-bc17-089aaa59e17e. To find your root device UUID run blkid /dev/ROOTDEVICE.\n\n"
+    },
+    {
+      "title": "Debug",
+      "level": 3,
+      "content": "If Booster has issues and does not work as expected, enable debug output that provides extra information about what is going on:\n\n- for generator there is a -debug command line flag: booster -debug.\n- for init there is a booster.debug kernel parameter.\n\nIf you believe it is an issue with Booster itself, then please file a ticket on GitHub.\n\n"
+    },
+    {
+      "title": "Booster generator fails with \"too many open files\" error",
+      "level": 3,
+      "content": "If you enabled strip and universal and see an error like /usr/lib/modules/glue_helper.ko: pipe2: too many open files, then you need to increase per-process limit for open files. See Limits.conf#nofile.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- upstream README\n\n"
+    }
+  ]
+}

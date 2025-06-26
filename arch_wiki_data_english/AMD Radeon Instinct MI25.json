@@ -1,0 +1,66 @@
+{
+  "title": "AMD Radeon Instinct MI25",
+  "url": "https://wiki.archlinux.org/title/AMD_Radeon_Instinct_MI25",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- GPGPU\n- AMDGPU\n\nThis page describes the steps necessary to perform GPGPU on the AMD Radeon Instinct MI25 (and other gfx900 vega10 GPUs).\n\n"
+    },
+    {
+      "title": "BIOS and cooling",
+      "level": 2,
+      "content": "The MI25 is a power hungry, passively cooled accelerator card that often exhibits incompatibility with consumer level hardware and has no video out by default. To remedy this, we can flash a WX9100 BIOS to the MI25, which lowers the power limit from 220W to 170W, enables the Mini DisplayPort hidden behind the PCIe bracket, enables the fan header to be used for active cooling, and allows consumer equipment to boot with the MI25 attached if it would not before.\n\nDepending on your situation, you may be able to flash the BIOS from within the operating system using amdvbflashAUR if you can boot successfully and keep it cool. Alternatively, the BIOS can be flashed quite easily in hardware without the risk of overheating.\n\nThe recommended and most widely tested WX9100 BIOS can be downloaded here.\n\n"
+    },
+    {
+      "title": "Hardware flashing with a Raspberry Pi",
+      "level": 3,
+      "content": "The BIOS chip is located under the backplate and can be flashed with a SOP8 test clip and a Raspberry Pi using flashrom.\n\nFirstly, we need to connect the MI25 BIOS chip and clip to the Raspberry Pi GPIO pins according to this diagram here. Once we have carefully connected everything and have the Raspberry Pi booted, use the following command to see if the flash is detected.\n\n```\n# flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=8192\n```\n\nOnce the flash has been successfully detected, we must backup the original BIOS before we flash the new one. This serves two purposes, it provides us with a backup to restore to, and confirms that we have a good connection to the BIOS flash chip.\n\n```\n# flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=8192 -r mi25-dump1.rom\n```\n\n```\n# flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=8192 -r mi25-dump2.rom\n```\n\n```\n$ sha1sum mi25-dump*.rom\n```\n\nIf the checksums match, then we are good to go. If not, try reseating the clip and try again until you get consistent dumps.\n\nYou may have noticed that the WX9100 BIOS is 256KiB, while the MI25 BIOS is 1MiB. To remedy this, we create a 768KiB file consisting of zero bytes and append it to the end of our WX9100 BIOS, 218718.rom.\n\n```\n$ truncate -s +768KiB pad.bin\n```\n\n```\n$ cat 218718.rom pad.bin > 218718-padded.rom\n```\n\nAfter that, we can flash the freshly padded BIOS to the MI25.\n\n```\n# flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=8192 -w 218718-padded.rom -V\n```\n\nFlashrom should verify a successful flash, but feel free to take another BIOS dump and compare checksums to 218718-padded.rom.\n\n"
+    },
+    {
+      "title": "Cooling",
+      "level": 3,
+      "content": "The MI25 has a JST-PH 4-pin fan header that actually works under the WX9100 BIOS. Simply purchase a cheap KK254 4-pin (regular 4 pin computer fan) to JST-PH 4-pin (MI25 fan header) adaptor cable. If you shop around, you can find a cheap adapter that lets you power two 4 pin fans from the MI25 (try searching for \"Graphics Card Fan Adapter Cable\"). To install the adapter cable, the shroud needs to be taken off, and the cable can be routed out through the gap next to the power connector.\n\nSince the MI25 comes passively cooled, some sort of ducting is required to redirect airflow through the heatsink. 3D printing one of these cooling shrouds, depending on which fan you decide to use, is quite a nice option, although a homemade solution would also suffice.\n\n"
+    },
+    {
+      "title": "ROCm",
+      "level": 2,
+      "content": "The MI25 (and other gfx900 GPUs) are deprecated and official support has ended. They were officially supported under ROCm 4, unofficially supported under ROCm 5, and unsupported under ROCm 6. So to install the latest working ROCm stack for gfx900, we first look at the dependencies of rocm-hip-sdk version 5.7.1-2 and miopen-hip version 5.7.1-1.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nTable content:\nLevel | Dependencies\nPackage | rocm-hip-sdk\nDirect dependencies | rocm-hip-sdk rocm-core rocm-hip-libraries rocm-llvm rocm-hip-runtime hipblas hipcub hipfft hipsparse hipsolver miopen-hip rccl rocalution rocblas rocfft rocprim rocrand rocsolver rocsparse rocthrust\nSecondary dependencies | composable-kernel hip-runtime-amd rocm-clang-ocl rocm-cmake rocm-language-runtime rocminfo\nTertiary dependencies | comgr hsa-rocr rocm-smi-lib hsakmt-roct rocm-device-libs rocm-opencl-runtime\nOptional dependencies | rocm-ml-libraries rocm-ml-sdk rocm-opencl-sdk\n\nTo install ROCm 5.7.1 from the Arch Linux Archive, we make use of the downgradeAUR script to select our desired package versions and obtain a functional ROCm environment.\n\n```\n# downgrade rocm-hip-sdk rocm-core rocm-hip-libraries rocm-llvm rocm-hip-runtime hipblas hipcub hipfft hipsparse hipsolver miopen-hip rccl rocalution rocblas rocfft rocprim rocrand rocsolver rocsparse rocthrust composable-kernel hip-runtime-amd rocm-clang-ocl rocm-cmake rocm-language-runtime rocminfo comgr hsa-rocr rocm-smi-lib hsakmt-roct rocm-device-libs rocm-opencl-runtime rocm-ml-libraries rocm-ml-sdk rocm-opencl-sdk\n```\n\nSee the for Arch Linux repository for more information about the remaining ROCm packages.\n\n"
+    },
+    {
+      "title": "OpenCL",
+      "level": 3,
+      "content": "opencl-amdAUR is functional, however it is incompatible with the ROCm 5.7.1 stack we have just installed.\n\nThe recommended method to obtain a performant, functional OpenCL sdk and runtime alongside ROCm, is by installing ROCm 5.7.1 and all of its dependencies listed above.\n\n"
+    },
+    {
+      "title": "GPGPU accelerated software",
+      "level": 2,
+      "content": "The purpose of this section is to list GPGPU accelerated software and how to run them on gfx900 GPUs.\n\n"
+    },
+    {
+      "title": "AUTOMATIC1111s Stable Diffusion web UI",
+      "level": 3,
+      "content": "A web interface for Stable Diffusion, implemented using Gradio library.\n\nstable-diffusion-webui-gitAUR can be used with a little manual configuration after installation. See rabcors comment on the AUR to get it working.\n\n"
+    },
+    {
+      "title": "BitCrack",
+      "level": 3,
+      "content": "A tool for brute-forcing Bitcoin private keys.\n\n- Clone repository.\n\n```\n$ git clone https://github.com/brichard19/BitCrack.git\n```\n\n- Change directory and build for OpenCL.\n\n```\n$ cd BitCrack && make BUILD_OPENCL=1\n```\n\n- Run clBitCrack.\n\n```\n$ ./bin/clBitCrack 1FshYsUh3mqgsG29XpZ23eLjWV8Ur3VwH 15JhYXn6Mx3oF4Y7PcTAv2wVVAuCFFQNiP 19EEC52krRUK1RkUAEZmQdjTyHT7Gp1TYT\n```\n\n"
+    },
+    {
+      "title": "Ollama",
+      "level": 3,
+      "content": "Get up and running with large language models.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nThe latest version of ollama to support ROCm 5.7 is 0.1.28. However, ollama 0.1.28 from the Arch Linux Archive is compiled without gfx900 support, so we must:\n\n- Downgrade ollama.\n\n```\n# downgrade ollama==0.1.28\n```\n\n- Clone repository.\n\n```\n$ git clone https://github.com/ollama/ollama.git\n```\n\n- Change directory and checkout version 0.1.28\n\n```\n$ cd ollama && git checkout 21347e1\n```\n\n- Build for gfx900.\n\n```\n$ AMDGPU_TARGETS=gfx900 go generate ./... && go build .\n```\n\n- Replace ollamas executable with our freshly compiled binary\n\n```\n# mv ./ollama /usr/bin/ollama\n```\n\n- Start ollama.service.\n- Perform inference.\n\n```\n$ ollama run tinyllama\n```\n\n"
+    },
+    {
+      "title": "PyTorch",
+      "level": 3,
+      "content": "Pytorch v2.2.2 is the latest release that supports ROCm 5.7, and can be installed via pip within a python311AUR virtual environment.\n\n```\n(venv)$ pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/rocm5.7\n```\n\n"
+    },
+    {
+      "title": "Tensorflow",
+      "level": 3,
+      "content": "Tensorflow 2.13.0.570 is the latest ROCm 5.7 compatible release, and can be installed via pip within a python311AUR virtual environment.\n\n```\n(venv)$ pip install tensorflow-rocm==2.13.0.570\n```\n\n```\n(venv)$ pip install tensorflow-rocm==2.13.0.570 jupyterlab ipython==8.23.0\n```\n\n"
+    }
+  ]
+}

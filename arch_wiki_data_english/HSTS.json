@@ -1,0 +1,91 @@
+{
+  "title": "HSTS",
+  "url": "https://wiki.archlinux.org/title/HSTS",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "According to Wikipedia:\n\n"
+    },
+    {
+      "title": "Implementations",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nThere are multiple TLS implementations available. OpenSSL should already be installed on your system as it is an indirect dependency of the base meta package (base > coreutils > openssl). GnuTLS might already be installed on your system as it is required by many packages.\n\n- OpenSSL — A robust, commercial-grade, and full-featured toolkit for the TLS and SSL protocols; also a general-purpose cryptography library.\n\n- GnuTLS — A free software implementation of the TLS, SSL and DTLS protocols. Offers APIs for X.509, PKCS #12 and other structures.\n\n- Network Security Services (NSS) — Implementation of cryptographic libraries supporting TLS/SSL and S/MIME. Also supports TLS acceleration and smart cards.\n\n- mbed TLS — Portable SSL/TLS implementation, aka PolarSSL.\n\n- LibreSSL — A version of the TLS/crypto stack forked from OpenSSL in 2014 by the OpenBSD project, with goals of modernizing the codebase and improving security.\n\n"
+    },
+    {
+      "title": "Certificate authorities",
+      "level": 2,
+      "content": "With TLS one of a set of certificate authorities (CAs) checks and signs for the authenticity of a public key certificate from a server. A client connecting to the server via TLS may verify its certificate's authenticity by relying on a digital signature of CA. To check the digital signature a client must have a public key of CA, obtained via a separate path and stored as a self-signed certificate. On Arch Linux the default set of CA certificates is provided by the ca-certificates package.\n\nArch Linux provides a centralized system-wide interface for managing CA certificates. This interface is the library /usr/lib/pkcs11/p11-kit-trust.so from the libp11-kit package, which provides PKCS #11 API for certificates, stored in /usr/share/ca-certificates/trust-source/ (the token \"Default Trust\") and /etc/ca-certificates/trust-source/ (the token \"System Trust\").\n\nFor using the interface from a command line, the p11-kit package provides the trust(1) utility.\n\nFor libraries, that have not been ported to PKCS #11 and use a custom logic for managing CA certificates, the package ca-certificates-utils provides the update-ca-trust(8) script. It copies CA certificates obtained through the centralized interface to /etc/ca-certificates/extracted/ and /etc/ssl/certs/.\n\n"
+    },
+    {
+      "title": "An overview of mechanisms for loading a default set of CA certificates",
+      "level": 3,
+      "content": "Table content:\nImplementation | Mechanism | Arch Linux configuration\nOpenSSL | Provides API functions that load the certificates from a hardcoded directory or file. SSL_CTX_set_default_verify_paths(3). | A default file is /etc/ssl/cert.pem, a default directory is /etc/ssl/certs/.\nGnuTLS | Provides an API function that loads the certificates from a hardcoded directory, file, or configured PKCS #11 modules. In the last case, a hardcoded URL allows to load either an arbitrary trusted certificate, or trusted CA certificates on modules, marked with trust-policy: yes, optionally with additional filtration criteria. [1], [2]. | Loads all trusted CA certificates from configured PKCS #11 modules, marked with trust-policy: yes.\nNetwork Security Services | Automatically loads the certificates from a dynamically configured list of PKCS #11 modules, managed with a dedicated API. Configuration can be stored in any directory, pointed by a user. The list always contains the built-in module that stores objects in the same user-provided directory. [3], modutil(1). | \nmbed TLS | A user should load the certificates. [4]. | \nLibreSSL | Provides an API function that loads the certificates from a hardcoded directory or file. libressl-SSL_CTX_load_verify_locations(3). | A default file is /etc/libressl/cert.pem, a default directory is /etc/libressl/certs/.\n\n"
+    },
+    {
+      "title": "Trust management",
+      "level": 2,
+      "content": "For trust management the trust(1) utility is provided. The utility operates on a list of PKCS #11 modules with the trust-policy: yes setting, sorted by the priority: setting. See pkcs11.conf(5) for details about configuration of modules.\n\n"
+    },
+    {
+      "title": "List trust store items",
+      "level": 3,
+      "content": "```\n$ trust list\n```\n\n"
+    },
+    {
+      "title": "Add a certificate to a trust store",
+      "level": 3,
+      "content": "```\n# trust anchor certificate.crt\n```\n\nThe certificate should be in the persistence, DER or PEM format (including the OpenSSL-specific trusted certificate format). This command stores the certificate in the first writable token found by querying the list of modules.\n\n"
+    },
+    {
+      "title": "Remove a certificate from a trust store",
+      "level": 3,
+      "content": "```\n$ trust anchor --remove 'pkcs11:id=%00%11%22%33%44%55%66%77%88%99%AA%BB%CC%DD%EE%FF%00%11%22%33;type=cert'\n```\n\n"
+    },
+    {
+      "title": "Override default trust",
+      "level": 3,
+      "content": "The default trust store p11-kit-trust.so includes a blocklist directory at /etc/ca-certificates/trust-source/blocklist/ and certificates in it will be treated as distrusted for all purposes.\n\nThe token representing certificates in /usr/share/ca-certificates/trust-source/ is always write-protected. To distrust a default certificate authority it can be extracted to the system's blocklist:\n\n```\n$ trust extract --format=pem-bundle --filter='pkcs11:id=%00%11%22%33%44%55%66%77%88%99%AA%BB%CC%DD%EE%FF%00%11%22%33;type=cert' /etc/ca-certificates/trust-source/blocklist/untrusted_authority.pem\n```\n\nAlternatively, an already extracted certificate may also be copied to the blocklist from the /etc/ca-certificates/extracted/cadir/ path. See update-ca-trust(8) § SOURCE CONFIGURATION for further information.\n\n"
+    },
+    {
+      "title": "Obtaining a certificate",
+      "level": 2,
+      "content": "The first step is to generate a private key. Before generating the key, set a restrictive file mode creation mask with umask (for example 077). This ensures that the keys written by openssl are read-protected.\n\nKeys can use either elliptic curve or RSA algorithms.\n\nElliptic curves are newer algorithms and are becoming increasingly adopted for modern systems. A 256-bit elliptic curve key is expected to provide sufficient security through the year 2030 [5]. Curve25519 is an elliptic curve algorithm which has good security and performance properties.\n\nRSA is an older cryptosystem and has higher compatibility, especially with clients that do not support recent versions of TLS. However, RSA relies on factorization, which is an area of cryptography which may be becoming weaker due to the development of faster factorization algorithms [6]. A 2048-bit RSA private key is expected to provide security through most of the 2020s [7]. A 4096-bit RSA private key is expected to provide security for longer (barring major advancements in factorization), but has a very large performance impact. The performance difference can be benchmarked with openssl speed rsa2048 rsa4096 [8].\n\nAfter the key is generated, a certificate can be obtained from a certificate authority with a Certificate Signing Request (CSR), or a certificate may be self-signed. While self-signed certificates can be generated easily, clients will reject them by default, meaning that every client needs to be configured to trust the self-signed certificate.\n\nFor the actual generation commands refer to the article of the used implementation:\n\n- OpenSSL#Usage\n- GnuTLS#Usage\n- Network Security Services#Usage\n- mbed TLS#Usage\n\n- You can get free trusted certificates from the Let's Encrypt certificate authority with ACME.\n- You can make locally trusted development certificates with the mkcert tool. See also Certificates for localhost.\n\n"
+    },
+    {
+      "title": "Server-side recommendations",
+      "level": 2,
+      "content": "Because there are various attacks against TLS the best practices should be considered:\n\n- Disable SSLv3 to prevent the POODLE attack.\n- weakdh.org's Guide to Deploying Diffie-Hellman for TLS\n- Mozilla's Server Side TLS article\n- SSL Labs' SSL and TLS Deployment Best Practices\n- Recommended TLS/SSL configurations for popular services\n\n"
+    },
+    {
+      "title": "Checking TLS",
+      "level": 3,
+      "content": "Programs to check TLS:\n\n- testssl.sh\n- Nmap\n- OpenSSL\n- cipherscan\n\nWebsites to check TLS:\n\n- https://dev.ssllabs.com/ssltest/ (only HTTPS)\n- https://www.checktls.com/ (only email)\n- https://www.immuniweb.com/ssl/ (any port)\n- https://tls.imirhil.fr/tls (any port)\n\n"
+    },
+    {
+      "title": "ACME clients",
+      "level": 3,
+      "content": "The Automated Certificate Management Environment (ACME) protocol lets you request valid X.509 certificates from certificate authorities, like Let's Encrypt.\n\nSee also List of ACME clients.\n\n- acme-cli — Yet another Letsencrypt (ACME) client using Ruby.\n\n- acme-tiny — A 200-line Python script to issue and renew TLS certs from Let's Encrypt.\n\n- acme.sh — A pure Unix shell script ACME client.\n\n- acmetool — An easy-to-use ACME CLI, written in Go.\n\n- Certbot — ACME client recommended by Let's Encrypt, written in Python.\n\n- dehydrated — ACME client, including support for wildcard certificates! Written in Bash.\n\n- getssl — ACME client, written in Bash.\n\n- lego — Lets Encrypt client and ACME library, written in Go.\n\n- manuale — A fully manual Let's Encrypt client, written in Python.\n\n- ruby-acme-client — A Ruby client for the letsencrypt's ACME protocol.\n\n- simp_le — Simple Let's Encrypt client, written in Python.\n\n"
+    },
+    {
+      "title": "OCSP",
+      "level": 3,
+      "content": "The Online Certificate Status Protocol (OCSP) is supported by Firefox. Chromium has its own mechanism[9].\n\nSee also ocsptool(1) by GnuTLS and ocsp(1ssl) by OpenSSL.\n\n"
+    },
+    {
+      "title": "HSTS",
+      "level": 3,
+      "content": "The HTTP Strict Transport Security (HSTS) mechanism is supported by Firefox, Chromium and wget (~/.wget-hsts).\n\n"
+    },
+    {
+      "title": "DNS CAA",
+      "level": 3,
+      "content": "See Wikipedia:DNS Certification Authority Authorization.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gentoo:Certificates\n- A note about SSL/TLS trusted certificate stores, and platforms (OpenSSL and GnuTLS)\n- PKCS #11 Cryptographic Token Interface Usage Guide\n\n"
+    }
+  ]
+}
