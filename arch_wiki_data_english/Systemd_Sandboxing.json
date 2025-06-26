@@ -1,0 +1,61 @@
+{
+  "title": "Systemd/Sandboxing",
+  "url": "https://wiki.archlinux.org/title/Systemd/Sandboxing",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Firejail\n- AppArmor\n- cgroups\n\nsystemd enables users to harden and sandbox system service units. Because of technical limitations, and ironically security reasons, user units can not be hardened or sandboxed properly since this would make privilege escalation issues possible. This does not affect system units which use the User= directive.\n\nBecause of the nature of other unit types, only service units can be hardened/sandboxed in the traditional sense. See systemd.exec(5) and systemd.resource-control(5) for more information.\n\n"
+    },
+    {
+      "title": "General",
+      "level": 2,
+      "content": "Since hardening/sandboxing effectively restricts an application, it is not possible to use all the sandboxing directives. A web server for example should not use PrivateNetwork=true since it usually needs network access.\n\nsystemd-analyze security unit generates a score for the unit showing all the used directives, which can be helpful to determine what settings to try next.\n\nUnfortunately, systemd's error messages on misconfiguration relating to sandboxing are sometimes vague and/or misleading. Setting the log level temporarily to debug may help getting actually relevant information.\n\n```\n# systemctl log-level debug\n```\n\n"
+    },
+    {
+      "title": "Capabilities",
+      "level": 2,
+      "content": "capabilities(7) are used to grant a process certain elevated privileges. For example, CAP_NET_BIND_SERVICE can be used so that an otherwise unprivileged process can bind ports below 1024, eliminating the need for it to start with root privileges at all. Another notable example is CAP_DAC_READ_SEARCH to grant a backup program unrestricted read access to all locations.\n\n- It is good practice to always use CapabilityBoundingSet and AmbientCapabilities together.\n- systemd-analyze capability provides a list of capabilities which can be used with systemd. This can be useful should you run an experimental kernel which adds capabilities.\n\nIn service units, you can accomplish this by using AmbientCapabilities= to grant it capabilities and CapabilityBoundingSet= to ensure nothing beyond the intended scope is granted:\n\n```\nexample.service\n```\n\n```\n[Service]\nAmbientCapabilities=CAP_NET_BIND_SERVICE\nCapabilityBoundingSet=CAP_NET_BIND_SERVICE\n```\n\n"
+    },
+    {
+      "title": "Common directives",
+      "level": 2,
+      "content": "Most of these directives can be applied to most applications without causing too many problems.\n\n"
+    },
+    {
+      "title": "Without special configuration",
+      "level": 3,
+      "content": "Simple boolean settings which can either be enabled or not. They can not be configured.\n\nTable content:\nDirective | Impact1 | Breakage2 | Notes\nLockPersonality | Medium | Low | \nMemoryDenyWriteExecute | Medium | Medium | Incompatible with dynamically generated code at runtime, including JIT, executable stacks, C compiler code \"trampoline\". Can be enhanced with SystemCallFilter.\nNoNewPrivileges | High | Low | \nPrivateDevices | Medium | Low | /dev/null and similar will still be there.\nPrivateNetwork | High | Very high | Disallows any network access.\nPrivateTmp | Medium | Low | \nPrivateUsers | High | High | \nRestrictRealtime | Low | Low | May prevent denial-of-service situations.\nRestrictSUIDSGID | Medium | Low | Best used with NoNewPrivileges.\n\n1. How effective the directive is\n1. How likely the directive is to break something\n\n"
+    },
+    {
+      "title": "Configurable directives",
+      "level": 3,
+      "content": "Most of these directives are quite powerful and will affect a lot. It is recommended to consider using at least some of them.\n\nTable content:\nDirective | Value | Impact1 | Breakage2 | Notes\nProtectSystem | strict | Very high | Very high | Usually used with ReadWritePaths=\nfull | High | Medium | May break e.g web servers using ACME to renew their own keys which may be in /etc\ntrue | High | Medium | There are in theory few applications which write to /boot and /usr\nProtectHome | true | High | Medium | Some applications may need persistent data stored in XDG_CONFIG_HOME3\ntmpfs | High | Medium | Home directories contain a lot of sensitive data and using either tmpfs or true may prevent leaks.4\nread-only | Low | Low | Ideal for backup services\nProtectProc5 | invisible | High | Medium | \nnoaccess | Medium | Medium | \nRestrictAddressFamilies | e.g AF_UNIX AF_INET AF_INET6 | Low | Low | Takes a space-separated list of address families, address_families(7).\n\n1. How effective the directive is\n1. How likely the directive is to break something\n1. StateDirectory= can be used to mitigate some of the negative consequences\n1. This also makes /run/user/ inaccessible, preventing leakage using IPC sockets. In theory, there may also be sockets elsewhere, e.g /tmp.\n1. Defaults to the hidepid value of the /proc mount when directive is omitted, which is usually 0 (unrestricted)\n\n"
+    },
+    {
+      "title": "Advanced directives",
+      "level": 2,
+      "content": "These directives are not useful for most units and are thus used more rarely.\n\nTable content:\nDirective | Value | Impact | Breakage | Notes\nDynamicUser | Boolean, e.g true | Medium | Medium | Needs to be combined with StateDirectory=, RuntimeDirectory=, CacheDirectory=, LogsDirectory= and ConfigurationDirectory=.[1]\nProtectClock1,2 | Boolean | Low | Medium | Some users reported smartctl can not run when this is set, but this should be relatively safe.\nProtectControlGroups1 | Boolean | Medium | Low | \nProtectHostname1,2 | Boolean | Low | Low | \nProtectKernelLogs1 | Boolean | Low | Low | All official kernels have SECURITY_DMESG_RESTRICT set to y, but this is still defense in depth.\nProtectKernelModules1 | Boolean | Medium | Low | \nProtectKernelTunables1 | Boolean | Low | Low | \nRestrictFileSystems | e.g ext4 tmpfs | Medium | Medium | Takes a space-separated list of file systems or a set, e.g @network. See systemd-analyze filesystems for a full list.\nSystemCallArchitectures | e.g native | Low | Low | See also #Disabling non-native syscalls - prefer using this to opt out a unit from the system default instead.\nSystemCallFilter | e.g @system-service | Medium | High | See systemd.exec(5) § SYSTEM CALL FILTERING - forgetting just a single syscall will lead to your application segfaulting at possibly inopportune times.\nSocketBindAllow/Deny | e.g SocketBindAllow=ipv4:22 SocketBindDeny=any | Medium | Medium | Best combined with CAP_NET_BIND_SERVICE to ensure the privileged context can only bind to desired ports.\n\n1. Redundant and unnecessary to specify if the service unit does not run with elevated privileges resulting from use of e.g AmbientCapabilities= or running as root. If a service unit is running as another normal and unprivileged User=, these settings are entirely superfluous and can be safely omitted.\n1. Restricts issuing corresponding syscalls only, but not access to IPC services shipped by systemd (namely systemd-timedated and systemd-hostnamed).[2] Care must be taken to block the D-Bus/Varlink methods involved if absolute security is demanded.\n\n"
+    },
+    {
+      "title": "chroot jail",
+      "level": 3,
+      "content": "It is possible to severely restrict what a process can see by specifying TemporaryFileSystem=/:ro and mounting required paths into this chroot-like jail. RootDirectory requires a directory to be present, whereas TemporaryFileSystem does not and will override / seamlessly. Both, and especially the latter, appear to be secure chroot-like directives, which can not be broken out easily, as they do not use the chroot syscall.\n\nAll required paths must be mounted into this jail via BindReadOnlyPaths and BindPaths:\n\n```\nexample_jailed_unit.service\n```\n\n```\n[Unit]\nDescription=Example unit\n\n[Service]\nExecStart=/home/someuser/executable\nUser=someuser\nGroup=someuser\nTemporaryFileSystem=/:ro\nPrivateTmp=true\nBindReadOnlyPaths=/usr/lib /lib64 /lib\nBindPaths=/home/someuser/executable\n```\n\nThis is a minimal example and most application will need more paths whitelisted. Some common paths include:\n\n- /etc/ca-certificates, /etc/ssl\n- /etc/resolv.conf\n- /usr/share/zoneinfo\n- Any sockets you need, e.g /var/run/mysqld/mysqld.sock\n\nIt will be likely that debugging is at some point necessary when trying to sandbox a unit for the first time. If a unit can not be started at all and fails with status=203/EXEC, either the executable itself or required libraries are not accessible. Starting with broad paths at first (e.g allowing the entirety of /usr) and narrowing it down later can help, too.\n\n"
+    },
+    {
+      "title": "system.conf",
+      "level": 2,
+      "content": "Changes to /etc/systemd/system.conf are global, so they will affect every unit. See systemd-system.conf(5)\n\n"
+    },
+    {
+      "title": "Disabling non-native syscalls",
+      "level": 3,
+      "content": "Non-native binaries, in almost all cases 32-bit binaries, may partially compromise the security of the system because they do not have access to more hardening. There have been some relatively minor vulnerabilities, like CVE-2009-0835, which affected non-native syscalls.\n\nNote: **will** \n\n```\n/etc/systemd/system.conf\n```\n\n```\nSystemCallArchitectures=native\n```\n\nThis works well on most systems, but it needs to be at least partially disabled if e.g multilib is in use. Especially gaming with Wine may be impacted. Using systemd-run or modifying the session slice to override SystemCallArchitectures can be used to disable restrictions partially.\n\n"
+    },
+    {
+      "title": "Enabling more unit statistics",
+      "level": 3,
+      "content": "systemd does not track all resource usage of a unit by default. Enable Default*Accounting to get more statistics in the systemctl status output and the journal. This is not strictly a security setting, but it will certainly make debugging easier and can provide useful insights into resource usage.\n\n```\n/etc/systemd/system.conf\n```\n\n```\nDefaultCPUAccounting=yes\nDefaultIOAccounting=yes\nDefaultIPAccounting=yes\nDefaultMemoryAccounting=yes\nDefaultTasksAccounting=yes\n```\n\n"
+    }
+  ]
+}

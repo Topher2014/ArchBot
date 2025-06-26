@@ -1,0 +1,41 @@
+{
+  "title": "Haskell package guidelines",
+  "url": "https://wiki.archlinux.org/title/Haskell_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document aims to cover standards and guidelines for producing good Haskell packages on Arch.\n\nUntil this document is written, contact User:Felixonmars.\n\n"
+    },
+    {
+      "title": "Package naming",
+      "level": 2,
+      "content": "For Haskell libraries, use haskell-libraryname usually the same name as on hackage.\n\n"
+    },
+    {
+      "title": "Architecture",
+      "level": 2,
+      "content": "See PKGBUILD#arch.\n\nEvery Haskell library or program is architecture-dependent.\n\n"
+    },
+    {
+      "title": "Source",
+      "level": 2,
+      "content": "The preferred source of a Haskell program or library is from hackage. PKGBUILD#source source=() array should use the following URL template:\n\n```\nhttps://hackage.haskell.org/packages/archive/$_hkgname/$pkgver/$_hkgname-$pkgver.tar.gz\n```\n\nNote that a custom _hkgname variable is used instead of pkgname since Haskell packages are generally prefixed with haskell-. This variable can generically be defined as follows:\n\n```\n_hkgname=stm-delay\n```\n\n"
+    },
+    {
+      "title": "Rebuild order",
+      "level": 2,
+      "content": "When a Haskell library changes its build flags or is updated, all dependent packages need to be rebuilt. The genrebuild tool can be used to find out what needs rebuilding and how. Example usage:\n\n```\n$ ./genrebuild -H haskell-basement\n```\n\n"
+    },
+    {
+      "title": "Using arch-hs",
+      "level": 2,
+      "content": "arch-hs is provided to automate PKGBUILD generation and maintenance.\n\nTo generate a series of PKGBUILDs for a Hackage package (and its unpackaged dependencies):\n\n```\n$ arch-hs -o /path/to/workdir library_name\n```\n\nTo compare dependencies and other packaging metadata for updating an existing package:\n\n```\n$ arch-hs-diff library_name old_version new_version\n```\n\nTo compare Arch [extra] package versions and their corresponding Hackage package versions:\n\n```\n$ arch-hs-sync check\n```\n\nNote that arch-hs uses cabal-install to maintain Hackage databases, so please update your cabal-install database regularly to keep them fresh:\n\n```\n$ cabal update\n```\n\n"
+    },
+    {
+      "title": "PKGBUILD library example",
+      "level": 2,
+      "content": "Packaging a Haskell library is different from packaging a Haskell program, the libraries packaged in Arch Linux are meant to be used by packaged Haskell programs.\n\n```\nPKGBUILD\n```\n\n```\n# Maintainer: Your Name <youremail@domain.com>\n_hkgname=stm-delay\npkgname=haskell-stm-delay\npkgver=\npkgrel=1\nlicense=()\narch=('x86_64')\nurl=\"https://hackage.haskell.org/package/$_hkgname\"\ndepends=(ghc-libs)\nmakedepends=(ghc)\nsource=(\"https://hackage.haskell.org/packages/archive/$_hkgname/$pkgver/$_hkgname-$pkgver.tar.gz\")\nsha256sums=()\n\nbuild() {\n  cd \"$_hkgname-$pkgver\"\n\n  runhaskell Setup configure -O --enable-shared --enable-debug-info --enable-executable-dynamic --disable-library-vanilla \\\n    --prefix=/usr --docdir=\"/usr/share/doc/$pkgname\" --datasubdir=$pkgname --enable-tests \\\n    --dynlibdir=/usr/lib --libsubdir=\\$compiler/site-local/\\$pkgid \\\n    --ghc-option=-optl-Wl\\,-z\\,relro\\,-z\\,now \\\n    --ghc-option='-pie'\n\n  runhaskell Setup build $MAKEFLAGS\n  runhaskell Setup register --gen-script\n  runhaskell Setup unregister --gen-script\n  sed -i -r -e \"s|ghc-pkg.*update[^ ]* |&'--force' |\" register.sh\n  sed -i -r -e \"s|ghc-pkg.*unregister[^ ]* |&'--force' |\" unregister.sh\n}\n\ncheck() {\n  cd \"$_hkgname-$pkgver\"\n  runhaskell Setup test\n}\n\npackage() {\n  cd \"$_hkgname-$pkgver\"\n\n  install -D -m744 register.sh \"$pkgdir/usr/share/haskell/register/$pkgname.sh\"\n  install -D -m744 unregister.sh \"$pkgdir/usr/share/haskell/unregister/$pkgname.sh\"\n  runhaskell Setup copy --destdir=\"$pkgdir\"\n  install -D -m644 \"LICENSE\" \"${pkgdir}/usr/share/licenses/${pkgname}/LICENSE\"\n  rm -f \"${pkgdir}/usr/share/doc/${pkgname}/LICENSE\"\n}\n```\n\n"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "title": "Efistub",
+  "url": "https://wiki.archlinux.org/title/Efistub",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Arch boot process\n- Unified Extensible Firmware Interface\n- Unified kernel image\n\nAn EFI boot stub (aka EFI stub) is a kernel that is an EFI executable, i.e. that can directly be booted from the UEFI.\n\nHistorically, this article and the Debian Wiki used the terms as one word (EFISTUB or EFIStub).\n\nBy default Arch Linux kernels are EFI boot stubs. If compiling the kernel, activate it by setting CONFIG_EFI_STUB=y. See The EFI Boot Stub for more information.\n\nBefore continuing, you need an EFI system partition and choose how it is mounted.\n\n- pacman will directly update the kernel that the UEFI will read if you mount the ESP to /boot.\n- EFI boot stubs can also be booted indirectly using a boot loader: There are several UEFI boot managers which can provide additional options or simplify the process of UEFI booting This is especially useful if you are experimenting with kernel parameters or if you have multiple kernels/operating systems and your motherboard's UEFI boot menu is not easy to use. A boot manager which has a file system driver for the partition where the kernel and initramfs reside (e.g. rEFInd) allows keeping them off of the ESP.\n\n- There are several UEFI boot managers which can provide additional options or simplify the process of UEFI booting\n- This is especially useful if you are experimenting with kernel parameters or if you have multiple kernels/operating systems and your motherboard's UEFI boot menu is not easy to use.\n- A boot manager which has a file system driver for the partition where the kernel and initramfs reside (e.g. rEFInd) allows keeping them off of the ESP.\n\n"
+    },
+    {
+      "title": "Using UEFI directly",
+      "level": 3,
+      "content": "UEFI is designed to remove the need for an intermediate boot loader such as GRUB. If your motherboard has a good UEFI implementation, it is possible to embed the kernel parameters within a UEFI boot entry and for the motherboard to boot Arch directly. You can use efibootmgr or UEFI Shell v2 to modify your motherboard's boot entries.\n\nNote: **Lenovo** \n\n- Outdated UEFI implementations may have compatibility issues with the Linux kernel. If there is a newer version of your UEFI with bug fixes, consider flashing it with the manufacturer's recommended tool.\n- Some firmwares (notably Lenovo and Dell laptops) do not pass command line parameters from the boot entries in NVRAM to the EFI binaries.[1] In that case, the kernel and parameters can be combined into a unified kernel image, then create a boot entry with the resulting .efi file.\n\n"
+    },
+    {
+      "title": "efibootmgr",
+      "level": 4,
+      "content": "To create a boot entry with efibootmgr that will load the kernel:\n\n```\n# efibootmgr --create --disk /dev/sdX --part Y --label \"Arch Linux\" --loader /vmlinuz-linux --unicode 'root=block_device_identifier rw initrd=\\initramfs-linux.img'\n```\n\nWhere /dev/sdX and Y are the drive and partition number where the ESP is located and root= parameters with your Linux root partitions.\n\nIf omitted, then the first partition on /dev/sda is used as the ESP.\n\nNote that the -u/--unicode argument in quotes is just the list of kernel parameters, so you may need to add additional parameters (e.g. for suspend to disk).\n\nAn example with LTS Linux kernel, NVME storage, BTRFS filesystem with specific subvolume and hibernation on swap partition:\n\n```\n# efibootmgr --create \\\n --disk /dev/nvme0n1 --part 1 \\\n --label \"EFISTUB Arch\" \\\n --loader /vmlinuz-linux-lts \\\n --unicode 'root=UUID=01a40dd8-28f0-4636-be1e-aeed60c98095 resume=UUID=2d877d5d-4ca1-4d46-a3d6-b6ee94cbbd78 rw rootflags=subvol=@ loglevel=3 quiet initrd=\\initramfs-linux-lts.img'\n```\n\nFor getting a list with the boot entries, setting the boot order or removing them, see efibootmgr.\n\n- You can simplify and automate this with the kesboot-gitAUR package: it also contains a pacman hook that can add and remove EFI variables during actions with packages.\n- https://github.com/de-arl/auto-UEFI-entry is a bash helper to create the commands.\n- It is convenient to save the command to create the boot entry in a shell script, which makes it easier to modify, for example when changing kernel parameters. In doing so, consider automating the deletion of old boot entries, as efibootmgr currently does not support editing existing entries.\n- The forum post titled The Linux kernel with built-in boot loader might also be of interest.\n\n"
+    },
+    {
+      "title": "bcfg",
+      "level": 4,
+      "content": "Some UEFI implementations make it difficult to modify the NVRAM successfully using efibootmgr. If efibootmgr cannot successfully create an entry, you can use the bcfg command in UEFI Shell v2 (i.e., from the Arch Linux live iso).\n\nFirst, find out the device number where your ESP resides with:\n\n```\nShell> map\n```\n\nIn this example, 1 is used as the device number. To list the contents of the ESP:\n\n```\nShell> ls FS1:\n```\n\nTo view the current boot entries:\n\n```\nShell> bcfg boot dump\n```\n\nTo add an entry for your kernel, use:\n\n```\nShell> bcfg boot add N FS1:\\vmlinuz-linux \"Arch Linux\"\n```\n\nWhere N is the location where the entry will be added in the boot menu. 0 is the first menu item. Menu items already existing will be shifted in the menu without being discarded.\n\nYou can add kernel options directly:\n\n```\nShell> bcfg boot -opt N \"root=/dev/sda2 initrd=\\initramfs-linux.img\"\n```\n\nOr by creating a file on your ESP:\n\n```\nShell> edit FS1:\\options.txt\n```\n\nIn the file, add the boot line. For example:\n\n```\nroot=/dev/sda2 rw initrd=\\initramfs-linux.img\n```\n\nPress F2 to save and then F3 to exit.\n\nAdd these options to your previous entry:\n\n```\nShell> bcfg boot -opt N FS1:\\options.txt\n```\n\nRepeat this process for any additional entries.\n\nTo remove a previously added item do:\n\n```\nShell> bcfg boot rm N\n```\n\n"
+    },
+    {
+      "title": "Using UEFI Shell",
+      "level": 3,
+      "content": "If you do not want to create a permanent boot entry it is possible to launch the kernel from UEFI Shell since it is a normal UEFI application:\n\n```\n> FS0:\n> \\vmlinuz-linux root=PARTUUID=3518bb68-d01e-45c9-b973-0b5d918aae96 rw initrd=\\initramfs-linux.img\n```\n\nIn this case, the kernel parameters are passed as normal parameters to the EFI boot stub kernel.\n\nTo avoid needing to remember all of your kernel parameters every time, you can save the executable command to a shell script such as archlinux.nsh on your EFI system partition, then run it with:\n\n```\n> FS0:\n> archlinux\n```\n\n"
+    },
+    {
+      "title": "Using a startup.nsh script",
+      "level": 4,
+      "content": "Some UEFI implementations do not retain EFI variables between cold boots (e.g. VirtualBox before version 6.1) and anything set through the UEFI is lost on poweroff.\n\nThe UEFI Shell Specification 2.0 establishes that a script called startup.nsh at the root of the ESP partition will always be interpreted and can contain arbitrary instructions; among those you can set a bootloading line. Make sure you mount the ESP partition on /boot and create a startup.nsh script that contains a kernel bootloading line. For example:\n\n```\nvmlinuz-linux rw root=/dev/sdX [rootfs=myfs] [rootflags=myrootflags] \\\n [kernel.flag=foo] [mymodule.flag=bar] \\\n initrd=\\initramfs-linux.img\n```\n\nThis method will work with almost all UEFI versions you may encounter in real hardware, you can use it as last resort. The script must be a single long line. Sections in brackets are optional and given only as a guide. Shell style linebreaks are for visual clarification only. FAT filesystems use the backslash as path separator and in this case, the backslash declares the initramfs is located in the root of the ESP partition.\n\n"
+    },
+    {
+      "title": "Boot entry with fallback ramdisk",
+      "level": 3,
+      "content": "Without a boot manager, the kernel command line is not changeable at boot time. To have at least some sort of fallback possibility, e.g. to use the initramfs-linux-fallback.img and/or start without Intel microcode, simply create a further boot entry with efibootmgr, e.g. labeled \"Arch Linux fallback\" and the desired fallback options.\n\n"
+    },
+    {
+      "title": "Unbootable stub on some Dell systems",
+      "level": 3,
+      "content": "Several generation Dell firmwares are wrongly passing the arguments to the boot loader, thus making EFISTUB parse a null command line which normally means unbootable system (see the complete linux-efi thread).\n\nA workaround has been found since Linux 5.10 to correct this behavior (see this commit ). For Linux < 5.10, you can use an efi-packer like arch-efiboot, or a different boot loader.\n\n"
+    },
+    {
+      "title": "Changes to boot entries are not applied",
+      "level": 3,
+      "content": "Some motherboards, such as Haswell-era ASUS boards (as encountered on the french forum), will not notice changes to boot entries unless the system is booted with another pre-existing one.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Linux Kernel Documentation - The EFI Boot Stub\n- Linux kernel commit - x86, efi: EFI boot stub support\n- Rod Smith's - Using the Kernel's EFI Stub Loader\n\n"
+    }
+  ]
+}

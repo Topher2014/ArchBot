@@ -1,0 +1,66 @@
+{
+  "title": "Modprobed db",
+  "url": "https://wiki.archlinux.org/title/Modprobed_db",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Kernels\n- Linux-ck\n\nmodprobed-db is a utility that populates a list of all the kernel modules that have been loaded on a system while running. This list can then be used to disable all the unused modules when building your own kernel and significantly reduce the compilation time.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the modprobed-dbAUR package.\n\n1. Run modprobed-db to create $XDG_CONFIG_HOME/modprobed-db.conf if it does not already exist.\n1. Run modprobed-db store to create the $XDG_CONFIG_HOME/modprobed.db database file and populate it with the currently loaded modules.\n\nOptionally: add modules in the ignore array that you do NOT want counted, for example modules that get built or that are provided by another package. Some common ones are included by default:\n\n```\n$ cat ~/.config/modprobed-db.conf\n```\n\n```\nIGNORE=(nvidia vboxdrv vboxnetflt vboxnetadp vboxpci lirc_dev lirc_i2c\nosscore oss_hdaudio oss_usb tp_smapi thinkpad_ec\nzavl znvpair zunicode zcommon zpios zfs spl splat)\n```\n\n"
+    },
+    {
+      "title": "Populating the database",
+      "level": 3,
+      "content": "Once the initial database has been created, use modprobed-db list to show the current database modules and modprobed-db store to update the database with the currently loaded kernel modules.\n\n"
+    },
+    {
+      "title": "Recommendations",
+      "level": 4,
+      "content": "It is recommended to \"use\" the official Arch kernel, with modprobed-db installed, for a good amount of time to allow the database to grow based on usage and capture everything the system needs before building a kernel without the unneeded modules). Here are some suggested actions to allow appropriate modules to load and get cataloged:\n\n- Mount every kind of filesystem that will be used.\n- Insert every kind of removable media that will be used (USB, DVD, CD, etc.). This includes the mounting of ISO image files if applicable, which uses the loop and isofs modules.\n- Use every device on the machine (network interfaces, input devices, webcams, mobile devices, etc.).\n- Use every desired application, as some depend on kernel modules. For example: IP blocking/filtering software such as pgl-cliAUR require the iptables kernel module. Encryption software such as veracrypt requires cryptography kernel modules. Be sure to mount some encrypted containers so they will actually be loaded. Certain QEMU configurations require kernel modules. lm-sensors requires kernel modules for reading hardware sensors.\n- Try re-running modprobed-db while running different Linux-kernels; they may include modules not enabled in the other kernels.\n\n- This includes the mounting of ISO image files if applicable, which uses the loop and isofs modules.\n\n- IP blocking/filtering software such as pgl-cliAUR require the iptables kernel module.\n- Encryption software such as veracrypt requires cryptography kernel modules. Be sure to mount some encrypted containers so they will actually be loaded.\n- Certain QEMU configurations require kernel modules.\n- lm-sensors requires kernel modules for reading hardware sensors.\n\nThese suggested actions are to be made in parallel with periodically updating the database with modprobed-db store to capture any newly loaded kernel module.\n\n"
+    },
+    {
+      "title": "Automatic periodic database updates",
+      "level": 4,
+      "content": "Calls to modprobed-db store can be automated with one of the following methods:\n\nThe most convenient method to use modprobed-db is to simply add a crontab entry invoking /usr/bin/modprobed-db store at some regular interval.\n\nExample running the script once every hour:\n\n```\n$ crontab -e\n0 */1 * * *   /usr/bin/modprobed-db store &> /dev/null\n```\n\nInstead of cron, enable/start the modprobed-db.service user unit. It will run modprobed-db in store mode once per 6 hours, and at boot and on shutdown.\n\nLike any service and timer, the status of the modprobed-db.service user unit can be queried.\n\n"
+    },
+    {
+      "title": "Manually editing the database",
+      "level": 4,
+      "content": "Using the #Automatic periodic database updates or manually running modprobed-db store is not entirely foolproof:\n\n- Some modules get loaded then unloaded between two periodic database updates and may not be captured.\n- Some modules are used during boot and are not captured by modprobed-db (e.g. efivarfs), they need to be manually added to the modprobed.db file.\n\nThankfully, the modprobed.db database file is a simple text file that contains one kernel module name per line: it can be manually edited to add/remove a module. It is then recommended to run modprobed-db store after a manual edit so the modules get automatically reordered.\n\nThese modules are recommended to be added to the $XDG_CONFIG_HOME/modprobed.db database file as they are broadly used:\n\n- ext4, fat, vfat: to support common file systems and the EFI system partition\n- nls_ascii, nls_cp437: to support mounting the EFI system partition. This is required on linux-xanmodAUR, on other kernels they may be built-in.\n- loop: to mount a file as a file system\n- isofs: to mount ISO files\n- cifs: for network filesystems like Samba\n- efivarfs: for mounting the UEFI#UEFI variables file system\n- usb_storage: to support USB storage devices\n- usbhid: to support USB input devices\n\n"
+    },
+    {
+      "title": "Building a kernel with modprobed-db",
+      "level": 3,
+      "content": "After the database has been adequately populated, it can be read directly by make localmodconfig.\n\n"
+    },
+    {
+      "title": "Traditional compilation",
+      "level": 4,
+      "content": "modprobed-db naturally intervenes in a traditional compilation workflow during the configuration step with the default Arch .config file.\n\n"
+    },
+    {
+      "title": "Using the official Arch kernel PKGBUILD",
+      "level": 4,
+      "content": "The official Arch kernel PKGBUILD can be modified as shown to do this automatically:\n\n```\n...\n    msg2 \"Applying patch $src...\"\n    patch -Np1 < \"../$src\"\n  done\n\n  msg2 \"Setting config...\"\n  cp ../config .config\n  make olddefconfig\n\n  yes \"\" | make LSMOD=$HOME/.config/modprobed.db localmodconfig\n\n  make -s kernelrelease > ../version\n...\n```\n\n"
+    },
+    {
+      "title": "Using linux-tkg",
+      "level": 4,
+      "content": "linux-tkg offers a user-friendly kernel build script that also includes extra patches oriented towards improving desktop/gaming performance. The use of modprobed-db's database to strip unneeded modules can be toggled in its configuration file.\n\n"
+    },
+    {
+      "title": "Benefits of modprobed-db with \"make localmodconfig\" in custom kernels",
+      "level": 2,
+      "content": "1. Significantly reduced compilation time\n1. Unneeded modules are not built, the saved disk space is negligible for desktop computers as it is a relatively small gain (few hundred megabytes).\n\nComparisons using kernel version 5.13.1, where a Kernel/Traditional compilation is made with the default Arch configuration.\n\nTable content:\nMachine CPU | # of threads | Compiler | make localmodconfig | # of Modules | Total Compilation Time | Kernel Compilation Time | Modules Compilation Time\nRyzen 5950X @ 4.55 GHz | 32 | GCC 11.1.0 | No | 5442 | 5m 12s | 58s | 4m 14s\nRyzen 5950X @ 4.55 GHz | 32 | GCC 11.1.0 | Yes | 227 | 1m 32s | 57s | 35s\nRyzen 5950X @ 4.55 GHz | 32 | Clang 12.0.1 | No | 5442 | 9m 5s | 1m 13s | 7m 52s\nRyzen 5950X @ 4.55 GHz | 32 | Clang 12.0.1 | Yes | 227 | 2m 13s | 1m 13s | 1m\n\nThe main results of the benchmark is that 80% of the build time of a \"full\" kernel is spent on modules. Given that only a fraction of those modules are needed by any given machine, the build time can be reduced by ~70%. The results will vary from one machine to another but should be similar.\n\nThe number of modules can be determined by the following:\n\n```\n$ cd /lib/modules/15.13.1-your-custom-kernel\n$ find -name '*.ko*' | wc -l\n```\n\nThe kernel build time is obtained with:\n\n```\n$ time make -jx bzImage # Replace \"x\" with the wanted number of threads\n```\n\nthen the modules build time is obtained with:\n\n```\n$ time make -jx modules # Replace \"x\" with the wanted number of threads\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://docs.kernel.org/admin-guide/README.html#configuring-the-kernel for documentation for make localmodconfig\n- https://docs.kernel.org/kbuild/kconfig.html and the parent directory\n\n"
+    }
+  ]
+}

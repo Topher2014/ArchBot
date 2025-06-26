@@ -1,0 +1,71 @@
+{
+  "title": "Smartcard",
+  "url": "https://wiki.archlinux.org/title/Smartcard",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Common Access Card\n- Electronic identification\n- OpenPGP card\n- Trusted Platform Module\n\nThis page explains how to setup your system in order to use a smart card reader.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install pcsclite and ccid.\n\nEnable and start pcscd.service.\n\n"
+    },
+    {
+      "title": "OpenSC",
+      "level": 3,
+      "content": "OpenSC provides an optional set of libraries and utilities to work with smart cards using pcsclite.\n\nInstall opensc.\n\nIf the card reader does not have a PIN pad, append the line(s) and set enable_pinpad = false in the opensc configuration file /etc/opensc.conf.\n\n"
+    },
+    {
+      "title": "Mozilla Firefox",
+      "level": 3,
+      "content": "The browser needs to set the new security-related device. Open the Security Devices page (reach it via Preferences > Privacy & Security > Certificates > Security Devices), then click Load and set the Module Name to CAC Module and module filename to /usr/lib/opensc-pkcs11.so.\n\n"
+    },
+    {
+      "title": "Chromium",
+      "level": 3,
+      "content": "Chromium uses NSS. Open a shell in your home directory and verify that the CAC Module is not already present:\n\n```\n$ modutil -list -dbdir $HOME/.pki/nssdb/\n```\n\n```\nListing of PKCS #11 Modules\n-----------------------------------------------------------\n  1. NSS Internal PKCS #11 Module\n    ....\n```\n\nIf not, close any browser and add the module (an user interaction for confirmation is required):\n\n```\n$ modutil -dbdir sql:$HOME/.pki/nssdb/ -add \"CAC Module\" -libfile /usr/lib/opensc-pkcs11.so\n```\n\n```\nWARNING: Performing this operation while the browser is running could cause\ncorruption of your security databases. If the browser is currently running,\nyou should exit browser before continuing this operation. Type\n'q <enter>' to abort, or <enter> to continue:\n\nModule \"CAC Module\" added to database.\n```\n\nCheck for the correct execution of the command:\n\n```\n$ modutil -list -dbdir $HOME/.pki/nssdb/\n```\n\n```\nListing of PKCS #11 Modules\n-----------------------------------------------------------\n  1. NSS Internal PKCS #11 Module\n    ....\n  2. CAC Module\n    library name: /usr/lib/opensc-pkcs11.so\n       uri: pkcs11:library-manufacturer=OpenSC%20Project;library-description=OpenSC%20smartcard%20framework;library-version=0.19\n     slots: 1 slot attached\n    status: loaded\n```\n\n"
+    },
+    {
+      "title": "Scan for readers and cards",
+      "level": 3,
+      "content": "Install pcsc-tools and start the pcsc_scan(1) utility, then connect the Smart card reader and finally insert a card. If you see output like this, the smart card reader and also the card have been successfully recognized.\n\n```\n$ pcsc_scan\n```\n\n```\nPC/SC device scanner\nV 1.5.2 (c) 2001-2017, Ludovic Rousseau <ludovic.rousseau@free.fr>\nUsing reader plug'n play mechanism\nScanning present readers...\n0: Alcor Micro AU9560 00 00\n\nSat Aug  5 18:49:32 2017\n Reader 0: Alcor Micro AU9560 00 00\n  Card state: Card removed, \n  \nSat Aug  5 19:00:35 2017\n Reader 0: Alcor Micro AU9560 00 00\n  Card state: Card inserted, \n  ATR:  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF\n\nATR:  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF\n+ TS = 3B --> Direct Convention\n+ T0 = DF, Y(1): 1101, K: 15 (historical bytes)\n  TA(1) = 18 --> Fi=372, Di=12, 31 cycles/ETU\n    129032 bits/s at 4 MHz, fMax for Fi = 5 MHz => 161290 bits/s\n  TC(1) = 00 --> Extra guard time: 0\n  TD(1) = 81 --> Y(i+1) = 1000, Protocol T = 1\n-----\n  TD(2) = 31 --> Y(i+1) = 0011, Protocol T = 1\n-----\n  TA(3) = FE --> IFSC: 254\n  TB(3) = 7D --> Block Waiting Integer: 7 - Character Waiting Integer: 13\n+ Historical bytes: 00 6B 02 0C 01 82 01 11 01 43 4E 53 10 31 80\n  Category indicator byte: 00 (compact TLV data object)\n    Tag: 6, len: B (pre-issuing data)\n      Data:  FF FF FF FF FF FF FF FF FF FF\n    Mandatory status indicator (3 last bytes)\n      LCS (life card cycle): 10 (Proprietary)\n      SW: 3180 (Error not defined by ISO 7816)\n+ TCK = FC (correct checksum)\n\nPossibly identified card (using /usr/share/pcsc/smartcard_list.txt):\nFF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF\n      Italian healtcare card (TS) National Service Card (CNS) (HealthCare)\n```\n\n"
+    },
+    {
+      "title": "Smargo/TV Card reader",
+      "level": 3,
+      "content": "When interfacing with a TV-card for live TV and recording (PVR/DVR), you may need to assign the smartcard reader to the video user group allowing decryption. When using a Smargo Smartreader consider the following udev rule:\n\n```\n/etc/udev/rules.d/98-smargo.rules\n```\n\n```\nSUBSYSTEM==\"tty\", ATTRS{idVendor}==\"0403\", ATTRS{idProduct}==\"6001\", GROUP=\"video\", MODE=\"0666\", SYMLINK+=\"smargo\"\n```\n\nSet /dev/smargo as the reader device when using softcam applications like OSCam.\n\n"
+    },
+    {
+      "title": "p11tool",
+      "level": 3,
+      "content": "If using packages from the GnuTLS suite which utilize p11-kit, such as p11tool, the OpenSC driver might not properly load. This can be determined if you run p11tool --list-tokens and you do not see your hardware token in the list.\n\nInstall the opensc-p11-kit-moduleAUR package in order to enable loading of the OpenSC module.\n\nAlternatively, it is possible to manually create a file that allows the OpenSC driver to be properly loaded:\n\n```\n/usr/share/p11-kit/modules/opensc.module\n```\n\n```\nmodule: opensc-pkcs11.so\n```\n\n"
+    },
+    {
+      "title": "SafeNet eToken",
+      "level": 3,
+      "content": "Class of Tokens and SmartCards from ThalesGroup. Used by companies like Certisign.\n\nInstall the sac-coreAUR to pkcs11 library installation.\n\n"
+    },
+    {
+      "title": "SafeNet eToken on Google Chrome",
+      "level": 4,
+      "content": "Module needs to be added to nssdb:\n\n```\n$ modutil -dbdir sql:$HOME/.pki/nssdb/ -add \"eToken\" -libfile /usr/lib/libeToken.so\n```\n\n```\nWARNING: Performing this operation while the browser is running could cause\ncorruption of your security databases. If the browser is currently running,\nyou should exit browser before continuing this operation. Type\n'q <enter>' to abort, or <enter> to continue:\n\nModule \"eToken\" added to database.\n```\n\nTo confirm it's installed:\n\n```\n$ modutil -dbdir sql:$HOME/.pki/nssdb/ -list\n```\n\n```\nListing of PKCS #11 Modules\n\n  1. NSS Internal PKCS #11 Module\n           uri: pkcs11:library-manufacturer=Mozilla%20Foundation;library-description=NSS%20Internal%20Crypto%20Services;library-version=3.98\n         slots: 2 slots attached\n        status: loaded\n\n         slot: NSS Internal Cryptographic Services\n        token: NSS Generic Crypto Services\n          uri: pkcs11:token=NSS%20Generic%20Crypto%20Services;manufacturer=Mozilla%20Foundation;serial=0000000000000000;model=NSS%203\n\n         slot: NSS User Private Key and Certificate Services\n        token: NSS Certificate DB\n          uri: pkcs11:token=NSS%20Certificate%20DB;manufacturer=Mozilla%20Foundation;serial=0000000000000000;model=NSS%203\n\n  2. eToken\n        library name: /usr/lib/libeToken.so\n           uri: pkcs11:library-manufacturer=SafeNet,%20Inc.;library-description=SafeNet%20eToken%20PKCS%2311;library-version=10.8\n         slots: 8 slots attached\n        status: loaded\n\n         slot: Gemalto PC Twin Reader 00 00\n        token: eCPF Certisign\n          uri: pkcs11:token=eCPF%20Certisign;manufacturer=Gemalto;serial=AF3E411BD8A8E169;model=ID%20Prime%20MD\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n\n         slot:\n        token:\n          uri: pkcs11:\n```\n\n"
+    },
+    {
+      "title": "Firefox can't access data",
+      "level": 3,
+      "content": "If the browser is not able to use the smart card data, probably it is not aware of the service which provides access to the device. This happens if you plug in the smart card reader after you open Firefox. To solve this issue, simply restart Firefox.\n\n"
+    },
+    {
+      "title": "LIBUSB_ERROR_BUSY",
+      "level": 3,
+      "content": "PC/SC can conflict with GnuPG for access to smartcards. See Ludovic Rousseau's blog and GnuPG#GnuPG with pcscd (PCSC Lite).\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Debian:Smartcards\n\n"
+    }
+  ]
+}

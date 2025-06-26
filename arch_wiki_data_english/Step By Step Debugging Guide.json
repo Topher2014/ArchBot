@@ -1,0 +1,76 @@
+{
+  "title": "Step By Step Debugging Guide",
+  "url": "https://wiki.archlinux.org/title/Step_By_Step_Debugging_Guide",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- General troubleshooting\n- Reporting bug guidelines\n- Debugging/Getting traces\n- Debugging/Profiling\n- Boot debugging\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nThis page is mainly about how to gather more information in connection with bug reports. Even though the word \"debug\" is used, it is not intended as a guide for how to debug programs while developing.\n\n"
+    },
+    {
+      "title": "Check availability of a core dump",
+      "level": 2,
+      "content": "A core dump is a file containing a process's address space (memory) when the process terminates unexpectedly. If the application is compiled in a debug-friendly way, the \"core\" file can be used to find out where things went wrong.\n\nThe location of core dumps may vary depending on the operating system configuration. See core dump to find whether generation of core dump files is enabled on your system and where do they go.\n\n"
+    },
+    {
+      "title": "Segmentation faults",
+      "level": 2,
+      "content": "There are several techniques that can be used to figure out what went wrong. Put your detective hat on.\n\n"
+    },
+    {
+      "title": "Gdb",
+      "level": 3,
+      "content": "gdb is an ancient and well tested application for debugging applications. See Debugging/Getting traces#Getting the trace for more instructions how to use it to obtain a trace. While running from gdb, you might have to wait for the segfault. Afterwards, post the trace to a pastebin service and include the URL in your bug report.\n\nIf you have a \"core\" file, it can be used together with gdb to get a backtrace:\n\n```\n$ gdb appname core\nbt full\n```\n\n"
+    },
+    {
+      "title": "Valgrind",
+      "level": 3,
+      "content": "Assuming you have an unstripped binary without inlined functions, it is usually a good idea to also run that program through valgrind. valgrind is a tool that emulates a CPU and usually shows where things go wrong or provide info in addition to gdb.\n\n```\n$ valgrind appname\n```\n\nit will provide a lot of helpful debug output if there is a crash. Consider -v and --leak-check=full to get even more info.\n\nAlternatively, use:\n\n```\n$ valgrind --tool=callgrind appname\n```\n\nand run the output through kcachegrind to graphically explore the functions the program uses. If a program hangs, this makes it easier to pinpoint the location of the error.\n\n"
+    },
+    {
+      "title": "Memory errors",
+      "level": 2,
+      "content": "In some cases, it may be necessary to find out if the application handles its memory correctly. This only affects applications written in memory-unsafe languages. For example, some crashes may be caused by memory errors such as a heap overflow.\n\nKeep in mind that packages on Arch Linux are compiled with additional flags to harden the application, which may influence memory errors. See Arch package guidelines/Security.\n\n"
+    },
+    {
+      "title": "AddressSanitizer",
+      "level": 3,
+      "content": "In order for ASan to work, the application must be compiled with -f sanitize=address and debugging symbols.\n\nThe compiled application will be slower with ASan enabled, but it heavily depends on the software itself, the compiler used (including its version) and the used -O value, among other things. If the application is unbearably slow, it is worth trying out different combinations. An extreme example is that Cataclysm: Dark Days Ahead took 60 minutes to load a simple save with GCC 9 and ASan enabled. Without ASan, the save would take under a minute to load. GCC 14 cut the loading time in half with ASan, but it still remained at 30 minutes, which is unacceptably slow. Clang 18 with ASan did not have that issue and the slowdown was negligible. However, forcing GCC 14 to use -O3 with ASan massively sped up the loading, but it still took a minute to load and was not as fast as clang.\n\nAn additional complication was that only GCC 9 was able to trigger the specific bug, a heap overflow. A version compiled with GCC 14 was unable to reproduce the bug. As such, it is important to keep the compiler versions in mind, too.\n\nTo find memory errors, simply run the application as normal. ASan will automatically crash the application on things such as a heap overflow or even use-after-free. When this happens, a detailed and helpful trace can be found in the output. The behavior of ASan can be influenced at runtime via the ASAN_OPTIONS environment variable. Additionally, there are compilation flags to alter its behavior.\n\nA common use for this environment variable is to tell ASan to not fatally crash the application when it finds something other than a memory leak:\n\n```\nASAN_OPTIONS=halt_on_error=0\n```\n\nFurther information can be found at:\n\n- https://github.com/google/sanitizers/wiki/AddressSanitizer\n- https://github.com/google/sanitizers/wiki/AddressSanitizerFlags\n- https://clang.llvm.org/docs/AddressSanitizer.html\n\n"
+    },
+    {
+      "title": "Valgrind",
+      "level": 3,
+      "content": "Valgrind can also be used to detect these behaviors and in contrast to ASan it does not need to be compiled in. Compared to ASan, it is massively slower and a bit more limited.\n\nIn order to find memory errors, invoke Valgrind with:\n\n```\n$ valgrind --tool=memcheck --track-origins=yes --keep-stacktraces=alloc-and-free application\n```\n\nAlso see #Valgrind.\n\n"
+    },
+    {
+      "title": "Strace",
+      "level": 3,
+      "content": "strace finds out in detail what an application is actually doing. If an application tries to open a file that is not there, it can be discovered by strace.\n\nFor finding which files a program named appname tries to open:\n\n```\n$ strace -eopen appname\n```\n\n"
+    },
+    {
+      "title": "LD_DEBUG",
+      "level": 3,
+      "content": "Setting LD_DEBUG=files gives another overview of what files an application is looking for. For an application named appname:\n\n```\n$ LD_DEBUG=files appname > appname.log 2>&1\n```\n\nThe output will end up in appname.log.\n\nFor more information, see ld-linux(8).\n\n"
+    },
+    {
+      "title": "Readelf",
+      "level": 3,
+      "content": "If you get no such file or directory when running an application, try the following command:\n\n```\n$ readelf -a /usr/bin/appname | grep interp\n```\n\n(replace /usr/bin/appname with the location of your executable)\n\nMake sure the interpreter in question (like /lib/ld-linux-x86-64.so.2) actually exists. Install ld-lsb if need be.\n\n"
+    },
+    {
+      "title": "Not a binary file",
+      "level": 2,
+      "content": "Use file on the executable to get more information:\n\n```\n$ file /usr/bin/appname\n```\n\nIf it says ELF, it is a binary executable. If it says Python script, you know you are dealing with an application written in Python.\n\nIf it is a shell script, open up the shell script in a text editor and see (usually at the bottom of the file) if you can find the name of the real application (ELF file). You can then temporarily put \"gdb\" right in the shellscript, before the name of the executable, for debugging purposes. See the sections about gdb further up. Prefix the command with gdb --args if the executable in question needs arguments as well.\n\nFor pure shell scripts, you can also use bash -x script_name or bash -xv script_name.\n\nFor Python applications, the output will often say which file and line number the crash occurred at. If you are proficient with Python, you can try to fix this and include the fix in the bug report.\n\n"
+    },
+    {
+      "title": "Report the bug",
+      "level": 2,
+      "content": "First check if the bug in question is a packaging bug. If the bug is introduced due to how Arch Linux packages this application, report it to https://gitlab.archlinux.org/groups/archlinux/packaging/-/issues. This also includes issues with libraries or dependencies (e.g if one of them is not built with a specific feature that is needed). Inspect the PKGBUILD of the package, which is possible with the Arch build system, to see how it gets packaged. See Bug reporting guidelines#Upstream or Arch? for more information.\n\nIf the bug is not related to Arch Linux and is reproducible anywhere else, only report it to upstream. Arch Linux can not magically fix upstream bugs. Reporting it to the Arch bugtracker would not help and might even be counterproductive because it tends to waste time of the bug wranglers.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gentoo:Project:Quality Assurance/Backtraces\n\n"
+    }
+  ]
+}

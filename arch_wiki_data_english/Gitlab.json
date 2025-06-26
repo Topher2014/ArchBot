@@ -1,0 +1,181 @@
+{
+  "title": "Gitlab",
+  "url": "https://wiki.archlinux.org/title/Gitlab",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Gitolite\n- Ruby on Rails\n\nFrom GitLab's homepage:\n\nAn example live version can be found at GitLab.com.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "GitLab requires Valkey and a database backend. If you plan to run it on the same machine, first install PostgreSQL.\n\nInstall the gitlab package.\n\nFinally, a web server has to be installed and configured. The configuration for GitLab will be discussed in the #Web server configuration section.\n\n"
+    },
+    {
+      "title": "Preliminary notes",
+      "level": 3,
+      "content": "GitLab is composed of multiple components, see the architecture overview page.\n\nThe gitlab package installs GitLab's files in a manner that more closely follow standard Linux conventions:\n\nTable content:\nDescription | GitLab's Official | gitlab\nApplication Code | /home/git | /usr/share/webapps/gitlab\nApplication Data | /home/git | /var/lib/gitlab\nUser (Home Directory) | git (/home/git) | gitlab (/var/lib/gitlab)\nConfiguration File GitShell | /home/git/gitlab-shell/config.yml | /etc/webapps/gitlab-shell/config.yml\nConfiguration File GitLab | /home/git/gitlab/config/gitlab.yml | /etc/webapps/gitlab/gitlab.yml\nLogs | /home/git/log | /var/log/gitlab\nUnix socket files / PID files | /home/git/sockets | /run/gitlab\n\n"
+    },
+    {
+      "title": "GitLab",
+      "level": 3,
+      "content": "Edit /etc/webapps/gitlab/gitlab.yml and setup at least the following parameters:\n\nHostname: In the gitlab: section set host: - replacing localhost to yourdomain.com (no http:// or trailing slash) - into your fully qualified domain name.\n\nPort: port: can be confusing. This is not the port that the GitLab server (Puma) runs on; it is the port that users will initially access through in their browser. Basically, if you intend for users to visit yourdomain.com in their browser, without appending a port number to the domain name, leave port: as 80. If you intend your users to type something like yourdomain.com:3425 into their browsers, then you would set port: to 3425. You will also have to configure your webserver to listen on that port.\n\nTimezone (optional): The time_zone: parameter is optional, but may be useful to force the zone of GitLab applications.\n\nBased on the table in #Preliminary notes above, the following paths have to be configured in gitlab.yml:\n\n- repository_downloads_path: \"/var/lib/gitlab/shared/cache/archive/\"\n- gitlab_ci section: builds_path: \"/var/lib/gitlab/builds/\"\n- incoming_email section (if enabled): log_path: \"/var/log/gitlab/mail_room_json.log\"\n- artifacts section (if enabled): path: \"/var/lib/gitlab/shared/artifacts\"\n- external_diffs section (if enabled): storage_path: \"/var/lib/gitlab/shared/external-diffs\"\n- lfs section (if enabled): storage_path: \"/var/lib/gitlab/shared/lfs-objects\"\n- packages section (if enabled): storage_path: \"/var/lib/gitlab/shared/packages\"\n- dependency_proxy section (if enabled): storage_path: \"/var/lib/gitlab/shared/dependency_proxy\"\n- terraform_state section (if enabled): storage_path: \"/var/lib/gitlab/shared/terraform_state\"\n- pages section (if enabled): path: \"/var/lib/gitlab/shared/pages\"\n- registry section (if enabled): path: \"/var/lib/gitlab/shared/registry\"\n\n"
+    },
+    {
+      "title": "Custom port for Puma",
+      "level": 3,
+      "content": "GitLab Puma is the main component which processes most of the user requests. By default, it listens on the /run/gitlab/gitlab.socket UNIX socket which can be changed in the /etc/webapps/gitlab/puma.rb file.\n\nTo configure Puma to listen on a TCP port as well as UNIX socket:\n\n```\n/etc/webapps/gitlab/puma.rb\n```\n\n```\nbind 'unix:///run/gitlab/gitlab.socket'\nbind 'tcp://127.0.0.1:8080'\n```\n\nIf the Puma address is changed, the configuration of other components which communicate with Puma have to be updated as well:\n\n- For GitLab Shell, update the gitlab_url variable in /etc/webapps/gitlab-shell/config.yml and url in the [gitlab] section in /etc/gitlab-gitaly/config.toml.\n\n- For GitLab Workhorse, edit the gitlab-workhorse.service and update the -authBackend option. See [1] for details.\n\n"
+    },
+    {
+      "title": "Secret strings",
+      "level": 3,
+      "content": "Make sure that the files /etc/webapps/gitlab/secret and /etc/webapps/gitlab-shell/secret files contain something. Their content should be kept secret because they are used for the generation of authentication tokens etc.\n\nFor example, random strings can be generated with the following commands:\n\n```\n# hexdump -v -n 64 -e '1/1 \"%02x\"' /dev/urandom > /etc/webapps/gitlab/secret\n# chmod 640 /etc/webapps/gitlab/secret\n```\n\n```\n# hexdump -v -n 64 -e '1/1 \"%02x\"' /dev/urandom > /etc/webapps/gitlab-shell/secret\n# chmod 640 /etc/webapps/gitlab-shell/secret\n```\n\nAlso fill in (new) secret strings for secrets.yml:\n\n```\n/etc/webapps/gitlab/secrets.yml\n```\n\n```\nproduction:\n  secret_key_base: secret\n  db_key_base: secret\n  otp_key_base: secret\n  openid_connect_signing_key: secret\n  active_record_encryption_primary_key: [\"32-alphanumeric-chars\"]\n  active_record_encryption_deterministic_key: [\"32-alphanumeric-chars\"]\n  active_record_encryption_key_derivation_salt: \"32-alphanumeric-chars\"\n```\n\n"
+    },
+    {
+      "title": "Valkey",
+      "level": 3,
+      "content": "In order to provide sufficient performance you will need a cache database. Install and configure a Valkey instance, being careful to the section dedicated to listening via a socket.\n\nAdd the gitlab user to the valkey user group and update this configuration file:\n\n```\n/etc/webapps/gitlab/resque.yml\n```\n\n```\ndevelopment:\n  url: unix:/run/valkey/valkey.sock\ntest:\n  url: unix:/run/valkey/valkey.sock\nproduction:\n  url: unix:/run/valkey/valkey.sock\n```\n\n"
+    },
+    {
+      "title": "PostgreSQL database",
+      "level": 3,
+      "content": "A PostgreSQL database will be required before Gitlab can be run.\n\nLogin to PostgreSQL and create the gitlabhq_production database along with its user. Remember to change your_username_here and your_password_here to the real values:\n\n```\n# psql -d template1\n```\n\n```\ntemplate1=# CREATE USER your_username_here WITH PASSWORD 'your_password_here';\ntemplate1=# ALTER USER your_username_here SUPERUSER;\ntemplate1=# CREATE DATABASE gitlabhq_production OWNER your_username_here;\ntemplate1=# \\q\n```\n\nTry connecting to the new database with the new user to verify it works:\n\n```\n$ psql -d gitlabhq_production -U your_username_here -W\n```\n\nOpen the new /etc/webapps/gitlab/database.yml and set the values for username: and password:. For example:\n\n```\n/etc/webapps/gitlab/database.yml\n```\n\n```\n#\n# PRODUCTION\n#\nproduction:\n  main:\n    adapter: postgresql\n    encoding: unicode\n    database: gitlabhq_production\n    username: your_username_here\n    password: \"your_password_here\"\n    # host: localhost\n    # port: 5432\n    socket: /run/postgresql/.s.PGSQL.5432\n  ci:\n    adapter: postgresql\n    encoding: unicode\n    database: gitlabhq_production\n    database_tasks: false\n    username: your_username_here\n    password: \"your_password_here\"\n    # host: localhost\n    # port: 5432\n    socket: /run/postgresql/.s.PGSQL.5432\n...\n```\n\nFor our purposes (unless you know what you are doing), you do not need to worry about configuring the other databases listed in /etc/webapps/gitlab/database.yml. We only need to set up the production database to get GitLab working.\n\nNote: **must be to the same database** \n\n"
+    },
+    {
+      "title": "Initialize Gitlab database",
+      "level": 3,
+      "content": "Start the Valkey server and the gitlab-gitaly.service before initializing the database.\n\nInitialize the database and activate advanced features:\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:setup\n```\n\nYou can set the Administrator/root password and email by supplying them in the GITLAB_ROOT_PASSWORD and GITLAB_ROOT_EMAIL environment variables, respectively, as seen below. If you do not set the password (and it is set to the default one), do not expose GitLab to the public internet until the installation is done and you have logged into the server the first time. During the first login, you are forced to change the default password. An Enterprise Edition license may also be installed at this time by supplying a full path in the GITLAB_LICENSE_FILE environment variable.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:setup GITLAB_ROOT_PASSWORD=yourpassword GITLAB_ROOT_EMAIL=youremail GITLAB_LICENSE_FILE=/path/to/license\n```\n\nFinally run the following commands to check your installation:\n\n```\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:env:info\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:check\n```\n\n- The gitlab:env:info and gitlab:check commands might show a fatal error related to git. This is OK.\n- The gitlab:check will complain about missing initscripts. This is nothing to worry about, as systemd service files are used instead (which GitLab does not recognize).\n\n"
+    },
+    {
+      "title": "Adjust modifier bits",
+      "level": 3,
+      "content": "(The gitlab check will not pass if the user and group ownership is not configured properly)\n\n```\n# chmod -R ug+rwX,o-rwx /var/lib/gitlab/repositories/\n# chmod -R ug-s /var/lib/gitlab/repositories\n# find /var/lib/gitlab/repositories/ -type d -print0 | xargs -0 chmod g+s\n```\n\n"
+    },
+    {
+      "title": "Web server configuration",
+      "level": 3,
+      "content": "To access GitLab from an outside network, the upstream documentation recommends to use an established web server as a proxy. All queries from the web server to GitLab are processed by GitLab Workhorse, which decides how they should be processed. See [2] for details.\n\n"
+    },
+    {
+      "title": "Nginx",
+      "level": 4,
+      "content": "See Nginx#Configuration for basic nginx configuration and Nginx#TLS for enabling HTTPS. The sample in this section also assumes that server blocks are managed with Nginx#Managing server entries.\n\nCreate and edit the configuration based on the following snippet. See the upstream GitLab repository for more examples.\n\n```\n/etc/nginx/sites-available/gitlab\n```\n\n```\nupstream gitlab-workhorse {\n  server unix:/run/gitlab/gitlab-workhorse.socket fail_timeout=0;\n}\n\nserver {\n  listen 80;                  # IPv4 HTTP\n  #listen 443 ssl http2;      # uncomment to enable IPv4 HTTPS + HTTP/2\n  #listen [::]:80;            # uncomment to enable IPv6 HTTP\n  #listen [::]:443 ssl http2; # uncomment to enable IPv6 HTTPS + HTTP/2\n  server_name example.com;\n\n  access_log  /var/log/gitlab/nginx_access.log;\n  error_log   /var/log/gitlab/nginx_error.log;\n\n  #ssl_certificate ssl/example.com.crt;\n  #ssl_certificate_key ssl/example.com.key;\n\n  location ~ ^/(assets)/ {\n    root /usr/share/webapps/gitlab/public;\n    gzip_static on; # to serve pre-gzipped version\n    expires max;\n    add_header Cache-Control public;\n  }\n\n  location / {\n      # unlimited upload size in nginx (so the setting in GitLab applies)\n      client_max_body_size 0;\n\n      # proxy timeout should match the timeout value set in /etc/webapps/gitlab/puma.rb\n      proxy_read_timeout 60;\n      proxy_connect_timeout 60;\n      proxy_redirect off;\n\n      proxy_set_header Host $http_host;\n      proxy_set_header X-Real-IP $remote_addr;\n      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n      proxy_set_header X-Forwarded-Proto $scheme;\n\n      #proxy_set_header X-Forwarded-Ssl on;\n\n      proxy_pass http://gitlab-workhorse;\n  }\n\n  error_page 404 /404.html;\n  error_page 422 /422.html;\n  error_page 500 /500.html;\n  error_page 502 /502.html;\n  error_page 503 /503.html;\n  location ~ ^/(404|422|500|502|503)\\.html$ {\n    root /usr/share/webapps/gitlab/public;\n    internal;\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 4,
+      "content": "Install and configure the Apache HTTP Server and Apache HTTP Server#TLS for enabling HTTPS. You can use these upstream recipes to get started with the configuration file for GitLab's virtual host.\n\nNotice that the SSL virtual host needs a specific IP instead of generic. Also if you set a custom port for Puma, do not forget to set it at the BalanceMember line.\n\nThe following Apache modules must also be loaded in the configuration file /etc/httpd/conf/httpd.conf:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nLoadModule proxy_module modules/mod_proxy.so\nLoadModule proxy_http_module modules/mod_proxy_http.so\nLoadModule proxy_wstunnel_module modules/mod_proxy_wstunnel.so\n```\n\nIf an Apache configuration via unix socket for the gitlab-workhorse.service is desired, the following configuration is functional:\n\n```\n/etc/httpd/conf/extra/gitlab.conf\n```\n\n```\n<VirtualHost *:443>\n    ServerName SERVERNAME\n    ServerAlias SERVERNAME\n    DocumentRoot /usr/share/webapps/gitlab/public\n    <Directory /usr/share/webapps/gitlab/public>\n        Options FollowSymlinks\n        AllowOverride all\n        Require all granted\n    </Directory>\n    <IfModule mod_alias.c>\n        Alias / /usr/share/webapps/gitlab/public/\n    </IfModule>\n\n    <IfModule mod_headers.c>\n        Header always set Strict-Transport-Security \"max-age=15552000; includeSubDomains; preload\"\n    </IfModule>\n\n    ProxyPreserveHost On\n    SSLProxyEngine on\n    AllowEncodedSlashes NoDecode\n    \n    <Location />\n        ProxyPass unix:/run/gitlab/gitlab-workhorse.socket|http://127.0.0.1/\n        ProxyPassReverse unix:/run/gitlab/gitlab-workhorse.socket|http://127.0.0.1/\n    </Location>\n \n    <Location /-/cable>\n        ProxyPass unix:/run/gitlab/gitlab-workhorse.socket|ws://127.0.0.1/-/cable\n        ProxyPassReverse unix:/run/gitlab/gitlab-workhorse.socket|ws://127.0.0.1/-/cable\n    </Location> \n    #\n    RewriteEngine on\n    RewriteCond %{DOCUMENT_ROOT}/%{REQUEST_FILENAME} !-f [OR]\n    RewriteCond %{REQUEST_URI} ^/uploads/.*\n    RewriteRule .* unix:/run/gitlab/gitlab-workhorse.socket|http://127.0.0.1%{REQUEST_URI} [P,QSA,NE]\n    RequestHeader set X_FORWARDED_PROTO 'https'\n    RequestHeader set X-Forwarded-Ssl on\n    #\n    ErrorDocument 404 /404.html\n    ErrorDocument 422 /422.html\n    ErrorDocument 500 /500.html\n    ErrorDocument 503 /deploy.html\n    ErrorLog /var/log/httpd/gitlab.lan.info-error_log\n    CustomLog /var/log/httpd/gitlab.lan.info-access_log common\nInclude /etc/letsencrypt/options-ssl-apache.conf\nSSLCertificateFile /etc/letsencrypt/live/SERVERNAME/fullchain.pem\nSSLCertificateKeyFile /etc/letsencrypt/live/SERVERNAME/privkey.pem\n</VirtualHost>\n\n<VirtualHost *:80>\n    ServerName SERVERNAME\n    Redirect / https://SERVERNAME\nRewriteEngine on\nRewriteCond %{SERVER_NAME} =SERVERNAME\nRewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]\n</VirtualHost>\n```\n\nA working example with tcp network connection (certbot flavor) assuming that gitlab-workhorse.service contains -listenNetwork tcp -listenAddr 127.0.0.1:8181 on the ExecStart line:\n\n```\n/etc/httpd/conf/extra/gitlab.conf\n```\n\n```\n<VirtualHost *:443>\n    ServerName SERVERNAME\n    ServerAlias SERVERNAME\n    DocumentRoot /usr/share/webapps/gitlab/public\n    <Directory /usr/share/webapps/gitlab/public>\n        Options FollowSymlinks\n        AllowOverride all\n        Require all granted\n    </Directory>\n    <IfModule mod_alias.c>\n        Alias / /usr/share/webapps/gitlab/public/\n    </IfModule>\n\n    <IfModule mod_headers.c>\n        Header always set Strict-Transport-Security \"max-age=15552000; includeSubDomains; preload\"\n    </IfModule>\n\n    ProxyPreserveHost On\n    SSLProxyEngine on\n    AllowEncodedSlashes NoDecode\n    <Location />\n        ProxyPassReverse http://127.0.0.1:8181\n        ProxyPassReverse http://SERVERNAME\n    </Location>\n    <Location /-/cable>\n        ProxyPassReverse http://127.0.0.1:8181\n        ProxyPassReverse http://SERVERNAME\n    </Location>\n    #\n    RewriteEngine on\n    RewriteCond %{DOCUMENT_ROOT}/%{REQUEST_FILENAME} !-f [OR]\n    RewriteCond %{REQUEST_URI} ^/uploads/.*\n    RewriteRule .* http://127.0.0.1:8181%{REQUEST_URI} [P,QSA,NE]\n    RequestHeader set X_FORWARDED_PROTO 'https'\n    RequestHeader set X-Forwarded-Ssl on\n    #\n    ErrorDocument 404 /404.html\n    ErrorDocument 422 /422.html\n    ErrorDocument 500 /500.html\n    ErrorDocument 503 /deploy.html\n    ErrorLog /var/log/httpd/gitlab.lan.info-error_log\n    CustomLog /var/log/httpd/gitlab.lan.info-access_log common\nInclude /etc/letsencrypt/options-ssl-apache.conf\nSSLCertificateFile /etc/letsencrypt/live/SERVERNAME/fullchain.pem\nSSLCertificateKeyFile /etc/letsencrypt/live/SERVERNAME/privkey.pem\n</VirtualHost>\n\n<VirtualHost *:80>\n    ServerName SERVERNAME\n    Redirect / https://SERVERNAME\nRewriteEngine on\nRewriteCond %{SERVER_NAME} =SERVERNAME\nRewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]\n</VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "Node.js",
+      "level": 4,
+      "content": "You can easily set up an HTTPS proxy on port 443 to proxy traffic to the GitLab Workhorse using http-master for Node.js. http-master is built on top of node-http-proxy.\n\n"
+    },
+    {
+      "title": "Change GitLab configs",
+      "level": 4,
+      "content": "Modify /etc/webapps/gitlab/shell.yml so the URL to your GitLab site starts with https://. Modify /etc/webapps/gitlab/gitlab.yml so that https: setting is set to true.\n\n"
+    },
+    {
+      "title": "Let's Encrypt",
+      "level": 4,
+      "content": "To validate your URL, the Let's Encrypt process will try to access your GitLab server via a URL such as your.domain.name/.well-known/acme-challenge/a_long_id. Hence, you need to make sure that requests to the .well-known subdirectory are not proxied to GitLab Workhorse. This can be done easily with the Certbot's \"webroot\" method, see Certbot#Webroot for details.\n\n"
+    },
+    {
+      "title": "Firewall",
+      "level": 3,
+      "content": "If you want to give direct access to your Gitlab installation through an iptables firewall, you may need to adjust the port and the network address:\n\n```\n# iptables -A tcp_inbound -p TCP -s 192.168.1.0/24 --destination-port 80 -j ACCEPT\n```\n\nIf you are behind a router, do not forget to forward this port to the running GitLab server host, if you want to allow WAN access.\n\n"
+    },
+    {
+      "title": "Start and test GitLab",
+      "level": 2,
+      "content": "Make sure PostgreSQL and Valkey are running and setup correctly.\n\nThen start/enable gitlab.target.\n\nNow test your GitLab instance by visiting http://localhost or http://localhost:port, where port is the port number on which your web server listens. You should be prompted to create a password:\n\n```\nusername: root\npassword: You will be prompted to create one on your first visit.\n```\n\nSee #Troubleshooting and log files inside the /var/log/gitlab/ directory for troubleshooting.\n\n"
+    },
+    {
+      "title": "Manual method",
+      "level": 3,
+      "content": "After updating the gitlab package, it is required to upgrade the database:\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake db:migrate\n```\n\nAfterwards, reload and restart gitlab-sidekiq.service, gitlab-puma.service, gitlab-workhorse.service and gitlab-gitaly.service.\n\n"
+    },
+    {
+      "title": "Automatic method",
+      "level": 3,
+      "content": "You can create pacman hooks to automate database upgrades on GitLab package updates. Create the three following files, do not forget to make the shell script executable:\n\n```\n/etc/pacman.d/hooks/05-gitlab-pre.hook\n```\n\n```\n[Trigger]\nOperation = Upgrade\nType = Package\nTarget = gitlab\n\n[Action]\nDescription = Stopping gitlab services\nWhen = PreTransaction\nExec = /usr/bin/systemctl stop gitlab-gitaly.service gitlab-mailroom.service gitlab-puma.service gitlab-sidekiq.service gitlab-workhorse.service\n```\n\n```\n/etc/pacman.d/hooks/99-gitlab-post.hook\n```\n\n```\n[Trigger]\nOperation = Upgrade\nType = Package\nTarget = gitlab\n\n[Action]\nDescription = Migrating GitLab database and starting services\nWhen = PostTransaction\nExec = /etc/pacman.d/scripts/gitlab-migrate-database.sh\n```\n\n```\n/etc/pacman.d/scripts/gitlab-migrate-database.sh\n```\n\n```\n#!/bin/sh\n\ncd \"/usr/share/webapps/gitlab\"\nsudo -u gitlab $(cat environment | xargs) bundle exec rake db:migrate\n\n# The hook runs after 30-systemd-daemon-reload.hook so another systemctl daemon-reload is not necessary.\nsystemctl start gitlab.target\n```\n\n"
+    },
+    {
+      "title": "Basic SSH",
+      "level": 3,
+      "content": "After completing the basic installation, set up SSH access for users. Configuration for OpenSSH is described below. Other SSH clients and servers will require different modifications.\n\nFor tips on adding user SSH keys, the process is well-documented on the GitLab website. You can check the administrator logs at /var/lib/gitlab/log/gitlab-shell.log to confirm user SSH keys are being submitted properly. Behind the scenes, GitLab adds these keys to its authorized_keys file in /var/lib/gitlab/.ssh/authorized_keys.\n\nThe common method of testing keys (e.g. ssh -T git@your_server) requires a bit of extra configuration to work correctly. The user configured in /etc/webapps/gitlab/gitlab.yml (by default gitlab) must be added to the server's sshd configuration file, in addition to a handful of other changes:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nPubkeyAuthentication   yes\nAuthorizedKeysFile     %h/.ssh/authorized_keys\n```\n\nIf your /etc/ssh/sshd_config contains the AllowUsers option, then the gitlab user should be added to the list:\n\n```\n/etc/ssh/sshd_config\n```\n\n```\nAllowUsers gitlab other users...\n```\n\nAfter updating the configuration file, restart the sshd.service.\n\nTest user SSH keys (optionally add -v to see extra information):\n\n```\n$ ssh -T gitlab@your_server\n```\n\n"
+    },
+    {
+      "title": "Custom SSH connection",
+      "level": 3,
+      "content": "If you are running SSH on a non-standard port, you must change the GitLab user's SSH config:\n\n```\n/var/lib/gitlab/.ssh/config\n```\n\n```\nhost localhost      # Give your setup a name (here: override localhost)\nuser gitlab         # Your remote git user\nport 2222           # Your port number\nhostname 127.0.0.1; # Your server name or IP\n```\n\nYou also need to change the corresponding options (e.g. ssh_user, ssh_host, admin_uri) in the /etc/webapps/gitlab/gitlab.yml file.\n\n"
+    },
+    {
+      "title": "Sending emails from GitLab",
+      "level": 3,
+      "content": "GitLab can send emails either using a local mail transfer agent (via sendmail) or using SMTP.\n\nTo use sendmail, edit /etc/webapps/gitlab/smtp_settings.rb and comment out all lines. Then mail delivery should work without any further configuration in GitLab, assuming that the local mail transfer agent is configured properly.\n\nTo use SMTP, configure the options in smtp_settings.rb according to your mail server. For example, to send via Gmail:\n\n```\n/etc/webapps/gitlab/smtp_settings.rb\n```\n\n```\nif Rails.env.production?\n  Gitlab::Application.config.action_mailer.delivery_method = :smtp\n\n  ActionMailer::Base.delivery_method = :smtp\n  ActionMailer::Base.smtp_settings = {\n    address:              'smtp.gmail.com',\n    port:                 587,\n    domain:               'gmail.com',\n    user_name:            'username@gmail.com',\n    password:             'application password',\n    authentication:       'plain',\n    enable_starttls_auto: true\n  }\nend\n```\n\n"
+    },
+    {
+      "title": "Rake tasks",
+      "level": 3,
+      "content": "A number of setup/maintenance/etc tasks are available through rake. To list them, go to Gitlab's home directory:\n\n```\n$ cd /usr/share/webapps/gitlab\n```\n\nand run:\n\n```\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake -T | grep gitlab\n```\n\n```\nrake gitlab:app:check                         # GITLAB | Check the configuration of the GitLab Rails app\nrake gitlab:backup:create                     # GITLAB | Create a backup of the GitLab system\nrake gitlab:backup:restore                    # GITLAB | Restore a previously created backup\nrake gitlab:check                             # GITLAB | Check the configuration of GitLab and its environment\nrake gitlab:cleanup:block_removed_ldap_users  # GITLAB | Cleanup | Block users that have been removed in LDAP\nrake gitlab:cleanup:dirs                      # GITLAB | Cleanup | Clean namespaces\nrake gitlab:cleanup:repos                     # GITLAB | Cleanup | Clean repositories\nrake gitlab:env:check                         # GITLAB | Check the configuration of the environment\nrake gitlab:env:info                          # GITLAB | Show information about GitLab and its environment\nrake gitlab:generate_docs                     # GITLAB | Generate sdocs for project\nrake gitlab:gitlab_shell:check                # GITLAB | Check the configuration of GitLab Shell\nrake gitlab:import:all_users_to_all_groups    # GITLAB | Add all users to all groups (admin users are added as owners)\nrake gitlab:import:all_users_to_all_projects  # GITLAB | Add all users to all projects (admin users are added as masters)\nrake gitlab:import:repos                      # GITLAB | Import bare repositories from gitlab_shell -> repos_path into GitLab project instance\nrake gitlab:import:user_to_groups[email]      # GITLAB | Add a specific user to all groups (as a developer)\nrake gitlab:import:user_to_projects[email]    # GITLAB | Add a specific user to all projects (as a developer)\nrake gitlab:satellites:create                 # GITLAB | Create satellite repos\nrake gitlab:setup                             # GITLAB | Setup production application\nrake gitlab:shell:build_missing_projects      # GITLAB | Build missing projects\nrake gitlab:shell:install[tag,repo]           # GITLAB | Install or upgrade gitlab-shell\nrake gitlab:shell:setup                       # GITLAB | Setup gitlab-shell\nrake gitlab:sidekiq:check                     # GITLAB | Check the configuration of Sidekiq\nrake gitlab:test                              # GITLAB | Run all tests\nrake gitlab:web_hook:add                      # GITLAB | Adds a web hook to the projects\nrake gitlab:web_hook:list                     # GITLAB | List web hooks\nrake gitlab:web_hook:rm                       # GITLAB | Remove a web hook from the projects\nrake setup                                    # GITLAB | Setup gitlab db\n```\n\n"
+    },
+    {
+      "title": "Backup and restore",
+      "level": 3,
+      "content": "Create a backup of the gitlab system:\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:backup:create\n```\n\nRestore the previously created backup file /var/lib/gitlab/backups/1556571328_2019_04_29_11.10.2_gitlab_backup.tar:\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:backup:restore BACKUP=1556571328_2019_04_29_11.10.2\n```\n\n"
+    },
+    {
+      "title": "Enable fast SSH key lookup",
+      "level": 3,
+      "content": "Enable Fast SSH Key Lookup as explained in this page: https://docs.gitlab.com/ee/administration/operations/fast_ssh_key_lookup.html\n\nIn short, edit /etc/ssh/sshd_config.\n\nRevert all changes done following this wiki (or revert sshd_config from the openssh package) and only add:\n\n```\nAuthorizedKeysCommand /var/lib/gitlab/gitlab-shell/bin/gitlab-shell-authorized-keys-check gitlab %u %k\nAuthorizedKeysCommandUser gitlab\n```\n\nFinally restart the sshd.service.\n\n"
+    },
+    {
+      "title": "Rails console",
+      "level": 3,
+      "content": "Rails console can be used to interface directly with GitLab. See [3] for details.\n\nTo access Rails console:\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rails console\n```\n\nFrom here you can troubleshoot problems or do administration tasks like resetting user passwords.\n\n"
+    },
+    {
+      "title": "HTTPS is not green (gravatar not using https)",
+      "level": 3,
+      "content": "Valkey caches gravatar images, so if you have visited your GitLab with http, then enabled https, gravatar will load up the non-secure images. You can clear the cache by doing\n\n```\n$ cd /usr/share/webapps/gitlab\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake cache:clear\n```\n\nas the gitlab user.\n\n"
+    },
+    {
+      "title": "Errors after updating",
+      "level": 3,
+      "content": "After updating the package from the AUR, the database migrations and asset updates will sometimes fail. These steps may resolve the issue, if a simple reboot does not.\n\nFirst, move to the gitlab installation directory.\n\n```\n$ cd /usr/share/webapps/gitlab\n```\n\nIf every gitlab page gives a 500 error, then the database migrations and the assets are probably stale. If not, skip this step.\n\n```\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake db:migrate\n```\n\nIf gitlab is constantly waiting for the deployment to finish, then the assets have probably not been recompiled.\n\n```\n$ sudo -u gitlab $(cat environment | xargs) bundle exec rake gitlab:assets:clean gitlab:assets:compile cache:clear\n```\n\nFinally, restart gitlab-puma.service, gitlab-sidekiq.service and gitlab-workhorse.service.\n\n"
+    },
+    {
+      "title": "GitLab Puma cannot access non-default repositories directory",
+      "level": 3,
+      "content": "If a custom repository storage directory is set in /home, disable the ProtectHome=true parameter in the gitlab-puma.service (see systemd#Drop-in files and the relevant forum thread on gitlab.com).\n\n"
+    },
+    {
+      "title": "Failed to connect to Gitaly",
+      "level": 3,
+      "content": "Sometimes, the Gitaly service will not get started, leaving GitLab unable to connect to Gitaly. The solution is simple: start gitlab-gitaly.service.\n\n"
+    },
+    {
+      "title": "Failed to connect via SSH",
+      "level": 3,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nIf git operations (-T, pull, clone, etc.) fails using ssh try changing the shell:\n\n```\n# usermod -s /usr/share/webapps/gitlab-shell/bin/gitlab-shell gitlab\n```\n\n"
+    },
+    {
+      "title": "CSS or styles issue",
+      "level": 3,
+      "content": "If you have any issues with styles and CSS not working, you may try to edit /usr/share/webapps/gitlab/config/environments/production.rb and change:\n\n```\n# Disable Rails's static asset server (Apache or nginx will already do this)\n config.public_file_server.enabled = false\n```\n\nto:\n\n```\n# Disable Rails's static asset server (Apache or nginx will already do this)\n config.public_file_server.enabled = true\n```\n\n"
+    },
+    {
+      "title": "The server does not support push options",
+      "level": 3,
+      "content": "If you get an error like fatal: the receiving end does not support push options you might need to enable it for the GitLab Git user (gitlab) on the server. This can be done in the gitconfig:\n\n```\n/etc/webapps/gitlab-shell/.gitconfig\n```\n\n```\n[receive]\n         advertisePushOptions = true\n```\n\nAlternatively one can set this with:\n\n```\n$ sudo -u gitlab -H git config --global receive.advertisePushOptions true\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official installation documentation\n- GitLab recipes with further documentation on running it with several web servers\n- GitLab source code\n- Tachtler's DokuWiki - GitLab ArchLinux (German installation guide)\n\n"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "title": "SSSD",
+  "url": "https://wiki.archlinux.org/title/SSSD",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- LDAP authentication\n- Identity management\n\nSSSD is a system daemon. Its primary function is to provide access to identity and authentication remote resource through a common framework that can provide caching and offline support to the system. It provides PAM and NSS modules, and in the future will D-BUS based interfaces for extended user information. It provides also a better database to store local users as well as extended user data.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the sssd package.\n\n"
+    },
+    {
+      "title": "LDAP",
+      "level": 3,
+      "content": "See LDAP authentication#SSSD configuration.\n\n"
+    },
+    {
+      "title": "PAM proxy",
+      "level": 3,
+      "content": "If you would like software running as a non-root user to be able to use pam_unix.so for authentication, you can run SSSD as a PAM proxy for this by creating the following files.\n\n```\n/etc/sssd/sssd.conf\n```\n\n```\n[sssd]\nservices = pam\ndomains = local\n\n[domain/local]\nid_provider = proxy\nproxy_lib_name = files\nproxy_pam_target = sssd-shadowutils\n```\n\n```\n/etc/pam.d/sssd\n```\n\n```\n#%PAM-1.0\n\nauth      required  pam_sss.so\naccount   required  pam_sss.so\npassword  required  pam_sss.so\nsession   required  pam_sss.so\n```\n\nNow specify sssd as the PAM service name in your software's configuration.\n\n"
+    },
+    {
+      "title": "Run SSSD as root",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nSSSD 2.10 and above runs as a non-root user by default, but here it needs to run as root in order to access /etc/shadow. Override the unit sssd.service exactly like this:\n\n```\n[Service]\nEnvironment=DEBUG_LOGGER=--logger=files\nEnvironmentFile=-/etc/sysconfig/sssd\nExecStartPre=+-/bin/chown -f root:sssd /etc/sssd\nExecStartPre=+-/bin/chown -f root:sssd /etc/sssd/sssd.conf\nExecStartPre=+-/bin/chown -f -R root:sssd /etc/sssd/conf.d\nExecStartPre=+-/bin/chown -f -R root:sssd /etc/sssd/pki\nExecStartPre=+-/bin/sh -c \"/bin/chown -f root:sssd /var/lib/sss/db/*.ldb\"\nExecStartPre=+-/bin/sh -c \"/bin/chown -f root:sssd /var/lib/sss/gpo_cache/*\"\nExecStartPre=+-/bin/sh -c \"/bin/chown -f root:sssd /var/log/sssd/*.log\"\nExecStart=/usr/bin/sssd -i ${DEBUG_LOGGER}\nType=notify\nNotifyAccess=main\nRestart=on-abnormal\nCapabilityBoundingSet= CAP_CHOWN CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID CAP_DAC_READ_SEARCH \n#SecureBits=noroot noroot-locked\nUser=root\nGroup=sssd\n# If service configured to be run under \"root\", uncomment \"SupplementaryGroups\"\n#SupplementaryGroups=sssd\n```\n\nNote that SSSD wants its files like /var/log/sssd and /etc/sssd to have the same owner as the user running SSSD, so you have to chown those files to be root-owned. Additionally, delete and add /usr/lib/tmpfiles.d/sssd-perms.conf to NoExtract in /etc/pacman.conf to prevent systemd-tmpfiles from reverting the permissions of SSSD files.\n\nFinally, enable/start sssd.service.\n\n"
+    },
+    {
+      "title": "Prevent logins with empty passwords",
+      "level": 3,
+      "content": "If using SSSD as a PAM proxy, by default it allows logging into accounts with empty passwords, which could be undesirable. To fix this, remove nullok from /etc/pam.d/sssd-shadowutils:\n\n```\n/etc/pam.d/sssd-shadowutils\n```\n\n```\n#%PAM-1.0\nauth        [success=done ignore=ignore default=die] pam_unix.so try_first_pass\nauth        required      pam_deny.so\n\naccount     required      pam_unix.so\naccount     required      pam_permit.so\n```\n\nThen add that file to NoUpgrade in /etc/pacman.conf.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official website\n\n"
+    }
+  ]
+}

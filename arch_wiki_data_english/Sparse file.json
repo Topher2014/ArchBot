@@ -1,0 +1,71 @@
+{
+  "title": "Sparse file",
+  "url": "https://wiki.archlinux.org/title/Sparse_file",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "According to Wikipedia, a sparse file is a type of file that attempts to use file system space more efficiently when blocks allocated to a file are mostly empty. This is achieved by writing brief information (metadata) representing the empty blocks to disk instead of the actual \"empty\" space which makes up the block, using less disk space. The full block size is written to disk as the actual size only when the block contains \"real\" (non-empty) data.\n\nWhen reading sparse files, the file system transparently converts metadata representing empty blocks into \"real\" blocks filled with zero bytes at runtime. The application is unaware of this conversion.\n\nMost modern file systems support sparse files, including most Unix variants and NTFS, but notably not Apple's HFS+. Sparse files are commonly used for disk images (not to be confused with sparse images), database snapshots, log files and in scientific applications.\n\nThe advantage of sparse files is that storage is only allocated when actually needed: disk space is saved, and large files can be created even if there is insufficient free space on the file system.\n\nDisadvantages are that sparse files may become fragmented; file system free space reports may be misleading; filling up file systems containing sparse files can have unexpected effects; and copying a sparse file with a program that does not explicitly support them may copy the entire file, including the empty blocks which are not on explicitly stored on the disk, which wastes the benefits of the sparse property of a file.\n\n"
+    },
+    {
+      "title": "Creating sparse files",
+      "level": 2,
+      "content": "The truncate utility can create sparse files. This command creates a 512 MiB sparse file:\n\n```\n$ truncate -s 512M file.img\n```\n\nThe dd utility can also be used, for example:\n\n```\n$ dd if=/dev/zero of=file.img bs=1 count=0 seek=512M\n```\n\nSparse files have different apparent file sizes (the maximum size to which they may expand) and actual file sizes (how much space is allocated for data on disk). To check a file's apparent size, just run:\n\n```\n$ du -h --apparent-size file.img\n```\n\n```\n512M    file.img\n```\n\nand, to check the actual size of a file on disk:\n\n```\n$ du -h file.img\n```\n\n```\n0       file.img\n```\n\nAs you can see, although the apparent size of the file is 512 MiB, its \"actual\" size is really zero—that's because due to the nature and beauty of sparse files, it will \"expand\" arbitrarily to minimize the space required to store its contents.\n\n"
+    },
+    {
+      "title": "Making existing files sparse",
+      "level": 3,
+      "content": "The fallocate utility can make existing files sparse on supported file systems:\n\n```\n$ fallocate -d copy.img\n$ du -h copy.img\n0       copy.img\n```\n\n"
+    },
+    {
+      "title": "Making existing files non-sparse",
+      "level": 3,
+      "content": "The following command creates a non-sparse copy of a (sparse) file:\n\n```\n$ cp file.img copy.img --sparse=never\n$ du -h copy.img \n512M    copy.img\n```\n\n"
+    },
+    {
+      "title": "Creating a filesystem in a sparse file",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nNow that we have created a sparse file, it is time to format it with a filesystem. For example, ext4:\n\n```\n$ mkfs.ext4 file.img\n```\n\nWe can now check its size to see how a filesystem has affected it:\n\n```\n$ du -h --apparent-size file.img\n```\n\n```\n512M    file.img\n```\n\n```\n$ du -h file.img\n```\n\n```\n456K     file.img\n```\n\nAs you may have expected, formatting it with a filesystem has increased its actual size, but left its apparent size the same. Now we can create a directory which we will use to mount our file:\n\n```\n# mount --mkdir -o loop file.img mountpoint\n```\n\nTada! We now have both a file and a folder into which we may store almost 512 MiB worth of information!\n\n"
+    },
+    {
+      "title": "Mounting a file at boot",
+      "level": 3,
+      "content": "To mount a sparse image automatically at boot, add an entry to your fstab:\n\n```\n/path/to/file.img  /path/to/mountpoint  ext4  loop,defaults  0  0\n```\n\n"
+    },
+    {
+      "title": "Detecting sparse files",
+      "level": 2,
+      "content": "Since sparse files occupy less blocks than the apparent file size would require, they can be detected by comparing the two sizes. This is not a bulletproof method if the filesystem uses compression, extended attributes take up the difference in space, file is internally fragmented, has indirect blocks, and similar. Still, the standard way to check is:\n\n```\n$ ls -ls sparse-file.bin\n```\n\nIf a file size is greater than the allocated size in the first column a file is sparse. The same can be achieved with du by comparing:\n\n```\n$ du sparse-file.bin\n$ du --apparent-size sparse-file.bin\n```\n\nA step further is to print sparsiness value with find:\n\n```\n$ find sparse-file.bin -printf '%S\\t%p\\n'\n```\n\nA sparse file has a sparsiness value of less than one whereas normal files have exactly one or just slightly above. The above command can be easily extended to list sparse files in a desired path:\n\n```\n$ find path/ -type f -printf '%S\\t%p\\n' | gawk '$1 < 1.0 {print}' | cut -f '2-'\n```\n\n"
+    },
+    {
+      "title": "Copying with cp",
+      "level": 3,
+      "content": "Normally, cp is good at detecting whether a file is sparse, so it suffices to run:\n\n```\n$ cp file.img new_file.img\n```\n\nThen new_file.img will be sparse. However, cp does have a --sparse=when option. This is especially useful if a sparse file has somehow become non sparse (i.e. the empty blocks have been written out to disk in full). Disk space can be recovered by:\n\n```\n$ cp --sparse=always new_file.img recovered_file.img\n```\n\n"
+    },
+    {
+      "title": "Archiving with tar",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nOne day, you may decide to back up your well-loved sparse file, and choose the tar utility for that very purpose; however, you soon realize you have a problem:\n\n```\n$ du -h file.img\n```\n\n```\n33M     file.img\n```\n\n```\n$ tar -cf file.tar file.img\n```\n\n```\n$ du -h file.tar\n```\n\n```\n513M    file.tar\n```\n\nApparently, even though the current size of the sparse file is only 33 MB, archiving it with tar created an archive of the ENTIRE SIZE OF THE FILE! Luckily for you, though, tar has a `--sparse' (`-S') flag, that when used in conjunction with the `--create' (`-c') operation, tests all files for sparseness while archiving. If tar finds a file to be sparse, it uses a sparse representation of the file in the archive. This is useful when archiving files, such as dbm files, likely to contain many nulls, and dramatically decreases the amount of space needed to store such an archive.\n\n```\n$ tar -Scf file.tar file.img\n```\n\n```\n$ du -h file.tar\n```\n\n```\n12K     file.tar\n```\n\n"
+    },
+    {
+      "title": "Resizing a sparse file",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nBefore we resize a sparse file, let us populate it with a couple small files for testing purposes:\n\n```\n$ for f in {1..5}; do touch folder/file${f}; done\n```\n\n```\n$ ls folder/\nfile1  file2  file3  file4  file5\n```\n\nNow, let us add some content to one of the files:\n\n```\n$ echo \"This is a test to see if it works...\" >> folder/file1\n```\n\n```\n$ cat folder/file1\nThis is a test to see if it works...\n```\n\n"
+    },
+    {
+      "title": "Growing a file",
+      "level": 3,
+      "content": "Should you ever need to grow a file, you may do the following:\n\n```\n# umount folder\n```\n\n```\n$ dd if=/dev/zero of=file.img bs=1 count=0 seek=1G\n```\n\n```\n0+0 records in\n0+0 records out\n0 bytes (0 B) copied, 2.2978e-05 s, 0.0 kB/s\n```\n\nThis will increase its size to 1 GiB and leave its information intact. Next, we need to increase the size of its filesystem:\n\n```\n$ e2fsck -f file.img\n```\n\n```\n$ resize2fs file.img\n```\n\n```\nresize2fs 1.47.1 (20-May-2024)\nResizing the filesystem on file.img to 262144 (4k) blocks.\nThe filesystem on file.img is now 262144 (4k) blocks long.\n```\n\n...and, remount it:\n\n```\n# mount -o loop file.img folder\n```\n\nChecking its size gives us:\n\n```\n# du -h --apparent-size file.img\n```\n\n```\n1.0G    file.img\n```\n\n```\n# du -h file.img\n```\n\n```\n564K     file.img\n```\n\n...and to check for consistency:\n\n```\n# df -h folder\n```\n\n```\nFilesystem            Size  Used Avail Use% Mounted on\n/tmp/file.img         1.0G   33M  992M   4% /tmp/folder\n```\n\n```\n# ls folder\n```\n\n```\nfile1  file2  file3  file4  file5\n```\n\n```\n# cat folder/file1\n```\n\n```\nThis is a test to see if it works...\n```\n\n"
+    },
+    {
+      "title": "Tools",
+      "level": 2,
+      "content": "- sparse-fio — dd-like program to work with files that are sparsely filled with non-zero data\n\n- sparseutils — utilities to work with sparsely-populated files, provides mksparse and sparsemap, can be installed with pip\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wikipedia:Sparse file\n- Archiving Sparse Files\n\n"
+    }
+  ]
+}

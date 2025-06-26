@@ -1,0 +1,231 @@
+{
+  "title": "Boxee-source",
+  "url": "https://wiki.archlinux.org/title/Boxee-source",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Kodi (formerly known as XBMC) is an award-winning free and open source (GPL) software media player and entertainment hub that can be installed on Linux, OSX, Windows, iOS and Android, featuring a 10-foot user interface for use with televisions and remote controls. These can all be played directly from a CD/DVD, or from the hard-drive. Kodi can also play multimedia from a computer over a local network (LAN), or play media streams directly from the Internet. It can also be used to play and record live TV using a tuner, a backend server and a PVR plugin; more information about this can be found on the Kodi wiki.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the kodi package. Users wanting HDR support should instead install the kodi-gles package. Be sure to review/install optional dependencies listed by pacman to enable additional functionality.\n\n"
+    },
+    {
+      "title": "Setup",
+      "level": 3,
+      "content": "Both packages support several composers, with varying levels of functionality:\n\nAll of the official addons in the kodi-addons group are disabled by default and need to be enabled in Kodi's addon menu after installation.\n\n"
+    },
+    {
+      "title": "Hardware video acceleration",
+      "level": 3,
+      "content": "Enable and configure hardware video acceleration to speed up playback performance. Once installed, the hardware backend(s) are presented under Settings > Player > Videos.\n\n"
+    },
+    {
+      "title": "Running",
+      "level": 2,
+      "content": "There are two general use cases:\n\n1. /usr/bin/kodi is meant to be run by any user on an on-demand basis. Use it like any other program on the system.\n1. /usr/bin/kodi-standalone is meant to be run as the only graphical application, for example on a HTPC. See #Running standalone for more information.\n\n"
+    },
+    {
+      "title": "Running standalone",
+      "level": 2,
+      "content": "Using standalone mode is advantageous for several reasons:\n\n1. One can define an unprivileged user to run kodi and have no access to a shell.\n1. When paired with a systemd unit (or equivalent, see below), this setup makes the box on which Kodi is running more like an appliance.\n\nNote: **only one** \n\n"
+    },
+    {
+      "title": "kodi-standalone service",
+      "level": 3,
+      "content": "kodi-standalone-serviceAUR provides three services and automatically creates and provisions the unprivileged user to run Kodi in standalone mode.\n\n- kodi-x11.service\n- kodi-gbm.service\n- kodi-wayland.service\n\n- The correct video driver and optionally hardware video acceleration are assumed dependencies.\n- The home/userdata directory for the created kodi user is /var/lib/kodi/.\n- Certain use cases may require environment variables to be passed to the service. Define these variables in /etc/conf.d/kodi-standalone and they will be passed along to the service.\n- If kodi-x11.service fails to start, see Xorg#Rootless Xorg for possible workarounds (this is uncommon).\n- kodi-gbm.service and kodi-wayland.service do not allow exiting to another virtual console.\n\n"
+    },
+    {
+      "title": "Recommended methods to reboot/shutdown using kodi-standalone service",
+      "level": 4,
+      "content": "Note: **instead of** \n\nIn principal this is no different than data loss occurring from a user doing work when a sysadmin issues a reboot command without prior warning. While it is possible to run Kodi in systemd's user.slice instead, doing so makes it difficult to use USB mounts within Kodi and to use PulseAudio for Kodi sessions.\n\n- Kodi GUI: Selecting the corresponding option under power menu in the Kodi GUI.\n- Mobile device: The official Android/iOS apps can also perform these actions (assuming the corresponding options are enabled in Kodi).\n- CLI: Use kodi-send provided by kodi-eventclients to send the ShutDown() or the Reboot command. The syntax is:\n\n```\n$ kodi-send -a Reboot\n$ kodi-send -a ShutDown()\n```\n\n"
+    },
+    {
+      "title": "Xsession with LightDM",
+      "level": 3,
+      "content": "To use LightDM with automatic login, see LightDM#Enabling autologin and LightDM#Enabling interactive passwordless login. Kodi includes kodi.desktop as xsession.\n\n```\n/etc/lightdm/lightdm.conf\n```\n\n```\n[Seat:seat0]\npam-service=lightdm-autologin\nautologin-user=kodi\nautologin-user-timeout=0\nuser-session=kodi\n```\n\n"
+    },
+    {
+      "title": "Xsession with NoDM",
+      "level": 3,
+      "content": "Nodm is an automatic display manager which automatically starts an X session at system boot.\n\nBy creating a user for kodi (e.g. useradd -mU kodi) and installing nodm we simply have to specify the kodi user inside:\n\n```\n/etc/nodm.conf\n```\n\n```\nNODM_USER=kodi\nNODM_XSESSION=/home/kodi/.xinitrc\n```\n\nMake sure to execute kodi inside the xinitrc file.\n\n"
+    },
+    {
+      "title": "Socket activation",
+      "level": 3,
+      "content": "Socket activation can be used to start Kodi when the user issues a Wakeup command from a remote control app like Kore, or makes a connection to Kodi's html control port. Start listening by starting kodi@user.socket (replace user with the user running Kodi to be started as).\n\nThere are no packaged kodi@.service and kodi@.socket files, one must create them manually. Depending on the setup, one can optionally change the ports in kodi@.socket.\n\n```\n/etc/systemd/system/kodi@.service\n```\n\n```\n# This fails if the user does not have an X session.\n[Unit]\nDescription=Launch Kodi on main display\nConflicts=kodi.socket\n\n[Service]\nType=simple\nEnvironment=DISPLAY=:0.0\nNice=-1\nExecStart=/usr/bin/su %i /usr/bin/kodi\nExecStopPost=/usr/bin/systemctl --no-block start kodi@%i.socket\n\n[Install]\nWantedBy=multi-user.target\n```\n\n```\n/etc/systemd/system/kodi@.socket\n```\n\n```\n[Unit]\nConflicts=kodi@%i.service\n\n[Socket]\n# Unset \nListenStream=\n# Start when receiving a TCP request on the http control port\nListenStream=8080\n# start when receiving an UDP datagram (Wakeup/WOL)\nListenDatagram=9\n\n[Install]\nWantedBy=sockets.target\n```\n\n"
+    },
+    {
+      "title": "Start from remote control with LIRC / irexec",
+      "level": 3,
+      "content": "Kodi can be configured to start via a key press. Users will need kodi-standalone-serviceAUR and lirc. This can be useful on setups running 24/7 and having kodi up on demand.\n\nSee the corresponding LIRC article and create a functional setup with a remote. Also, the package kodi-standalone-serviceAUR has to be installed.\n\nGenerate the file /var/lib/kodi/.lircrc with the following content:\n\n```\n/var/lib/kodi/.lircrc\n```\n\n```\nbegin\nprog = irexec\nremote = devinput\nbutton = KEY_MEDIA\nconfig = pgrep kodi-standalone || /usr/bin/kodi-standalone -l /run/lirc/lircd\nrepeat = 0\nend\n```\n\nAdopt button to whatever button on the remote is to start Kodi. One can use irw (see LIRC#Testing) to find out the correct values for remote and button.\n\nCreate a drop-in for kodi-xxx.service:\n\n```\n/etc/systemd/system/kodi-xxx.service.d/lirc.conf\n```\n\n```\n[Service]\nExecStart =\nExecStart = /usr/bin/irexec\n```\n\nStart kodi-xxx.service and enable it to run at boot time.\n\n"
+    },
+    {
+      "title": "Using a remote control",
+      "level": 2,
+      "content": "As Kodi is geared toward being a remote-controlled media center via an official app, physical remote control, or USB/bluetooth keyboard/mouse.\n\n"
+    },
+    {
+      "title": "Using the Android or iOS app",
+      "level": 3,
+      "content": "Both Android and iOS users can use the official app (currently free of charge) to control kodi once it is correctly setup to do so. Steps to configure both Kodi and the app are detailed on the Official Kodi Remote and Kore Manual page.\n\n"
+    },
+    {
+      "title": "Using a physical remote control",
+      "level": 3,
+      "content": "Any PC with a supported IR receiver/remote, can use LIRC or even kernel supported modules to drive it. Configuring specific remotes with lirc is covered on the LIRC article.\n\nTo work properly with Kodi, a file that maps the lirc events to Kodi keypresses is needed. Create an XML file at ~/.kodi/userdata/Lircmap.xml (note the capital 'L').\n\nLircmap.xml format is as follows:\n\n```\n<lircmap>\n  <remote device=\"devicename\">\n      <XBMC_button>LIRC_button</XBMC_button>\n      ...\n  </remote>\n</lircmap>\n```\n\n- Device Name is whatever LIRC calls the remote. This is set using the Name directive in lircd.conf and can be viewed by running irw and pressing a few buttons on the remote. IRW will report the name of the button pressed and the name of the remote will appear on the end of the line.\n- XBMC_button is the name of the button as defined in keymap.xml.\n- LIRC_button is the name as defined in lircd.conf. If lircd.conf was autogenerated using irrecord, these are the names selected for the buttons. Refer back to LIRC for more information.\n- A very thorough LIRC page hosted on the Kodi Wiki should be consulted for more help and information on this subject as this is out of scope of this article.\n\n"
+    },
+    {
+      "title": "HDMI-CEC",
+      "level": 3,
+      "content": "With a supported USB-CEC adapter, Kodi can be used to automatically turn on and off the TV and other home theater equipment. Volume control from Kodi can be sent to a supported amplifier, one can manage DVD or Blu-Ray players from inside Kodi, and redirect the active source on the TV to whichever equipment needs it, all from one remote control. For more information see the official Kodi wiki page on CEC and libCEC FAQ.\n\nInstall libcec.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nWhen connected, the USB-CEC's /dev entry (usually /dev/ttyACM*) will default to being owned by the uucp group, so in order to use the device the user running Kodi needs to belong to that group. See Users and groups#Group management for instructions on how to add users to groups.\n\n- Add all users that will use Kodi to the uucp user group.\n\n"
+    },
+    {
+      "title": "Using a gamepad",
+      "level": 3,
+      "content": "Install kodi-addon-peripheral-joystick.\n\nFirst, confirm that the gamepad is detected by the OS, navigate to Kodi Settings > Input > Peripherals and confirm your device is listed. Then, enter the Configure attached controllers submenu. Kodi will prompt to press buttons on the controller one at a time. Once the mapping is finished, the gamepad should be able to control the UI.\n\n"
+    },
+    {
+      "title": "Sharing media and a centralized database across multiple nodes",
+      "level": 2,
+      "content": "If multiple PCs on the same network are running Kodi, they can be configured to share a single media library (video and music). The advantage of this is media and key metadata are stored in one place, and are shared/updated by all nodes on the network. For example, users of this setup can:\n\n- Stop watching a movie or show in one room then finish watching it in another room automatically.\n- Share watched and unwatched status for media on all nodes.\n- Simplify the setup with only a single library to maintain.\n\nAs well, the media itself can be located in one space thus allowing a lighter footprint of client systems (ie no need for large HDD space).\n\nSeveral things are needed for this to work:\n\n- Network exposed media (via protocols that Kodi can read, e.g. NFS or Samba).\n- A MariaDB server.\n\nThese assumptions are used for the guide, substitute as needed:\n\n- The media is located under following mount points: /mnt/shows /mnt/movies /mnt/music.\n- The network addresses of all nodes are within the 192.168.0.* subnet range.\n- The IP address of the machine running both the NFS exports and the MariaDB database is 192.168.0.105.\n- Each Kodi box is referred to as a node.\n- The Linux user running Kodi is 'kodi' on all nodes.\n\nFor additional info, refer to the official Kodi wiki.\n\n"
+    },
+    {
+      "title": "NFS server export example",
+      "level": 3,
+      "content": "This section provides an example using exports, see NFS for install and usage. Nexus v20.0 of Kodi contains initial support for NFSv4 exports. A limitation is that users of NFSv4 exports will have to manually add the exports/browsing the NFS network is not currently supported. Users will also need to restart Kodi after the sources have been added. Using a NFSv3 export does not have these caveats.\n\nUsers wanting a pure NFSv4 setup should see NFS#Starting the server in order to keep things clean. Of course, this only applies to the box running the NFSv4 exports.\n\nCreate an empty directory in NFS root for each media directory to be shared. E.g.:\n\n```\n# mkdir -p /srv/nfs/{shows,movies,music}\n```\n\nBind mount the media directories to the empty directories in /srv/nfs/.\n\nThe following example is for a NFSv3 exports:\n\n```\n/etc/exports.d/kodi.exports\n```\n\n```\n/srv/nfs          192.168.0.0/24(ro,fsid=0,no_subtree_check)\n/srv/nfs/shows    192.168.0.0/24(ro,no_subtree_check,insecure)\n/srv/nfs/movies   192.168.0.0/24(ro,no_subtree_check,insecure)\n/srv/nfs/music    192.168.0.0/24(ro,no_subtree_check,insecure)\n```\n\nThe following example is for a NFSv4 exports:\n\n```\n/etc/exports.d/kodi.exports\n```\n\n```\n/srv/nfs          192.168.0.0/24(ro,fsid=0,no_subtree_check,insecure,async,all_squash,pnfs,anonuid=99,anongid=99)\n/srv/nfs/shows    192.168.0.0/24(ro,no_subtree_check,insecure,async,all_squash,pnfs,anonuid=99,anongid=99)\n/srv/nfs/movies   192.168.0.0/24(ro,no_subtree_check,insecure,async,all_squash,pnfs,anonuid=99,anongid=99)\n/srv/nfs/music    192.168.0.0/24(ro,no_subtree_check,insecure,async,all_squash,pnfs,anonuid=99,anongid=99)\n```\n\n"
+    },
+    {
+      "title": "Install and set up the MariaDB server",
+      "level": 3,
+      "content": "See MariaDB for installation and configuration instructions.\n\nTo create a database for Kodi, use the following commands:\n\n```\n$ mysql -u root -p\n   <<enter the mariadb root password assigned in the first step>>\nMariaDB [(none)]> CREATE USER 'kodi' IDENTIFIED BY 'kodi';\nMariaDB [(none)]> GRANT ALL ON *.* TO 'kodi';\nMariaDB [(none)]> flush privileges;\nMariaDB [(none)]> \\q\n```\n\n"
+    },
+    {
+      "title": "Set up Kodi to use the common SQL database",
+      "level": 4,
+      "content": "To tell Kodi to use the common database, insure that Kodi is not running, then create the following file:\n\n```\n~/.kodi/userdata/advancedsettings.xml\n```\n\n```\n<advancedsettings>\n  <videodatabase>\n    <type>mysql</type>\n    <host>192.168.0.105</host>\n    <port>3306</port>\n    <user>kodi</user>\n    <pass>kodi</pass>\n  </videodatabase>\n\n  <musicdatabase>\n    <type>mysql</type>\n    <host>192.168.0.105</host>\n    <port>3306</port>\n    <user>kodi</user>\n    <pass>kodi</pass>\n  </musicdatabase>\n\n  <videolibrary>\n    <importwatchedstate>true</importwatchedstate>\n    <importresumepoint>true</importresumepoint>\n  </videolibrary>\n</advancedsettings>\n```\n\n"
+    },
+    {
+      "title": "Set up network shares",
+      "level": 4,
+      "content": "For NFSv3 shares, load Kodi and define the network shares that correspond to the exports by browsing to the following within the interface Video > Files > Add Videos > Browse > Network Filesystem(NFS).\n\nAfter a few seconds, the IP address corresponding to the NFS server should appear.\n\nSelect /srv/nfs/shows from the list of share and then OK from the menu on the right. Assign this share the category of TV Shows to setup the appropriate scraper and to populate the SQL database with the correct metadata.\n\nRepeat this browsing process for the \"movies\" and \"music\" and then exit Kodi once properly configured. At this point, the SQL tables should have been created.\n\nFor NFSv4 shares, user cannot browse the network but will have to manually define them under Video > Files > Add Videos > Browse > Add network location... For there, change the Protocol to \"Network File System (NFS)\" and then define the server address (numerical IP or hostname) and then define the share under the Remote path section. Repeat for each export.\n\nNote: **must** \n\n"
+    },
+    {
+      "title": "Cloning the configuration to other nodes on the network",
+      "level": 3,
+      "content": "To set up another Kodi node on the network to use this library, simply copy ~/.kodi/userdata/advancedsettings.xml to that box and restart Kodi. There is NO need to copy any other files or to do any other setup steps on the new kodi node. The nfs exports, the metadata for the programming, any stop/start times, view status, etc. are all stored in the SQL tables.\n\n"
+    },
+    {
+      "title": "Keep a log of what is watched",
+      "level": 3,
+      "content": "Keep track of every video watched on kodi with kodi-loggerAUR.\n\n"
+    },
+    {
+      "title": "Speedup video playback (synchronized audio and video) up to 1.5x",
+      "level": 3,
+      "content": "To enable speed-up and slow-down with audio/video sync (0.8x - 1.5x) do the following:\n\n- Create the following file that will map the [ and ] keys to the tempo down and tempo up actions, respectively:\n\n```\n~/.kodi/userdata/keymaps/custom.xml\n```\n\n```\n<keymap>\n  <FullscreenVideo>\n    <keyboard>\n      <opensquarebracket>PlayerControl(tempodown)</opensquarebracket>\n      <closesquarebracket>PlayerControl(tempoup)</closesquarebracket>\n    </keyboard>\n  </FullscreenVideo>\n  <VideoMenu>\n    <keyboard>\n      <opensquarebracket>PlayerControl(tempodown)</opensquarebracket>\n      <closesquarebracket>PlayerControl(tempoup)</closesquarebracket>\n    </keyboard>\n  </VideoMenu>\n</keymap>\n```\n\n- Restart kodi which will read in these changes.\n- Navigate to System > Player > Videos > Playback and enable \"Sync playback to display\" option.\n\n"
+    },
+    {
+      "title": "Modify default values for watch and resume points",
+      "level": 3,
+      "content": "Some users may wish to make the thresholds Kodi uses to create a resume point/consider a video \"watched\" entirely. Do so by editing ~/.kodi/userdata/advancedsettings.xml inserting the following three xml fields:\n\n```\n~/.kodi/userdata/advancedsettings.xml\n```\n\n```\n<advancedsettings>\n  <video>\n    <!-- see https://kodi.wiki/view/HOW-TO:Modify_automatic_watch_and_resume_points -->\n    <ignoresecondsatstart>10</ignoresecondsatstart>\n    <playcountminimumpercent>90</playcountminimumpercent>\n    <ignorepercentatend>8</ignorepercentatend>\n  </video>\n</advancedsettings>\n```\n\n"
+    },
+    {
+      "title": "CLI for kodi",
+      "level": 3,
+      "content": "- kodi-eventclients package provides kodi-send which can send valid kodi action or kodi function to kodi from the shell.\n\n- texturecacheAUR can handle many aspects of library management, from clean-up of unused images, to searching, to querying what is currently playing.\n\n"
+    },
+    {
+      "title": "Use Kodi to view security camera streams (rtsp or rtmp)",
+      "level": 3,
+      "content": "Since Kodi uses ffmpeg for video playback, it is able to play streams such as rtsp and rtmp can be viewed. To do so, simply create a txt file in the filesystem exposed to the kodi user containing the stream. For example:\n\n```\n$ cat front-door.strm\n```\n\n```\nrtsp://username:password@10.1.10.101\n```\n\nOptionally meta-data, such as cover art and summaries can also be associated to the .strm file just like normal entries in a library by using an NFO file.\n\n"
+    },
+    {
+      "title": "UPnP and DLNA",
+      "level": 3,
+      "content": "Go to Settings > Services > UPnP/DLNA and toggle Enable UPnP support.\n\n"
+    },
+    {
+      "title": "Adjusting CD/DVD drive speed",
+      "level": 3,
+      "content": "The eject program from the util-linux package does a nice job for this, but its setting is cleared as soon as the media is changed.\n\nThis udev-rule reduces the speed permanently:\n\n```\n/etc/udev/rules.d/dvd-speed.rules\n```\n\n```\nKERNEL==\"sr0\", ACTION==\"change\", ENV{DISK_MEDIA_CHANGE}==\"1\", RUN+=\"/usr/bin/eject -x 2 /dev/sr0\"\n```\n\nReplace sr0 with the device name of the optical drive. Replace -x 2 with -x 4 if the preference is 4x-speed instead of 2x-speed.\n\nAfter creating the file, reload the udev rules with\n\n```\n# udevadm control --reload\n```\n\n"
+    },
+    {
+      "title": "Use port 80 for webserver",
+      "level": 3,
+      "content": "Kodi has a webservice that allows interaction through a web-interface. By default, it uses port 8080 as 80 requires root privileges. Use the following to permit it to use low port numbers:\n\n```\n# setcap 'cap_net_bind_service=+ep' /usr/lib/kodi/kodi.bin\n```\n\nRestart Kodi and set port 80 in the configuration menu (Services > Webserver > Port).\n\n"
+    },
+    {
+      "title": "Using ALSA",
+      "level": 3,
+      "content": "If PulseAudio or PipeWire do not work properly, try forcing ALSA by launching Kodi with the --audio-backend=alsa flag.\n\nOne method to set the audio backend permanently is to create a custom systemd unit, or, alternatively, edit one from kodi-standalone-serviceAUR.\n\n"
+    },
+    {
+      "title": "Audio passthrough output device list in Kodi 21+",
+      "level": 3,
+      "content": "One can allow an external receiver or sound bar to decode audio by enabling passthrough. This is useful for files encoded in TrueHD or Atmos. If using PulseAudio, follow the instructions at https://kodi.wiki/view/PulseAudio to first enable passthrough in PulseAudio. Once complete, the corresponding passthrough options should appear in Kodi. When forcing ALSA by launching Kodi with --audio-backend=alsa, the passthrough options will appear in Kodi automatically.\n\n- PulseAudio requires the output in Kodi to be set to 2 channel. Audio encoded in formats not passed through will only be sent as stereo audio. Use ALSA to support passthrough and passing decoded surround audio signals\n- PulseAudio does not support TrueHD, DTS-MA, or Atmos passthrough. Use ALSA to pass these to through the receiver.\n\nAnother way of getting TrueHD and DTS-MA passthrough without disabling PulseAudio or pipewire-pulse is to use an external player like MPV, first create the file ~/.kodi/userdata/playercorefactory.xml then paste the following into it:\n\n```\n<playercorefactory>\n  <players>\n    <player name=\"MPV\" type=\"ExternalPlayer\" audio=\"false\" video=\"true\">\n      <filename>/usr/bin/mpv</filename>\n      <args>--fs=yes \"{1}\"</args>\n      <hidexbmc>true</hidexbmc>\n    </player>\n  </players>\n  <rules action=\"prepend\">\n    <rule video=\"true\" player=\"MPV\"/>\n  </rules>\n</playercorefactory>\n```\n\nNote: **This article or section is a candidate for merging with mpv.** This article or section is a candidate for merging with mpv.\n\nThis article or section is a candidate for merging with mpv.\n\nMPV should now be the default media player for Kodi. To set the correct audio output device for MPV, use the following command to show a list of available audio devices:\n\n```\n$ mpv --audio-device=help\n```\n\nFor example:\n\n```\nalsa/hdmi:CARD=NVidia,DEV=1\n```\n\nNow edit ~/.config/mpv/mpv.conf and add the following lines:\n\n```\naudio-spdif=ac3,eac3,dts-hd,truehd\naudio-device=alsa/hdmi:CARD=NVidia,DEV=1\n```\n\nTo have auto switching of refresh rates create the following folder ~/.config/mpv/scripts then download and place mpv-plugin-xrandr/xrandr.lua into that folder.\n\n"
+    },
+    {
+      "title": "Kodi JSON-RPC API to alter settings from external tools",
+      "level": 3,
+      "content": "Users can interact directly with Kodi on the CLI or from a python script etc. by making use of the JSON-RPC API.\n\nFor example, using curl:\n\n```\n$ curl -v -H \"Content-type: application/json\" -d \\\n  '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"Settings.GetSettingValue\",\"params\":{\"setting\":\"audiooutput.audiodevice\"}}' \\\n  http://localhost:8080/jsonrpc -u xbmc:xbmc\n```\n\nAnother example is this python script which simply toggles between two groups of settings, in this case, toggling the audio source back-and-forth between HDMI and optical out.\n\n"
+    },
+    {
+      "title": "Fix for delayed startup on Wi-Fi",
+      "level": 3,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nIf running with Wi-Fi only (wired network unplugged) while #Sharing media and a centralized database across multiple nodes, kodi will likely start before the wireless network is up, which will result in failure to connect to the shares and to the SQL server. Assuming the network is managed by systemd-networkd, this can be fixed by using a drop-in file:\n\n```\n/etc/systemd/system/systemd-networkd-wait-online.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/lib/systemd/systemd-networkd-wait-online --ignore eth0\n```\n\n"
+    },
+    {
+      "title": "Run kodi in a window manager",
+      "level": 3,
+      "content": "Users running kodi in a Window manager may see a black screen at exit. To fix this, try switching to another tty. A possible solution is to run kodi with this script (running as the root user):\n\n```\nkodi.sh\n```\n\n```\n#!/bin/sh\nkodi-standalone\nsudo chvt 2 \nsleep 1\nsudo chvt 1\n```\n\nTo make sure that sudo does not ask for password for chvt add this line to sudoers file:\n\n```\n/etc/sudoers\n```\n\n```\nUserNameHere ALL=NOPASSWD: /usr/bin/chvt\n```\n\n"
+    },
+    {
+      "title": "USB DAC not working",
+      "level": 3,
+      "content": "Users of USB DAC/sound cards may experience distorted sound/clicks/pops or no sound at all when selecting it from Audio settings. A possible fix:\n\nOpen guisettings.xml (it should be under /var/lib/kodi/.kodi/userdata/ if using the supplied kodi-xxx.service) and change\n\n```\n<processquality default=\"true\">101</processquality>\n```\n\nto\n\n```\n<processquality default=\"false\">100</processquality>\n```\n\n"
+    },
+    {
+      "title": "Virtual file system support",
+      "level": 3,
+      "content": "Kodi provides addons for accessing various virtual file systems from within Kodi. RAR archives can be accessed using kodi-addon-vfs-rarAUR. SFTP shares can be accessed using kodi-addon-vfs-sftpAUR. Super Audio CD ISO files can be access using kodi-addon-vfs-sacdAUR. Each of these addons must be enabled within Kodi's addon manager in order to be utilized.\n\n"
+    },
+    {
+      "title": "Inhibit KDE automatic sleep during playback",
+      "level": 3,
+      "content": "Using the add-on ossscreensavermanager in combination with commands using kwriteconfig6 it is possible to inhibit KDE's power saving functions during playback. Install the add-on, then under its advanced settings write under \"Command to suspend screen saver\":\n\n```\nkwriteconfig6 --file powermanagementprofilesrc --group AC --group SuspendSession --key idleTime 1800000\n```\n\nUnder \"Command to resume screen saver\", write:\n\n```\nkwriteconfig6 --file powermanagementprofilesrc --group AC --group SuspendSession --key idleTime 86400000\n```\n\nIn this example, the system suspends after 360 minutes during playback, and after 30 minutes without playback.\n\n"
+    },
+    {
+      "title": "Accessing Kodi logs",
+      "level": 3,
+      "content": "In case of an error the first point to start investigation can be ~/.kodi/temp/kodi.log.\n\n"
+    },
+    {
+      "title": "Fullscreen mode stretches Kodi across multiple displays",
+      "level": 3,
+      "content": "For a multi-monitor setup, Kodi may default to stretching across all screens. One can restrict the fullscreen mode to one display by setting the environment variable SDL_VIDEO_FULLSCREEN_HEAD to the number of the desired target display. For example, having Kodi show up on display 0, add the following line to the Kodi user's ~/.bashrc configuration:\n\n```\nSDL_VIDEO_FULLSCREEN_HEAD=0\n```\n\n"
+    },
+    {
+      "title": "H.264 playback is using only a single core",
+      "level": 3,
+      "content": "If the hardware does not or cannot make use of acceleration, disable it and explicitly set video decoding to software. This is because H.264 decoding is only multithreaded when video decoding is set to software.\n\nTo achieve this, go to System Settings > Video. Set the settings level to Advanced or Expert. Then go to Acceleration and set Decoding method to software.\n\n"
+    },
+    {
+      "title": "Kodi hangs on exit, fully occupying one CPU core, UI unresponsive",
+      "level": 3,
+      "content": "This problem can arise with third-party plugins installed, there is some issue with their termination[1],[2].\n\nWorkaround: find proper UI description file (DialogButtonMenu.xml) and tweak exit button type from internal Kodi's Quit() function call to sending signal from outside system to Kodi. Here is one-liner that makes modifications to any skin from the default Kodi package:\n\n```\n# find /usr/share/kodi/addons/skin.* -name DialogButtonMenu.xml -exec sed -i 's%<onclick>Quit()</onclick>%<onclick>System.Exec (\"killall --signal SIGHUP kodi.bin\")</onclick>%' {} \\;\n```\n\n"
+    },
+    {
+      "title": "kodi-standalone will not play DVDs",
+      "level": 3,
+      "content": "If kodi-standalone will not play DVDs, it may help to install udisks.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Kodi Wiki - Excellent resource with much information about Arch Linux specifically\n- Wikipedia:Kodi (software)\n- http://www.hdpfans.com/thread-329076-1-1.html[dead link 2025-03-15 ⓘ] - Kodi/xbmc Chinese plug-in library installation method\n- https://github.com/taxigps/xbmc-addons-chinese - xbmc-addons-chinese: Addon scripts, plugins, and skins for XBMC Media Center. Special for chinese laguage.\n\n"
+    }
+  ]
+}

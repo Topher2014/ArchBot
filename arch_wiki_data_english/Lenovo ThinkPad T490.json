@@ -1,0 +1,61 @@
+{
+  "title": "Lenovo ThinkPad T490",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T490",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nGPU |  | Yes\nWireless |  | Yes\nAudio |  | Yes\nTrackPoint |  | Yes\nTouchpad |  | Yes\nWebcam | 04f2:b681 | Yes\nBluetooth |  | Yes\nMobile broadband |  | Untested\nFingerprint reader | 06cb:00bd | Yes\nMicroSD reader |  | Yes\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Most Function keys should work out of the box, but if it does not, bind mentioned keys to below commands:\n\n- F1 button: amixer set Master toggle.\n- F2 button: amixer set Master 5%-.\n- F3 button: amixer set Master 5%+.\n- F4 button: amixer set Capture toggle.\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 2,
+      "content": "Touchpad is problematic. By default, if you hold the thumb over the button area, the pointer will not move. Once the system is installed, the problem disappears when using KDE, while GNOME still exhibits the issue. In GNOME, use the following to fix the problem:\n\n```\n$ xinput set-prop 'SynPS/2 Synaptics TouchPad' 'libinput Click Method Enabled' 1 0\n```\n\nEven after doing this, the mouse pointer still jumps around when clicking the button sometimes.\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nsystemd v245 contains broken hwdb entry that sets invalid aspect ratio for the touchpad making it behave strangely.\n\n"
+    },
+    {
+      "title": "Fingerprint Sensor",
+      "level": 2,
+      "content": "The fingerprint sensor works with some recent firmware and software updates (2019-12-15). Driver development info: [1].\n\nUse fwupd to install the latest firmware for \"Synaptics Prometheus Fingerprint Reader\". The update might have to be done manually as the released firmware is in testing; or you could enable the testing remote in fwupd to allow automated upgrade. The relevant firmwares are Prometheus Fingerprint Reader and Prometheus Fingerprint Reader Configuration.\n\nfprint has more details on how to setup the fingerprint for PAM authentication for example.\n\n"
+    },
+    {
+      "title": "Extremely high battery usage because of dedicated GPU",
+      "level": 3,
+      "content": "In short, because of a device-specific quirk in how Lenovo handles ACPI calls, you need the following kernel command line parameter to successfully power off your dedicated GPU: acpi_osi='!Linux-Lenovo-NV-HDMI-Audio'.\n\nIf your laptop is equipped with a NVIDIA dedicated GPU (such as the GeForce MX250), you will likely encounter very high battery usage because the GPU will not turn off.\n\nYou can check the \"power state\" of the dedicated GPU with the following, where you need to change 3c:00.0 with the PCI Bus ID of your GPU you get from lspci | grep -i nvidia.\n\n```\n$ cat /sys/bus/pci/devices/0000:3c:00.0/power_state\n```\n\nor\n\n```\n$ cat /sys/bus/pci/devices/0000:3c:00.0/firmware_node/power_state\n```\n\nPower state 'D0' means your GPU is consuming a lot of power right now. Power states 'D3hot' and 'D3cold' are the low-power modes where the GPU is basically turned off, but still recognized by the kernel.\n\nUse bbswitch to disable the GPU altogether:\n\n- Install nvidia, xf86-video-intel and bbswitch (optionally, install bumblebee or nvidia-xrunAUR to enable the card on-demand).\n- Make sure to have the following inside file /etc/X11/nvidia-xorg.conf, where the ID after \"PCI:\" (60 in the example above) will be the output you get from lspci | grep -i nvidia, converted from hex to decimal (e.g., from 3c to 60): Section \"Device\" Identifier \"nvidia\" Driver \"nvidia\" BusID \"PCI:60:0:0\" EndSection\n- Load the bbswitch module at boot by running # echo bbswitch > /etc/modules-load.d/bbswitch.conf\n- Important: Add acpi_osi='!Linux-Lenovo-NV-HDMI-Audio' to the kernel command line parameters. This article has a short explaination why, and reboot. This step is required because of a Lenovo bug in how they handle ACPI calls, which bbswitch relies on to power on/off your GPU.\n- You can now turn on/off the dedicated GPU by running the following # echo OFF > /proc/acpi/bbswitch # echo ON > /proc/acpi/bbswitch\n\n```\nSection \"Device\"\n  Identifier \"nvidia\"\n  Driver \"nvidia\"\n  BusID \"PCI:60:0:0\"\nEndSection\n```\n\n```\n# echo bbswitch > /etc/modules-load.d/bbswitch.conf\n```\n\n```\n# echo OFF > /proc/acpi/bbswitch\n# echo ON > /proc/acpi/bbswitch\n```\n\nCheck the power status of the GPU by running\n\n```\n$ cat /proc/acpi/bbswitch\n```\n\nIf you want to boot with your GPU disabled, run:\n\n```\n# echo options bbswitch load_state=0 unload_state=1 > /etc/modprobe.d/bbswitch.conf\n```\n\nAnd blacklist any nvidia/nouveau driver that tries to load at boot, by editing /etc/modprobe.d/blacklist.conf:\n\n```\nblacklist nouveau\nblacklist nvidia-drm\nblacklist nvidia-modeset\nblacklist nvidia-uvm\nblacklist nvidia\n```\n\nIf you did everything correctly, you should experience a significant drop in battery usage on idle (e.g., from 7W to 3.5W on idle), almost doubling your battery life.\n\n"
+    },
+    {
+      "title": "CPU throttling issue",
+      "level": 3,
+      "content": "With the BIOS Version 1.52 (this problem is known to occur on 1.52, it might still happen on other versions too), the CPU tends to throttle down to 400 MHz earlier than it should. In particular, this can be seen when using Bumblebee.\n\nAfter installing BIOS Version 1.54, this problem is fixed.\n\n"
+    },
+    {
+      "title": "Speaker noise issue",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThe speaker on the Lenovo Thinkpad T490 may have a high static hissing noise, which does not change if you lower the volume, but stops if you mute the speaker or use the headphone jack. This problem cannot be fixed completely as of now. Updating to the most current BIOS version will make the speaker silent while it is not playing anything without you having to mute it all the time. But as soon as the user is playing sound, the noise will be back, clearly audible in the background.\n\nCheck the Lenovo Support Website for the newest BIOS Version.\n\n"
+    },
+    {
+      "title": "Slow wakeup after suspend",
+      "level": 3,
+      "content": "After suspend the laptop takes a few second until it becomes responsive. Disallowing the access to the WWAN device in the BIOS solves this issue.\n\n"
+    },
+    {
+      "title": "2101: Detection error on HDD0 (Main HDD)",
+      "level": 3,
+      "content": "If you get this error after a reboot using \"LENSE30256GMSP34MEAT3TA\" NVMe SSD, try adding nvme_core.default_ps_max_latency_us=0 to your kernel parameters.\n\nYou can see some exceptions for some SSDs but not for this model since kernel v5.16 core.c?h=v5.16#n2474\n\n"
+    },
+    {
+      "title": "ACPI",
+      "level": 2,
+      "content": "The default /etc/acpi/handler.sh script has a check for the device that looks like this:\n\n```\nac_adapter)\n        case \"$2\" in\n            AC|ACAD|ADP0)\n```\n\nThis will not work, since the T490 device is called ACPI0003 which is not matched by the above check. The instructions in acpid does mention a pattern that does work and it is recommended to use this instead.\n\n"
+    },
+    {
+      "title": "Also See",
+      "level": 2,
+      "content": "- Lenovo Forums: A throttling fix is being investigated by Lenovo.\n- Unix & Linux Stack Exchange: kernel - clarifying nvme apst problems for linux\n\n"
+    }
+  ]
+}

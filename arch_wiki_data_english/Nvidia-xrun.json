@@ -1,0 +1,46 @@
+{
+  "title": "Nvidia-xrun",
+  "url": "https://wiki.archlinux.org/title/Nvidia-xrun",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "nvidia-xrun is a utility that allows NVIDIA Optimus-enabled laptops to run X server with discrete NVIDIA graphics on demand. This solution offers full GPU utilization, compatibility and better performance than Bumblebee.\n\nX server can only be used with integrated graphics or discrete NVIDIA graphics, but not both, so the user might want to switch to a separate virtual console and start another X server using different graphics from what was used for the first X server.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install:\n\n- nvidia - if using older drivers you have to edit nvidia-xrun's PKGBUILD and remove the NVIDIA depend\n- nvidia-xrun-gitAUR(recommended) or nvidia-xrunAUR (old method, uses bumblebee to switch off the dedicated card)\n- Any window manager, since running application directly like with nvidia-xrun application is not recommended.\n\n"
+    },
+    {
+      "title": "Setting the right bus id",
+      "level": 3,
+      "content": "Find your display device bus id:\n\n```\n$ lspci | grep -i nvidia | awk '{print $1}'\n```\n\nIt might return something similar to 01:00.0. Then create a file (for example /etc/X11/nvidia-xorg.conf.d/30-nvidia.conf) to set the proper bus id:\n\n```\n/etc/X11/nvidia-xorg.conf.d/30-nvidia.conf\n```\n\n```\nSection \"Device\"\n    Identifier \"nvidia\"\n    Driver \"nvidia\"\n    BusID \"PCI:1:0:0\"\n    #  Option \"DPI\" \"96 x 96\"\nEndSection\n```\n\nAlso this way you can adjust some NVIDIA settings if you encounter issues:\n\n```\n/etc/X11/nvidia-xorg.conf.d/30-nvidia.conf\n```\n\n```\nSection \"Screen\"\n    Identifier \"nvidia\"\n    Device \"nvidia\"\n    #  Option \"AllowEmptyInitialConfiguration\" \"Yes\"\n    #  Option \"UseDisplayDevice\" \"none\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "External GPU setup",
+      "level": 3,
+      "content": "You can also use this in an external GPU setup. Make sure to load the nvidia-modeset and nvidia-drm modules and add the option Option \"AllowExternalGpus\" \"true\" to the \"Device\" section.\n\nChange the auto-generated configuration to use the internal display on devices with multiple NVIDIA cards:\n\n```\n/etc/X11/nvidia-xorg.conf.d/30-nvidia.conf\n```\n\n```\nSection \"ServerLayout\"\n  Identifier \"layout\"\n  Screen 0 \"nvidia\" 0 0\n  Inactive \"intel\"\n  Option  \"AutoAddGPU\" \"false\"\nEndSection\n\nSection \"Device\"\n  Identifier \"nvidia\"\n  Driver \"nvidia\"\n  BusID \"PCI:9:0:0\"\n  Option \"AllowExternalGpus\" \"true\"\n  Option \"ProbeAllGpus\" \"false\"\n  Option \"HardDPMS\" \"false\"\n  Option \"NoLogo\" \"true\"\n  Option \"UseEDID\" \"false\"\n#    Option \"UseDisplayDevice\" \"none\"\nEndSection\n\nSection \"Screen\"\n  Identifier \"nvidia\"\n  Device \"nvidia\"\n  Option \"AllowEmptyInitialConfiguration\" \"Yes\"\n#  Option \"UseDisplayDevice\" \"None\"\nEndSection\n```\n\nRemember to set the bus id to the correct graphics card.\n\n"
+    },
+    {
+      "title": "Automatically run window manager",
+      "level": 3,
+      "content": "For convenience you can create an $XDG_CONFIG_HOME/X11/nvidia-xinitrc file with your favorite window manager. (if using nvidia-xrun < v.0.3.79 create $HOME/.nvidia-xinitrc)\n\n```\nif [ $# -gt 0 ]; then\n  $*\nelse\n  your-window-manager\nfi\n```\n\nWith it you do not need to specify the app and can simply execute:\n\n```\n$ nvidia-xrun\n```\n\nSince this method starts an isolated X server, it is also a good idea to get a copy of all the other configurations files that you have located at /etc/X11/xorg.conf.d/, except for your prior standard integrated GPU configurations.\n\n"
+    },
+    {
+      "title": "Use bbswitch to manage the NVIDIA card",
+      "level": 3,
+      "content": "When the NVIDIA card is not needed, bbswitch can be used to turn it off. The nvidia-xrun script will automatically take care of running a window manager and waking up the NVIDIA card. To achieve that, you need to:\n\nLoad the bbswitch module on boot:\n\n```\n# echo 'bbswitch' > /etc/modules-load.d/bbswitch.conf\n```\n\nDisable the nvidia module on boot:\n\n```\n# echo 'options bbswitch load_state=0 unload_state=1' > /etc/modprobe.d/bbswitch.conf\n```\n\nAfter a reboot, the NVIDIA card will be off. This can be seen by querying bbswitch's status:\n\n```\n$ cat /proc/acpi/bbswitch\n```\n\nTo force the card to turn on/off respectively run:\n\n```\n# echo OFF > /proc/acpi/bbswitch\n# echo ON > /proc/acpi/bbswitch\n```\n\nFor more about bbswitch see Bumblebee-Project/bbswitch.\n\n"
+    },
+    {
+      "title": "Start at boot",
+      "level": 3,
+      "content": "Enable nvidia-xrun-pm.service - this shuts down the NVIDIA card during boot.\n\nOnce the system boots, from the virtual console, login to your user, and run nvidia-xrun application.\n\nIf above does not work, switch to unused virtual console and try again.\n\nAs mentioned before, running applications directly with nvidia-xrun application does not work well, so it is best to create an nvidia-xinitrc file as outlined earlier, and use nvidia-xrun to launch your window manager.\n\n"
+    },
+    {
+      "title": "NVIDIA GPU fails to switch off or is set to be default",
+      "level": 3,
+      "content": "See #Use bbswitch to manage the NVIDIA card.\n\nIf NVIDIA GPU still fails to switch off, or is somehow set to be default whenever you use or not nvidia-xrun, then you might likely need to blacklist specific modules (which were previously blacklisted by Bumblebee). Create this file and restart your system:\n\n```\n/usr/lib/modprobe.d/nvidia-xrun.conf\n```\n\n```\nblacklist nvidia\nblacklist nvidia-drm\nblacklist nvidia-modeset\nblacklist nvidia-uvm\nblacklist nouveau\n```\n\nThere seems to be a race condition between nvidia-xrun-pm.service and systemd-modules-load.service which loads the nvidia modules. If the latter runs first, nvidia-xrun-pm will hang (actually the tee command) during device removal. If on the other hand nvidia-xrun-pm runs first then it will succeed, and later the modules will fail to load with an error (which is harmless but ugly). For this reason it might be better to always blacklist the above modules.\n\nDRM kernel mode setting should be enabled for PRIME synchronization to work (for example on muxless devices where only the Intel GPU is connected to outputs). However, consider disabling it in case there is an issue. See NVIDIA#DRM kernel mode setting\n\nOn certain hardware, the NVIDIA GPU exposes two devices on the PCI bus: a 3D controller and an audio device. In this case, both devices need to be removed from the bus in order for the GPU to fully power down. This can be done by simply adding a line for the audio device bus id in /etc/default/nvidia-xrun, and the corresponding line in the function turn_off_gpu in /usr/bin/nvidia-xrun to remove the second device.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "title": "Bspwm/Example configurations",
+  "url": "https://wiki.archlinux.org/title/Bspwm/Example_configurations",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Window manager\n- Comparison of tiling window managers\n\nbspwm is a tiling window manager that represents windows as the leaves of a full binary tree. bspwm supports multiple monitors and is configured and controlled through messages. EWMH is partially supported.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install bspwm for the window manager itself and sxhkd for the X hotkey daemon.\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 2,
+      "content": "Run bspwm using xinit.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The example configuration is located in /usr/share/doc/bspwm/examples/.\n\nCopy/install bspwmrc from there into ~/.config/bspwm/ and sxhkdrc into ~/.config/sxhkd/.\n\nThe file bspwmrc needs to be executable since the default example is simply a shell script that in turn configures bspwm via the bspc command.\n\n```\n$ install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc ~/.config/bspwm/bspwmrc\n$ install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc ~/.config/sxhkd/sxhkdrc\n```\n\nThese two files are where you will be setting wm settings and keybindings, respectively.\n\nSee the bspwm(1) and sxhkd(1) manuals for detailed documentation.\n\n"
+    },
+    {
+      "title": "Note for multi-monitor setups",
+      "level": 3,
+      "content": "The example bspwmrc configures ten desktops on one monitor like this:\n\n```\nbspc monitor -d I II III IV V VI VII VIII IX X\n```\n\nYou will need to change this line and add one for each monitor, similar to this:\n\n```\nbspc monitor DVI-I-1 -d I II III IV\nbspc monitor DVI-I-2 -d V VI VII\nbspc monitor DP-1 -d VIII IX X\n```\n\nYou can use xrandr -q or bspc query -M --names to find the monitor names. Note that if monitor names contain special characters, the entire name needs to be escaped by a percentage sign bspc monitor %DVI-I-1.5 -d I II III IV to get identified correctly.\n\nThe total number of desktops were maintained at ten in the above example. To address each desktop, you should refer to the exact desktop names (defined by the bspc monitor command above) in your sxhkdrc like this:\n\n```\n# focus or send to the given desktop\nalt + {_,shift + }{1-9,0}\n    bspc {desktop --focus,node --to-desktop} '{I,II,III,IV,V,VI,VII,VIII,IX,X}'\n```\n\nNote: In default config, sxhkd refers to desktops by number. But those change each time the monitor setup is changed.\n\nDesktops in bspwm are activated by their index. Unless explicitly set, bspwm will automatically choose the display order, which determines the desktop index. If you encounter issues with desktops being on the wrong display, you should explicitly set the display order. similar to this:\n\n```\nbspc wm -O DVI-I-1 DVI-I-2 DP-1\n\nbspc monitor DVI-I-1 -d I II III IV\nbspc monitor DVI-I-2 -d V VI VII\nbspc monitor DP-1 -d VIII IX X\n```\n\nIf you want to automate your monitor-screens setup in case you periodically change monitor layouts, you need to use a conditional structure to check if a specific monitor is connected and configure it appropriately; you can place the following script in place of the standard bspc monitor -d I II III IV V VI VII VIII IX X command:\n\n```\nif [[ $(xrandr -q | grep \"DP-1 connected\") ]];\n   then\n      xrandr --output DP-1  --primary --mode 1920x1080 --pos 0x0  --rotate normal \\\n             --output DVI-I-1 --off \\\n             --output DVI-I-2 --off \n      bspc monitor DP-1 -d I II III IV V VI VII VIII IX\n   fi\n```\n\nThe previous script uses xrandr to set the virtual display configuration and bspc to assign the appropriate desktops layout.\n\nNote that you should first set your preferred monitor layout with arandr, then export the xrandr configuration script and then copy the contents inside the script in place of the xrandr command.\n\n"
+    },
+    {
+      "title": "Rules",
+      "level": 3,
+      "content": "bspwm can apply rules to windows based on the class name, which is the second string within the WM_CLASS property specified by ICCM. To determine the class name, you can:\n\n1. Install xorg-xprop.\n1. Run xprop | grep WM_CLASS.\n1. Click on the window of interest to indicate it to xprop.\n1. Record the second string from the output of the command.\n\nThere are two ways to configure window rules (as of cd97a32).\n\nThe first is by using the built in rule command, as shown in the example bspwmrc:\n\n```\nbspc rule -a Gimp desktop=^8 follow=on state=floating\nbspc rule -a Chromium desktop=^2\nbspc rule -a mplayer2 state=floating\nbspc rule -a Kupfer.py focus=on\nbspc rule -a Screenkey manage=off\n```\n\nThe second option is to use an external rule command. This is more complex, but can allow you to craft more complex window rules. See these examples for a sample rule command.\n\n"
+    },
+    {
+      "title": "Using lemonbar",
+      "level": 4,
+      "content": "An example panel for lemonbar-gitAUR is provided in the examples folder on the GitHub page. You might also get some insights from the lemonbar wiki page. The panel will be executed by placing panel & in your bspwmrc. Check the optdepends in the bspwm package for dependencies that may be required.\n\nTo display system information on your status bar you can use various system calls. This example will show you how to edit your panel to get the volume status on your BAR:\n\n```\npanel_volume()\n{\n        volStatus=$(amixer get Master | tail -n 1 | cut -d '[' -f 4 | sed 's/].*//g')\n        volLevel=$(amixer get Master | tail -n 1 | cut -d '[' -f 2 | sed 's/%.*//g')\n        # is alsa muted or not muted?\n        if [ \"$volStatus\" == \"on\" ]\n        then\n                echo \"%{Fyellowgreen} $volLevel %{F-}\"\n        else\n                # If it is muted, make the font red\n                echo \"%{Findianred} $volLevel %{F-}\"\n        fi\n}\n```\n\nNext, we will have to make sure it is called and redirected to $PANEL_FIFO:\n\n```\nwhile true; do\necho \"S\" \"$(panel_volume) $(panel_clock)\" > \"$PANEL_FIFO\"\n        sleep 1s\ndone &\n```\n\n"
+    },
+    {
+      "title": "Using polybar",
+      "level": 4,
+      "content": "Polybar can be used by adding polybar example & to your bspwmrc configuration file, where example is the name of the bar.\n\n"
+    },
+    {
+      "title": "Using pid",
+      "level": 4,
+      "content": "You can emulate a dropdown terminal.\n\nFirst create a file called /usr/local/bin/scratch:\n\n```\n#!/bin/bash\n\nname=\"$1\"\nfilename=/tmp/\"$1\"\n\nbspc_write_nodeid() {\n    while true\n    do\n        flag=false\n        for id in $(bspc query -d focused -N -n .floating.sticky.hidden)\n        do\n            bspc query --node $id -T | grep -q $name && { echo $id > $filename; flag=true; break; }\n        done\n        [[ \"$flag\" == \"true\" ]] && break\n        sleep 0.1s\n    done\n}\n\nhide_all_except_current(){\n    for id in $(bspc query -d focused -N -n .floating.sticky.!hidden)\n    do\n        bspc query --node $id -T | grep -qv $name && bspc node $id --flag hidden=on\n    done\n}\n\ntoggle_hidden() {\n    [ -e \"$filename\" ] || exit 1\n    hide_all_except_current\n    id=$(<$filename)\n    bspc node $id --flag hidden -f\n}\n\ncreate_terminal(){\n    alacritty --class=\"$name\",\"$name\" -e $1 &\n}\n\nif ! ps -ef | grep -q \"[c]lass=$name\"\nthen\n    bspc rule -a \"$name\" --one-shot state=floating sticky=on hidden=on\n    case \"$name\" in\n        \"htop\")\n            create_terminal htop\n            ;;\n        \"neomutt\")\n            create_terminal neomutt\n            ;;\n        \"newsboat\")\n            create_terminal newsboat\n            ;;\n        \"ranger\")\n            create_terminal ranger\n            ;;\n        \"terminal\")\n            create_terminal $SHELL\n            ;;\n        *)\n            exit 1\n    esac\n    dunstify \"Scratch: starting $name\"\n    bspc_write_nodeid\n    toggle_hidden\nelse\n    toggle_hidden\nfi\n```\n\nThe terminal application is alacritty. Modify the following class specification and command execution in above script for other terminals.\n\n```\nalacritty --class=\"$name\",\"$name\" -e $1 &\n```\n\nFor toggling the scratchpad, modify ~/.config/sxhkd/sxhkdrc:\n\n```\n# scratchpads\nsuper + alt + {b,g,i,space,t}\n    scratch {newsboat,neomutt,ranger,terminal,htop}\n```\n\n(source: [1])\n\nModify polybar config with:\n\n```\nmodules-left = scratchpad\n\n[module/scratchpad]\ntype = custom/script\ninterval = 0.1\nexec = $XDG_CONFIG_HOME/polybar/scratchpads_status.sh\n```\n\nAnd create a file $XDG_CONFIG_HOME/polybar/scratchpads_status.sh with:\n\n```\n#!/bin/bash\n\nnames=\"\nhtop H\nneomutt M\nnewsboat N\nranger R\nterminal T\n\"\nstatus=\"\"\ncmd=$(ps -ef)\n\ncheck_scratchpad() {\n    grep -q \"[c]lass=$1\" <<< \"$cmd\"\n}\n\nIFS=$'\\n'\nfor name in $names\ndo\n    status+=$(check_scratchpad ${name% *} && echo ${name#* })\ndone\n\nif [ -n \"$status\" ]\nthen\n    echo \"[$status]\"\nelse\n    echo \"\"\nfi\n```\n\n(source: [2])\n\n"
+    },
+    {
+      "title": "Using class name",
+      "level": 4,
+      "content": "In this example we are going to use termite with a custom class name as our dropdown terminal. It does not have to be termite.\n\nFirst create a file in your path with the following content and make it executable. In this example let us call it scratchpad.sh:\n\n```\n#!/usr/bin/bash\n\nif [ -z $1 ]; then\n\techo \"Usage: $0 <name of hidden scratchpad window>\"\n\texit 1\nfi\n    \npids=$(xdotool search --class ${1})\nfor pid in $pids; do\n\techo \"Toggle $pid\"\n\tbspc node $pid --flag hidden -f\ndone\n```\n\nThen add this to your bspwm config.\n\n```\n...\nbspc rule -a dropdown sticky=on state=floating hidden=on\ntermite --class dropdown -e \"zsh -i\" &\n...\n```\n\nTo toggle the window a custom rule in sxhkd is necessary. Give as parameter the custom class name.\n\n```\nsuper + u\n        scratchpad.sh dropdown\n```\n\n"
+    },
+    {
+      "title": "Other",
+      "level": 4,
+      "content": "For a scratch-pad which can use any window type without pre-defined rules, see: [3]\n\nFor a more sophisticated scratchpad script that supports many terminals out of the box and has flags for doing things like optionally starting a tmuxinator/tmux session, turning any window into a scratchpad on the fly, and automatically resizing a scratchpad to fit the current monitor see tdrop-gitAUR.\n\n"
+    },
+    {
+      "title": "Different monitor configurations for different machines",
+      "level": 3,
+      "content": "Since the bspwmrc is a shell script, it allows you to do things like these:\n\n```\n#!/bin/bash -\n \n if [[ $HOSTNAME == myhost ]]; then\n     bspc monitor eDP1 -d I II III IV V VI VII VIII IX X\n elif [[ $HOSTNAME == otherhost ]]; then\n     bspc wm -O VGA-0 VGA-1\n     bspc monitor VGA-0 -d I II III IV V\n     bspc monitor VGA-1 -d VI VII VIII IX X\n elif [[ $HOSTNAME == yetanotherhost ]]; then\n     bspc wm -O DVI-I-2 DVI-I-3\n     bspc monitor DVI-I-3 -d VI VII VIII IX X\n     bspc monitor DVI-I-2 -d I II III IV V\n fi\n```\n\n"
+    },
+    {
+      "title": "Set up a desktop where all windows are floating",
+      "level": 3,
+      "content": "Here is how to setup the desktop 3 to have only floating windows. It can be useful for GIMP or other applications with multiple windows.\n\nPut this script somewhere in your $PATH and call it from .xinitrc or similar (with a & at the end):\n\n```\n#!/bin/bash\n\n # change the desktop number here\n FLOATING_DESKTOP_ID=$(bspc query -D -d '^3')\n\n bspc subscribe node_add | while read -a msg ; do\n    desk_id=${msg[2]}\n    wid=${msg[4]}\n    [ \"$FLOATING_DESKTOP_ID\" = \"$desk_id\" ] && bspc node \"$wid\" -t floating\n done\n```\n\n(source)\n\n"
+    },
+    {
+      "title": "Keyboard",
+      "level": 3,
+      "content": "Bspwm does not handle any keyboard input and instead provides the bspc program as its interface.\n\nFor keyboard shortcuts you will have to setup a hotkey daemon like sxhkd (sxhkd-gitAUR for the development version).\n\n"
+    },
+    {
+      "title": "Blank screen and keybindings do not work",
+      "level": 3,
+      "content": "- Make sure sxhkd is installed.\n- Make sure you are starting sxhkd (in the background as it is blocking).\n- Make sure ~/.config/bspwm/bspwmrc is executable.\n- The example configuration file for sxhkd specifies urxvt as the terminal emulator. If you do not have this installed, edit ~/.config/sxhkd/sxhkdrc to point to the terminal emulator of your choosing.\n\n"
+    },
+    {
+      "title": "Cursor themes do not apply to the desktop",
+      "level": 3,
+      "content": "See Cursor themes#Change X shaped default cursor\n\n"
+    },
+    {
+      "title": "Window box larger than the actual application",
+      "level": 3,
+      "content": "This can happen if you are using GTK3 applications and usually for dialog windows. Create or add the following:\n\n```\n~/.config/gtk-3.0/gtk.css\n```\n\n```\n.window-frame, .window-frame:backdrop {\n  box-shadow: 0 0 0 black;\n  border-style: none;\n  margin: 0;\n  border-radius: 0;\n}\n    \n.titlebar {\n  border-radius: 0;\n}\n```\n\n(source: Bspwm forum thread)\n\n"
+    },
+    {
+      "title": "Problems with Java applications",
+      "level": 3,
+      "content": "If you have problems, like Java application Windows not resizing, or menus immediately closing after you click, see Java#Gray window, applications not resizing with WM, menus immediately closing.\n\nFurthermore, some applications based on Java can not display any window content at all (e.g. Intellij IDEs like PyCharm, CLion, etc). A solution is to install wmname and add the following line in your ~/.config/bspwm/bspwmrc:\n\n```\nwmname LG3D\n```\n\nAdditionally, these errors can often be solved by setting an environment variable for the JVM within bspwmrc or a shell rc like ~/.bashrc, since BSPWM is a non reparenting WM.\n\n```\nexport _JAVA_AWT_WM_NONREPARENTING=1\n```\n\n"
+    },
+    {
+      "title": "Problems with keybindings using fish",
+      "level": 3,
+      "content": "If you use fish, you will find that you are unable to switch desktops. This is because bspc's use of the ^ character is incompatible with fish. You can fix this by explicitly telling sxhkd to use bash to execute commands:\n\n```\n$ set -U SXHKD_SHELL /usr/bin/bash\n```\n\nAlternatively, the ^ character may be escaped with a backslash in your sxhkdrc file.\n\n"
+    },
+    {
+      "title": "Performance issues using fish",
+      "level": 3,
+      "content": "sxhkd uses the shell set in the SHELL environment variable in order to execute commands. fish can have long initialization time due to large or improper configuration files, thus all sxhkd commands can take much longer to execute than with other shells. To fix this without changing your default SHELL you can make tell sxhkd explicitly to use bash, or another faster shell to execute commands (for example, sh):\n\n```\n$ set -U SXHKD_SHELL sh\n```\n\n"
+    },
+    {
+      "title": "Error messages \"Could not grab key 43 with modfield 68\" on start",
+      "level": 3,
+      "content": "Either you try to use the same key twice, or you start sxhkd twice. Check bspwmrc and ~/.profile or ~/.bash_profile for excessive commands starting sxhkd.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Mailing List: bspwm at librelist.com.\n- #bspwm - IRC channel at irc.libera.chat\n- #bspwm:matrix.org - Matrix channel\n- https://bbs.archlinux.org/viewtopic.php?id=149444 - Arch BBS thread\n- https://github.com/baskerville/bspwm - GitHub project\n- https://github.com/windelicato/dotfiles/wiki/bspwm-for-dummies - earsplit's \"bspwm for dummies\"\n\n"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Gobi Broadband Modems",
+  "url": "https://wiki.archlinux.org/title/Gobi_Broadband_Modems",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "From Wikipedia:\n\n"
+    },
+    {
+      "title": "Device identification",
+      "level": 2,
+      "content": "Install usbutils and then examine the output of\n\n```\n$ lsusb\n```\n\nwhich will show the vendor and product IDs of the device.\n\nFor example, on a HP un2430 modem:\n\n```\nBus 001 Device 005: ID 03f0:371d Hewlett-Packard\n```\n\nThe device is detected by the qcserial module, if not, you are going to have to recompile the qcserial module with your added product and vendor id.\n\nAlternatively you can add the Product and Vendor ID by writing them into the new_id file (best both at the same time because most Gobi modules switch the Product ID when the Firmware is loaded). For example on a Gobi2K with the Vendor ID 04da and the Product IDs 250e (waiting for Firmware) and 250f (firmware loaded)\n\n```\n# echo \"04da 250e\" > /sys/bus/usb-serial/drivers/qcserial/new_id\n# echo \"04da 250f\" > /sys/bus/usb-serial/drivers/qcserial/new_id\n```\n\nnote that this has to be repeated when you reload the qcserial module or reboot/shutdown.\n\n"
+    },
+    {
+      "title": "gobi_loader",
+      "level": 2,
+      "content": "From the developer GitHub page:\n\nInstall gobi-loaderAUR and gobi-firmwareAUR.\n\nAfter installation, you should enter your product and vendor id in the /lib/udev/rules.d/60-gobi.rules\n\nThen a simple reload of the qcserial module:\n\n```\n# rmmod qcserial\n# modprobe qcserial\n```\n\n"
+    },
+    {
+      "title": "Manage Connection in Network Manager",
+      "level": 2,
+      "content": "ModemManager is required for network manager to detect any mobile broadband devices.\n\nThis needs to be started/enabled. As soon as they are started the Mobile Broadband option will be available from the Network Manager Applet.\n\nMake sure mobile-broadband-provider-info and nm-connection-editor are installed.\n\nTo use this quite old modem, you need to blacklist qmi_wwan and cdc_wdm modules from loading into [modern] Linux kernel. Else, if these modules are loaded, ModemManager recognizes this modem as something new with QMI interface, and then complains about too small versions of some QMI services. Source\n\n"
+    },
+    {
+      "title": "wvdial",
+      "level": 3,
+      "content": "See main article: wvdial\n\nThe general procedure is to switch the device into modem mode, make sure the ttyUSB device(s) are recognized by the qcserial kernel module, and then to run wvdial to dial, connect and start pppd.\n\nInstall wvdial. The configuration file /etc/wvdial.conf will in general depend on which device you have and which mobile network you are connecting to. A single wvdial.conf can be defined with named sections to be usable with several USB modems and networks, should you need them.\n\nRun:\n\n```\n# wvdialconf\n```\n\nwhich will attempt to write /etc/wvdial.conf correctly. You will need to add the user, password and Access Point Name (APN). You can obtain these from your network provider, from other users via published wvdial.confs, or by logging the USB tty traffic under another operating system (e.g. Sysinternals' Portmon).\n\nAn example of /etc/wvdial.conf looks like this:\n\n```\n/etc/wvdial.conf\n```\n\n```\n[Dialer status]\nInit1 = AT+CPIN?\nInit2 = ATI\nModem = /dev/ttyUSB1\n\n[Dialer pin]\nModem = /dev/ttyUSB1\nInit1 = AT+CPIN=1234\n\n[Dialer wwan]\nInit1 = ATZ\nInit2 = AT+CGDCONT=1,\"IP\",\"data.apn.com\"\nStupid Mode = yes\nPhone = *99***1#\nNew PPPD = yes\nModem = /dev/ttyUSB1\nUsername = XXXXXX\nDial Command = ATDT\nPassword = XXXXXX\nBaud = 460800\n```\n\nTo simplify the procedure, one can take the SIM card out and disable the PIN so wvdial pin is not needed before connecting to the internet.\n\nOften there will be several devices (at /dev/ttyUSB0, /dev/ttyUSB1, /dev/ttyUSB2 for example). If in doubt about which to use, try each of them in turn. Once the configuration files are prepared, the internet connection is established by running\n\n```\n$ wvdial section\n```\n\nThe final wvdial command should start pppd and the obtained IP address should be visible in the terminal output. At that point the internet connection should be live, which can be easily checked with a web browser or by pinging an external IP address.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- USB 3G Modem\n- Allow users to dial with wvdial\n- Idea netsetter(Huawei EG162G)\n- ZTE MF636\n- 3G and GPRS modems with pppd alone\n- Huawei E1550 3G modem\n\n"
+    }
+  ]
+}

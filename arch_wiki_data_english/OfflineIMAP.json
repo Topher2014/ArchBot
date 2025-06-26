@@ -1,0 +1,126 @@
+{
+  "title": "OfflineIMAP",
+  "url": "https://wiki.archlinux.org/title/OfflineIMAP",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- isync\n- notmuch\n- msmtp\n\nOfflineIMAP is a Python utility to sync mail from IMAP servers. It does not work with the POP3 protocol or mbox, and is usually paired with a MUA such as Mutt.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the offlineimap package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Offlineimap is distributed with two default configuration files, which are both located in /usr/share/offlineimap/. offlineimap.conf contains every setting and is thoroughly documented. Alternatively, offlineimap.conf.minimal is not commented and only contains a small number of settings; see: #Minimal.\n\nCopy one of the default configuration files to ~/.offlineimaprc or $XDG_CONFIG_HOME/offlineimap/config.\n\n"
+    },
+    {
+      "title": "Minimal",
+      "level": 3,
+      "content": "The following file is a commented version of offlineimap.conf.minimal.\n\n```\n~/.offlineimaprc\n```\n\n```\n[general]\n# List of accounts to be synced, separated by a comma.\naccounts = main\n\n[Account main]\n# Identifier for the local repository; e.g. the maildir to be synced via IMAP.\nlocalrepository = main-local\n# Identifier for the remote repository; i.e. the actual IMAP, usually non-local.\nremoterepository = main-remote\n\n[Repository main-local]\n# OfflineIMAP supports Maildir, GmailMaildir, and IMAP for local repositories.\ntype = Maildir\n# Where should the mail be placed?\nlocalfolders = ~/mail\n\n[Repository main-remote]\n# Remote repos can be IMAP or Gmail, the latter being a preconfigured IMAP.\n# SSL and STARTTLS are enabled by default.\ntype = IMAP\nremotehost = host.domain.tld\nremoteuser = username\n# Necessary for SSL connections, if using offlineimap version > 6.5.4\nsslcacertfile = /etc/ssl/certs/ca-certificates.crt\n```\n\n"
+    },
+    {
+      "title": "Selective folder synchronization",
+      "level": 3,
+      "content": "For synchronizing only certain folders, you can use a folderfilter in the remote section of the account in ~/.offlineimaprc. For example, the following configuration will only synchronize the folders Inbox and Sent:\n\n```\n~/.offlineimaprc\n```\n\n```\n[Repository main-remote]\n# Synchronize only the folders Inbox and Sent:\nfolderfilter = lambda foldername: foldername in [\"Inbox\", \"Sent\"]\n...\n```\n\nFor more options, see the official documentation.\n\n"
+    },
+    {
+      "title": "Custom port",
+      "level": 3,
+      "content": "Some IMAP servers might require you to connect on a custom port, instead of the default 993 port. To do so, add a remoteport option to the remote section in ~/.offlineimaprc:\n\n```\n~/.offlineimaprc\n```\n\n```\n[Repository main-remote]\nremoteport=1234\n```\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Before running offlineimap, create any parent directories that were allocated to local repositories:\n\n```\n$ mkdir ~/mail\n```\n\nNow, run the program:\n\n```\n$ offlineimap\n```\n\nMail accounts will now be synced. If anything goes wrong, take a closer look at the error messages. OfflineIMAP is usually very verbose about problems; partly because the developers did not bother with taking away tracebacks from the final product.\n\n"
+    },
+    {
+      "title": "Running offlineimap in the background",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nMost other mail transfer agents assume that the user will be using the tool as a daemon by making the program sync periodically by default. In offlineimap, there are a few settings that control backgrounded tasks.\n\nConfusingly, they are spread thin all-over the configuration file:\n\n```\n~/.offlineimaprc\n```\n\n```\n# In the general section\n[general]\n# Controls how many accounts may be synced simultaneously\nmaxsyncaccounts = 1\n\n# In the account identifier\n[Account main]\n# Minutes between syncs\nautorefresh = 0.5\n# Quick-syncs do not update if the only changes were to IMAP flags.\n# autorefresh=0.5 together with quick=10 yields\n# 10 quick refreshes between each full refresh, with 0.5 minutes between every \n# refresh, regardless of type.\nquick = 10\n\n# In the remote repository identifier\n[Repository main-remote]\n# Instead of closing the connection once a sync is complete, offlineimap will\n# send empty data to the server to hold the connection open. A value of 60\n# attempts to hold the connection for a minute between syncs (both quick and\n# autorefresh).This setting has no effect if autorefresh and holdconnectionopen\n# are not both set.\nkeepalive = 60\n# OfflineIMAP normally closes IMAP server connections between refreshes if\n# the global option autorefresh is specified.  If you wish it to keep the\n# connection open, set this to true. This setting has no effect if autorefresh\n# is not set.\nholdconnectionopen = yes\n```\n\nTo start the daemon automatically on login, start/enable the systemd/User service offlineimap.service using the --user flag.\n\nIn case you have more than one account configured, it is advised to use offlineimap@.service instead of increasing maxsyncaccounts parameter[1]. Simply start/enable offlineimap@youraccountname.service.\n\n"
+    },
+    {
+      "title": "systemd timer",
+      "level": 4,
+      "content": "Alternatively, it is possible to manage OfflineIMAP completely using systemd-user timers, start/enable offlineimap-oneshot.timer with the --user flag.\n\nThis timer by default runs OfflineIMAP every 15 minutes. This can be easily changed by creating a drop-in snippet. For example, the following modifies the timer to check every 5 minutes:\n\n```\n~/.config/systemd/user/offlineimap-oneshot.timer.d/timer.conf\n```\n\n```\n[Timer]\nOnUnitInactiveSec=5m\n```\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nFor more robust solution it is possible to set a watchdog which will kill OfflineIMAP in case of freeze:\n\n```\n~/.config/systemd/user/offlineimap-oneshot.service.d/service.conf\n```\n\n```\n[Service]\nWatchdogSec=300\n```\n\n"
+    },
+    {
+      "title": "Automatic mailbox generation for mutt",
+      "level": 3,
+      "content": "Mutt cannot be simply pointed to an IMAP or maildir directory and be expected to guess which subdirectories happen to be the mailboxes, yet offlineimap can generate a muttrc fragment containing the mailboxes that it syncs.\n\n```\n~/.offlineimaprc\n```\n\n```\n[mbnames]\nenabled = yes\nfilename = ~/.mutt/mailboxes\nheader = \"mailboxes \"\nperitem = \"+%(accountname)s/%(foldername)s\"\nsep = \" \"\nfooter = \"\\n\"\n```\n\nThen add the following lines to ~/.mutt/muttrc.\n\n```\n~/.mutt/muttrc\n```\n\n```\n# IMAP: offlineimap\nset folder = \"~/mail\"\nsource ~/.mutt/mailboxes\nset spoolfile = \"+account/INBOX\"\nset record = \"+account/Sent\\ Items\"\nset postponed = \"+account/Drafts\"\n```\n\naccount is the name you have given to your IMAP account in ~/.offlineimaprc.\n\n"
+    },
+    {
+      "title": "Gmail configuration",
+      "level": 3,
+      "content": "This remote repository is configured specifically for Gmail support, substituting folder names in uppercase for lowercase, among other small additions. Keep in mind that this configuration does not sync the All Mail folder, since it is usually unnecessary and skipping it prevents bandwidth costs:\n\n```\n~/.offlineimaprc\n```\n\n```\n[Repository gmail-remote]\ntype = Gmail\nremoteuser = user@gmail.com\nremotepass = password\nnametrans = lambda foldername: re.sub ('^\\[gmail\\]', 'bak',\n                               re.sub ('sent_mail', 'sent',\n                               re.sub ('starred', 'flagged',\n                               re.sub (' ', '_', foldername.lower()))))\nfolderfilter = lambda foldername: foldername not in ['[Gmail]/All Mail']\n# Necessary as of OfflineIMAP 6.5.4\nsslcacertfile = /etc/ssl/certs/ca-certificates.crt\n# Necessary to work around https://github.com/OfflineIMAP/offlineimap/issues/573 (versions 7.0.12, 7.2.1)\nssl_version = tls1_2\n```\n\n- If you have Gmail set to another language, the folder names may appear translated too, e.g. \"verzonden_berichten\" instead of \"sent_mail\".\n- After version 6.3.5, offlineimap also creates remote folders to match your local ones. Thus you may need a nametrans rule for your local repository too that reverses the effects of this nametrans rule. If you do not want to make a reverse nametrans rule, you can disable remote folder creation by putting this in your remote configuration: createfolders = False\n- As of 1 October 2012 gmail SSL certificate fingerprint is not always the same. This prevents from using cert_fingerprint and makes the sslcacertfile way a better solution for the SSL verification (see #SSL fingerprint does not match).\n\n"
+    },
+    {
+      "title": "OAuth2 access tokens via oama",
+      "level": 4,
+      "content": "oama (oama-binAUR) is a utility which provides IMAP/SMTP clients with renewal capabilities and authorization of OAuth2 credentials.\n\nOfflineIMAP can call Python code from its configuration. So in the [general] section at the beginning, add the line:\n\n```\n~/.offlineimaprc\n```\n\n```\n[general]\npythonfile = ~/.offlineimap.py\n```\n\nAnd in the Python file, add this code to retrieve OAuth2 access tokens via oama:\n\n```\n~/.offlineimap.py\n```\n\n```\nimport subprocess\n\ndef get_token(email_address):\n    return subprocess.run([\"oama\", \"access\", email_address], capture_output=True, text=True).stdout\n```\n\nAnd now back to the configuration file, in the repository section of a Gmail account, add the following:\n\n```\n~/.offlineimaprc\n```\n\n```\nauth_mechanisms = XOAUTH2\noauth2_client_id = YOUR_OAUTH2_CLIENT_ID\noauth2_client_secret = YOUR_OAUTH2_CLIENT_SECRET\noauth2_request_url = https://accounts.google.com/o/oauth2/token\noauth2_access_token_eval = get_token(\"YOUR_EMAIL_ADDRESS_FOR_THIS_ACCOUNT\")\n```\n\n"
+    },
+    {
+      "title": ".netrc",
+      "level": 4,
+      "content": "Add the following lines to your ~/.netrc:\n\n```\nmachine hostname.tld\n    login [your username]\n    password [your password]\n```\n\nDo not forget to give the file appropriate rights like 600 or 700:\n\n```\n$ chmod 600 ~/.netrc\n```\n\n"
+    },
+    {
+      "title": "Using GPG",
+      "level": 4,
+      "content": "GNU Privacy Guard can be used for storing a password in an encrypted file. First set up GnuPG and then follow the steps in this section. It is assumed that you can use your GPG private key without entering a password all the time.\n\nFirst type in the password for the email account in a plain text file. Do this in a secure directory with 700 permissions located on a tmpfs to avoid writing the unencrypted password to the disk. Then encrypt the file with GnuPG setting yourself as the recipient.\n\nRemove the plain text file since it is no longer needed. Move the encrypted file to the final location, e.g. ~/.offlineimappass.gpg.\n\nNow create a python function that will decrypt the password:\n\n```\n~/.offlineimap.py\n```\n\n```\n#! /usr/bin/env python\nfrom subprocess import check_output\n\ndef get_pass():\n    return check_output(\"gpg -dq ~/.offlineimappass.gpg\", shell=True).rstrip(b\"\\n\")\n```\n\nLoad this file from ~/.offlineimaprc and specify the defined function:\n\n```\n~/.offlineimaprc\n```\n\n```\n[general]\n# Path to file with arbitrary Python code to be loaded\npythonfile = ~/.offlineimap.py\n...\n\n[Repository example]\n# Decrypt and read the encrypted password\nremotepasseval = get_pass()\n...\n```\n\n"
+    },
+    {
+      "title": "Using pass",
+      "level": 4,
+      "content": "pass is a simple password manager from the command line based on GPG.\n\nFirst create a password for your email account(s):\n\n```\n$ pass insert Mail/account\n```\n\nNow create a python function that will decrypt the password:\n\n```\n~/.offlineimap.py\n```\n\n```\n#! /usr/bin/env python\nfrom subprocess import check_output\n\ndef get_pass(account):\n    return check_output(\"pass Mail/\" + account, shell=True).splitlines()[0]\n```\n\nThis is an example for a multi-account setup. You can customize the argument to pass as defined previously.\n\nLoad this file from ~/.offlineimaprc and specify the defined function:\n\n```\n~/.offlineimaprc\n```\n\n```\n[general]\n# Path to file with arbitrary Python code to be loaded\npythonfile = ~/.offlineimap.py\n...\n\n[Repository Gmail]\n# Decrypt and read the encrypted password\nremotepasseval = get_pass(\"Gmail\")\n...\n```\n\n"
+    },
+    {
+      "title": "Gnome keyring",
+      "level": 4,
+      "content": "In configuration for remote repositories the remoteusereval/remotepasseval fields can be set to custom python code that evaluates to the username/password. The code can be a call to a function defined in a Python script pointed to by 'pythonfile' config field. Create ~/.offlineimap.py according to the subsection below and use it in the configuration:\n\n```\n[general]\npythonfile = ~/.offlineimap.py\n\n[Repository examplerepo]\ntype = IMAP\nremotehost = mail.example.com\nremoteusereval = get_username(\"examplerepo\")\nremotepasseval = get_password(\"examplerepo\")\n```\n\nNote: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nEnsure that gnome-keyring, python2AUR, python2-gobjectAUR and libsecret are installed. Then create ~/.offlineimap.py with the following contents: gkgetsecret.py and set pythonfile = ~/.offlineimap.py in ~/.offlineimaprc as described above.\n\nIf you created a password using seahorse, you can retrieve it from its description. For instance, the password for a repository Work which is stored in gnome-keyring with the description Password for me@myworkemail.com can be retrieved by adding the following to ~/.offlineimaprc:\n\n```\n[Repository Work]\n...\nremotepasseval = get_pw_from_desc(\"Password for me@myworkemail.com\")\n```\n\nFor configurations where you wish to store the username as well, it is better if the password is created using secret-tool as this can be used to set attributes such as the username and repository name. Consider a password created with the following command:\n\n```\n$ secret-tool store --label \"Password for Work Email\" username me@myworkemail.com repo Work\n```\n\nThe username and password for this account can be retrieved by adding the following to ~/.offlineimaprc:\n\n```\n[Repository Work]\n...\nremoteusereval = get_val_from_attrs(\"username\", \"repo\", \"Work\")\nremotepasseval = get_pw_from_attrs(\"repo\", \"Work\")\n```\n\n"
+    },
+    {
+      "title": "python-keyring",
+      "level": 4,
+      "content": "There is a general solution that should work for any keyring. Install python-keyring and then change your ~/.offlineimaprc to say something like:\n\n```\n[general]\npythonfile = /home/user/offlineimap.py\n...\n[Repository RemoteEmail]\nremoteuser = username@host.net\nremotepasseval = keyring.get_password(\"host\",\"username\")\n...\n```\n\nand somewhere in ~/offlineimap.py add import keyring.\n\nNow all you have to do is set your password, either using python script like so:\n\n```\n$ python\n>>> import keyring\n>>> keyring.set_password(\"host\",\"username\", \"MYPASSWORD\")\n```\n\nor you can use keyring command provided by python-keyring package\n\n```\n$ keyring --help\n$ keyring set host username\nPassword for 'username' in 'host':\n$ keyring get host username\npassword\n```\n\nand it will grab the password from your (kwallet/gnome-) keyring instead of having to keep it in plaintext or enter it each time.\n\n"
+    },
+    {
+      "title": "Emacs EasyPG",
+      "level": 4,
+      "content": "See https://www.emacswiki.org/emacs/OfflineIMAP#toc2\n\n"
+    },
+    {
+      "title": "KeePassXC with Freedesktop.org secret-service",
+      "level": 4,
+      "content": "Install libsecret, in KeepassXC settings enable Freedesktop.org secret-service integration, expose entries in Database Settings > Secret Service Integration and add additional attribute Title with account@name.org in Edit Entry > Advanced settings. Now the command secret-tool lookup Title account@name.org should print the password in the console. Next create a python script:\n\n```\n~/.script.py\n```\n\n```\n#! /usr/bin/env python\nimport os\nfrom subprocess import check_output\n\ndef get_pass(account):\n    return check_output(\"secret-tool lookup Title \" + account, shell=True).splitlines()[0].decode(\"UTF-8\")\n```\n\nAn equivalent script which relies on python-secretstorage is:\n\n```\n~/.script.py\n```\n\n```\n#! /usr/bin/env python\nimport secretstorage\nfrom contextlib import closing\ndef get_pass(title):\n    with closing(secretstorage.dbus_init()) as conn:\n        assert(secretstorage.check_service_availability(conn))\n        collection = secretstorage.get_default_collection(conn)\n        if collection.is_locked():\n            collection.unlock()\n        matches = collection.search_items({\"Title\": title})\n        entry = next(matches)\n        if entry.is_locked():\n            entry.unlock()\n        return(entry.get_secret())\n```\n\nLoad this file from ~/.offlineimaprc and specify the defined function:\n\n```\n~/.offlineimaprc\n```\n\n```\n[general]\n# Path to file with arbitrary Python code to be loaded\npythonfile = ~/.script.py\n...\n[Repository Gmail]\n# Decrypt and read the encrypted password\nremotepasseval = get_pass(\"account@name.org\")\n...\n```\n\n"
+    },
+    {
+      "title": "Overriding UI and autorefresh settings",
+      "level": 3,
+      "content": "For the sake of troubleshooting, it is sometimes convenient to launch offlineimap with a more verbose UI, no background syncs and perhaps even a debug level:\n\n```\n$ offlineimap [ -o ] [ -d <debug_type> ] [ -u <ui> ]\n```\n\n"
+    },
+    {
+      "title": "Folder could not be created",
+      "level": 3,
+      "content": "In version 6.5.3, offlineimap gained the ability to create folders in the remote repository, as described here.\n\nThis can lead to errors of the following form when using nametrans on the remote repository:\n\n```\nERROR: Creating folder bar on repository foo-remote\n  Folder 'bar'[foo-remote] could not be created. Server responded: ('NO', ['[ALREADYEXISTS] Duplicate folder name bar (Failure)'])\n```\n\nThe solution is to provide an inverse nametrans lambda for the local repository, e.g.\n\n```\n~/.offlineimaprc\n```\n\n```\n[Repository foo-local]\nnametrans = lambda foldername: foldername.replace('bar', 'BAR')\n\n[Repository foo-remote]\nnametrans = lambda foldername: foldername.replace('BAR', 'bar')\n```\n\n- For working out the correct inverse mapping. the output of offlineimap --info should help.\n- After updating the mapping, it may be necessary to remove all of the folders under $HOME/.offlineimap/ for the affected accounts.\n\n"
+    },
+    {
+      "title": "SSL fingerprint does not match",
+      "level": 3,
+      "content": "```\nERROR: Server SSL fingerprint 'keykeykey' for hostname 'example.com' does not match configured fingerprint. Please verify and set 'cert_fingerprint' accordingly if not set yet.\n```\n\nTo solve this, add to ~/.offlineimaprc (in the same section as ssl = yes) one of the following:\n\n- either add cert_fingerprint, with the certificate fingerprint of the remote server. This checks whether the remote server certificate matches the given fingerprint. cert_fingerprint = keykeykey\n- or add sslcacertfile with the path to the system CA certificates file. Needs ca-certificates installed. This validates the remote ssl certificate chain against the Certification Authorities in that file. sslcacertfile = /etc/ssl/certs/ca-certificates.crt\n\n```\ncert_fingerprint = keykeykey\n```\n\n```\nsslcacertfile = /etc/ssl/certs/ca-certificates.crt\n```\n\n"
+    },
+    {
+      "title": "Copying message, connection closed",
+      "level": 3,
+      "content": "```\nERROR: Copying message -2 [acc: email] connection closed\nFolder sent [acc: email]: ERROR: while syncing sent [account email] connection closed\n```\n\nCause of this can be creation of same message both locally and on server. This happens if your email provider automatically saves sent mails to same folder as your local client. If you encounter this, disable save of sent messages in your local client.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official OfflineIMAP mailing list\n- Mutt + Gmail + Offlineimap - An outline of brisbin's simple gmail/mutt setup using cron to keep offlineimap syncing.\n\n"
+    }
+  ]
+}

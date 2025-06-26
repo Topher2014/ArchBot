@@ -1,0 +1,71 @@
+{
+  "title": "Mongodb",
+  "url": "https://wiki.archlinux.org/title/Mongodb",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "MongoDB (from humongous) is a source-available document-oriented database system developed and supported by MongoDB Inc. (formerly 10gen). It is part of the NoSQL family of database systems. Instead of storing data in tables as is done in a \"classical\" relational database, MongoDB stores structured data as JSON-like documents with dynamic schemas (MongoDB calls the format BSON), making the integration of data in certain types of applications easier and faster.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "MongoDB has been removed from the official repositories due to its re-licensing issues [1].\n\nInstall one of the following for the latest version available:\n\n- mongodbAUR - builds from source.\n- mongodb-binAUR - prebuilt MongoDB binary extracted from official MongoDB Ubuntu repository packages. Compilation options used are unknown.\n\nAlternatively, there are older versions of MongoDB available:\n\n- mongodb50AUR, mongodb50-binAUR\n- mongodb44AUR, mongodb44-binAUR\n- mongodb42-binAUR\n- mongodb40-binAUR\n- mongodb36-binAUR\n- mongodb34-binAUR\n- mongodb32-binAUR\n\n"
+    },
+    {
+      "title": "Tools",
+      "level": 3,
+      "content": "Other MongoDB tools can be found packaged as well:\n\n- MongoDB Shell — The new mongosh tool, which replaces the legacy mongo shell[2]. It's compatible with MongoDB 4.0 or newer.\n\n- MongoDB Compass — the GUI interactive tool for querying, optimizing, and analyzing MongoDB data\n\n- MongoDB Database Tools — Provides import, export, and diagnostic capabilities\n\n- Mingo — A proprietary, EULA licensed, MongoDB GUI built on Electron, designed to aid MongoDB developers with managing their databases.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Start/Enable the mongodb.service daemon.\n\nTo access the MongoDB shell [3]:\n\n```\n$ mongosh\n```\n\nOr, if authentication is configured:\n\n```\n$ mongosh -u userName\n```\n\n"
+    },
+    {
+      "title": "File Format",
+      "level": 3,
+      "content": "MongoDB uses a YAML-based configuration file format. See https://docs.mongodb.com/manual/reference/configuration-options/ for available configuration options.\n\n```\n/etc/mongodb.conf\n```\n\n```\nsystemLog:\n   destination: file\n   path: \"/var/log/mongodb/mongod.log\"\n   logAppend: true\nstorage:\n   journal:\n      enabled: true\nprocessManagement:\n   fork: true\nnet:\n   bindIp: 127.0.0.1\n   port: 27017\nsetParameter:\n   enableLocalhostAuthBypass: false\n..\n```\n\n"
+    },
+    {
+      "title": "Requiring Authentication",
+      "level": 3,
+      "content": "To create a MongoDB user account with administrator access [5]:\n\n```\n$ mongosh\n```\n\n```\nuse admin\ndb.createUser(\n  {\n    user: \"myUserAdmin\",\n    pwd: \"abc123\",\n    roles: [ { role: \"userAdminAnyDatabase\", db: \"admin\" }, \"readWriteAnyDatabase\" ]\n  }\n)\n```\n\nAppend the following to your /etc/mongodb.conf.\n\n```\n/etc/mongodb.conf\n```\n\n```\nsecurity:\n  authorization: \"enabled\"\n```\n\nRestart mongodb.service.\n\n"
+    },
+    {
+      "title": "NUMA",
+      "level": 3,
+      "content": "Running MongoDB with Non-Uniform Memory Access (NUMA) can significantly impact performance. [6]\n\nTo see if your system uses NUMA:\n\n```\n# dmesg | grep -i numa\n```\n\nAlso, /var/log/mongodb/mongod.log will show warnings if NUMA is in use and MongoDB is not started through numactl. (The mongo shell will also show this, but only if you do not have authentication enabled.)\n\nIf your system uses NUMA, to improve performance, you should make MongoDB start through numactl.\n\nEdit mongodb.service according to the package you installed.\n\nIf using mongodbAUR, change it from:\n\n```\nExecStart=/usr/bin/mongod $OPTIONS\n```\n\nTo:\n\n```\nExecStart=/usr/bin/numactl --interleave=all /usr/bin/mongod $OPTIONS\n```\n\nIf using mongodb-binAUR, change it from:\n\n```\nExecStart=/usr/bin/mongod --quiet --config /etc/mongodb.conf\n```\n\nTo:\n\n```\nExecStart=/usr/bin/numactl --interleave=all /usr/bin/mongod --quiet --config /etc/mongodb.conf\n```\n\nZone claim also needs to be disabled, but on arch, /proc/sys/vm/zone_reclaim_mode defaults to 0.\n\nReenable and Restart mongodb.service as needed.\n\n"
+    },
+    {
+      "title": "Clean Start and Stop",
+      "level": 3,
+      "content": "By default, systemd immediately kills anything after asking it to start or stop, if it has not finished doing so within 90 seconds.\n\nmongodbAUR makes systemd wait as long as it takes for MongoDB to start, but mongodb-binAUR does not. Both packages allow systemd to kill MongoDB after it is asked to stop, if it has not finished within 90 seconds.\n\nLarge MongoDB databases can take a considerable amount of time to cleanly shut down, especially if swap is being used. (An active 450GB database on a top of the line NVMe with 64GB RAM and 16GB swap can take an hour to shut down.)\n\nBy default, MongoDB uses journaling. [7] With journaling, an unclean shutdown should not pose a risk of data loss. But, if not shutdown cleanly, large MongoDB databases can take a considerable amount of time to start back up. In this case, choosing whether to require a clean shutdown is a choice of a slower shutdown versus a slower startup. [8]\n\nTo prevent systemd from killing MongoDB after 90 seconds, edit mongodb.service.\n\nTo allow MongoDB to cleanly shutdown, append to the [Service] section: (On large databases, this may substantially slow down your system shutdown time, but speeds up your next MongoDB start time)\n\n```\nTimeoutStopSec=infinity\n```\n\nIf MongoDB needs a long time to start back up, it can be very problematic for systemd to keep killing and restarting it every 90 seconds [10], so mongodbAUR prevents this. If using mongodb-binAUR, to make systemd wait as long as it takes for MongoDB to start, append to the [Service] section:\n\n```\nTimeoutStartSec=infinity\n```\n\n"
+    },
+    {
+      "title": "MongoDB will not start",
+      "level": 3,
+      "content": "If MongoDB will not start, and you just upgraded to mongodbAUR 4.0.6-2+, you probably have a custom /etc/mongodb.conf. When MongoDB was in the Official repositories, it used an Arch-specific configuration file that used the systemd service type of simple. It now supplies upstream's systemd service and configuration files, which instead use a systemd service type of forking. Pacman will automatically upgrade your systemd service file, but will only automatically upgrade your /etc/mongodb.conf if you never modified it. In that case, systemd will be expecting mongod to fork, but its configuration file will tell it not to. You need to: switch to the new configuration file installed at /etc/mongodb.conf.pacnew, and duplicate changes you made to the old one that you still need, considering the new one is now in the YAML format, and the old one is probably in the MongoDB 2.4 format; or modify your existing one to enable forking. (To continue using the old 2.4 file format instead of YAML, adding fork: true should be what is needed.)\n\nCheck that mongodb.service is configured to use the correct database location.\n\nAdd --dbpath /var/lib/mongodb to the ExecStart line:\n\n```\nExecStart=/usr/bin/numactl --interleave=all mongod --quiet --config /etc/mongodb.conf --dbpath /var/lib/mongodb\n```\n\nCheck that there is at least 3GB space available for its journal files, otherwise mongodb can fail to start (without issuing a message to the user):\n\n```\n$ df -h /var/lib/mongodb/\n```\n\nCheck if the mongod.lock lock file is empty or not:\n\n```\n# ls  -lisa /var/lib/mongodb\n```\n\nIf it is, stop mongodb.service. Run a repair on the database, specifying the dbpath (/var/lib/mongodb/ is the default --dbpath in Arch Linux):\n\n```\n# mongod --dbpath /var/lib/mongodb/ --repair\n```\n\nUpon completion, the dbpath should contain the repaired data files and an empty mongod.lock file.\n\nAfter running the repair as root, the files will be owned by the root user, whilst Arch Linux runs it under a different user. You will need to use chown to change the ownership of the files back to the correct user. See following link for further details: Further reference\n\n```\n# chown -R mongodb: /var/{log,lib}/mongodb/\n```\n\n"
+    },
+    {
+      "title": "Switching to a different version / Clean install",
+      "level": 4,
+      "content": "After removing a version of MongoDB and installing a different version, MongoDB might not start. In that case, try removing and recreating these folders (note that these will delete your database):\n\n```\n$ rm -r /var/{lib,log}/mongodb\n$ mkdir /var/{lib,log}/mongodb\n$ chown -R mongodb:mongodb /var/{log,lib}/mongodb/\n```\n\n"
+    },
+    {
+      "title": "Some computer just cannot run MongoDB",
+      "level": 4,
+      "content": "Some computers simply will not run MongoDB because their CPU architecture does not have the instruction set needed to run it. For instance, MongoDB was able to be installed on a GPD MicroPC which has an Intel \"Gemini Lake Refresh\"/Goldmount Plus microarchitecture, but running the MongoDB Shell returned the following:\n\n```\n$ mongosh 'mongodb://localhost:27017'\n```\n\n```\nCurrent Mongosh Log ID: 642b48661e2fc4dd5bda05d0\nConnecting to:          mongodb://localhost:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+1.8.0\nMongoNetworkError: connect ECONNREFUSED 127.0.0.1:27017\n```\n\nFurthermore, coredumpctl info reported a signal 4 (ILL) meaning that an illegal instruction execution was attempted. In other words, the computer did not have the instruction set to run this program, at least not locally.\n\nIt was able to connect to MongoDB Atlas where the server is hosted remotely on a machine that can run MongoDB, no mongodb.service required.\n\n"
+    },
+    {
+      "title": "Warning about Transparent Huge Pages (THP)",
+      "level": 3,
+      "content": "One may want to permanently disable this feature by using a tmpfile:\n\n```\n/etc/tmpfiles.d/mongodb.conf\n```\n\n```\nw /sys/kernel/mm/transparent_hugepage/enabled - - - - never\nw /sys/kernel/mm/transparent_hugepage/defrag - - - - never\n```\n\nUse sysctl to disable THP at runtime:\n\n```\n# echo never > /sys/kernel/mm/transparent_hugepage/enabled\n# echo never > /sys/kernel/mm/transparent_hugepage/defrag\n```\n\n"
+    },
+    {
+      "title": "Warning about Soft rlimits too low",
+      "level": 3,
+      "content": "If you are using systemd service, then edit the unit file:\n\n```\n[Service]\n# Other directives omitted\n# (file size)\nLimitFSIZE=infinity\n# (cpu time)\nLimitCPU=infinity\n# (virtual memory size)\nLimitAS=infinity\n# (locked-in-memory size)\nLimitMEMLOCK=infinity\n# (open files)\nLimitNOFILE=64000\n# (processes/threads)\nLimitNPROC=64000\n```\n\nSee following link for further details: Further reference\n\n"
+    }
+  ]
+}

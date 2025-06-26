@@ -1,0 +1,76 @@
+{
+  "title": "Onlyoffice Documentserver",
+  "url": "https://wiki.archlinux.org/title/Onlyoffice_Documentserver",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Onlyoffice Documentserver is a full-featured backend for editing different office documents like Open Document, Word, Excel, etc. online in your browser. The software is open source and can be easily deployed and integrated into existing server software. Available frontends are Nextcloud or the Onlyoffice CommunityServer. It can be also used in own software, see following examples for PHP, Nodejs, etc.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the onlyoffice-documentserver-binAUR package. Further you will need PostgreSQL or MariaDB as a database backend and the Redis and rabbitmq services installed.\n\nAlternatively, install via docker and run:\n\n```\n$ docker pull onlyoffice/documentserver\n$ docker run -i -t -d -p PORT:80 --restart=always onlyoffice/documentserver\n```\n\nWhere PORT can be either 80, if not already in use by another web server, or different, e.g. 9980.\n\n"
+    },
+    {
+      "title": "local.json",
+      "level": 3,
+      "content": "You can create local.json in /etc/webapps/onlyoffice/documentserver, where are possible to overwrite any parts of config (below full local.json with rabbitmq, mariadb, redis and accesskey configuration:\n\n```\n/etc/webapps/onlyoffice/documentserver/local.json\n```\n\n```\n{\n        \"queue\": {\n                \"type\": \"rabbitmq\"\n        },\n        \"rabbitmq\": {\n                \"url\": \"amqp://onlyoffice:onlyoffice@127.0.0.1:5672/onlyoffice\"\n        },\n        \"services\": {\n                \"CoAuthoring\": {\n                        \"sql\": {\n                                \"type\": \"mariadb\",\n                                \"dbHost\": \"127.0.0.1\",\n                                \"dbPort\": 3306,\n                                \"dbName\": \"onlyoffice\",\n                                \"dbUser\": \"onlyoffice\",\n                                \"dbPass\": \"ONLYOFFICE_DB_PASSWD\"\n                        },\n                        \"redis\": {\n                                \"name\": \"redis\",\n                                \"host\": \"127.0.0.1\",\n                                \"port\": 6379,\n                                \"db\": \"10\"\n                        },\n                        \"server\": {\n                                \"port\": 8000,\n                                \"workerpercpu\": 1,\n                                \"mode\": \"production\"\n                        },\n                        \"secret\": {\n                                \"browser\": {\"string\": \"YOUR SECRET IN NEXTCLOUD\"},\n                                \"inbox\": {\"string\": \"YOUR SECRET IN NEXTCLOUD\"},\n                                \"outbox\": {\"string\": \"YOUR SECRET IN NEXTCLOUD\"},\n                                \"session\": {\"string\": \"YOUR SECRET IN NEXTCLOUD\"}\n                        },\n                        \"token\": {\n                                \"enable\": {\n                                        \"browser\": true,\n                                        \"request\": {\n                                                \"inbox\": true,\n                                                \"outbox\": true\n                                        }\n                                 }\n                        }\n}\n}\n}\n```\n\nYou should NOT edit the default.json config file.\n\n"
+    },
+    {
+      "title": "RabbitMQ",
+      "level": 3,
+      "content": "You may create vhost in your RabbitMQ for onlyoffice and select it in local.json:\n\n```\n$ rabbitmqctl add_vhost onlyoffice\n$ rabbitmqctl add_user onlyoffice onlyoffice\n$ rabbitmqctl set_permissions -p onlyoffice onlyoffice \".*\" \".*\" \".*\"\n```\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 4,
+      "content": "The PostgreSQL database backend needs to be configured. Here is an example database setup:\n\n```\n[postgres]$ psql -c \"CREATE DATABASE onlyoffice;\"\n[postgres]$ psql -c \"CREATE USER onlyoffice WITH password 'onlyoffice';\"\n[postgres]$ psql -c \"GRANT ALL privileges ON DATABASE onlyoffice TO onlyoffice;\"\n```\n\nAs of PostgreSQL 15, it's required to give admin privileges to the onlyoffice user in psql so that the database schema migration command successfully executes:\n\n```\n[postgres]$ psql -c \"ALTER DATABASE onlyoffice OWNER TO onlyoffice;\"\n```\n\nTo migrate the documentserver database schema, run following command:\n\n```\n$ psql -hlocalhost -Uonlyoffice -d onlyoffice -f /usr/share/webapps/onlyoffice/documentserver/server/schema/postgresql/createdb.sql\n```\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 4,
+      "content": "Login to mariadb and create a database and a user:\n\n```\n$ create database onlyoffice;\n$ create user 'onlyoffice'@'localhost' identified by 'ONLYOFFICE_DB_PASSWD';\n$ grant all on onlyoffice.* to 'onlyoffice'@'localhost';\n$ flush privileges;\n```\n\nThen import schemadb:\n\n```\n$ mysql -uonlyoffice -p onlyoffice < /usr/share/webapps/onlyoffice/documentserver/server/schema/mysql/createdb.sql\n```\n\nChange the sql section in your local.json:\n\n```\n/etc/webapps/onlyoffice/documentserver/local.json\n```\n\n```\n\"sql\": {\n    \"type\": \"mariadb\",\n    \"dbHost\": \"localhost\",\n    \"dbPort\": \"3306\",\n    \"dbName\": \"onlyoffice\",\n    \"dbUser\": \"onlyoffice\",\n    \"dbPass\": \"ONLYOFFICE_DB_PASSWD\"\n},\n```\n\n"
+    },
+    {
+      "title": "Restrict access",
+      "level": 3,
+      "content": "Restrict access to your documentserver.\n\nEnable security token:\n\n```\n/etc/webapps/onlyoffice/documentserver/local.json\n```\n\n```\n\"token\": {\n    \"enable\": {\n        \"browser\": true,\n        \"request\": {\n            \"inbox\": true,\n            \"outbox\":true\n        }\n    },\n    ...\n},\n```\n\nSet a secret key:\n\n```\n/etc/webapps/onlyoffice/documentserver/local.json\n```\n\n```\n\"secret\": {\n    \"browser\": {\"string\": \"DOC_SERVER_PASSWD\", \"file\": \"\"},\n    \"inbox\": {\"string\": \"DOC_SERVER_PASSWD\", \"file\": \"\"},\n    \"outbox\": {\"string\": \"DOC_SERVER_PASSWD\", \"file\": \"\"},\n    \"session\": {\"string\": \"DOC_SERVER_PASSWD\", \"file\": \"\"}\n},\n```\n\nFinally, set the same secret key in Nextcloud > Administration Settings > ONLYOFFICE.\n\n"
+    },
+    {
+      "title": "Nginx / no SSL",
+      "level": 4,
+      "content": "Here is an example for the Nginx webserver:\n\n```\n/etc/nginx/sites-available/onlyoffice-documentserver\n```\n\n```\nmap $http_host $this_host {\n  \"\" $host;\n  default $http_host;\n}\nmap $http_x_forwarded_proto $the_scheme {\n  default $http_x_forwarded_proto;\n  \"\" $scheme;\n}\nmap $http_x_forwarded_host $the_host {\n  default $http_x_forwarded_host;\n  \"\" $this_host;\n}\nmap $http_upgrade $proxy_connection {\n  default upgrade;\n  \"\" close;\n}\nproxy_set_header Host $http_host;\nproxy_set_header Upgrade $http_upgrade;\nproxy_set_header Connection $proxy_connection;\nproxy_set_header X-Forwarded-Host $the_host;\nproxy_set_header X-Forwarded-Proto $the_scheme;\nserver {\n  listen 0.0.0.0:80;\n  listen [::]:80 default_server;\n  server_tokens off;\n  rewrite ^\\/OfficeWeb(\\/apps\\/.*)$ /web-apps$1 redirect;\n  location / {\n    proxy_pass http://localhost:8000;\n    proxy_buffers 4 256k; \n    proxy_max_temp_file_size 0;\n  }\n  location /spellchecker/ {\n    proxy_pass http://localhost:8080/;\n  }\n}\n```\n\n"
+    },
+    {
+      "title": "Nginx / reverse proxy with SSL",
+      "level": 4,
+      "content": "Create a Nginx configuration file like the following:\n\n```\n/etc/nginx/conf.d/onlyoffice.conf\n```\n\n```\nupstream docservice {\n  server 127.0.0.1:PORT;\n}\n\nmap $http_host $this_host {\n    \"\" $host;\n    default $http_host;\n}\n\nmap $http_x_forwarded_proto $the_scheme {\n     default $http_x_forwarded_proto;\n     \"\" $scheme;\n}\n\nmap $http_x_forwarded_host $the_host {\n    default $http_x_forwarded_host;\n    \"\" $this_host;\n}\n\nmap $http_upgrade $proxy_connection {\n  default upgrade;\n  \"\" close;\n}\n\nproxy_set_header Upgrade $http_upgrade;\nproxy_set_header Connection $proxy_connection;\nproxy_set_header X-Forwarded-Host $the_host;\nproxy_set_header X-Forwarded-Proto $the_scheme;\nproxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\nserver {\n    listen 0.0.0.0:443 ssl;\n    listen [::]:443 ssl default_server;\n    server_name SERVER_NAME\n    server_tokens off;\n    root /usr/share/nginx/html;\n\n    ssl_certificate SSL_CERT;\n    ssl_certificate_key SSL_KEY;\n    ssl_verify_client off;\n    ssl_ciphers \"EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH\";\n    ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;\n    ssl_session_cache  builtin:1000  shared:SSL:10m;\n    ssl_prefer_server_ciphers   on;\n\n    add_header X-Content-Type-Options nosniff;\n    location / {\n      proxy_pass http://docservice;\n      proxy_http_version 1.1;\n  }\n}\n```\n\nFill in PORT (default 8000), SERVER_NAME, SSL_CERT and SSL_KEY. This was taken from the nginx reference config.\n\nReload Nginx:\n\n```\n$ nginx -t\n$ nginx -s reload\n```\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 2,
+      "content": "Enable/start the following services if you wish to use them locally on the same machine:\n\n- rabbitmq.service\n- redis.service\n- postgresql.service\n\nFinally, start the documentserver services:\n\n- onlyoffice-fileconverter.service\n- onlyoffice-docservice.service\n\n"
+    },
+    {
+      "title": "Nextcloud app",
+      "level": 2,
+      "content": "Install the ONLYOFFICE app within Nextcloud. Enter Nextcloud > Settings > ONLYOFFICE and fill in Onlyoffice Docs address with https://SERVER_NAME.\n\n"
+    },
+    {
+      "title": "Onlyoffice Docker container on ZFS",
+      "level": 3,
+      "content": "When running onlyoffice/documentserver as a Docker container with the data-root pointing to a ZFS device, e.g. when /var is mounted as a ZFS pool, docker run might fail with Error: Daemon failed to copy files.\n\nIn this case, let Docker have its data-root on an ext4 partition, for instance /var_ext4/lib/docker:\n\n```\n/etc/docker/daemon.json\n```\n\n```\n{\n    \"data-root\": \"/var_ext4/lib/docker\"\n}\n```\n\n"
+    },
+    {
+      "title": "Pkg: Error reading from file.",
+      "level": 3,
+      "content": "If docservice exits with the above error, set the OPTIONS in /etc/makepkg.conf to the given default before building:\n\n```\n/etc/makepkg.conf\n```\n\n```\n...\nOPTIONS=(!strip docs libtool staticlibs emptydirs !zipman !purge !debug !lto !autodeps)\n...\n```\n\n"
+    },
+    {
+      "title": "ONLYOFFICE cannot be reached after upgrade to 8.2.0",
+      "level": 3,
+      "content": "Flush your redis database e.g. by executing\n\n```\n$ redis-cli flushall\n```\n\n"
+    }
+  ]
+}

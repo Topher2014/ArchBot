@@ -1,0 +1,96 @@
+{
+  "title": "Microsoft VPN client setup with pptpclient",
+  "url": "https://wiki.archlinux.org/title/Microsoft_VPN_client_setup_with_pptpclient",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- PPTP server\n\npptpclient is a program implementing the Microsoft PPTP protocol. As such, it can be used to connect to a Microsoft VPN network (or any PPTP-based VPN) provided by a school or workplace.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the pptpclient package.\n\n"
+    },
+    {
+      "title": "Configure",
+      "level": 2,
+      "content": "To configure pptpclient you will need to collect the following information from your network administrator:\n\n- The IP address or hostname of the VPN server.\n- The username you will use to connect.\n- The password you will use to connect.\n- The authentication (Windows) domain name. This is not necessary for certain networks.\n\nYou must also decide what to name the tunnel.\n\n"
+    },
+    {
+      "title": "Configure using pptpsetup",
+      "level": 3,
+      "content": "You can configure and delete tunnels by running the pptpsetup tool as root. For example:\n\n```\npptpsetup --create my_tunnel --server vpn.example.com --username alice --password foo --encrypt\npptpsetup --delete my_tunnel\n```\n\nYou can #Connect after a tunnel has been configured.\n\n"
+    },
+    {
+      "title": "Configure by hand",
+      "level": 3,
+      "content": "You can also edit all necessary configuration files by hand, rather than relying on pptpsetup.\n\n"
+    },
+    {
+      "title": "Edit The options File",
+      "level": 4,
+      "content": "The /etc/ppp/options file sets security options for your VPN client. If you have trouble connecting to your network, you may need to relax the options. At a minimum, this file should contain the options lock, noauth, nobsdcomp and nodeflate.\n\n```\n/etc/ppp/options\n```\n\n```\n# Lock the port\nlock\n# We don't need the tunnel server to authenticate itself\nnoauth\n# Turn off compression protocols we know won't be used\nnobsdcomp\nnodeflate\n# We won't do PAP, EAP, CHAP, or MSCHAP, but we will accept MSCHAP-V2\n# (you may need to remove these refusals if the server is not using MPPE)\nrefuse-pap\nrefuse-eap\nrefuse-chap\nrefuse-mschap\n```\n\n"
+    },
+    {
+      "title": "Edit The chap-secrets File",
+      "level": 4,
+      "content": "The /etc/ppp/chap-secrets file contains credentials for authenticating a tunnel. Make sure no one except root can read this file, as it contains sensitive information.\n\n```\nchmod 0600 /etc/ppp/chap-secrets\n```\n\nEdit the file. It has the following format:\n\n```\n/etc/ppp/chap-secrets\n```\n\n```\n<DOMAIN>\\\\<USERNAME> PPTP <PASSWORD> *\n```\n\nReplace each bracketed term with an appropriate value. Omit <DOMAIN>\\\\ if your connection does not require a domain.\n\n"
+    },
+    {
+      "title": "Name Your Tunnel",
+      "level": 4,
+      "content": "The /etc/ppp/peers/<TUNNEL> file contains tunnel-specific configuration options. <TUNNEL> is the name you wish to use for your VPN connection. The file should look like this:\n\n```\n/etc/ppp/peers/<TUNNEL>\n```\n\n```\npty \"pptp <SERVER> --nolaunchpppd\"\nname <DOMAIN>\\\\<USERNAME>\nremotename PPTP\nrequire-mppe-128\nfile /etc/ppp/options\nipparam <TUNNEL>\n```\n\nAgain, omit <DOMAIN>\\\\ if your connection does not require a domain. <SERVER> is the remote address of the VPN server, <DOMAIN> is the domain your user belongs to, <USERNAME> is the name you will use to connect to the server, and <TUNNEL> is the name of the connection.\n\n"
+    },
+    {
+      "title": "Connect",
+      "level": 2,
+      "content": "To make sure that everything is configured properly, as root execute:\n\n```\n# pon <TUNNEL> debug dump logfd 2 nodetach\n```\n\nIf everything has been configured correctly, the pon command should not terminate. Once you are satisfied that it has connected successfully, you can terminate the command.\n\nTo connect to your VPN normally, simply execute:\n\n```\n# pon <TUNNEL>\n```\n\nWhere <TUNNEL> is the name of the tunnel you established earlier. Note that this command should be run as root.\n\n"
+    },
+    {
+      "title": "Routing",
+      "level": 3,
+      "content": "Once you have connected to your VPN, you should be able to interact with anything available on the VPN server. To access anything on the remote network, you need to add a new route to your routing table.\n\nFor more information on how to add routes, you can read this article which has many more examples: PPTP Routing Howto\n\n"
+    },
+    {
+      "title": "Split Tunneling",
+      "level": 4,
+      "content": "Packets with a destination of your VPN's network should be routed through the VPN interface (usually ppp0). To do this, you create the route:\n\n```\n# ip route add 192.168.10.0/24 dev ppp0\n```\n\nThis will route all the traffic with a destination of 192.168.10.* through your VPN's interface, (ppp0).\n\n"
+    },
+    {
+      "title": "Route All Traffic",
+      "level": 4,
+      "content": "It may be desirable to route all traffic through your VPN connection. You can do this by running:\n\n```\n# ip route add default dev ppp0\n```\n\n"
+    },
+    {
+      "title": "Route All Traffic by /etc/ppp/ip-up.d",
+      "level": 4,
+      "content": "```\n/etc/ppp/ip-up.d/01-routes.sh\n```\n\n```\n#!/bin/bash\n\n# This script is called with the following arguments:\n# Arg Name\n# $1 Interface name\n# $2 The tty\n# $3 The link speed\n# $4 Local IP number\n# $5 Peer IP number\n# $6 Optional ``ipparam'' value foo\n\nip route add default via $4\n```\n\nMake sure the script is executable.\n\n"
+    },
+    {
+      "title": "Split Tunneling based on port by /etc/ppp/ip-up.d",
+      "level": 4,
+      "content": "```\n/etc/ppp/ip-up.d/01-routebyport.sh\n```\n\n```\n#!/bin/bash\n\n# This script is called with the following arguments:\n# Arg Name\n# $1 Interface name\n# $2 The tty\n# $3 The link speed\n# $4 Local IP number\n# $5 Peer IP number\n# $6 Optional ``ipparam'' value foo\n\necho 0 > /proc/sys/net/ipv4/conf/$1/rp_filter\necho 1 > /proc/sys/net/ipv4/ip_forward\necho 1 > /proc/sys/net/ipv4/ip_dynaddr\n\nip route flush table vpn\nip route add default via $5 dev $1 table vpn\n\n# forward only IRC ports over VPN\niptables -t mangle -A OUTPUT -p tcp -m multiport --dports 6667,6697 -j MARK --set-mark 0x1\niptables -t nat    -A POSTROUTING -o $1 -j MASQUERADE\n\nip rule  add fwmark 0x1 pri 100 lookup vpn\nip rule  add from $4 pri 200 table vpn\nip route flush cache\n```\n\nMake sure the script is executable and that the vpn table is added to /etc/iproute2/rt_tables\n\n```\n201 vpn\n```\n\n"
+    },
+    {
+      "title": "Disconnect",
+      "level": 2,
+      "content": "Execute the following to disconnect from a VPN:\n\n```\n# poff <TUNNEL>\n```\n\n<TUNNEL> is the name of your tunnel.\n\n"
+    },
+    {
+      "title": "Making A VPN Daemon and Connecting On Boot",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nYou can create a simple daemon for your VPN connection by creating an appropriate /etc/rc.d/* script:\n\nNote: **will not work** To resolve this issue, you can patch your /usr/bin/poff file by making the following changes on line 93:\n\nTo resolve this issue, you can patch your /usr/bin/poff file by making the following changes on line 93:\n\n```\n-PID=`ps axw | grep \"[ /]pppd call $1 *\\$\" | awk '{print $1}'`\n+PID=`ps axw | grep \"[ /]pppd call $1\" | awk '{print $1}'`\n```\n\n```\n/etc/rc.d/name-of-your-vpn\n```\n\n```\n#!/bin/bash\n\n. /etc/rc.conf\n. /etc/rc.d/functions\n\nDAEMON=<TUNNEL>-vpn\nARGS=\n\n[ -r /etc/conf.d/$DAEMON ] && . /etc/conf.d/$DAEMON\n\ncase \"$1\" in\n start)\n   stat_busy \"Starting $DAEMON\"\n   pon <TUNNEL> updetach persist &>/dev/null && <ROUTING COMMAND> &>/dev/null\n   if [ $? = 0 ]; then\n     add_daemon $DAEMON\n     stat_done\n   else\n     stat_fail\n     exit 1\n   fi\n   ;;\n stop)\n   stat_busy \"Stopping $DAEMON\"\n   poff <TUNNEL> &>/dev/null\n   if [ $? = 0 ]; then\n     rm_daemon $DAEMON\n     stat_done\n   else\n     stat_fail\n     exit 1\n   fi\n   ;;\n restart)\n   $0 stop\n   sleep 1\n   $0 start\n   ;;\n *)\n   echo \"usage: $0 {start|stop|restart}\"  \nesac\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "If client connections keep timing out with \"LCP: timeout sending Config-Requests\", make sure that GRE is allowed through the client firewall. For iptables, the necessary command is:\n\n```\niptables -A INPUT -p 47 -j ACCEPT\n```\n\nAlternatively, if you only want to allow PPTP traffic that corresponds to a connection request coming from your local machine, you can use the conntrack PPTP helper:\n\n```\niptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT \niptables -t raw -A OUTPUT -p tcp --dport 1723 -j CT --helper pptp\n```\n\nThe second line should autoload the nf_conntrack_pptp and nf_conntrack_proto_gre kernel modules, which are needed for this.\n\nIf you get “EAP: unknown authentication type 26; Naking”, open /etc/ppp/options.pptp and commented out the lines refuse-chap and refuse-mschap and add the options file entry to the tunnel file like this:\n\n```\n/etc/ppp/peers/<tunel>\n```\n\n```\n# written by pptpsetup\npty \"pptp vpn.foo.com --nolaunchpppd\"\nlock\nnoauth\nnobsdcomp\nnodeflate\nname USERNAME\nremotename vpn\nfile /etc/ppp/options.pptp\nipparam vpn\nrequire-mppe-128\n```\n\n"
+    },
+    {
+      "title": "Remarks",
+      "level": 2,
+      "content": "You can find more information about configuring pptpclient at their website: pptpclient website. The contents of this article were adapted from their Ubuntu How-To which also provides some hints on how to do things such as connecting on boot. These examples should be easy to adapt into daemons or other scripts to help automate your configuration.\n\n"
+    }
+  ]
+}

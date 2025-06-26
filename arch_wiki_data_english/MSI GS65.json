@@ -1,0 +1,101 @@
+{
+  "title": "MSI GS65",
+  "url": "https://wiki.archlinux.org/title/MSI_GS65",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nTouchpad |  | Partial\nKeyboard | 1038:1122 | Yes\nGPU (Intel) | 8086:3e9b | Yes\nGPU (Nvidia) | 10de:1ba1 | Yes\nWebcam | 5986:211c | Yes\nEthernet | 1969:e0b1 | Yes\nBluetooth | 8087:0aaa | Yes\nThunderbolt |  | Yes\nAudio | 8086:a348 | Yes\nWi-Fi | 8086:a370 | Yes\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Secure Boot can be disabled from the Security tab and boot mode can optionally be switched from UEFI to legacy. Advanced BIOS options can be accessed by going to the 'Advanced' tab and holding down l-alt, then pressing r-ctrl, r-shift, then F2.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "BIOS version E16Q2IMS.110 introduces many ACPI problems (if BIOS is changed from UEFI to legacy), including a flood of \"No handler or method for GPE [00->6E]\" at boot, which can be solved through kernel parameters:\n\n- acpi=off allows to boot but most things will not work, including the keyboard and touchpad.\n- pci=nomsi or acpi=off acpi=force allows to boot and have working keyboard and touchpad, but the NVidia card will not work ; neither will the USB3 ports.\n- pcie_aspm=off will allow most things to work: keyboard, touchpad, USB 3 devices, NVidia card.\n\n"
+    },
+    {
+      "title": "NVIDIA GPU multihead support",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Bumblebee.** This article or section is a candidate for merging with Bumblebee.\n\nThis article or section is a candidate for merging with Bumblebee.\n\nThe HDMI and DP ports are wired to the Nvidia GPU, so some additional actions required to make the multihead to work with monitors connected to this ports. Thunderbolt port is wired to Intel GPU thus allowing for external monitor to be used with Nvidia GPU off. See Bumblebee#Output wired to the NVIDIA chip, though configuration from there possibly would not work as is.\n\nInstructions to get the external monitor working on the HDMI and DP ports on MSI GS65:\n\n1. Install bumblebee and xf86-video-intel.\n\n2. Configure Xorg to use the intel (not the modesetting) video driver for the Intel GPU.\n\n```\n/etc/X11/xorg.conf.d/20-intel.conf\n```\n\n```\nSection \"Device\"\n    Identifier  \"intel\"\n    Driver      \"intel\"\nEndSection\n```\n\n3. Make Xorg launched by intel-virtual-output to use the Nvidia GPU:\n\n```\n/etc/bumblebee/xorg.conf.nvidia\n```\n\n```\nSection \"Device\"\n    Identifier  \"nvidia\"\n    Driver      \"nvidia\"\nEndSection\n```\n\n4. Restart X server\n\n5. Launch the intel-virtual-output -b\n\n6. Use xrandr or other tool to turn on the monitor and adjust its position.\n\n```\n$ xrandr --output VIRTUAL1 --right-of eDP1 --preferred\n```\n\nExternal monitor should be under the VIRTUAL1 output in xrandr -q. If not - check that intel-virtual-output -b successfully run the X server on DISPLAY=:8 and the xrandr -d :8 -q shows the connected monitor.\n\nLimitations\n\nIt looks like the only one is inability to use VDPAU hardware video decoding, though to be honest it could be used directly on DISPLAY=:8 as an ugly hack (make sure your WM ignores the external screen first). But NVENC/NVDEC does not depend on X and could be used with tools like ffmpeg and gstreamer, and the Intel Quick Sync VAAPI also works, so missing VDPAU is a minor issue.\n\n"
+    },
+    {
+      "title": "Hybrid graphics",
+      "level": 3,
+      "content": "Like most modern laptops with hybrid graphics, the GS65 uses the Optimus MUXless scheme and supports the ACPI methods necessary for the complete power down of the dedicated NVIDIA GPU (Runtime D3cold), saving large amounts of power when not in use.\n\nIf using the latest proprietary NVIDIA drivers nvidia or nvidia-dkms, this should work nearly out of box without needing tools like Bumblebee simply by setting the NVreg_DynamicPowerManagement option of the nvidia module:\n\n```\n/etc/modprobe.d/nvidia.conf\n```\n\n```\noptions nvidia NVreg_DynamicPowerManagement=2\n```\n\nIf the laptop's power LED settles from orange to white, this means the NVIDIA GPU is currently powered down. Use this and tools like nvtop to troubleshoot any configuration issues or misbehaving programs probing the GPU for no valid reason.\n\nIf you experience issues with the GPU's power management, visit PRIME#NVIDIA and this page for more details. If this still doesn't solve them, check if explicit ACPI D3cold capability is enabled in the advanced BIOS settings.\n\nNote that some ACPI-related kernel parameters (like acpi_osi) or custom DSDT tables might make this feature inoperable. Proceed with care.\n\n"
+    },
+    {
+      "title": "Power management",
+      "level": 2,
+      "content": "An issue when sleeping is that the networking will be disabled when waking and set to airplane mode. This issue does not affect hibernation.\n\n"
+    },
+    {
+      "title": "Keyboard backlight",
+      "level": 2,
+      "content": "The Steel Series lights on the keyboard cannot be configured with msi-keyboard-gitAUR because this tool only works with region-based RGB lighting. For this laptop model, the tool msi-perkeyrgbAUR provides partial control.\n\nIf keyboard lights remain off, be sure you have rebooted after installing msi-perkeyrgb to refresh udev and that the brightness is turned to maximum with Fn+PgUp, then try the command again.\n\nFor switching colors with a key, create a script file:\n\n```\nmsi-rgb-switch.sh\n```\n\n```\nprofs=(aqua chakra default disco drain freeway plain rainbow-split roulette disable)\nfn=\"./.msi-rgb\"\ntouch $fn\nprof=$(cat $fn)\nif [ -z $prof ]; then\n    echo \"0\" > $fn\n    vl=0\nelse\n    nv=$(($((prof+1)) > 9 ? 0 : $((prof+1))))\n    echo $nv > $fn\n    vl=$nv\nfi\nif [ ${profs[$vl]} = \"disable\" ]; then\n    msi-perkeyrgb -m GS65 -d\nelse\n    msi-perkeyrgb -m GS65 -p ${profs[$vl]}\nfi\n```\n\nand map the script to a shortcut key. This will rotate to the next rgb color automatically\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Table content:\nKey | Visible?1 | Marked?2 | Effect\nFn+F2 | Yes | Yes | Inputs Super+P.\nFn+F3 | Yes | Yes | F21/XF86XK_TouchpadToggle\nFn+F6 | Yes | Yes | Camera. This also brings the webcam online and exposes it to the kernel.\nFn+F7 | No4 | Yes | Unmapped.\nFn+F8 | Yes | No | WLAN/Airplane mode. Hardblocks Wi-Fi and removes Bluetooth from the USB bus. Enabled by EC. See #Airplane mode switch.\nFn+F9 | Yes | No | Bluetooth. Enabled by EC. See #Airplane mode switch.\nFn+F10 | No | Yes | Similar to Fn+F8 but doesn't send WLAN. See #Airplane mode switch.\nFn+F12 | Yes3 | Yes | Sleep\nFn+Del | Yes | Yes | Insert\nFn+Home | No | Yes | Non-functional.\nFn+PgUp | No4 | Yes | Increases keyboard backlight brightness.\nFn+PgDown | No4 | Yes | Decreases keyboard backlight brightness.\nFn+End | Yes | Yes | Mute\nFn+Up | Yes | Yes | Brightness up\nFn+Down | Yes | Yes | Brightness down\nFn+Left | Yes | Yes | Volume down\nFn+Right | Yes | Yes | Volume up\nFn+Q/A | No4 | No | Unmapped.\nFn+W/Z | No4 | No | Unmapped.\n\n1. The key is visible to xev and similar tools.\n1. The physical key has a symbol on it, which describes its function.\n1. systemd-logind handles this by default.\n1. Triggers unknown key events. Can be mapped to valid keycodes with setkeycodes(8) or Input remap utilities. Monitor dmesg when pressing these keys.\n\n"
+    },
+    {
+      "title": "Airplane mode switch",
+      "level": 3,
+      "content": "The airplane mode key combinations Fn+F8, Fn+F9 and Fn+F10 are disabled by default. They can re-enabled in a couple ways. This is especially relevant as resuming from sleep usually hardblocks the Wi-Fi card.\n\n"
+    },
+    {
+      "title": "Using kernel parameters",
+      "level": 4,
+      "content": "The simplest and safest method is by adding the following kernel parameters:\n\n```\nacpi_osi=! acpi_osi=\"Windows 2009\"\n```\n\nHowever, this might alter or disable other power management features, as this works by tricking the ACPI DSDT into thinking it's running on an older version of Windows.\n\n"
+    },
+    {
+      "title": "Using the EC (Embedded Controller)",
+      "level": 4,
+      "content": "Another more surgical, slightly riskier but more complete solution which does not involve ACPI, is to use iswAUR to write to the laptop's EC which temporarily restores the switch's functionality. Write byte 0x30(48) at offset 0x34. Unless you have the above kernel parameters active, the value before writing should be 0x50. Check with isw -c.\n\n```\n# isw -s 0x34 48\n```\n\nAfter a few seconds, the key combinations should work.\n\nAdditionally, with the airplane mode's functionality restored, writing 1 (disable) or 9 (enable) at offset 0x2e will change the state of the radio killswitch:\n\n```\n# isw -s 0x2e 9\n```\n\nThese commands can be used as part of systemd units and other scripts to automate control of the platform's airplane mode and mitigate sleep resume issues.\n\nPerform these actions at your own risk. The offsets should be identical for you, but always double-check your own EC's memory dump using isw -c, comparing values against the above, before writing to it. Do not write to any other location unless you know what you are doing. If you encounter unexpected issues, you may need to reset the EC by powering off the laptop and either removing the battery or pressing the pinhole switch on the underside for 10 seconds with the AC cable disconnected. Connect the cable before booting.\n\nA more detailed explanation can be found on the Talk:MSI GS65#Unblocking wifi after sleep page.\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 2,
+      "content": "Multi gestures do not work out the box, but are detected with libinput-gesturesAUR.\n\n"
+    },
+    {
+      "title": "Thermals",
+      "level": 2,
+      "content": "Fan control by \"Fancontrol (lm-sensors)\" or \"NoteBook Fan Control (NBFC)\" is not supported, but by the use of the tool iswAUR you can control the fans in the same way as Dragon Center on Windows.\n\n"
+    },
+    {
+      "title": "Microphone",
+      "level": 2,
+      "content": "GS65 has the twin microphone, which is very cool to have for noise reduction and echo cancellation, as well as background sounds suppression via beamforming technique. To get the best of it add this line to /etc/pulse/default.pa:\n\n```\nload-module module-echo-cancel use_master_format=1 aec_method=webrtc aec_args=\"beamforming=1 mic_geometry=-0.025,0,0,0.025,0,0\"\nset-default-source alsa_input.pci-0000_00_1f.3.analog-stereo.echo-cancel\n```\n\nAlso, it could be useful to add analog_gain_control=0 to aec_args to disable automatic gain control.\n\n"
+    },
+    {
+      "title": "Lockup Issue (lspci and poweroff hang)",
+      "level": 3,
+      "content": "Symptoms:\n\n- lspci hangs\n- poweroff hangs\n\nApplies to: Arch boot ISO and systems with nouveau or without nvidia driver installed. See NVIDIA Optimus#Lockup issue (lspci hangs).\n\nSolutions:\n\n- Arch ISO: Add modprobe.blacklist=nouveau to the kernel parameters (https://superuser.com/a/1301487).\n- System using nvidia: Should not run into this issue. bbswitch may not work and cause this, however.\n- System using nouveau: Add nouveau.runpm=0 to the kernel parameters. This disables runtime power-management, which causes this issue to begin with.\n\n"
+    },
+    {
+      "title": "Cheese Hangs While Opening Camera",
+      "level": 3,
+      "content": "The issue can be fixed by installing vlc and running:\n\n```\n$ vlc v4l:// :v4l-vdev=\"/dev/video0\"\n```\n\nFollowing this, cheese should work correctly.\n\n"
+    },
+    {
+      "title": "Wi-Fi is hardblocked (airplane mode) after waking up from suspend",
+      "level": 3,
+      "content": "Waking from suspend will have Wi-Fi in airplane mode. [1]\n\n```\n# rfkill list\n```\n\n```\n1: phy0: Wireless LAN\n\tSoft blocked: no\n\tHard blocked: yes\n```\n\nWi-Fi can be reactivated by either using the airplane mode key combination twice or by hibernating and rebooting.\n\nA way to mitigate this is by setting systemd to hibernate instead of suspending.\n\n```\n/etc/systemd/logind.conf\n```\n\n```\nHandleSuspendKey=hibernate\nHandleLidSwitch=hibernate\n```\n\n"
+    },
+    {
+      "title": "System freeze",
+      "level": 3,
+      "content": "From time to time the graphical interface will freeze and the keyboard will be unresponsive, though audio keeps running. It tends to happen when CPU temperature is high and CPUs are throttling.\n\nThere is no known solution for this.\n\nIt is not clear what causes this issue:\n\n```\n# journalctl -r --boot -1\n```\n\n```\nJul 22 20:27:40 almsi kernel: nvidia-modeset: ERROR: GPU:0: Failed to allocate memory for the display color lookup table.\n```\n\nIssue caused by the Intel E2500 Wi-Fi card.\n\n```\n# journalctl -f\n```\n\n```\niwlwifi 0000:00:14.3: BIOS contains WGDS but no WRDS\n```\n\nWi-Fi card ask for a hardware reset. (System will freeze for +/- 10s)\n\nFixed by replacing the Wi-Fi card.\n\n"
+    },
+    {
+      "title": "Display outputs do not work after suspend",
+      "level": 3,
+      "content": "If the laptop is suspended with another monitor connected, then on wake all display outputs do not recognise when an external display is connected to any port. This persists across reboots. Worryingly it also persists if you reboot into Windows.\n\nOne workaround is to boot into Windows, suspend the laptop, then wake it. Connected displays will then be recognised when rebooting into Windows or Arch. Another workaround is to suspend and wake until the connected display is recognized. Sometimes this takes several tries but it avoids having to boot into Windows.\n\nAnother workaround is to disable audio devices.\n\n```\nblacklist-intel_snd_suspend.conf\n```\n\n```\n#for kernel 4.x                                                                                                                        \nblacklist snd_hda_intel                                                                                                                \n                                                                                                                                       \n#for kernel 5.x - additional modules, if not disable it - suspend not working                                                          \nblacklist snd_sof_intel_hda                                                                                                            \nblacklist snd_sof_intel_hda_common                                                                                                     \nblacklist sof_pci_dev                                                                                                                  \nblacklist snd_sof_intel_byt                                                                                                            \nblacklist snd_sof_intel_ipc\n```\n\n"
+    }
+  ]
+}

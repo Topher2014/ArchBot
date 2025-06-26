@@ -1,0 +1,46 @@
+{
+  "title": "Huawei E220 E1550 3G modem",
+  "url": "https://wiki.archlinux.org/title/Huawei_E220_E1550_3G_modem",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- USB 3G Modem\n\nThis article describes how to configure Huawei E1550 3G modems.\n\n"
+    },
+    {
+      "title": "Preparing device",
+      "level": 2,
+      "content": "This modem is a generic device, but there are two caveats:\n\n"
+    },
+    {
+      "title": "Switching into modem mode",
+      "level": 3,
+      "content": "By default kernel recognizes it as usb-storage device (SCSI CD-ROM). It is true, because of this modem contains MicroSD card (up to 4Gb) reader and internal flash.\n\nTo turn on modem you should run\n\n```\n$ /lib/udev/usb_modeswitch --vendor 0x12d1 --product 0x1446 --type option-zerocd\n```\n\ncommand.\n\nSee also the usb_modeswitch package, which you may need in future since in udev-157 modem-modeswitch has been renamed and changed as described in the commit. This package does not need any modifications, just install it.\n\nAlso you can create udev's config: /etc/udev/rules.d/15-huawei-e1550.rules\n\n```\n/etc/udev/rules.d/15-huawei-e1550.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"12d1\", ATTRS{idProduct}==\"1446\", RUN+=\"/lib/udev/usb_modeswitch --vendor 0x12d1 --product 0x1446 --type option-zerocd\"\n```\n\nAfter that, modem changes its USB IDs to 12d1:140c and /sys/bus/usb/devices shows new USB endpoints.\n\n"
+    },
+    {
+      "title": "Loading the driver",
+      "level": 3,
+      "content": "usbserial is proper driver for this modem, but probably it does not recognize it, so you should force it, passing USB IDs.\n\n```\n# modprobe usbserial vendor=0x12d1 product=0x140c\n```\n\nor put options into /etc/modprobe.d/modprobe.conf\n\n```\n/etc/modprobe.d/modprobe.conf\n```\n\n```\n...\noptions usbserial vendor=0x12d1 product=0x140c\n...\n```\n\n(do not forget to rmmod usbserial if it is already loaded before)\n\n"
+    },
+    {
+      "title": "Naming the device (optional)",
+      "level": 3,
+      "content": "You can generate symlinks to the ttyUSB* ports for a more human readable configuration with udev rules.\n\nFor a Huawei device which identifies with the USB ID 12D1:1001 after modeswitching and has 3 serial ports:\n\n```\nSUBSYSTEMS==\"usb\", ATTRS{modalias}==\"usb:v12D1p1001*\", KERNEL==\"ttyUSB*\", ATTRS{bInterfaceNumber}==\"00\", ATTRS{bInterfaceProtocol}==\"ff\", SYMLINK+=\"ttyUSB_utps_modem\"\n SUBSYSTEMS==\"usb\", ATTRS{modalias}==\"usb:v12D1p1001*\", KERNEL==\"ttyUSB*\", ATTRS{bInterfaceNumber}==\"01\", ATTRS{bInterfaceProtocol}==\"ff\", SYMLINK+=\"ttyUSB_utps_diag\"\n SUBSYSTEMS==\"usb\", ATTRS{modalias}==\"usb:v12D1p1001*\", KERNEL==\"ttyUSB*\", ATTRS{bInterfaceNumber}==\"02\", ATTRS{bInterfaceProtocol}==\"ff\", SYMLINK+=\"ttyUSB_utps_pcui\"\n```\n\nFor a Huawei device which identifies with the USB ID 12D1:1003 after modeswitching and has 2 serial ports:\n\n```\nSUBSYSTEMS==\"usb\", ATTRS{modalias}==\"usb:v12D1p1003*\", KERNEL==\"ttyUSB*\", ATTRS{bInterfaceNumber}==\"00\", ATTRS{bInterfaceProtocol}==\"ff\", SYMLINK+=\"ttyUSB_utps_modem\"\n SUBSYSTEMS==\"usb\", ATTRS{modalias}==\"usb:v12D1p1003*\", KERNEL==\"ttyUSB*\", ATTRS{bInterfaceNumber}==\"01\", ATTRS{bInterfaceProtocol}==\"ff\", SYMLINK+=\"ttyUSB_utps_pcui\"\n```\n\n"
+    },
+    {
+      "title": "Connecting to the network",
+      "level": 2,
+      "content": "Now you have new 2 or 3 /dev/ttyUSB* devices.Most likely first of them (ttyUSB0 if you had not such devices before) is PPP compatible modem. Use it as usual with pppd, kppp, gnome-ppp, network-manager, etc.\n\n"
+    },
+    {
+      "title": "Using gammu",
+      "level": 2,
+      "content": "Use gammu to access cell phones functionalities.\n\nEdit ~/.gammurc\n\n```\n~/.gammurc\n```\n\n```\n[gammu]\nport=/dev/ttyUSB0\nconnection=at\nname=huawei e1550\nmodel=\n```\n\nyou can also generate the config using\n\n```\n$ gammu-detect > ~/.gammurc\n```\n\nSending SMS:\n\n```\n$ gammu sendsms TEXT +7123456789 -text qwe\n```\n\nfind device info:\n\n```\n$ gammu identify\n```\n\nfor gui use wammuAUR or modem-manager-gui.\n\n"
+    },
+    {
+      "title": "USSD Requests",
+      "level": 2,
+      "content": "Use ussd.php tool.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "title": "Greetd",
+  "url": "https://wiki.archlinux.org/title/Greetd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Display manager\n- Wayland\n- Sway\n\ngreetd is a minimal, agnostic and flexible login manager daemon which does not make assumptions about what the user wants to launch, should it be console-based or graphical. Any script or program which can be started from the console may be launched by greetd, which makes it particularly suitable for Wayland compositors. It can also launch a greeter to start user sessions, like any other display manager.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the greetd or greetd-gitAUR packages.\n\nThe default greetd configuration file is located at /etc/greetd/config.toml. PAM-specific configuration is set in /etc/pam.d/greetd.\n\n"
+    },
+    {
+      "title": "Greeters",
+      "level": 3,
+      "content": "Greetd has greetd-agreety as its built-in greeter, however this is a minimal implementation. You should consider using one of the several available greeters:\n\n- greetd-agreety — The default, a text-based greeter similar to agetty.\n\n- cosmic-greeter — A libcosmic greeter.\n\n- dlm — An fbdev greeter.\n\n- ddlm — An fbdev greeter. Enhanced/extended version of dlm.\n\n- gtkgreet — A GTK greeter.\n\n- ReGreet — A GTK greeter. Supports various customization options. Wayland only.\n\n- wlgreet — A Wayland greeter.\n\n- tuigreet — A console UI greeter.\n\n- qtgreet — A Qt greeter.\n\n- nwg-hello — GTK3-based greeter for greetd written in python.\n\n"
+    },
+    {
+      "title": "Starting greetd",
+      "level": 2,
+      "content": "Enable greetd.service so greetd will be started at boot.\n\nSee also Display manager#Loading the display manager.\n\n"
+    },
+    {
+      "title": "Greeter configuration",
+      "level": 2,
+      "content": "Configuring the greeter run by greetd is done using the command option in the default_session section in /etc/greetd/config.toml. The included agreety greeter will be used if no changes are made. Also see #agreety.\n\nBy default, greeters are run as the greeter user. This can be changed by editing the user option in the default_session section of the configuration file and replacing another_user with the chosen user:\n\n```\n...\n[default_session]\nuser = \"another_user\"\n...\n```\n\nMake sure the ownership of the /etc/greetd directory is set accordingly.\n\n"
+    },
+    {
+      "title": "agreety",
+      "level": 3,
+      "content": "This is the default greeter. It is launched by greetd with the configuration file set as follows:\n\n```\n...\n[default_session]\ncommand = \"agreety --cmd $SHELL\"\n...\n```\n\nagreety can launch any arbitrary command once a user logs in. For example, in order to start Sway, replace $SHELL in the example above with sway.\n\n"
+    },
+    {
+      "title": "gtkgreet",
+      "level": 3,
+      "content": "In order to run, gtkgreet needs a compositor. For the full experience, a compositor with wlr-layer-shell-unstable support is required but others can work. As such, it is recommended to use sway, but something like cage can also be used. Examples for both cage and sway are provided below.\n\nIn order to specify which login environments can be started by gtkgreet, list them in /etc/greetd/environments. For example:\n\n```\nsway\nbash\n```\n\nYou can also invoke gtkgreet with the -c mycommand parameter, replacing mycommand with the desired program (for example, gtkgreet -c bash or gtkgreet -c sway). Do so in the below compositor examples as desired.\n\n"
+    },
+    {
+      "title": "Using cage",
+      "level": 4,
+      "content": "Install cage and set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"cage -s -- gtkgreet\"\n...\n```\n\nThe -s argument enables VT switching in cage (0.1.2 and newer only), which is highly recommended to prevent locking yourself out.\n\n"
+    },
+    {
+      "title": "Using sway",
+      "level": 4,
+      "content": "Install sway. When using Sway, it must be terminated once the user logs in. For that purpose, a specific configuration file must be created, for example in /etc/greetd/sway-config, with the following content:\n\n```\n# `-l` activates layer-shell mode. Notice that `swaymsg exit` will run after gtkgreet.\nexec \"gtkgreet -l; swaymsg exit\"\n\nbindsym Mod4+shift+e exec swaynag \\\n-t warning \\\n-m 'What do you want to do?' \\\n-b 'Poweroff' 'systemctl poweroff' \\\n-b 'Reboot' 'systemctl reboot'\n\ninclude /etc/sway/config.d/*\n```\n\nThen, greetd must be set to start Sway with the configuration file above. Set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"sway --config /etc/greetd/sway-config\"\n...\n```\n\n"
+    },
+    {
+      "title": "ReGreet",
+      "level": 3,
+      "content": "Similar to gtkgreet, ReGreet needs a compositor. For example, both Cage and Sway can be used just like they are used for gtkgreet, replacing the gtkgreet command with regreet. The config for Sway would thus look like:\n\n```\n# Notice that `swaymsg exit` will run after ReGreet.\nexec \"regreet; swaymsg exit\"\n\nbindsym Mod4+shift+e exec swaynag \\\n-t warning \\\n-m 'What do you want to do?' \\\n-b 'Poweroff' 'systemctl poweroff' \\\n-b 'Reboot' 'systemctl reboot'\n\ninclude /etc/sway/config.d/*\n```\n\nReGreet picks up available sessions from /usr/share/xsession (for X11 sessions) and /usr/share/wayland-sessions (for Wayland sessions). Thus, there is no need to list sessions in /etc/greetd/environments.\n\nReGreet can be configured through a TOML file in /etc/greetd/regreet.toml. A sample file is provided in /usr/share/doc/greetd-regreet/regreet.sample.toml with all available options. Copy this to /etc/greetd/regreet.toml and make the changes you want, commenting out or deleting the lines you do not need. Any invalid options are ignored.\n\n"
+    },
+    {
+      "title": "wlgreet",
+      "level": 3,
+      "content": "In order to start wlgreet, a compositor with wlr-layer-shell-unstable is required. Follow the steps required to set up gtkgreet with Sway as described above but use the following for /etc/greetd/sway-config instead:\n\n```\nexec \"wlgreet --command sway; swaymsg exit\"\n\nbindsym Mod4+shift+e exec swaynag \\\n-t warning \\\n-m 'What do you want to do?' \\\n-b 'Poweroff' 'systemctl poweroff' \\\n-b 'Reboot' 'systemctl reboot'\n \ninclude /etc/sway/config.d/*\n```\n\n"
+    },
+    {
+      "title": "tuigreet",
+      "level": 3,
+      "content": "tuigreet does not require any special setup, just set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"tuigreet --cmd sway\"\n...\n```\n\ntuigreet --help will display customization options.\n\n"
+    },
+    {
+      "title": "ddlm",
+      "level": 3,
+      "content": "ddlm does not require any special setup, just set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"ddlm --target sway\"\n...\n```\n\n"
+    },
+    {
+      "title": "qtgreet",
+      "level": 3,
+      "content": "In order to use qtgreet, you need a WLR based compositor (e.g. wayfireAUR, sway).\n\n"
+    },
+    {
+      "title": "Using Wayfire",
+      "level": 4,
+      "content": "Install wayfireAUR and set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"wayfire --config /etc/qtgreet/wayfire.ini\"\n...\n```\n\nThe Wayfire configuration file referred to is included with qtgreet.\n\n"
+    },
+    {
+      "title": "Using Hyprland",
+      "level": 4,
+      "content": "Set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"Hyprland --config /etc/greetd/hyprland.conf\"\n...\n```\n\nThen create /etc/greetd/hyprland.conf as:\n\n```\n/etc/greetd/hyprland.conf\n```\n\n```\nexec-once = qtgreet; hyprctl dispatch exit\n```\n\n"
+    },
+    {
+      "title": "nwg-hello",
+      "level": 3,
+      "content": "In order to use nwg-hello, you either need sway or hyprland.\n\n"
+    },
+    {
+      "title": "Using Sway",
+      "level": 4,
+      "content": "Install sway and set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"sway -c /etc/nwg-hello/sway-config\"\n...\n```\n\nThe Sway configuration file referred to is included with nwg-hello.\n\n"
+    },
+    {
+      "title": "Using Hyprland",
+      "level": 4,
+      "content": "Install hyprland and set the command option as follows:\n\n```\n...\n[default_session]\ncommand = \"Hyprland -c /etc/nwg-hello/hyprland.conf\"\n...\n```\n\nThe Hyprland configuration file referred to is included with nwg-hello.\n\n"
+    },
+    {
+      "title": "Enabling autologin",
+      "level": 3,
+      "content": "If you want a user to be logged in automatically, an initial_session section must be defined in /etc/greetd/config.toml:\n\n```\n...\n[initial_session]\ncommand = \"sway\"\nuser = \"myuser\"\n...\n```\n\nThe command option may contain the name of any executable file. In the example above, Sway will be started by myuser at boot.\n\nIf you do not want to use greetd and always want autologin to be enabled, see autologin.\n\n"
+    },
+    {
+      "title": "Run local programs",
+      "level": 3,
+      "content": "Add your PATH to ~/.profile, or the DE called by greetd will not be able to run local programs. Greetd will not have access to .bashrc or .zshrc, so do not define the PATH there.\n\n```\n~/.profile\n```\n\n```\nexport PATH=\"$HOME/.local/bin:$PATH\"\n```\n\n"
+    },
+    {
+      "title": "Setting the Environment",
+      "level": 3,
+      "content": "By default greetd does not set environment variables such as XDG_SESSION_TYPE and XDG_CURRENT_DESKTOP, unless the greeter sets them based on the session you chose (for example TUI will set the session type based on the location of the session file chosen). One way to solve this is to use a wrapper script that sets any desired environment variables before running the actual command. For example to start sway:\n\n```\n/usr/local/bin/start-sway\n```\n\n```\n#!/bin/sh\nexport XDG_SESSION_TYPE=wayland\nexport XDG_SESSION_DESKTOP=sway\nexport XDG_CURRENT_DESKTOP=sway\n\n# Wayland stuff\nexport QT_QPA_PLATFORM=wayland\nexport SDL_VIDEODRIVER=wayland\nexport _JAVA_AWT_WM_NONREPARENTING=1\n\nexec sway \"$@\"\n```\n\nthen use this wrapper script as the command the greeter runs. For example with gtkgreet you could use\n\n```\n/etc/greetd/config.toml\n```\n\n```\n...\n[default_session]\ncommand = \"gtkgreet -c /usr/local/bin/start-sway\"\n...\n```\n\nor put start-sway in /etc/greetd/environments.\n\nSee How to Set XDG_SESSION_TYPE=wayland\n\n"
+    },
+    {
+      "title": "Setting logind session type",
+      "level": 3,
+      "content": "The logind session type is set by the XDG_SESSION_TYPE environment variable. However, it must be set before the PAM session is opened. Because of this, setting the variable through ~/.profile or a wrapper script will not work (both happen after session open).\n\nThe correct way to achieve this is through the environment variables sent by greeters (these are set before session open). So if your greeter supports it, just make it send the appropriate XDG_SESSION_TYPE=xxx.\n\nIf your greeter does not support this, it is also possible to use pam_env under the auth group. The drawback is that all the sessions spawned by greetd will use that session type, which may or may not be problematic depending on your use case.\n\nHere is how one could use the pam_env method to have a Wayland session:\n\n```\n/etc/greetd/config.toml\n```\n\n```\n[general]\nservice = \"greetd-spawn\"\n```\n\n```\n/etc/greetd/greetd-spawn.pam_env.conf\n```\n\n```\nXDG_SESSION_TYPE DEFAULT=wayland OVERRIDE=wayland\n```\n\n```\n/etc/pam.d/greetd-spawn\n```\n\n```\nauth       include      greetd\nauth       required     pam_env.so conffile=/etc/greetd/greetd-spawn.pam_env.conf\naccount    include      greetd\nsession    include      greetd\n```\n\n"
+    },
+    {
+      "title": "Missing mouse cursor",
+      "level": 3,
+      "content": "If you are using qtgreet with a compositor such as wayfire and generally need to export variables, such as WLR_NO_HARDWARE_CURSORS=1 to get the mouse cursor working, one solution would be to create a separate executable script and then calling that from /etc/greetd/config.toml.\n\n```\n/usr/local/bin/greetd-startup.sh\n```\n\n```\n#!/bin/sh\nexport WLR_NO_HARDWARE_CURSORS=1\nexec wayfire --config /etc/qtgreet/wayfire.ini\n```\n\n```\n/etc/greetd/config.toml\n```\n\n```\n...\n[default_session]\ncommand = \"/usr/local/bin/greetd-startup.sh\"\n...\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- greetd project page\n- greetd source code\n- greetd wiki\n\n"
+    }
+  ]
+}

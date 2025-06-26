@@ -1,0 +1,151 @@
+{
+  "title": "Gere novamente o initramfs",
+  "url": "https://wiki.archlinux.org/title/Gere_novamente_o_initramfs",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Booster\n- Depuração de inicialização\n- dracut (Português)\n- Módulos de kernel\n- Minimal initramfs\n- systemd (Português)\n\nmkinitcpio é um script bash usado para criar um ambiente disco RAM inicial (initial ramdisk, initrd). Da página man do mkinitcpio(8) (traduzido):\n\nTradicionalmente, o kernel era responsável por toda detecção de hardware e inicialização de tarefas iniciais no processo de inicialização antes de montar o sistema de arquivos raiz e passar o controle para init. No entanto, com avanços da tecnologia, estas tarefas se tornaram cada vez mais complexas.\n\nAtualmente, o sistema de arquivos raiz pode estar em uma ampla gama de hardware, como por exemplo: SCSI, SATA e dispositivos USB, controlados por uma variedade de controladores de drivers de diferentes fabricantes. Adicionalmente, o sistema de arquivos raiz pode estar criptografado ou compresso; dentro de um arranjo RAID de software ou um grupo de volumes lógico. A maneira simples de lidar com essa complexidade é passar o gerenciamento para o userspace: um disco RAM inicial. Veja também: /dev/brain0 » Blog Archive » Early Userspace in Arch Linux.\n\nmkinitcpio foi desenvolvido pelos desenvolvedores do Arch Linux e de contribuições da comunidade. Veja o repositório Git público.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Instale o pacote mkinitcpio, que é uma dependência do pacote linux, então a maioria dos usuários têm ele instalado.\n\nUsuários avançados podem querer instalar a versão de desenvolvimento mais recente do mkinitcpio do Git com o pacote mkinitcpio-gitAUR.\n\n"
+    },
+    {
+      "title": "Geração automatizada",
+      "level": 3,
+      "content": "Toda vez que um kernel é instalado ou atualizado, um pacman hook gera automaticamente um arquivo de .preset salvo em /etc/mkinitcpio.d/. Por exemplo, linux.preset para o pacote estável oficial linux. Um preset é simplesmente uma lista de informações necessárias para criar imagens de ramdisk iniciais, em vez de especificar manualmente os vários parâmetros e a localização dos arquivos de saída. Por padrão, contém as instruções para criar duas imagens:\n\n1. a imagem padrão do ramdisk criada seguindo as diretivas especificadas na configuração do mkinitcpio e\n1. a imagem fallback do ramdisk, igual à anterior exceto que pula o hook autodetect durante a criação, incluindo assim uma gama completa de módulos que suportam a maioria dos sistemas.\n\nDepois de criar o preset, o hook do pacman chama o script mkinitcpio que gera as duas imagens, usando as informações fornecidas no preset.\n\n"
+    },
+    {
+      "title": "Geração manual",
+      "level": 3,
+      "content": "Para executar manualmente o script, consulte a página de manual mkinitcpio(8) para instruções. Em particular, para (re)gerar o preset fornecido por um pacote de kernel, use a opção -p/--preset seguido pelo preset a ser utilizado. Por exemplo, para o pacote linux, use o comando:\n\n```\n# mkinitcpio -p linux\n```\n\nPara (re)gerar todos os presets existentes, use a opção -P/--allpresets. Isso é normalmente usado para regenerar todas as imagens initramfs após uma alteração da configuração global:\n\n```\n# mkinitcpio -P\n```\n\nOs usuários podem criar qualquer número de imagens initramfs com uma variedade de configurações diferentes. A imagem desejada deve ser especificada no respectivo arquivo de configuração do gerenciador de boot.\n\n"
+    },
+    {
+      "title": "Geração customizada",
+      "level": 3,
+      "content": "Usuários podem gerar uma imagem usando um arquivo de configuração alternativo. Por exemplo, o seguinte vai gerar uma imagem ramdisk inicial de acordo com as direções em /etc/mkinitcpio-custom.conf e salvar isso como /boot/initramfs-custom.img.\n\n```\n# mkinitcpio --config /etc/mkinitcpio-custom.conf --generate /boot/initramfs-custom.img\n```\n\nSe estiver gerando uma imagem para um kernel diferente daquele em execução no momento, adicione a versão de lançamento do kernel à linha de comando. As versões de kernel instaladas podem ser encontrada em /usr/lib/modules/, a sintaxe é consistente com a saída do comando uname -r para cada kernel.\n\n```\n# mkinitcpio --generate /boot/initramfs-custom2.img --kernel 5.7.12-arch1-1\n```\n\n"
+    },
+    {
+      "title": "Imagens de kernel unificadas",
+      "level": 3,
+      "content": "A partir da versão 31, o mkinitcpio também pode criar imagens de kernel unificadas.\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 2,
+      "content": "O arquivo de configuração primário do mkinitcpio é o /etc/mkinitcpio.conf. Adicionalmente, definições de preset são providos pelos pacotes de kernel no diretório /etc/mkinitcpio.d (e.x. /etc/mkinitcpio.d/linux.preset).\n\nNote: **lvm2** \n\nNote: **Usuários de teclado PS/2** \n\n- Usuários com múltiplos controladores de discos de hardware que usam o mesmo nome de nó mas diferentes módulos de kernel (e.x. dois SCSI/SATA ou dois controladores IDE) devem usar nomeação persistente de dispositivo de bloco para garantir que os dispositivos certos são montados. Senão, a localização do dispositivo raiz pode mudar entre inicializações, resultando em falhas do kernel.\n- Usuários de teclado PS/2: para conseguir resposta do teclado durante o init inicial, se ainda não ter, adicione o hook keyboard para o HOOKS. Em algumas placas-mãe (majoritariamente as mais antigas, mas também algumas novas), o controlador i8042 não pode ser automaticamente detectado. É raro, mas algumas pessoas vão ainda estar sem o teclado. Você pode detectar esta situação antecipadamente. Se você tem uma porta PS/2 e receber a mensagem i8042: PNP: No PS/2 controller found. Probing ports directly, adicione atkbd para o MODULES.\n\nUsuários podem modificar seis variáveis dentro do arquivo de configuração:\n\n"
+    },
+    {
+      "title": "MODULES",
+      "level": 3,
+      "content": "O vetor MODULES é usado para especificar módulos a serem carregados antes que qualquer coisa seja feita.\n\nMódulos sufixados com um ? não vão retornar erros se não forem encontrados. Isto pode ser útil para kernels customizados que compilam com módulos que são listados explicitamente em um hook ou arquivo de configuração.\n\nNote: **reiser4** \n\n- Se usar reiser4, ele deve ser adicionado para a lista de módulos.\n- Se precisar de qualquer sistema de arquivos durante o processo de inicialização que não está em execução quando o mkinitcpio é executado — por exemplo, se seu keyfile do LUKS está em um sistema de arquivos ext2 mas nenhum dispositivo desse tipo está montado quando o mkinitcpio é executado, o módulo do sistema de arquivos deve também ser adicionado para a lista MODULES. Veja Dm-crypt/Configuração do sistema#cryptkey para mais detalhes.\n\n"
+    },
+    {
+      "title": "BINARIES e FILES",
+      "level": 3,
+      "content": "Estas opções permitem que usuários adicionem arquivos para a imagem. Ambos BINARIES e FILES são adicionados antes da execução dos hooks, e podem ser usados para sobrescrever arquivos usados ou providos por um hook. BINARIES são localizados automaticamente dentro de um PATH padrão e suas dependências são tratadas, isto significa que qualquer biblioteca necessária será adicionada. FILES são adicionados do jeito que estão. Por exemplo:\n\n```\nFILES=(/etc/modprobe.d/modprobe.conf)\n```\n\n```\nBINARIES=(kexec)\n```\n\nNote que em ambos BINARIES e FILES, múltiplas entradas podem ser adicionadas delimitadas com espaços.\n\n"
+    },
+    {
+      "title": "HOOKS",
+      "level": 3,
+      "content": "O vetor HOOKS é a configuração mais importante no arquivo. Hooks são pequenos scripts que descrevem o que será adicionado para a imagem. Para alguns hooks, eles também vão conter componentes executados durante a execução da imagem que oferecem comportamento adicional, tais como iniciar um serviço, ou reunir um dispositivo de bloco empilhado. Hooks são referidos pelo seu nome, e executados na ordem que eles estão organizados no arranjo HOOKS do arquivo de configuração.\n\nA configuração padrão do HOOKS deve ser suficiente para as configurações mais simples de disco único. Para dispositivos raiz que são empilhados ou de múltiplos dispositivos de bloco tais como LVM, mdadm, ou dm-crypt, veja as páginas respectivas da wiki para mais configurações necessárias.\n\n"
+    },
+    {
+      "title": "Hooks de compilação",
+      "level": 4,
+      "content": "Hooks de compilação são encontrados em /usr/lib/initcpio/install/, hooks de compilação customizados podem ser colocados em /etc/initcpio/install/. Estes arquivos são executados pelo shell bash durante a execução do mkinitcpio e devem conter duas funções: build e help. A função build descreve os módulos, arquivos e binários que serão adicionados para a imagem. Uma API, documentada pelo mkinitcpio(8), serve para facilitar a adição destes itens. A função help mostra a descrição do que o hook faz.\n\nPara uma lista de todos os hooks disponíveis:\n\n```\n$ mkinitcpio -L\n```\n\nUse a opção -H/--hookhelp do mkinitcpio para a saída de ajuda de um hook específico, por exemplo:\n\n```\n$ mkinitcpio -H udev\n```\n\n"
+    },
+    {
+      "title": "Hooks de tempo de execução",
+      "level": 4,
+      "content": "Hooks de tempo de execução são encontrados em /usr/lib/initcpio/hooks/, hooks de tempo de execução customizados podem ser colocados em /etc/initcpio/hooks/. Para qualquer hook desse tipo, deve sempre ter um hook de compilação com o mesmo nome, que chama add_runscript para adicioná-lo à imagem. Estes arquivos são lidos pelo shell ash do busybox durante o early userspace. Com a exceção de hooks de limpeza, eles sempre serão executados na ordem listada na configuração HOOKS. Hooks de tempo de execução podem conter algumas funções:\n\nrun_earlyhook: Funções deste nome serão executados uma vez que a API dos sistemas de arquivos forem montadas e a linha de comando do kernel for tratada. Isto é geralmente onde daemons adicionais, tais como udev, que são necessários para o início do processo de inicialização são iniciados.\n\nrun_hook: Funções deste nome são executadas logo depois dos hooks anteriores. Este é o ponto mais comum de um hook, e operações tais como a reunião dos dispositivos de bloco devem tomar lugar aqui.\n\nrun_latehook: Funções deste nome são executadas depois que o dispositivo raiz for montado. Isto deve ser usado, com moderação, para mais configurações do dispositivo raiz, ou para montar outros sistemas de arquivos, tais como /usr.\n\nrun_cleanuphook: Funções deste nome são executadas o mais tarde possível, e na ordem reversa de como eles foram listados em HOOKS no arquivo de configuração. Estes hooks devem ser usados para a limpeza de último minuto, tais como desativar qualquer daemon iniciado em um hook anterior.\n\nNote: **systemd** \n\n"
+    },
+    {
+      "title": "Hooks comuns",
+      "level": 4,
+      "content": "Uma tabela de hooks comuns e como eles afetam a criação e execução da imagem a seguir. Note que esta tabela não está completa, já que pacotes oferecem hooks customizados.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nTable content:\ninit do busybox | init do systemd | Hook de compilação | Hook de tempo de execução (init somente do busybox)\nbase | Configura todos os diretórios iniciais e instala utilitários e bibliotecas básicas. Sempre mantenha este hook como o primeiro a menos que saiba o que está fazendo, já que isto causa um erro crítico no init do busybox quando o hook systemd não é utilizado. Provê um shell de recuperação do busybox quando o hook systemd é usado. | –\nudev | systemd | Adiciona udevd, udevadm, e um pequeno subconjunto de regras udev para sua imagem. | Inicia o daemon do udev e processa uevents do kernel; criando nós de dispositivos. Já que simplifica o processo de inicialização ao não precisar que o usuário explicitamente especifique os módulos necessários, usar isto é recomendado.\nusr | Adiciona suporte para ter o /usr como uma partição separada. Veja #/usr como uma partição separada para detalhes. | Monta a partição /usr depois que a raiz for montada.\nresume | – | Tenta resumir do estado \"suspender para o disco\" (suspend to disk). Veja Hibernação para configuração adicional.\nbtrfs | -- | Define os módulos necessários para habilitar o Btrfs para usar múltiplos dispositivos com Btrfs. Você precisa ter btrfs-progs instalado para usá-lo. Este hook não é necessário para usar o Btrfs em um único dispositivo. | Executa btrfs device scan para reunir o sistema de arquivos raiz Btrfs de múltiplos dispositivos quando o hook udev ou systemd não está presente. O pacote btrfs-progs é necessário para este hook.\nautodetect | Deixa seu initramfs com um tamanho menor ao criar uma whitelist de módulos por um escaneamento sysfs. Tenha certeza de verificar os módulos incluídos estão corretos e nenhum está faltando. Este hook deve ser executado antes dos hooks de outros subsistemas para tirar vantagem da detecção automática. Qualquer hook colocado antes do 'autodetect' será totalmente instalado. | –\nmodconf | Inclui arquivos de configuração do modprobe em /etc/modprobe.d/ e /usr/lib/modprobe.d/. | –\nblock | Adiciona todos os módulos de dispositivos de bloco, antes providos separadamente pelos hooks fw, mmc, pata, sata, scsi, usb e virtio. | –\nnet | não implementado | Adiciona os módulos necessários para um dispositivo de rede. Você deve ter mkinitcpio-nfs-utils instalado para usá-lo, veja #Usando net para detalhes. | Provê gerenciamento para sistemas de arquivos baseados no NFS.\ndmraid | ? | Oferece suporte para dispositivos raiz fakeRAID. Você deve ter dmraid instalado para usar isto. Note que é recomendado usar mdadm com o hook mdadm_udev com fakeRAID se seu controlador suporta. Veja #Usando RAID para detalhes. | Localiza e reúne dispositivos de bloco fakeRAID usando dmraid.\nmdadm | -- | Oferece suporte a reunião de arranjos RAID do /etc/mdadm.conf, ou detecção automática durante a inicialização. Você deve ter mdadm instalado para usá-lo. O hook mdadm_udev é recomendado ao invês desse hook. Veja #Usando RAID para detalhes. | Localiza e reune dispositivos de bloco do RAID de software usando mdassemble.\nmdadm_udev | Oferece suporte a reunião de arranjos RAID pelo udev. Você deve ter mdadm instalado. Se você usa este hook com um arranjo FakeRAID, é recomendado incluir mdmon em BINARIES. Veja #Usando RAID para detalhes. | Localiza e reune dispositivos de bloco do RAID de software usando udev e reunião incremental mdadm. Este é o método recomendado de reunião mdadm (mais do que usar o hook mdadm acima).\nkeyboard | Adiciona os módulos necessários para teclados. Use isto se você tem um teclado USB ou serial e precisa dele no early userspace (para entrar com as senhas da criptografia ou usar em um shell interativo). Como efeito colateral, módulos para dispositivos de entrada que não são teclado podem ser adicionados também, mas não dependa disto. Superconjunto do antigo hook usbinput. Dica: Para sistemas que são inicializados com diferentes configurações de hardware (ex., notebooks com teclado externo vs. interno ou sistemas headless), é útil colocar este hook antes do autodetect para sempre incluir todos os drivers de teclado. Senão, o teclado externo somente funciona no early userspace se ele estava conectado na criação da imagem. | –\nkeymap | sd-vconsole | Adiciona o keymap(s) especificado(s) em /etc/vconsole.conf para o initramfs. Se você usa encriptação de sistema, especialmente encriptação total de disco, tenha certeza de adicioná-la antes do hook encrypt. | Carrega o(s) keymap(s) especificado(s) em /etc/vconsole.conf durante o early userspace.\nconsolefont | Adiciona a fonte do console especificada no /etc/vconsole.conf para o initramfs. | Carrega a fonte do console especificada no /etc/vconsole.conf durante o early userspace.\nencrypt | sd-encrypt | Adiciona o módulo do kernel dm_crypt e a ferramenta cryptsetup para a imagem. Você deve ter cryptsetup instalado para usar isto. | Detecta e abre uma partição raiz criptografada. Veja #Customização do tempo de execução para mais configurações. Para sd-encrypt veja sd-encrypt.\nlvm2 | sd-lvm2 | Adiciona o módulo do mapeador de dispositivos do kernel e a ferramenta lvm para a imagem. Você deve ter lvm2 instalado para usar isto. | Habilita todos os grupos de volume LVM2. Isto é necessário se tem seu sistema de arquivos raiz no LVM.\nfsck | Adiciona o binário fsck e auxiliares de sistemas de arquivos. Se adicionado depois do hook autodetect, somente o auxiliar específico para seu sistema de arquivos raiz será adicionado. O uso deste hook é fortemente recomendado, e é necessário com uma partição /usr. | Executa fsck em seu dispositivo raiz (e /usr se separado) antes de montar. Necessita que o parâmetro rw esteja definido na linha de comando do kernel (discussão em inglês).\nfilesystems | Inclui módulos de sistemas de arquivos necessários em sua imagem. Este hook é necessário a menos que você especifique o módulo de seu sistema de arquivos em MODULES. | –\n\nProvê um shell de recuperação do busybox quando o hook systemd é usado.\n\nNote: **autodetect** \n\nPara sd-encrypt veja sd-encrypt.\n\n"
+    },
+    {
+      "title": "COMPRESSION",
+      "level": 3,
+      "content": "O kernel suporta vários formatos de compressão do initramfs: —gzip, bzip2, lzma, xz (também conhecido como lzma2), lzo, e lz4. Para a maioria dos casos, gzip, lzop, e lz4 oferecem o melhor balanço de tamanho de imagem compactada e velocidade de descompressão. A mkinitcpio.conf tem várias opções COMPRESSION comentadas. Descomente uma para escolher qual formato de compressão você deseja.\n\nNão especificar COMPRESSION vai resultar em um arquivo initramfs compactado com gzip. Para criar uma imagem sem compressão, especifique COMPRESSION=cat na configuração ou use -z cat na linha de comando.\n\nTenha certeza de ter o utilitário de compressão de arquivos instalado para o método que você deseja usar.\n\n"
+    },
+    {
+      "title": "COMPRESSION_OPTIONS",
+      "level": 3,
+      "content": "Estas são as opções adicionais passadas para o programa especificado em COMPRESSION, tal como:\n\n```\nCOMPRESSION_OPTIONS=(-9)\n```\n\nNote: **sistema não inicializável** \n\n"
+    },
+    {
+      "title": "Customização do tempo de execução",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nOpções de configuração do tempo de execução podem ser passadas para init e certos hooks pela linha de comando do kernel. Parâmetros da linha de comando do kernel são geralmente fornecidos pelo gerenciador de boot. As opções discutidas abaixo podem ser adicionadas a linha de comando do kernel para alterar o comportamento padrão. Veja parâmetros do kernel e processo de inicialização do Arch para mais informação.\n\n"
+    },
+    {
+      "title": "init do hook base",
+      "level": 3,
+      "content": "```\nroot=/dev/sda1                                                # nó /dev\nroot=LABEL=CorsairF80                                         # etiqueta\nroot=UUID=ea1c4959-406c-45d0-a144-912f4e86b207                # UUID\nroot=PARTUUID=14420948-2cea-4de7-b042-40f67c618660            # UUID da partição GPT\n```\n\n```\ndisablehooks=resume\n```\n\nVeja Depuração de inicialização e mkinitcpio(8) para outros parâmetros.\n\n"
+    },
+    {
+      "title": "Usando RAID",
+      "level": 3,
+      "content": "Primeiro, adicione o hook mdadm_udev ou mdadm para o arranjo HOOKS e qualquer módulo RAID necessário (e.x. raid456, ext4) para o arranjo MODULES no /etc/mkinitcpio.conf.\n\nUsando o hook mdadm, você não precisa mais configurar seu arranjo RAID nos parâmetros do kernel. o hook mdadm vai usar ou seu arquivo /etc/mdadm.conf ou vai detectar automaticamente o arranjo(s) durante a fase init da inicialização.\n\nReunir dispositivos com o udev também é possível usando o hook mdadm_udev. Os desenvolvedores preferem este método. /etc/mdadm.conf vai ainda ser lida com o propósito de nomear os dispositivos reunidos.\n\n"
+    },
+    {
+      "title": "Usando net",
+      "level": 3,
+      "content": "Pacotes necessários\n\nnet precisa do pacote mkinitcpio-nfs-utils.\n\nParâmetros do kernel\n\nInformação compreensiva e atualizada pode ser encontrada na documentação do kernel.\n\nip=\n\nEste parâmetro fala para o kernel como configurar os endereços IP dos dispositivos e também como configurar a tabela de roteamento IP. Pode ter 9 argumentos separados por dois pontos: ip=<ip-do-cliente>:<ip-do-servidor>:<ip-gw>:<máscara de rede>:<nome do host>:<dispositivo>:<autoconf>:<ip-dns0>:<ip-dns1>.\n\nSe não ter este parâmetro na linha de comando do kernel, todos os campos são assumidos como vazios, e o padrão mencionado na documentação do kernel são aplicadas. Em geral isto significa que o kernel tenta configurar tudo usando autoconfiguração.\n\nO parâmetro <autoconf> pode aparecer sozinho, como valor para o parâmetro 'ip' (sem todos os ':' antes). Se o valor é ip=off ou ip=none, nenhuma autoconfiguração vai executada, de outro modo, ela será executada. A maneira mais comum de usar isto é ip=dhcp.\n\nPara explicação dos parâmetros, veja a documentação do kernel.\n\nExemplos:\n\n```\nip=127.0.0.1:::::lo:none  --> Habilita a interface do dispositivo de loop.\n ip=192.168.1.1:::::eth2:none --> Habilita a interface eth2 estática.\n ip=:::::eth0:dhcp --> Habilita o protocolo dhcp para configuração eth0.\n```\n\nBOOTIF=\n\nSe você tem múltiplas placas de rede, este parâmetro pode incluir o endereço MAC da interface que está inicializando. Isto é geralmente útil já que a numeração da interface pode mudar, ou em conjunção com a opção pxelinux IPAPPEND 2 ou IPAPPEND 3. Se não for dado, eth0 será usado.\n\nExemplo:\n\n```\nBOOTIF=01-A1-B2-C3-D4-E5-F6  # Note o \"01-\" prefixado e letras maiúsculas.\n```\n\nnfsroot=\n\nSe o parâmetro nfsroot não é dado na linha de comando, o padrão /tftpboot/%s será usado.\n\n```\nnfsroot=[<ip-do-servidor>:]<diretório-raiz>[,<opções-nfs>]\n```\n\nExecute mkinitcpio -H net para explicação do parâmetro.\n\n"
+    },
+    {
+      "title": "Usando LVM",
+      "level": 3,
+      "content": "Se seu dispositivo raiz está em LVM, veja Instalar Arch Linux no LVM#Adição de hooks do mkinitcpio.\n\n"
+    },
+    {
+      "title": "Usando raiz criptografada",
+      "level": 3,
+      "content": "Se você está usando uma raiz criptografada veja Dm-crypt/Configuração do sistema#mkinitcpio para informação detalhada de quais hooks incluir.\n\n"
+    },
+    {
+      "title": "/usr como uma partição separada",
+      "level": 3,
+      "content": "Se você mantém o /usr como uma partição separada, você deve aderir ao seguintes requisitos:\n\n- Adicionar o hook fsck, marcar /usr com um passno de 2 no /etc/fstab para executar a checagem da partição na inicialização. Enquanto recomendado para todo mundo, é mandatório se você quer que o fsck seja executado em sua partição /usr durante a inicialização. Sem este hook, fsck nunca será executado no /usr.\n- Se não está usando o hook do systemd, adicione o hook usr. Isto vai montar a partição /usr depois da raiz a ser montada.\n\n"
+    },
+    {
+      "title": "Extraindo a imagem",
+      "level": 3,
+      "content": "Se está curioso sobre o que está dentro da imagem initramfs, você pode extrai-la e ver os arquivos dentro dela.\n\nA imagem initramfs é um arquivo CPIO SVR4, gerado pelos comandos find e bsdcpio, opcionalmente compactados com uma compressão que o kernel entende. Para mais informação sobre a compressão, veja #COMPRESSION.\n\nmkinitcpio inclui um utilitário chamado lsinitcpio que listará e/ou extrairá o conteúdo das imagems initramfs.\n\nVocê pode listar os arquivos na imagem com:\n\n```\n$ lsinitcpio /boot/initramfs-linux.img\n```\n\nE para extrair todos eles no diretório atual:\n\n```\n$ lsinitcpio -x /boot/initramfs-linux.img\n```\n\nVocê pode conseguir uma lista das partes importantes na imagem de forma mais legível com:\n\n```\n$ lsinitcpio -a /boot/initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "Comprimindo novamente uma imagem extraída e modificada",
+      "level": 3,
+      "content": "Depois de extrair uma imagem como explicado acima, depois de modificá-la, você pode encontrar o comando necessário para comprimí-la. Edite o /usr/bin/mkinitcpio e mude a linha como mostrado abaixo (linha 531 no mkinitcpio v20-1.)\n\n```\n#MKINITCPIO_PROCESS_PRESET=1 \"$0\" \"${preset_cmd[@]}\"\nMKINITCPIO_PROCESS_PRESET=1 /usr/bin/bash -x \"$0\" \"${preset_cmd[@]}\"\n```\n\nEntão execute o mkinitcpio com sua opções comuns (tipicamente mkinitcpio -p linux), nas últimas 20 linhas ou mais você vai encontrar algo que parece com isto:\n\n```\n+ find -mindepth 1 -printf '%P\\0'\n+ LANG=C\n+ bsdcpio -0 -o -H newc --quiet\n+ gzip\n```\n\nQue corresponde ao comando que você precisa executar, que pode ser:\n\n```\n# find -mindepth 1 -printf '%P\\0' | LANG=C bsdcpio -0 -o -H newc --quiet | gzip > /boot/initramfs-linux.img\n```\n\n"
+    },
+    {
+      "title": "\"/dev must be mounted\" quando /dev já está montado",
+      "level": 3,
+      "content": "O teste usado pelo mkinitcpio para determinar se /dev está montado é verficar se /dev/fd/ existe. Se todo o resto parecer ok, esse diretório pode ser \"criado\" manualmente com:\n\n```\n# ln -s /proc/self/fd /dev/\n```\n\n(Obviamente, /proc deve ser montado também. mkinitcpio precisa dele, e esta é a próxima coisa a ser verificada.)\n\n"
+    },
+    {
+      "title": "Possivelmente faltando firmware para módulo XXXX",
+      "level": 3,
+      "content": "Quando o initramfs está sendo gerado depois de uma atualização do kernel, você pode receber estes avisos ou similares:\n\n```\n==> WARNING: Possibly missing firmware for module: aic94xx\n==> WARNING: Possibly missing firmware for module: wd719x\n```\n\nEles aparecem para qualquer usuário do Arch Linux, especialmente para os que não tem instalado estes módulos de firmware. Se não tem hardware que usa eles você pode ignorar esta mensagem.\n\nOs arquivos mais comuns de firmware podem ser adquiridos ao instalar o pacote linux-firmware. Para outros pacotes que oferecem firmware, tente pesquisar pelo nome do módulo nos repositórios oficiais ou AUR.\n\n"
+    },
+    {
+      "title": "Procedimentos de recuperação padrão",
+      "level": 3,
+      "content": "Com um disco RAM inicial impróprio um sistema normalmente não é inicializável. Então siga um procedimento de recuperação de sistema como o abaixo:\n\n"
+    },
+    {
+      "title": "Inicializa com sucesso em uma máquina mas em outra falha",
+      "level": 4,
+      "content": "O hook autodetect do mkinitcpio filtra módulos de kernel não necessários no escaneamento primário do /sys para o initramfs e módulos carregados no tempo de execução. Se transferir seu diretório /boot para outra máquina e a sequência de inicialização falhar durante o early userspace, pode ser devido ao novo hardware não detectado por causa da falta de determinados módulos de kernel. Note que USB 2.0 e 3.0 precisam de diferentes módulos de kernel.\n\nPara consertar isto, primeiro tente escolher a imagem de fallback no seu gerenciador de boot, já que esta não é filtrada pelo autodetect. Uma vez inicializado o sistema, execute mkinitcpio na nova máquina para gerar novamente a imagem primária com os módulos corretos. Se a imagem de fallback falhar, tente inicializar por um live CD/USB do Arch Linux, execute chroot na instalação, e execute mkinitcpio na nova máquina. Como última alternativa, tente adicionar módulos manualmente para o initramfs.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- Documentação do kernel Linux sobre initramfs \"What is rootfs\"\n- Documentação do kernel Linux sobre initrd (inglês)\n- Artigo do Wikipédia sobre initrd (inglês)\n\n"
+    }
+  ]
+}

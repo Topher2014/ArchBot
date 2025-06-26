@@ -1,0 +1,46 @@
+{
+  "title": "Xattrs",
+  "url": "https://wiki.archlinux.org/title/Xattrs",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- File permissions and attributes\n- Capabilities\n\nFrom xattr(7): \"Extended attributes are name:value pairs associated permanently with files and directories\". There are four extended attribute classes: security, system, trusted and user.\n\nExtended attributes are also used to set Capabilities.\n\n"
+    },
+    {
+      "title": "User extended attributes",
+      "level": 2,
+      "content": "User extended attributes can be used to store arbitrary information about a file. To create one:\n\n```\n$ setfattr --name=user.checksum --value=\"3baf9ebce4c664ca8d9e5f6314fb47fb\" file.txt\n```\n\nUse getfattr to display extended attributes:\n\n```\n$ getfattr --encoding=text --dump file.txt\n```\n\n```\n# file: file.txt\nuser.checksum=\"3baf9ebce4c664ca8d9e5f6314fb47fb\"\n```\n\nTo remove an extended attribute:\n\n```\n$ setfattr --remove=user.checksum file.txt\n```\n\nTo find files with certain extended attributes use rawhideAUR:\n\n```\n$ rh /path/to/dir '\"XATTR_REGEX\".reea'\n```\n\nSome other user extended attributes include:\n\n- user.mime_type: helps programs know mimetype and set it with less guesswork.\n- user.charset: used by the Apache httpd module mod_mime_xattr.\n- user.creator: The name of the application that created the file.\n\nXDG also proposes a set of standardized extended attributes to be used by programs:\n\n- user.xdg.comment: supported by Dolphin and other file managers.\n- user.xdg.origin.url: for files downloaded from a url.\n- user.xdg.robots.index: \"true\" if a file is included in indexing, \"false\" otherwise\n- user.xdg.robots.backup: \"true\" if a file is included in backup, \"false\" otherwise\n- user.xdg.language\n- user.xdg.creator\n- user.xdg.publisher\n- user.xdg.origin.email.subject\n- user.xdg.origin.email.from\n- user.xdg.origin.email.message-id\n\nuser.xdg.tags is not part of the official standard, but it has become a \"de facto\" standard as several popular programs have implemented support for it (see #Software). It is implemented as a CSV list of user-specified tags for each file.\n\n"
+    },
+    {
+      "title": "Preserving extended attributes",
+      "level": 2,
+      "content": "Table content:\nCommand | Preserves by default?/Required flag\ncp | --archive/--preserve=all/--preserve=xattr\nmv | Yes1\ntar | --xattrs for creation and --xattrs-include='*' for extraction\nbsdtar | -p for extraction\nrsync | -X, --xattrs\ncpio | No\ngzip | No\npax | No\nsyncthing | by enabling syncXattrs\n\n1. mv silently discards extended attributes when the target file system does not support them.\n\nTo preserve extended attributes with text editors you need to configure them to truncate files on saving instead of using rename(2). [1]\n\nJust like you should do for any other data you do not want to lose, you should make regular backups of your extended attributes. To make a full backup of the extended attributes of all files in the current directory (recursively):\n\n```\n$ getfattr --dump --recursive . > backup.txt\n```\n\nTo restore a backup:\n\n```\n$ setfattr --restore=backup.txt\n```\n\n"
+    },
+    {
+      "title": "File systems",
+      "level": 3,
+      "content": "All major Linux file systems including Ext4, Btrfs, ZFS, and XFS support extended attributes. The kernel allows to have extended attribute names of up to 255 bytes and values of up to 64 KiB, but Ext4 and Btrfs might impose smaller limits, requiring extended attributes to be within a \"filesystem block\".\n\nNTFS uses Alternative Data Streams to store user. The mount option user_xattr or streams_interface=xattr should be used by default. However, it might not be supported if mount option streams_interface=windows is used. ntfs-3g supports mapping Alternative Data Streams to extended attributes in FUSE.\n\nNFS supports extended attributes since Linux 5.9.\n\n"
+    },
+    {
+      "title": "Software",
+      "level": 3,
+      "content": "Table content:\nApplication | Supported extended attributes | Notes\nbaloo | user.xdg.tags user.baloo.rating | \ncaja | Yes | Supported by caja-xattr-tags and caja.eiciel extensions.\nChromium | No | Used to support referrer and URL, but was disabled due to privacy and security concerns. See also CVE-2018-20483.\nbrave-binAUR | No | \nCURL | user.xdg.origin.url user.xdg.referrer.url | Enabled with --xattr flag.\nDolphin | user.baloo.rating user.xdg.comment user.xdg.tags | Dolphin provides comprehensive support for file tagging, including the ability to add tags to files through the context menu, and support for searching by file tags. Tags are stored as CSV in the user.xdg.tags attribute. See also Dolphin#File tagging. [2], [3]\nDropbox | user.com.dropbox.attributes | \nemacs-vm | No | Resets mbox xattrs.\nEpiphany | No | \nExiftool | No | \nfd | No | \nfindutils | No | \nFirefox | No | \ngallery-dlAUR | No | \nGwenview | user.xdg.tags | \nkfind | No | \nkonqueror | No | \nkio | [4] | \nNautilus | No | Full extended file attributes support can be added by the Nautilus extension from eicielAUR.\nrclone | No | \nrecoll | user.xdg.tags | \ntagspacesAUR | No | \ntmsuAUR | No | \nThunar | No | \nyoutube-dlAUR, yt-dlp | user.xdg.referrer.url user.dublincore.title user.dublincore.date user.dublincore.description user.dublincore.contributor user.dublincore.format | Enabled with --xattrs flag.\nWget | user.xdg.origin.url user.xdg.referrer.url | Enabled with --xattrs flag.\nwebkit | No | \n\n```\nuser.xdg.tags\nuser.baloo.rating\n```\n\n```\nuser.xdg.origin.url\nuser.xdg.referrer.url\n```\n\n```\nuser.baloo.rating\nuser.xdg.comment\nuser.xdg.tags\n```\n\n[2], [3]\n\n```\nuser.xdg.referrer.url\nuser.dublincore.title\nuser.dublincore.date\nuser.dublincore.description\nuser.dublincore.contributor\nuser.dublincore.format\n```\n\n```\nuser.xdg.origin.url\nuser.xdg.referrer.url\n```\n\n"
+    },
+    {
+      "title": "Other tagging systems",
+      "level": 2,
+      "content": "It might not be possible to use extended attributes due to lack of support of either the file system or software. For this reason, many media formats store metadata included in the file format that can be viewed using programs like Exiftool or more specified ones like id3AUR for audio.\n\n- For all files: Exiftool\n- For audio: Audio tag editors\n- For video: ffprobe(1) from FFmpeg\n\n"
+    },
+    {
+      "title": "gvfs",
+      "level": 3,
+      "content": "Another filesystem-independent workaround is Gnome virtual filesystem: gvfs which is used to store metadata (gvfsd-metadata). For example, Firefox stores metadata this way and can be viewed with:\n\n```\n$ gio info --attributes=metadata:: downloaded.html\n```\n\nOther programs that use this approach include:\n\n- Thunar: to save file color highlights.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- XDG guidelines for extended attributes\n- wikipedia:Extended file attributes#Linux\n- Extended attributes: the good, the not so good, the bad.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,316 @@
+{
+  "title": "Nextcloud",
+  "url": "https://wiki.archlinux.org/title/Nextcloud",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Apache HTTP Server\n- Nginx\n- UWSGI\n- OpenSSL\n- WebDAV\n\nNextcloud is a suite of client-server-software that (by means of so-called apps) allows all kinds of sharing, collaboration and communication, e.g.:\n\n- file sharing\n- personal information manager (contacts, calendar, tasks)\n- messaging (mail, chat, video conferencing)\n- collaborative editing of documents (text, Office integration)\n\nNextcloud is open source and based on open standards. Data sovereignty is a big plus, i.e. with your own instance of Nextcloud, you break free from proprietary (and potentially untrustworthy) services like Dropbox, Office 365, or Google Drive.\n\nDepending on your needs Nextcloud can be deployed from single-board computers (like e.g. a Raspberry Pi) all the way up to full scale data centers serving millions of users. With an elaborated authorization scheme and the option for federation (connecting discrete instances) Nextcloud is well suited for use in enterprise environments.\n\nNextcloud is a fork of ownCloud. See Wikipedia for the history.\n\n"
+    },
+    {
+      "title": "Setup overview",
+      "level": 2,
+      "content": "A complete installation of Nextcloud comprises (at least) the following components:\n\nA web server paired with an application server on which runs Nextcloud (i.e. the PHP code) using a database.\n\nThis article will cover MariaDB/MySQL and PostgreSQL as databases and the following combinations of web server and application server:\n\n- nginx → uWSGI (plus uwsgi-plugin-php)\n- nginx → FPM,\n- Apache HTTP server (using mod_proxy_uwsgi) → uWSGI (plus uwsgi-plugin-php)\n- Apache HTTP server (using mod_proxy_fcgi) → FPM\n\nThe Nextcloud package complies with the web application package guidelines. Among other things this mandates that the web application be run with a dedicated user - in this case nextcloud. This is one of the reasons why the application server comes into play here. For the very same reason it is not possible anymore to execute Nextcloud's PHP code directly in the Apache process by means of php-apache.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the nextcloud package. This will pull in quite a few dependent packages. Most of the required PHP extensions will be taken care of this way.\n\nIt is recommended to also install the packages\n\n- php-legacy-sodium for the argon2 hashing algorithm and\n- php-legacy-imagick and librsvg for preview generation\n\n(preferrably as dependent package). Other optional dependencies will be covered later depending on your concrete setup (e.g. what database you choose).\n\nMind that some modules (namely bcmath, exif, gmp, intl and sysvsem) come with php-legacy. So no explicit installation is required for those.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "This guide does not tamper with PHP's central configuration file /etc/php-legacy/php.ini but instead puts Nextcloud specific PHP configuration in places where it does not potentially interfere with settings for other PHP based applications. These places are:\n\n- A dedicated copy of php.ini in /etc/webapps/nextcloud (for the occ command line tool and the background job). This is literally a copy of the original php.ini as provided by the php-legacy package with some Nextcloud specific additions / modifications.\n\n- Corresponding settings in the configuration of the application server. These will be covered in the section about application servers.\n\nMake a copy of /etc/php-legacy/php.ini to /etc/webapps/nextcloud (or even better, extract php.ini from the php-legacy package tarball below /var/cache/pacman/pkg). Although not strictly necessary, change ownership of the copy:\n\n```\n# cp /etc/php-legacy/php.ini /etc/webapps/nextcloud\n# chown nextcloud:nextcloud /etc/webapps/nextcloud/php.ini\n```\n\nMost of the required PHP modules listed in Nextcloud's documentation are already enabled in the just copied bare PHP installation configuration file. Additionally enable the following extensions:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nextension=exif\nextension=gd\nextension=iconv\nextension=intl\nextension=sysvsem\n; bcmath and gmp for passwordless login\nextension=bcmath\nextension=gmp\n; sodium for the argon2 hashing algorithm\nextension=sodium\n; in case you installed php-legacy-imagick (as recommended)\nextension=imagick\n```\n\nDepending on the database you are going to use enable the corresponding pdo_xxxx module. See Database below.\n\nSet date.timezone to your preferred timezone, e.g.:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\ndate.timezone = Europe/Berlin\n```\n\nRaise PHP's memory limit to at least 512MiB:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nmemory_limit = 512M\n```\n\nOptional: For additional security configure open_basedir. This limits the locations where Nextcloud's PHP code can read and write files. Proven settings are\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nopen_basedir=/var/lib/nextcloud:/tmp:/usr/share/webapps/nextcloud:/etc/webapps/nextcloud:/dev/urandom:/usr/lib/php-legacy/modules:/var/log/nextcloud:/proc/meminfo:/proc/cpuinfo\n```\n\nDepending on what additional extensions you configure you may need to extend this list, e.g. /run/valkey in case you opt for Redis.\n\nIt is not necessary to configure opcache here as this php.ini is only used by the occ command line tool and the background job, i.e. by short running PHP processes.\n\n"
+    },
+    {
+      "title": "Nextcloud",
+      "level": 3,
+      "content": "Add the following entries to Nextcloud's configuration file:\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n'trusted_domains' =>\n  array (\n    0 => 'localhost',\n    1 => 'cloud.mysite.com',\n  ),    \n'overwrite.cli.url' => 'https://cloud.mysite.com/',\n'htaccess.RewriteBase' => '/',\n```\n\nAdapt the given example hostname cloud.mysite.com. In case your Nextcloud installation will be reachable via a subfolder (e.g. https://www.mysite.com/nextcloud) overwrite.cli.url and htaccess.RewriteBase have to be modified accordingly.\n\n"
+    },
+    {
+      "title": "System and environment",
+      "level": 3,
+      "content": "To make sure the Nextcloud specific php.ini is used by the occ tool set the environment variable NEXTCLOUD_PHP_CONFIG:\n\n```\n$ export NEXTCLOUD_PHP_CONFIG=/etc/webapps/nextcloud/php.ini\n```\n\nAlso add this line to your .bashrc (or .bash_profile ) to make this setting permanent.\n\nAs a privacy and security precaution create the dedicated directory for session data:\n\n```\n# install --owner=nextcloud --group=nextcloud --mode=700 -d /var/lib/nextcloud/sessions\n```\n\n"
+    },
+    {
+      "title": "Database",
+      "level": 2,
+      "content": "MariaDB/MySQL is the canonical choice for Nextcloud.\n\nMost information concerning databases with Nextcloud deals with MariaDB/MySQL. The Nextcloud developers admit to have less detailed expertise with other databases.\n\nPostgreSQL is said to deliver better performance and overall has fewer quirks compared to MariaDB/MySQL. SQLite is mainly supported for test / development installations and not recommended for production. The list of supported databases also contains Oracle database. This product will not be covered here.\n\n"
+    },
+    {
+      "title": "MariaDB / MySQL",
+      "level": 3,
+      "content": "Since MariaDB has been the default MySQL implementation in Arch Linux since 2013[2] this text only mentions MariaDB.\n\nIn case you want to run your database on the same host as Nextcloud install, configure and start mariadb (if you have not done so already). See the corresponding article for details. Do not forget to initialize MariaDB with mariadb-install-db. It is recommended for additional security to configure MariaDB to only listen on a local Unix socket:\n\n```\n/etc/my.cnf.d/server.cnf\n```\n\n```\n[mysqld]\nskip_networking\n```\n\nNextcloud's own documentation recommends to set the transaction isolation level to READ-COMMITTED. This is especially important when you expect high load with many concurrent transactions.\n\n```\n/etc/my.cnf.d/server.cnf\n```\n\n```\n[mysqld]\ntransaction_isolation=READ-COMMITTED\n```\n\nThe other recommendation to set binlog_format=ROW is obsolete. The default MIXED in recent MariaDB versions is at least as good as the recommended ROW. In any case the setting is only relevant when replication is applied.\n\nStart the CLI tool mysql with database user root. (Default password is empty, but hopefully you change it as soon as possible.)\n\n```\n$ mysql -u root -p\n```\n\nCreate the user and database for Nextcloud with\n\n```\nCREATE USER 'nextcloud'@'localhost' IDENTIFIED BY 'db-password';\nCREATE DATABASE IF NOT EXISTS nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;\nGRANT ALL PRIVILEGES on nextcloud.* to 'nextcloud'@'localhost';\nFLUSH privileges;\n```\n\n(db-password is a placeholder for the actual password of DB user nextcloud you must choose.) Quit the tool with \\q.\n\nSo that you have decided to use MariaDB as the database of your Nextcloud installation you have to enable the corresponding PHP extension:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nextension=pdo_mysql\n```\n\nFurther configuration (related to MariaDB) is not required (contrary to the information given in Nextcloud's admin manual).\n\nNow setup Nextcloud's database schema with:\n\n```\n$ occ maintenance:install \\\n    --database=mysql \\\n    --database-name=nextcloud \\\n    --database-host=localhost:/run/mysqld/mysqld.sock \\\n    --database-user=nextcloud \\\n    --database-pass=db-password \\\n    --admin-pass=admin-password \\\n    --admin-email=admin-email \\\n    --data-dir=/var/lib/nextcloud/data\n```\n\nMind the placeholders (e.g. db-password) and replace them with appropriate values. This command assumes that you run your database on the same host as Nextcloud. Enter occ help maintenance:install and see Nextcloud's documentation for other options. See Using the \"occ\" command line tool for Arch-specific details about this tool.\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 3,
+      "content": "Consult the corresponding article for detailed information about PostgreSQL. In case you want to run your database on the same host as Nextcloud install, configure and start postgresql (if you have not done so already). For additional security in this scenario it is recommended to configure PostgreSQL to only listen on a local UNIX socket:\n\n```\n/var/lib/postgres/data/postgresql.conf\n```\n\n```\nlisten_addresses = ''\n```\n\nEspecially do not forget to initialize your database with initdb. After having done so start PostgreSQL's CLI tool psql and create the database user nextcloud and the database of the same name\n\n```\n[postgres]$ psql\n```\n\n```\nCREATE USER nextcloud WITH PASSWORD 'db-password';\nCREATE DATABASE nextcloud TEMPLATE template0 ENCODING 'UNICODE';\nALTER DATABASE nextcloud OWNER TO nextcloud;\nGRANT ALL PRIVILEGES ON DATABASE nextcloud TO nextcloud;\n\\q\n```\n\n(db-password is a placeholder for the password of database user nextcloud that you have to choose.)\n\nInstall the additional package php-legacy-pgsql as dependency (pacman option --asdeps) and enable the corresponding PHP extension in /etc/webapps/nextcloud/php.ini:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nextension=pdo_pgsql\n```\n\nNow setup Nextcloud's database schema with:\n\n```\n$ occ maintenance:install \\\n    --database=pgsql \\\n    --database-name=nextcloud \\\n    --database-host=/run/postgresql \\\n    --database-user=nextcloud \\\n    --database-pass=db-password \\\n    --admin-pass=admin-password \\\n    --admin-email=admin-email \\\n    --data-dir=/var/lib/nextcloud/data\n```\n\nMind the placeholders (e.g. db-password) and replace them with appropriate values. This command assumes that you run your database on the same host as Nextcloud. Enter occ help maintenance:install and see Nextcloud's documentation for other options. See Using the \"occ\" command line tool for Arch-specific details about this tool.\n\n"
+    },
+    {
+      "title": "Application server",
+      "level": 2,
+      "content": "There are two prevalent application servers that can be used to process PHP code: uWSGI or FPM. FPM is specialized on PHP. The protocol used between the web server and FPM is fastcgi. The tool's documentation leaves room for improvement. uWSGI on the other hand can serve code written in a handful of languages by means of language specific plugins. The protocol used is uwsgi (lowercase). The tool is extensively documented - albeit the sheer amount of documentation can become confusing and unwieldy.\n\n"
+    },
+    {
+      "title": "uWSGI",
+      "level": 3,
+      "content": "uWSGI has its own article. A lot of useful information can be found there. Install uwsgi and the plugin uwsgi-plugin-php-legacy - preferrably as dependencies, i.e. with --asdeps. To run Nextcloud's code with (or in) uWSGI you have to configure one uWSGI specific configuration file (nextcloud.ini) and define one systemd service.\n\n"
+    },
+    {
+      "title": "nextcloud.ini",
+      "level": 4,
+      "content": "The nextcloud package includes a sample configuration file already in the right place /etc/uwsgi/nextcloud.ini. In almost any case you will have to adapt this file to your requirements and setup. Find a version with lots of commented changes (compared to the package's version). It assumes a no-frills Nextcloud installation for private use (i.e. with moderate load).\n\nIn general keep the enabled extensions, extension specific settings and open_basedir in sync with /etc/webapps/nextcloud/php.ini (with the exception of opcache).\n\n- Make a copy of the file as provided by the package (e.g. by extracting from the package) and store it as nextcloud.ini.package.\n- In case an update of package nextcloud produces a nextcloud.ini.pacnew you can identify the changes with diff nextcloud.ini.package nextcloud.ini.pacnew.\n- Selectively apply the changes to your nextcloud.ini depending on whether they make sense with your version or not.\n- Move nextcloud.ini.pacnew over nextcloud.ini.package.\n\n"
+    },
+    {
+      "title": "uWSGI service",
+      "level": 4,
+      "content": "The package uwsgi provides a template unit file (uwsgi@.service). The instance ID (here nextcloud) is used to pick up the right configuration file. Enable and start uwsgi@nextcloud.service.\n\nIn case you have more than a few (e.g. 2) services started like this and get the impression this is a waste of resource you might consider using emperor mode.\n\n"
+    },
+    {
+      "title": "FPM",
+      "level": 3,
+      "content": "In case you opt to use FPM as your application server install php-legacy-fpm - preferrably as a dependent package (--asdeps).\n\nConfiguration consists of a copy of php.ini relevant for all applications served by FPM and a so-called pool file specific for the application (here Nextcloud). Finally you have to tweak the systemd service file.\n\n"
+    },
+    {
+      "title": "php-fpm.ini",
+      "level": 4,
+      "content": "As stated earlier this article avoids modifications of PHP's central configuration in /etc/php-legacy/php.ini. Instead create a FPM specific copy.\n\n```\n# cp /etc/php-legacy/php.ini /etc/php-legacy/php-fpm.ini\n```\n\nMake sure it is owned and only writeable by root (-rw-r--r-- 1 root root ... php-fpm.ini). Enable the op-cache, i.e. uncomment the line\n\n```\n/etc/php-legacy/php-fpm.ini\n```\n\n```\nzend_extension=opcache\n```\n\nand put the following parameters below the existing line [opcache]:\n\n```\n/etc/php-legacy/php-fpm.ini\n```\n\n```\nopcache.enable = 1\nopcache.interned_strings_buffer = 16\nopcache.max_accelerated_files = 10000\nopcache.memory_consumption = 128\nopcache.save_comments = 1\nopcache.revalidate_freq = 1\n```\n\n"
+    },
+    {
+      "title": "nextcloud.conf",
+      "level": 4,
+      "content": "Next you have to create a so called pool file for FPM. It is responsible for spawning dedicated FPM processes for the Nextcloud application. Create a file /etc/php-legacy/php-fpm.d/nextcloud.conf - you may use this functional version as a starting point.\n\nAgain make sure this pool file is owned and only writeable by root (i.e. -rw-r--r-- 1 root root ... nextcloud.conf). Depending on whether access log is configured (it is with above sample nextcloud.conf) you may need to create the corresponding directory (here /var/log/php-fpm-legacy/access). Adapt or add settings (especially pm..., php_value[...] and php_flag[...]) to your liking. The settings php_value[...] and php_flag[..] must be consistent with the corresponding settings in /etc/webapps/nextcloud/php.ini (but not /etc/php-legacy/php-fpm.ini).\n\nThe settings done by means of php_value[...] and php_flag[...] could instead be specified in php-fpm.ini. But mind that settings in php-fpm.ini apply for all applications served by FPM.\n\n"
+    },
+    {
+      "title": "Systemd service",
+      "level": 4,
+      "content": "FPM is run as a systemd service. You have to modify the service configuration to be able to run Nextcloud. This is best achieved by means of a drop-in file:\n\n```\n/etc/systemd/system/php-fpm-legacy.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/php-fpm-legacy --nodaemonize --fpm-config /etc/php-legacy/php-fpm.conf --php-ini /etc/php-legacy/php-fpm.ini\nReadWritePaths=/var/lib/nextcloud\nReadWritePaths=/etc/webapps/nextcloud/config\n```\n\n- It replaces the ExecStart line by a start command that uses the php-fpm.ini covered in the previous section.\n- The directories /var/lib/nextcloud and /etc/webapps/nextcloud/config (and everything below) are made writable. The ProtectSystem=full in the original service definition causes /usr, /boot and /etc to be mounted read-only for the FPM processes.\n- If you want to use hardware transcoding (e.g. in the memories app) you need to explicitly allow access to your graphics device as PrivateDevices=true hides any devices from the FPM processes. For example adding BindPaths=/dev/dri/renderD128 and DeviceAllow=/dev/dri/renderD128 rw to the drop-in file allows usage of a properly configured Intel iGpu.\n\nDo not forget to enable and start the service php-fpm-legacy.\n\n"
+    },
+    {
+      "title": "Keep /etc tidy",
+      "level": 4,
+      "content": "The Nextcloud package unconditionally creates the uWSGI configuration file /etc/uwsgi/nextcloud.ini. Of course it is of no use when you run FPM instead of uWSGI (and it does no harm whatsoever). In case you nevertheless want to get rid of it, just add the following NoExtract line to /etc/pacman.conf:\n\n```\n/etc/pacman.conf\n```\n\n```\n# uWSGI configuration that comes with Nextcloud is not needed\nNoExtract = etc/uwsgi/nextcloud.ini\n```\n\n"
+    },
+    {
+      "title": "Web server",
+      "level": 2,
+      "content": "There is an abundance of web servers you can choose from. Whatever option you finally pick you have to keep in mind that the Nextcloud application needs to be run with its own system user nextcloud. So you will need to forward your requests to one of the above mentioned application servers.\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 3,
+      "content": "Configuration of nginx is way beyond the scope of this article. See the relevant article for further information. Also consult Nextcloud's documentation for an elaborated configuration. It is up to you how to include this snippet into your nginx' configuration. One common approach is to use directories /etc/nginx/sites-available and /etc/nginx/sites-enabled to separate configurations for various servers (aka virtual hosts). See Nginx#Managing server entries for details.\n\nIf using the example nginx config from the Nextcloud documentation linked above, the root directory should be changed to:\n\n```\ncloud.mysite.com.conf\n```\n\n```\nroot /usr/share/webapps/nextcloud;\n```\n\nThe usage of the block upstream php-handler { ... } is not necessary. Just specify fastcgi_pass unix:/run/php-fpm-legacy/nextcloud.sock; in the location block that deals with forwarding request with PHP URIs to the application server. When using uWSGI instead of FPM replace this location block with:\n\n```\ncloud.mysite.com.conf\n```\n\n```\nlocation ~ \\.php(?:$|/) {\n    include uwsgi_params;\n    uwsgi_modifier1 14;\n    # Avoid duplicate headers confusing OC checks\n    uwsgi_hide_header X-Frame-Options;\n    uwsgi_hide_header X-XSS-Protection;\n    uwsgi_hide_header X-Content-Type-Options;\n    uwsgi_hide_header X-Robots-Tag;\n    uwsgi_hide_header X-Download-Options;\n    uwsgi_hide_header X-Permitted-Cross-Domain-Policies;\n    uwsgi_pass unix:/run/uwsgi/nextcloud.sock;\n}\n```\n\nThings you might have to adapt (not exhaustive):\n\n- Your server name (server_name clauses 2x), i.e. the server part of the URL your Nextcloud installation will be reachable with.\n- The name of the certificate and key you use for SSL / TLS.\n- If and where you want an access log written to.\n- The location where Certbot (or any other ACME client) will put the domain verification challenges. Usage of alias instead of try_files is probably more adequate here.\n- The path used to reach your Nextcloud installation. (The part right to the server name & port section in the URL.)\n- What application server (uWSGI or FPM) you are using, i.e. how and where nginx will pass requests that need to trigger some PHP code. (See above.)\n- Configure OCSP stapling.\n\nThere is no need to install any additional modules since nginx natively supports both protocols FastCGI and uwsgi.\n\n"
+    },
+    {
+      "title": "Apache HTTP server",
+      "level": 3,
+      "content": "Find lots of useful information in the article about the Apache HTTP Server. Nextcloud's documentation has some sample configuration that can also be found in /usr/share/doc/nextcloud/apache.example.conf. Both implicitly rely on mod_php that cannot be used anymore. mod_proxy_fcgi or mod_proxy_uwsgi need to be applied.\n\nInformation about how to integrate Apache with FPM can be found here in this wiki. uWSGI's documentation has some information about how to integrate Apache with PHP by means of uWSGI and mod_proxy_uwsgi. Mind that the Apache package comes with both modules mod_proxy_fcgi and mod_proxy_uwsgi. They need to be loaded as required.\n\nThe following Apache modules are required to run Nextcloud:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\n# these are already loaded in a standard Apache installation\nLoadModule headers_module modules/mod_headers.so\nLoadModule env_module modules/mod_env.so\nLoadModule dir_module modules/mod_dir.so\nLoadModule mime_module modules/mod_mime.so\nLoadModule setenvif_module modules/mod_setenvif.so\n\n# these need to be uncommented explicitly\nLoadModule rewrite_module modules/mod_rewrite.so\nLoadModule ssl_module modules/mod_ssl.so\nLoadModule socache_shmcb_module modules/mod_socache_shmcb.so\nLoadModule proxy_module modules/mod_proxy.so\n\n# either this one in case you use FPM\nLoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so\n# or this one in case you opt for uWSGI\nLoadModule proxy_uwsgi_module modules/mod_proxy_uwsgi.so\n```\n\nAlso uncomment the following directive to pull in TLS configuration parameters:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nInclude conf/extra/httpd-ssl.conf\n```\n\nConsult Mozilla's SSL configurator for details about how to optimize your TLS configuration.\n\nRefer to the following two sample configuration files depending on how you want to access your Nextcloud installation:\n\n- In case your Nextcloud installation is accessed via a dedicated host name (e.g. https://cloud.mysite.com/) put this fragment into /etc/httpd/conf/extra/httpd-vhosts.conf.\n\n- In case your Nextcloud installation is located in a subfolder of your web site (e.g. https://www.mysite.com/nextcloud/) put this fragment in your /etc/httpd/conf/httpd.conf.\n\nOf course you must adapt these sample configuration files to your concrete setup. Replace the SetHandler directive by SetHandler \"proxy:unix:/run/uwsgi/nextcloud.sock|uwsgi://nextcloud/\" when you use uWSGI.\n\nThe Nextcloud package comes with a .htaccess that already takes care of a lot of rewriting and header stuff. Run occ maintenance:update:htaccess to adapt this file. Parameter htaccess.RewriteBase in /etc/webapps/nextcloud/config/config.php is vital for this.\n\n"
+    },
+    {
+      "title": "Background jobs",
+      "level": 2,
+      "content": "Nextcloud requires certain tasks to be run on a scheduled basis. See Nextcloud's documentation for some details. The easiest (and most reliable) way to set up these background jobs is to use the systemd service and timer units that are already installed by nextcloud. The service unit needs some tweaking so that the job uses the correct PHP ini-file (and not the global php.ini). Create a drop-in file and add:\n\n```\n/etc/systemd/system/nextcloud-cron.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/php-legacy -c /etc/webapps/nextcloud/php.ini -f /usr/share/webapps/nextcloud/cron.php\n```\n\nAfter that enable and start nextcloud-cron.timer (not the service).\n\nAs recommended by the documentation add the parameter\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n....\n'maintenance_window_start' => 0,\n....\n```\n\nto Nextcloud's configuration file. The value is the hour of the day in UTC defining the start of a 4 hours window. Time consuming jobs that need to be run only once a day will be scheduled in this time frame, i.e. outside working hours.\n\n"
+    },
+    {
+      "title": "In-memory caching",
+      "level": 2,
+      "content": "Nextcloud's documentation recommends to apply some kind of in-memory object cache to significantly improve performance.\n\n"
+    },
+    {
+      "title": "APCu",
+      "level": 3,
+      "content": "Install php-legacy-apcu (as dependency --asdeps). Enable the extension in the relevant configuration files. These are\n\n- /etc/webapps/nextcloud/php.ini used by the occ command and the background jobs and\n- depending on the application server you use either /etc/uwsgi/nextcloud.ini in case of uWSGI or /etc/php-legacy/php-fpm.d/nextcloud.conf in case of FPM.\n\n- /etc/uwsgi/nextcloud.ini in case of uWSGI or\n- /etc/php-legacy/php-fpm.d/nextcloud.conf in case of FPM.\n\nIn /etc/webapps/nextcloud/php.ini add the lines\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nextension=apcu\napc.ttl=7200\napc.enable_cli = 1\n```\n\n(preferably somewhere below Module Settings).\n\nFor the other two files the setting to activate APCu is already in place and only needs to be uncommented. Two other configuration parameters related to APCu are also already there. No need to touch /etc/php-legacy/php.ini or /etc/php-legacy/conf.d/apcu.ini.\n\nRestart your application server (not the web server as Nextcloud's documentation claims). Add the following line to your Nextcloud configuration file:\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n'memcache.local' => '\\OC\\Memcache\\APCu',\n```\n\n"
+    },
+    {
+      "title": "Valkey (Redis)",
+      "level": 3,
+      "content": "Valkey was forked from Redis version 7.2.4 in March 2024 due to license issues. Nextcloud's documentation still only mentions Redis. However, one year later Valkey can still be considered a drop-in replacement for Redis. (Future will show how long this will stand.)\n\nInstall php-legacy-igbinary and php-legacy-redis (as dependency --asdeps) in case you run this component locally (i.e. on the same host as Nextcloud). Alternatively the Valkey server can be run on a different machine. For more information see Nextcloud's documentation.\n\nEnable the required extensions igbinary and redis in the relevant configuration files. These are:\n\n- /etc/webapps/nextcloud/php.ini used by the occ command and the background jobs and\n- depending on the application server you use either /etc/uwsgi/nextcloud.ini in case of uWSGI or /etc/php-legacy/php-fpm.d/nextcloud.conf in case of FPM.\n\n- /etc/uwsgi/nextcloud.ini in case of uWSGI or\n- /etc/php-legacy/php-fpm.d/nextcloud.conf in case of FPM.\n\nLocate the existing sections where other extensions are enabled and add two additional lines corresponding to igbinary and redis.\n\nIn case you have specified the open_basedir option in the above configuration files and use Valkey locally with a local Unix socket, you have to extend the list of directories where PHP is allowed to read and write files. Locate the relevant lines in the files specified above and add the directory containing the local Unix socket created by Valkey, e.g. /run/valkey.\n\nExtend your Nextcloud configuration as follows:\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n'memcache.local' => '\\OC\\Memcache\\APCu',\n'memcache.distributed' => '\\OC\\Memcache\\Redis',\n'memcache.locking' => '\\OC\\Memcache\\Redis',\n'valkey' => [\n     'host'     => '/run/valkey/valkey.sock',\n     'port'     => 0,\n     'dbindex'  => 0,\n     'password' => '',\n     'timeout'  => 1.5,\n],\n```\n\nAgain, adapt /run/valkey/valkey.sock as required. dbindex, password and timeout are optional.\n\nIn case Valkey runs on a different machine:\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n'memcache.local' => '\\OC\\Memcache\\APCu',\n'memcache.distributed' => '\\OC\\Memcache\\Redis',\n'memcache.locking' => '\\OC\\Memcache\\Redis',\n'valkey' => [\n     'host' => 'valkey-host.mysite.com',\n     'port' => 6379,\n],\n```\n\nvalkey-host.mysite.com is just a placeholder. Adapt to your actual setup.\n\n"
+    },
+    {
+      "title": "Security Hardening",
+      "level": 2,
+      "content": "See the Nextcloud documentation and Security. Nextcloud additionally provides a Security scanner.\n\n"
+    },
+    {
+      "title": "Desktop",
+      "level": 3,
+      "content": "The official client can be installed with the nextcloud-client package. Alternative versions are available in the AUR: nextcloud-client-gitAUR. Please keep in mind that using owncloud-client with Nextcloud is not supported.\n\nThe desktop client basically syncs one or more directories of your desktop computer with corresponding folders in your Nextcloud's file service. It integrates nicely with your desktop's file manager (Dolphin in KDE Plasma, Nautilus in Gnome) displaying overlays representing synchronization and share status. The context menu of each file gets an additional entry Nextcloud to manage sharing of this file and getting the public or internal share link. Nextcloud's documentation has a volume exclusively about the desktop client.\n\nIn case the integration does not work as described consult the optional dependencies of package nextcloud-client. E.g. Nautilus requires nautilus-python. Install as dependent package.\n\n"
+    },
+    {
+      "title": "Thunderbird",
+      "level": 3,
+      "content": "Since version 102 Thunderbird fully supports CalDAV and CardDAV - even with auto detection (i.e. you do not have to provide long URLs to access your calendars and address books). See Nextcloud's documentation for details.\n\n"
+    },
+    {
+      "title": "Mounting files with davfs2",
+      "level": 3,
+      "content": "If you want to mount your Nextcloud using WebDAV, install davfs2AUR (as described in davfs2).\n\nTo mount your Nextcloud, use:\n\n```\n# mount -t davfs https://cloud.mysite.com/remote.php/dav/files/username/ /path/to/mount\n```\n\nYou can also create an entry for this in /etc/fstab:\n\n```\n/etc/fstab\n```\n\n```\nhttps://cloud.mysite.com/remote.php/dav/files/username/ /path/to/mount davfs rw,user,noauto 0 0\n```\n\n"
+    },
+    {
+      "title": "Mounting files in GNOME Files (Nautilus)",
+      "level": 3,
+      "content": "You can access the files directly in Nautilus ('+ Other Locations') via the WebDAV protocol. Use the link as shown in your Nextcloud installation Web GUI (e.g. https://cloud.mysite.com/remote.php/webdav/) but replace the protocol name https by davs. Nautilus will ask for user name and password when trying to connect.\n\n"
+    },
+    {
+      "title": "Android",
+      "level": 3,
+      "content": "Download the official Nextcloud app from Google Play or F-Droid.\n\nTo enable contacts and calendar sync (Android 4+):\n\n1. Download DAVx5 (Play Store, F-Droid).\n1. Create a new DAVdroid account in the Account settings and specify your server URL (e.g. https://cloud.mysite.com) and login / password pair.\n\n"
+    },
+    {
+      "title": "iOS",
+      "level": 3,
+      "content": "Download the official Nextcloud app from the App Store.\n\n"
+    },
+    {
+      "title": "Using the \"occ\" command line tool",
+      "level": 3,
+      "content": "A useful tool for server administration is occ. Refer to Nextcloud's documentation for details. You can perform many common server operations with occ, such as managing users and configuring apps.\n\nA convenience wrapper around the original /usr/share/webapps/nextcloud/occ is provided with /usr/bin/occ which automatically runs as the default user (nextcloud), using the default PHP executable and PHP configuration file. The environment variables NEXTCLOUD_USER, NEXTCLOUD_PHP and NEXTCLOUD_PHP_CONFIG can be used to specify a non-default user, PHP executable and PHP configuration file (respectively). Especially the latter (using NEXTCLOUD_PHP_CONFIG) is necessary when Nextcloud was setup in a way as described in the sections Configuration and Application server, i.e. using a PHP configuration specific to Nextcloud. In this case put export NEXTCLOUD_PHP_CONFIG=/etc/webapps/nextcloud/php.ini in your .bashrc.\n\nWhen using package php instead of the recommended package php-legacy you also have to set NEXTCLOUD_PHP, i.e. export NEXTCLOUD_PHP=/usr/bin/php.\n\n"
+    },
+    {
+      "title": "Pacman hook",
+      "level": 3,
+      "content": "The nextcloud package comes with a pacman hook that takes care of automatically upgrading the Nextcloud database after the package has been updated. Take a look /usr/share/doc/nextcloud/nextcloud.hook.\n\nUnfortunately, this hook unconditionally uses the global php.ini when running occ upgrade, i.e. it does not take into account the value of environment variable NEXTCLOUD_PHP_CONFIG as mentioned above in Using the \"occ\" command line tool.\n\nAs a possible workaround make a copy of the delivered hook file in the appropriate location:\n\n```\n# mkdir -vp /etc/pacman.d/hooks\n# cp -a /usr/share/doc/nextcloud/nextcloud.hook /etc/pacman.d/hooks/10-nextcloud.hook\n```\n\nand change the line starting with Exec to:\n\n```\n/etc/pacman.d/hooks/10-nextcloud.hook\n```\n\n```\nExec = /usr/bin/runuser -u nextcloud -- /usr/bin/php-legacy --php-ini /etc/webapps/nextcloud/php.ini /usr/share/webapps/nextcloud/occ upgrade\n```\n\n"
+    },
+    {
+      "title": "Running Nextcloud in a subdirectory",
+      "level": 3,
+      "content": "The instructions in section Web server will result in a setup where your Nextcloud installation is reachable via a dedicated server name, e.g. cloud.mysite.com. If you would like to have Nextcloud located in a subdirectory. e.g. www.mysite.com/nextcloud, then:\n\n- For nginx refer to the section in Nextcloud's documentation that explicitly covers this topic.\n\n- For apache edit the /etc/httpd/conf/extra/nextcloud.conf you included and comment out the <VirtualHost *:80> ... </VirtualHost> part of the include file.\n\n"
+    },
+    {
+      "title": "Docker",
+      "level": 3,
+      "content": "See the Nextcloud repository on Docker Hub for running Nextcloud in Docker.\n\n"
+    },
+    {
+      "title": "Office integration",
+      "level": 3,
+      "content": "There are currently three different solutions for office integration:\n\n- Collabora Online\n- ONLYOFFICE\n- MS Office Online Server\n\nAll three have in common that a dedicated server is required and your web server needs to be adapted to forward certain requests to the office service. The actual integration with Nextcloud is then accomplished by means of a Nextcloud app specific for one of the above products.\n\nMind that all three products are aimed at businesses, i.e. you will have to pay for the office service. Only Collabora offers a developers plan (CODE) for free. ONLYOFFICE offers a Home Server plan for a reasonable price.\n\nFor installation, setup instructions and integration with Nextcloud consult:\n\n- Collabora online, app\n- ONLYOFFICE, app\n- MS Office Online Server, app\n\n"
+    },
+    {
+      "title": "Disabling app recommendations",
+      "level": 3,
+      "content": "By default, Nextcloud recommends apps to new clients, which can result in a lot of notifications. To disable this, disable the recommendations app using occ app:disable recommendations.\n\n"
+    },
+    {
+      "title": "Backup calendars and address books with calcardbackup",
+      "level": 3,
+      "content": "The calcardbackupAUR package can be installed and configured to provide regular backups of the calendar and/or address book databases. Edit /etc/calcardbackup/calcardbackup.conf to your liking and then start and enable calcardbackup.timer.\n\n"
+    },
+    {
+      "title": "Reading the log",
+      "level": 3,
+      "content": "By default, the logs of the web application are available in /var/log/nextcloud/nextcloud.log. The entries (lines) are in JSON format and can be very long. Readability can be greatly improved by using jq:\n\n```\n# jq . </var/log/nextcloud/nextcloud.log | less\n```\n\n"
+    },
+    {
+      "title": "Work around \"is_file(): open_basedir restriction in effect\"",
+      "level": 3,
+      "content": "With Nextcloud v28.0.4 a regression was introduced that manifests in error messages containing\n\n```\nis_file(): open_basedir restriction in effect\n```\n\nin the log file /var/log/nextcloud/nextcloud.log. The file path given after this messages is missing one slash at one position, whereas at another position there is one too many, e.g.\n\n```\nFile (/usr/share/webapps/nextcloudapps//dav/l10n/de.js)\n```\n\nThis is a known bug that has already been fixed and backported to v28.0.5. For v28.0.4 you may apply the following work-around:\n\n- Add a symbolic link /usr/share/webapps/nextcloudapps pointing to /usr/share/webapps/nextcloud/apps\n\n```\n# cd /usr/share/webapps\n# ln -sf nextcloud/apps nextcloudapps\n```\n\n- Add the path of this symbolic link to the open_basedir settings relevant for your Nextcloud installation. These are:\n\n```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nopen_basedir=...:/usr/share/webapps/nextcloudapps:...\n```\n\nand depending on the application server you use either (FPM)\n\n```\n/etc/php-legacy/php-fpm.d/nextcloud.conf\n```\n\n```\nphp_value[open_basedir] = ...:/usr/share/webapps/nextcloudapps:...\n```\n\nor (uWSGI)\n\n```\n/etc/uwsgi/nextcloud.ini\n```\n\n```\nphp-set = open_basedir=...:/usr/share/webapps/nextcloudapps:...\n```\n\nWith v28.0.5 you should be able to roll back this work-around again.\n\n"
+    },
+    {
+      "title": "Migrating to php-legacy",
+      "level": 3,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nIn the past it had happened several times that the php package was updated to the latest PHP version in a timely manner (in line with Arch Linux' rolling release philosophy) but Nextcloud not being compatible with this brand new version - breaking existing installations and causing lots of efforts for maintainers and users of package nextcloud. When package php switched from version 8.1 to version 8.2 this was about to happen once again.\n\nTo avoid this frequent hassle a new set of php-legacy packages has been introduced by that time. These will follow the oldest but still actively supported PHP branch.\n\nIt is highly recommended to go for php-legacy. With this only slightly aged version of PHP it will be very unlikely that a system upgrade renders an existing Nextcloud installation unusable.\n\nMigrating to php-legacy requires some manual actions. Depending on your actual setup a subset of the following tasks must be applied:\n\n"
+    },
+    {
+      "title": "PHP extensions",
+      "level": 4,
+      "content": "Replace php extensions by their corresponding php-legacy counterparts. For example uninstall php-apcu php-fpm php-gd php-imagick php-pgsql and install as dependants php-legacy-apcu php-legacy-fpm php-legacy-gd php-legacy-imagick php-legacy-pgsql.\n\nThe former extension php-intl is an exception as it has become an integral part of php and php-legacy. So there is no need to explicitly take care of this package here.\n\nThe actual set of PHP extensions is subject to the database, the in-memory object cache, the application server and other factors. Of course, in case another application depends on the most recent PHP version the non-legacy module may still be needed. Same applies for php itself.\n\n"
+    },
+    {
+      "title": "Nextcloud specific copy of php.ini",
+      "level": 4,
+      "content": "```\n/etc/webapps/nextcloud/php.ini\n```\n\n```\nopen_basedir=...:/usr/lib/php-legacy/modules:...\nextension_dir = \"/usr/lib/php-legacy/modules/\"\n;extension=imap                                            <= to be deleted\n```\n\n"
+    },
+    {
+      "title": "FPM configuration",
+      "level": 4,
+      "content": "(This only applies if the application server FPM is used.)\n\n```\n$ mv /etc/php/php-fpm.ini /etc/php-legacy/php-fpm.ini\n$ mv /etc/php/php-fpm.d/nextcloud.conf /etc/php-legacy/php-fpm.d/nextcloud.conf\n```\n\nModify /etc/php-legacy/php-fpm.ini\n\n```\n/etc/php-legacy/php-fpm.ini\n```\n\n```\nextension_dir = \"/usr/lib/php-legacy/modules/\"\n;extension=imap                                            <= to be deleted\n```\n\nModify /etc/php-legacy/php-fpm.d/nextcloud.conf\n\n```\n/etc/php-legacy/php-fpm.d/nextcloud.conf\n```\n\n```\nlisten = /run/php-fpm-legacy/nextcloud.sock\n;       It's available in: /usr/share/php-legacy/fpm/status.html\naccess.log = /var/log/php-fpm-legacy/access/$pool.log\n; uncomment if php-imap is installed and used              <= to be deleted\n; php_value[extension] = imap                              <= to be deleted\n```\n\nOptional, but recommended: Make www.conf a no-op while still being able to track modifications of this file that might come in with future updates of php-legacy-fpm\n\n```\n$ mv /etc/php-legacy/php-fpm.d/www.conf /etc/php-legacy/php-fpm.d/www.conf.package\n$ echo \"; just a no-op\" > /etc/php-legacy/php-fpm.d/www.conf\n```\n\nStop and disable the systemd service php-fpm.service. Create a drop-in file for php-fpm-legacy.service:\n\n```\n/etc/systemd/system/php-fpm-legacy.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/php-fpm-legacy --nodaemonize --fpm-config /etc/php-legacy/php-fpm.conf --php-ini /etc/php-legacy/php-fpm.ini\nReadWritePaths=/var/lib/nextcloud\nReadWritePaths=/etc/webapps/nextcloud/config\n```\n\nEnable and start the systemd service php-fpm-legacy.service.\n\n"
+    },
+    {
+      "title": "uWSGI configuration",
+      "level": 4,
+      "content": "(This only applies if the application server uWSGI is used.)\n\n```\n/etc/uwsgi/nextcloud.ini\n```\n\n```\nphp-set = open_basedir=...:/usr/lib/php-legacy/modules...\n# uncomment if php-imap is installed and used               <= to be deleted\n# php-set = extension=imap                                  <= to be deleted\n```\n\n"
+    },
+    {
+      "title": "Nginx configuration",
+      "level": 4,
+      "content": "Modify the file where the forwarding of certain requests to the application server is configured. In case of FPM e.g.\n\n```\ncloud.mysite.com.conf\n```\n\n```\nfastcgi_pass unix:/run/php-fpm-legacy/nextcloud.sock;\n```\n\nIn case of uWSGI no adaptation is required.\n\n"
+    },
+    {
+      "title": "Apache HTTP server configuration",
+      "level": 4,
+      "content": "In case you use Apache's HTTP server and FPM as application server adapt this line in your configuration\n\n```\nSetHandler \"proxy:unix:/run/php-fpm-legacy/nextcloud.sock|fcgi://nextcloud/\"\n```\n\nIn case of uWSGI no adaptation is required.\n\n"
+    },
+    {
+      "title": "Background jobs",
+      "level": 4,
+      "content": "Update the drop-in file for Nextcloud's scheduled background job:\n\n```\n/etc/systemd/system/nextcloud-cron.service.d/override.conf\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/php-legacy -c /etc/webapps/nextcloud/php.ini -f /usr/share/webapps/nextcloud/cron.php\n```\n\n"
+    },
+    {
+      "title": "Pacman hook",
+      "level": 4,
+      "content": "The pacman hook /etc/pacman.d/hooks/10-nextcloud.hook needs to be adapted as well. Change the line starting with Exec to:\n\n```\n/etc/pacman.d/hooks/10-nextcloud.hook\n```\n\n```\nExec = /usr/bin/runuser -u nextcloud -- /usr/bin/php-legacy --php-ini /etc/webapps/nextcloud/php.ini /usr/share/webapps/nextcloud/occ upgrade\n```\n\nOtherwise during the next upgrade of Nextcloud pacman will complain about /usr/bin/php not being found.\n\n"
+    },
+    {
+      "title": "Cleanup",
+      "level": 4,
+      "content": "Do not forget to cleanup files and directories that may have become obsolete. Potential candidates are:\n\n```\n/usr/lib/php\n/etc/php\n```\n\n"
+    },
+    {
+      "title": "Weird behavior of one or more apps",
+      "level": 3,
+      "content": "There are two locations where folders with files of Nextcloud's apps can be found:\n\n- /usr/share/webapps/nextcloud/apps (aka read-only apps directory). This is where the nextcloud package and the app packages (e.g. nextcloud-app-contacts) put the folders with files comprising Nextcloud apps.\n\n- /var/lib/nextcloud/apps (aka writeable apps directory). This is where you find folders with files of apps installed via GUI or via the occ app:install command.\n\nWhen files of an app can be found in both directories (especially in different versions) all kind of strange things can happen. In a concrete case the contacts app could be found in both the read-only apps directory and the writeable apps directory. As a result the page with contacts in the GUI did not display. It remained blank white. The browser's Javascript console showed an error message:\n\n```\nUncaught Error: Could not find initial state contactsinteraction of contacts\n```\n\nCheck for apps to be found in both locations. To find out whether to delete the app folder in the read-only directory or in the writeable directory determine whether the app is part of a package. Run\n\n```\n# cd /usr/share/webapps/nextcloud/apps\n# pacman -Qo * >/dev/null\n```\n\nAll folders reported with\n\n```\nerror: No package owns ....\n```\n\n(and that can also be found in the writeable apps directory) can be safely deleted from /usr/share/webapps/nextcloud/apps. Other double installed apps (i.e. those belonging to a package) should be removed from /var/lib/nextcloud/apps.\n\n"
+    },
+    {
+      "title": "InnoDB refuses to write tables with ROW_FORMAT=COMPRESSED",
+      "level": 3,
+      "content": "MariaDB versions >= 10.6 and < 10.6.6 were not compatible with Nextcloud as the database enforced read-only for compressed InnoDB tables and Nextcloud has been (and still is) using these kind of tables:\n\nAdditionally the issue has already been addressed by Nextcloud. Starting with Nextcloud v24 new installations of Nextcloud do not use row format COMPRESSED anymore. It has to be noted that existing (pre v24) installations are not migrated away from row format COMPRESSED automatically.\n\nBottom line: Probably you are not affected since Arch Linux has been shipping MariaDB v10.6.6 or later since 2022-02-10.\n\nIn the unlikely case that you are affected by this issue there are several possible remedies:\n\n- Adapt your MariaDB configuration:\n\n```\n/etc/my.cnf.d/server.cnf\n```\n\n```\n[mariadb-10.6]\n  innodb_read_only_compressed=OFF\n```\n\n- Migrate your MariaDB tables from row format COMPRESSED to DYNAMIC as suggested by some comments for the corresponding Nextcloud issue. Mind that as long as you stay with Nextcloud < v24 new tables will again use row format COMPRESSED - so will need to be migrated in the same way.\n\n- Replace MariaDB by PostgreSQL and migrate the data of your Nextcloud instance with occ db:convert-type. See Nextcloud's documentation for details.\n\n"
+    },
+    {
+      "title": "Issues with permissions and setup after upgrade to >= 21.0.0",
+      "level": 3,
+      "content": "Since version 21.0.0 nextcloud more closely follows the web application package guidelines. This introduces the separate user nextcloud, as which the web application is run.\n\nAfter an upgrade from nextcloud < 21.0.0 make sure that\n\n- the data directory is located at /var/lib/nextcloud/data\n- the writable apps directory is located at /var/lib/nextcloud/apps\n- both the data directory and the writable apps directory, alongside all files beneath them are writable and owned by the nextcloud user\n- the web application configuration file resides in /etc/webapps/nextcloud/config/ and that that directory and its contents are writable and owned by the nextcloud user\n- an application server, such as FPM or uWSGI is configured to run the web application as the nextcloud user and not the http user\n- update the cron job/systemd timer to run with the new user\n- Finally allow read access to the nextcloud installation /usr/share/webapps/nextcloud to your web-server user http by doing:\n\n```\n# chown -R nextcloud:http /usr/share/webapps/nextcloud\n```\n\n"
+    },
+    {
+      "title": "Login loop without any clue in access.log, error.log, nor nextcloud.log",
+      "level": 3,
+      "content": "As mentioned in a post in the forum, this issue can be fixed by setting correct permissions on the sessions directory. (See Nextcloud's documentation for details.) It is also possible that the sessions directory is missing altogether. The creation of this directory is documented in System and environment.\n\n/var/lib/nextcloud should look like this:\n\n```\ndrwxr-xr-x  6 nextcloud nextcloud 4096 17. Apr 00:56 ./\ndrwxr-xr-x 21 root      root      4096 17. Apr 00:53 ../\ndrwxr-xr-x  2 nextcloud nextcloud 4096 16. Feb 00:21 apps/\ndrwxrwx--- 10 nextcloud nextcloud 4096 16. Apr 13:46 data/\ndrwx------  2 nextcloud nextcloud 4096 17. Apr 01:04 sessions/\n```\n\nAlso, this can be caused by a full system-partition caused by an extensive size of nextcloud.log because of this bug. In this case, truncating the log-file and disabling the preview-generator or setting the log-level to 4 in config.php and restarting Nextcloud helps.\n\n"
+    },
+    {
+      "title": "Environment variables not available",
+      "level": 3,
+      "content": "Depending on what application server you use custom environment variables can be provided to Nextcloud's PHP code.\n\n"
+    },
+    {
+      "title": "FPM",
+      "level": 4,
+      "content": "Add one or more lines in /etc/php-legacy/php-fpm.d/nextcloud.conf as per Nextcloud's documentation, e.g.:\n\n```\n/etc/php-legacy/php-fpm.d/nextcloud.conf\n```\n\n```\nenv[PATH] = /usr/local/bin:/usr/bin:/bin\n```\n\n"
+    },
+    {
+      "title": "uWSGI",
+      "level": 4,
+      "content": "Add one or more lines in /etc/uwsgi/nextcloud.ini, e.g.:\n\n```\n/etc/uwsgi/nextcloud.ini\n```\n\n```\nenv = PATH=/usr/local/bin:/usr/bin:/bin\n```\n\nMind there must not be any blanks around the second =.\n\n"
+    },
+    {
+      "title": "You are accessing your instance over a secure connection, however your instance is generating insecure URLs",
+      "level": 3,
+      "content": "If you get the following message in your administration settings:\n\nAdd the following in your configuration file: [8]\n\n```\n/etc/webapps/nextcloud/config/config.php\n```\n\n```\n'trusted_proxies' => ['192.168.1.0'],\n'overwriteprotocol' => 'https',\n```\n\nReplace 192.168.1.0 with your public IP.\n\n"
+    },
+    {
+      "title": "Nextcloud reports corrupted index (MariaDB)",
+      "level": 3,
+      "content": "If Nextcloud reports corrupted indices (e.g. during occ db: commands or in Administration > Logging) you can repair your database by executing:\n\n```\n$ mysqlcheck --check --auto-repair nextcloud -u nextcloud -p\n```\n\nIf the command fails, it still will point out the table TABLE containing a corrupted index. Repair it by logging into mariadb:\n\n```\n$ mysql -u nextcloud -p\nmysql> use nextcloud;\nmysql> check table TABLE;\nmysql> optimize table TABLE;\nmysql> exit;\n```\n\nReplace TABLE to match your findings.\n\n"
+    },
+    {
+      "title": "Failed to fetch the Collabora capabilities endpoint",
+      "level": 3,
+      "content": "In case you get responses with:\n\ndouble-check your config.php that entry overwrite.cli.url has been set as described in section Configuration / Nextcloud.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Nextcloud Documentation Overview\n- Nextcloud Admin Manual\n\n"
+    }
+  ]
+}

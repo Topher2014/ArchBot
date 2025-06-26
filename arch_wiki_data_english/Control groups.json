@@ -1,0 +1,131 @@
+{
+  "title": "Control groups",
+  "url": "https://wiki.archlinux.org/title/Control_groups",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Linux Containers\n- systemd-nspawn\n- Docker\n- limits.conf\n\nNote: **This article or section is a candidate for merging with systemd.** This article or section is a candidate for merging with systemd.\n\nThis article or section is a candidate for merging with systemd.\n\nControl groups (or cgroups as they are commonly known) are a feature provided by the Linux kernel to manage, restrict, and audit groups of processes. Compared to other approaches like the nice(1) command or /etc/security/limits.conf, cgroups are more flexible as they can operate on (sub)sets of processes (possibly with different system users).\n\nControl groups can be accessed with various tools:\n\n- using directives in systemd unit files to specify limits for services and slices;\n- by accessing the cgroup filesystem directly;\n- via tools like cgcreate, cgexec and cgclassify (part of the libcgroupAUR and libcgroup-gitAUR packages);\n- using the \"rules engine daemon\" to automatically move certain users/groups/commands to groups (/etc/cgrules.conf and cgconfig.service) (part of the libcgroupAUR and libcgroup-gitAUR packages); and\n- through other software such as Linux Containers (LXC) virtualization.\n\nFor Arch Linux, systemd is the preferred and easiest method of invoking and configuring cgroups as it is a part of the default installation.\n\n"
+    },
+    {
+      "title": "Installing",
+      "level": 2,
+      "content": "Make sure you have one of these packages installed for automated cgroup handling:\n\n- systemd - for controlling resources of a systemd service.\n- libcgroupAUR, libcgroup-gitAUR - set of standalone tools (cgcreate, cgclassify, persistence via cgconfig.conf).\n\n"
+    },
+    {
+      "title": "Hierarchy",
+      "level": 3,
+      "content": "Current cgroup hierarchy can be seen with systemctl status or systemd-cgls command.\n\n```\n$ systemctl status\n```\n\n```\n● myarchlinux\n    State: running\n     Jobs: 0 queued\n   Failed: 0 units\n    Since: Wed 2019-12-04 22:16:28 UTC; 1 day 4h ago\n   CGroup: /\n           ├─user.slice \n           │ └─user-1000.slice \n           │   ├─user@1000.service \n           │   │ ├─gnome-shell-wayland.service \n           │   │ │ ├─ 1129 /usr/bin/gnome-shell\n           │   │ ├─gnome-terminal-server.service \n           │   │ │ ├─33519 /usr/lib/gnome-terminal-server\n           │   │ │ ├─37298 fish\n           │   │ │ └─39239 systemctl status\n           │   │ ├─init.scope \n           │   │ │ ├─1066 /usr/lib/systemd/systemd --user\n           │   │ │ └─1067 (sd-pam)\n           │   └─session-2.scope \n           │     ├─1053 gdm-session-worker [pam/gdm-password]\n           │     ├─1078 /usr/bin/gnome-keyring-daemon --daemonize --login\n           │     ├─1082 /usr/lib/gdm-wayland-session /usr/bin/gnome-session\n           │     ├─1086 /usr/lib/gnome-session-binary\n           │     └─3514 /usr/bin/ssh-agent -D -a /run/user/1000/keyring/.ssh\n           ├─init.scope \n           │ └─1 /sbin/init\n           └─system.slice \n             ├─systemd-udevd.service \n             │ └─285 /usr/lib/systemd/systemd-udevd\n             ├─systemd-journald.service \n             │ └─272 /usr/lib/systemd/systemd-journald\n             ├─NetworkManager.service \n             │ └─656 /usr/bin/NetworkManager --no-daemon\n             ├─gdm.service \n             │ └─668 /usr/bin/gdm\n             └─systemd-logind.service \n               └─654 /usr/lib/systemd/systemd-logind\n```\n\n"
+    },
+    {
+      "title": "Find cgroup of a process",
+      "level": 3,
+      "content": "The cgroup name of a process can be found in /proc/PID/cgroup.\n\nFor example, the cgroup of the shell:\n\n```\n$ cat /proc/self/cgroup\n```\n\n```\n0::/user.slice/user-1000.slice/session-3.scope\n```\n\n"
+    },
+    {
+      "title": "cgroup resource usage",
+      "level": 3,
+      "content": "The systemd-cgtop command can be used to see the resource usage:\n\n```\n$ systemd-cgtop\n```\n\n```\nControl Group                            Tasks   %CPU   Memory  Input/s Output/s\nuser.slice                                 540  152,8     3.3G        -        -\nuser.slice/user-1000.slice                 540  152,8     3.3G        -        -\nuser.slice/u…000.slice/session-1.scope     425  149,5     3.1G        -        -\nsystem.slice                                37      -   215.6M        -        -\n```\n\n"
+    },
+    {
+      "title": "Custom cgroups",
+      "level": 3,
+      "content": "systemd.slice(5) systemd unit files can be used to define a custom cgroup configuration. They must be placed in a systemd directory, such as /etc/systemd/system/. The resource control options that can be assigned are documented in systemd.resource-control(5).\n\nThis is an example slice unit that only allows 30% of one CPU to be used:\n\n```\n/etc/systemd/system/my.slice\n```\n\n```\n[Slice]\nCPUQuota=30%\n```\n\nRemember to do a daemon-reload to pick up any new or changed .slice files.\n\n"
+    },
+    {
+      "title": "Service unit file",
+      "level": 4,
+      "content": "Resources can be directly specified in service definition or as a drop-in file:\n\n```\n[Service]\nMemoryMax=1G\n```\n\nThis example limits the service to 1 gigabyte.\n\n"
+    },
+    {
+      "title": "Grouping unit under a slice",
+      "level": 4,
+      "content": "Service can be specified what slice to run in:\n\n```\n[Service]\nSlice=my.slice\n```\n\n"
+    },
+    {
+      "title": "As root",
+      "level": 3,
+      "content": "systemd-run can be used to run a command in a specific slice.\n\n```\n# systemd-run --slice=my.slice command\n```\n\n--uid=username option can be used to spawn the command as specific user.\n\n```\n# systemd-run --uid=username --slice=my.slice command\n```\n\nThe --shell option can be used to spawn a command shell inside the slice.\n\n"
+    },
+    {
+      "title": "As unprivileged user",
+      "level": 3,
+      "content": "Unprivileged users can divide the resources provided to them into new cgroups, if some conditions are met.\n\nCgroups v2 must be utilized for a non-root user to be allowed managing cgroup resources.\n\n"
+    },
+    {
+      "title": "Controller types",
+      "level": 4,
+      "content": "Not all resources can be controlled by user.\n\nTable content:\nController | Can be controlled by user | Options\ncpu | Requires delegation | CPUAccounting, CPUWeight, CPUQuota, AllowedCPUs, AllowedMemoryNodes\nio | Requires delegation | IOWeight, IOReadBandwidthMax, IOWriteBandwidthMax, IODeviceLatencyTargetSec\nmemory | Yes | MemoryLow, MemoryHigh, MemoryMax, MemorySwapMax\npids | Yes | TasksMax\nrdma | No | ?\neBPF | No | IPAddressDeny, DeviceAllow, DevicePolicy\n\n"
+    },
+    {
+      "title": "User delegation",
+      "level": 4,
+      "content": "For user to control cpu and io resources, the resources need to be delegated. This can be done with a drop-in file.\n\nFor example if your user id is 1000:\n\n```\n/etc/systemd/system/user@1000.service.d/delegate.conf\n```\n\n```\n[Service]\nDelegate=cpu cpuset io\n```\n\nReboot and verify that the slice your user session is under has cpu and io controller:\n\n```\n$ cat /sys/fs/cgroup/user.slice/user-1000.slice/cgroup.controllers\n```\n\n```\ncpuset cpu io memory pids\n```\n\n"
+    },
+    {
+      "title": "User-defined slices",
+      "level": 4,
+      "content": "The user slice files can be placed in ~/.config/systemd/user/.\n\nTo run the command under certain slice:\n\n```\n$ systemd-run --user --slice=my.slice command\n```\n\nYou can also run your login shell inside the slice:\n\n```\n$ systemd-run --user --slice=my.slice --shell\n```\n\n"
+    },
+    {
+      "title": "Run-time adjustment",
+      "level": 3,
+      "content": "cgroups resources can be adjusted at run-time using systemctl set-property command. Option syntax is the same as in systemd.resource-control(5).\n\nNote: **permanent** \n\nFor example, cutting off internet access for all user sessions:\n\n```\n$ systemctl set-property user.slice IPAddressDeny=any\n```\n\n"
+    },
+    {
+      "title": "With libcgroup",
+      "level": 2,
+      "content": "You can enable the cgconfig service with systemd. This allows you to track any errors in cgconfig.conf more easily.\n\n"
+    },
+    {
+      "title": "Ad-hoc groups",
+      "level": 3,
+      "content": "One of the powers of cgroups is that you can create \"ad-hoc\" groups on the fly. You can even grant the privileges to create custom groups to regular users. groupname is the cgroup name:\n\n```\n# cgcreate -a user -t user -g memory,cpu:groupname\n```\n\nNow all the tunables in the group groupname are writable by your user:\n\n```\n$ ls -l /sys/fs/cgroup/memory/groupname\n```\n\n```\ntotal 0\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cgroup.event_control\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cgroup.procs\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.rt_period_us\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.rt_runtime_us\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 cpu.shares\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 notify_on_release\n-rwxrwxr-x 1 user root 0 Sep 25 00:39 tasks\n```\n\nCgroups are hierarchical, so you can create as many subgroups as you like. If a normal user wants to run a bash shell under a new subgroup called foo:\n\n```\n$ cgcreate -g memory,cpu:groupname/foo\n$ cgexec    -g memory,cpu:groupname/foo bash\n```\n\nTo make sure (only meaningful for legacy (v1) cgroups):\n\n```\n$ cat /proc/self/cgroup\n```\n\n```\n11:memory:/groupname/foo\n6:cpu:/groupname/foo\n```\n\nA new subdirectory was created for this group. To limit the memory usage of all processes in this group to 10 MB, run the following:\n\n```\n$ echo 10000000 > /sys/fs/cgroup/memory/groupname/foo/memory.limit_in_bytes\n```\n\nNote that the memory limit applies to RAM use only -- once tasks hit this limit, they will begin to swap. But it will not affect the performance of other processes significantly.\n\nSimilarly you can change the CPU priority (\"shares\") of this group. By default all groups have 1024 shares. A group with 100 shares will get a ~10% portion of the CPU time:\n\n```\n$ echo 100 > /sys/fs/cgroup/cpu/groupname/foo/cpu.shares\n```\n\nYou can find more tunables or statistics by listing the cgroup directory.\n\nYou can also change the cgroup of already running processes. To move all 'bash' commands to this group:\n\n```\n$ pidof bash\n13244 13266\n$ cgclassify -g memory,cpu:groupname/foo `pidof bash`\n$ cat /proc/13244/cgroup\n11:memory:/groupname/foo\n6:cpu:/groupname/foo\n```\n\n"
+    },
+    {
+      "title": "Persistent group configuration",
+      "level": 3,
+      "content": "If you want your cgroups to be created at boot, you can define them in /etc/cgconfig.conf instead. For example, the \"groupname\" has a permission for $USER and users of group $GROUP to manage limits and add tasks. A subgroup \"groupname/foo\" group definitions would look like this:\n\n```\n/etc/cgconfig.conf\n```\n\n```\ngroup groupname {\n  perm {\n# who can manage limits\n    admin {\n      uid = $USER;\n      gid = $GROUP;\n    }\n# who can add tasks to this group\n    task {\n      uid = $USER;\n      gid = $GROUP;\n    }\n  }\n# create this group in cpu and memory controllers\n  cpu { }\n  memory { }\n}\n\ngroup groupname/foo {\n  cpu {\n    cpu.shares = 100;\n  }\n  memory {\n    memory.limit_in_bytes = 10000000;\n  }\n}\n```\n\nNote: **#** This is equivalent to these shell commands:\n\n- Comments should begin at the start of a line! The # character for comments must appear as the first character of a line. Else, cgconfigparser will have problem parsing it but will only report cgroup change of group failed as the error, unless you started cgconfig with Systemd\n- The permissions section is optional.\n- The /sys/fs/cgroup/ hierarchy directory containing all controllers sub-directories is already created and mounted at boot as a virtual file system. This gives the ability to create a new group entry with the $CONTROLLER-NAME { } command. If for any reason you want to create and mount hierachies in another place, you will then need to write a second entry in /etc/cgconfig.conf following this way :\n\n```\nmount {    \n   cpuset = /your/path/groupname;\n }\n```\n\nThis is equivalent to these shell commands:\n\n```\n# mkdir /your/path/groupname\n # mount -t /your/path -o cpuset groupname /your/path/groupname\n```\n\n"
+    },
+    {
+      "title": "With the cgroup virtual filesystem",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nStarting with systemd 232, the cgm method described in the next section, this section will instead describe a manual method to limit memory usage.\n\nCreate a new cgroup named groupname:\n\n```\n# mkdir /sys/fs/cgroup/memory/groupname\n```\n\nExample: set the maximum memory limit to 100MB:\n\n```\n# echo 100000000 > /sys/fs/cgroup/memory/groupname/memory.limit_in_bytes\n```\n\nMove a process to the cgroup:\n\n```\n# echo pid > /sys/fs/cgroup/memory/groupname/cgroup.procs\n```\n\n"
+    },
+    {
+      "title": "Restrict memory or CPU use of a command",
+      "level": 3,
+      "content": "The following example shows a cgroup that constrains a given command to 2GB of memory.\n\n```\n$ systemd-run --scope -p MemoryMax=2G --user command\n```\n\nThe following example shows a command restricted to 20% of one CPU core.\n\n```\n$ systemd-run --scope -p CPUQuota=\"20%\" --user command\n```\n\n"
+    },
+    {
+      "title": "Matlab",
+      "level": 3,
+      "content": "Doing large calculations in MATLAB can crash your system, because Matlab does not have any protection against taking all your machine's memory or CPU. The following examples show a cgroup that constrains Matlab to first 6 CPU cores and 5 GB of memory.\n\n"
+    },
+    {
+      "title": "With systemd",
+      "level": 4,
+      "content": "```\n~/.config/systemd/user/matlab.slice\n```\n\n```\n[Slice]\nAllowedCPUs=0-5\nMemoryHigh=6G\n```\n\nLaunch Matlab like this (be sure to use the right path):\n\n```\n$ systemd-run --user --slice=matlab.slice /opt/MATLAB/2012b/bin/matlab -desktop\n```\n\n"
+    },
+    {
+      "title": "With libcgroup",
+      "level": 4,
+      "content": "```\n/etc/cgconfig.conf\n```\n\n```\ngroup matlab {\n    perm {\n        admin {\n            uid = username;\n        }\n        task {\n            uid = username;\n        }\n    }\n\n    cpuset {\n        cpuset.mems=\"0\";\n        cpuset.cpus=\"0-5\";\n    }\n    memory {\n        memory.limit_in_bytes = 5000000000;\n    }\n}\n```\n\nChange username to the user Matlab is run as.\n\nYou can also restrict the CPU share with the cpu constraint.\n\nLaunch Matlab like this (be sure to use the right path):\n\n```\n$ cgexec -g memory,cpuset:matlab /opt/MATLAB/2012b/bin/matlab -desktop\n```\n\n"
+    },
+    {
+      "title": "Documentation",
+      "level": 2,
+      "content": "- For information on controllers and what certain switches and tunables mean, refer to kernel's documentation v1 or v2 (or install linux-docs and see /usr/src/linux/Documentation/cgroup)\n- Linux manual page: cgroups(7)\n- A detailed and complete Resource Management Guide can be found in the Red Hat Enterprise Linux documentation.\n\nFor commands and configuration files, see relevant man pages, e.g. cgcreate(1) or cgrules.conf(5)\n\n"
+    },
+    {
+      "title": "Enable cgroup v1",
+      "level": 3,
+      "content": "Cgroup v2 is now enabled by default, cgroups v1 is considered obsolete and the system will refuse to boot since systemd v256.[1] If you want to switch to cgroup v1 instead, you need to set the following kernel parameters:\n\n```\nSYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 systemd.unified_cgroup_hierarchy=0\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- systemd cgroups hacker guide\n- cgroupv2: Linux's new unified control group system\n\n"
+    }
+  ]
+}

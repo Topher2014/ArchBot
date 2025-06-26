@@ -1,0 +1,121 @@
+{
+  "title": "DWM",
+  "url": "https://wiki.archlinux.org/title/DWM",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- dmenu\n- Window manager\n\ndwm is a dynamic window manager for Xorg. It manages windows in tiled, stacked, and full-screen layouts, as well as many others with the help of optional patches. Layouts can be applied dynamically, optimizing the environment for the application in use and the task being performed. dwm is extremely lightweight and fast, written in C and with a stated design goal of remaining under 2000 source lines of code. It provides multihead support for xrandr and Xinerama.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "dwm can be installed with the packages dwmAUR or dwm-gitAUR. Make any required configuration changes before building and installing, see makepkg.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "dwm is configured at compile-time by editing some of its source files, specifically config.h. For detailed information on these settings, see the included, well-commented config.def.h as well as the customisation section on the dwm website.\n\nThe official website has a number of patches that can add extra functionality to dwm. These patches primarily make changes to the dwm.c file but also make changes to the config.h file where appropriate. For information on applying patches, see the Patching packages article.\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 2,
+      "content": "Select Dwm from the menu in a display manager of choice. Alternatively, to start dwm with startx append exec dwm to ~/.xinitrc and prepend other programs to execute them as well, for example:\n\n```\nredshift -O3500; xset r rate 300 50; exec dwm\n```\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "See the dwm tutorial for information on basic dwm usage.\n\n"
+    },
+    {
+      "title": "Statusbar configuration",
+      "level": 3,
+      "content": "For more examples of status bars, see [1].\n\ndwm reads the name of the root window and redirects it to the statusbar. The root window is the window within which all other windows are drawn and arranged by the window manager. Like any other window, the root window has a title/name, but it is usually undefined because the root window always runs in the background.\n\nThe information that you want dwm to show in the statusbar should be defined with xsetroot -name \"\" command in ~/.xinitrc or ~/.xprofile (if you are using a display manager). For example:\n\n```\nxsetroot -name \"Thanks for all the fish!\"\n```\n\nDynamically updated information should be put in a loop which is forked to background - see the example below:\n\n```\n# Statusbar loop\nwhile true; do\n   xsetroot -name \"$( date +\"%F %R\" )\"\n   sleep 1m    # Update time every minute\ndone &\n\n# Autostart section\npcmanfm & \n\nexec dwm\n```\n\nIn this case the date is shown in RFC:3339 format and PCManFM is launched at startup.\n\n"
+    },
+    {
+      "title": "Conky statusbar",
+      "level": 4,
+      "content": "Conky can be printed to the statusbar with xsetroot -name:\n\n```\n(conky | while read LINE; do xsetroot -name \"$LINE\"; done) &\nexec dwm\n```\n\nIf you do not want to spawn too many PIDs by 'xsetroot' command, you can compile this C program:\n\n```\n#include <string.h>\n#include <stdlib.h>\n#include <stdio.h>\n#include <X11/Xlib.h>\n\nint main(int argc, char * argv[])\n{\n        Display * dpy = NULL;\n        Window win = 0;\n        size_t length = 0;\n        ssize_t bytes_read = 0;\n        char * input = NULL;\n\n        dpy = XOpenDisplay(getenv(\"DISPLAY\"));\n        if (dpy == NULL)\n        {\n                fprintf(stderr, \"Can't open display, exiting.\\n\");\n                exit(1);\n        }\n        win = DefaultRootWindow(dpy);\n\n        while ((bytes_read = getline(&input, &length, stdin)) != EOF)\n        {\n                input[strlen(input) - 1] = '\\0';\n                XStoreName(dpy, win, input);\n                XFlush(dpy);\n                fprintf(stderr, \"Input: %s\", input);\n                fprintf(stderr, \"\\nbytes read: %ld\\n\", bytes_read);\n        }\n        free(input);\n        return 0;\n}\n```\n\nSave this code to file dwm-setstatus.c, compile:\n\n```\n$ gcc dwm-setstatus.c -lX11 -o dwm-setstatus\n```\n\nmove 'dwm-setstatus' within your $PATH (/usr/local/bin, for example)\n\n```\n# mv dwm-setstatus /usr/local/bin\n```\n\nand run:\n\n```\n$ conky | dwm-setstatus\n```\n\nTo do this, conky needs to be told to output text to the console only. The following is a sample conkyrc for a dual core CPU, displaying several usage statistics:\n\n```\nconky.config = {\nout_to_console = true,\nout_to_x = false,\nbackground = false,\nupdate_interval = 2,\ntotal_run_times = 0,\nuse_spacer = 'none',\n};\nconky.text = [[\n$mpd_smart :: ${cpu cpu1}% / ${cpu cpu2}%  ${loadavg 1} ${loadavg 2 3} :: ${acpitemp}c :: $memperc% ($mem) :: ${downspeed eth0}K/s ${upspeed eth0}K/s :: ${time %a %b %d %I:%M%P}\n]];\n```\n\nFor icons and color options, see dzen.\n\n"
+    },
+    {
+      "title": "Restart dwm",
+      "level": 3,
+      "content": "To restart dwm without logging out or closing applications, change or add a startup script so that it loads dwm in a while loop, for example:\n\n```\nwhile true; do\n    # Log stderror to a file \n    dwm 2> ~/.dwm.log\n    # No error logging\n    #dwm >/dev/null 2>&1\ndone\n```\n\ndwm can now be restarted without destroying other X windows by pressing the usual Mod-Shift-Q combination.\n\nIt is a good idea to place the above startup script into a separate file, ~/bin/startdwm for instance, and execute it through ~/.xinitrc. Consider running the script with exec to avoid security implications with remaining logged in after the X server is terminated; see Xinit#Autostart X at login for more information. From this point on, when you wish to end the X session, simply execute pkill dwm, or bind it to a convenient keybind. Alternatively, you could setup your dwm session script so that it relaunches dwm only if the binary changes. This could be useful in the case where you change a setting or update the dwm code base.\n\n```\n# relaunch DWM if the binary changes, otherwise bail\ncsum=\"\"\nnew_csum=$(sha1sum $(which dwm))\nwhile true\ndo\n    if [ \"$csum\" != \"$new_csum\" ]\n    then\n        csum=$new_csum\n        dwm\n    else\n        exit 0\n    fi\n    new_csum=$(sha1sum $(which dwm))\n    sleep 0.5\ndone\n```\n\n"
+    },
+    {
+      "title": "Bind the right Alt key to Mod4",
+      "level": 3,
+      "content": "When using Mod4 (the Super/Windows Key) as the MODKEY, it may be equally convenient to have the right Alt key (Alt_R) act as Mod4. This will allow you to perform otherwise awkward keystrokes one-handed, such as zooming with Alt_R+Enter.\n\nFirst, find out which keycode is assigned to Alt_R:\n\n```\n$ xmodmap -pke | grep Alt_R\n```\n\nThen simply add the following to the startup script (e.g. ~/.xinitrc), changing the keycode 113 if necessary to the result gathered by the previous xmodmap command:\n\nReassign Alt_R to Super_L:\n\n```\nxmodmap -e \"keycode 113 = Super_L\"\n```\n\nMake sure X keeps it out of the \"mod1\" group:\n\n```\nxmodmap -e \"remove mod1 = Super_L\"\n```\n\nAfter doing so, any functions that are triggered by the Super_L key press will also be triggered by an Alt_R key press.\n\n"
+    },
+    {
+      "title": "Use both Alt keys as Meta in DWM",
+      "level": 3,
+      "content": "Use xmodmap to assign Alt_L as a secondary meta key in DWM (provided already using Mod1Mask (Alt_R))\n\n```\n~/.xinitrc\n```\n\n```\n/usr/bin/xmodmap -e \"clear mod5\"\n/usr/bin/xmodmap -e \"keycode 108 = Alt_L\"\n```\n\n"
+    },
+    {
+      "title": "Space around font in dwm's bar",
+      "level": 3,
+      "content": "By default, dwm's bar adds 2px around the size of the font. To change this, modify the following line:\n\n```\ndwm.c\n```\n\n```\nbh = dc.h = dc.font.height + 2;\n```\n\n"
+    },
+    {
+      "title": "Disable focus follows mouse",
+      "level": 3,
+      "content": "To disable focus follows mouse behaviour, comment out the following line in definition of struct handler:\n\n```\ndwm.c\n```\n\n```\n[EnterNotify] = enternotify,\n```\n\nNote that this change can cause some difficulties; the first click on an inactive window will only bring the focus to it. To interact with window contents (buttons, fields etc), you need to click again. Also, if you have several monitors, you may notice that the keyboard focus does not switch to another monitor activated by clicking.\n\n"
+    },
+    {
+      "title": "Floating layout for some windows",
+      "level": 3,
+      "content": "For some windows, such as preferences dialogs, it does not make sense for these windows to be tiled - they should be free-floating instead. For example, to make Firefox's preferences dialog float, add the following to your rules array in config.h:\n\n```\n{ \"Firefox\",     NULL,       \"Firefox Preferences\",        1 << 8,         True,     -1 },\n```\n\nTo get the properties of other Windows, the program xprop can be used.\n\n```\nxprop | awk '\n/^WM_CLASS/{sub(/.* =/, \"instance:\"); sub(/,/, \"\\nclass:\"); print}\n/^WM_NAME/{sub(/.* =/, \"title:\"); print}'\n```\n\nFurther information can be found on the dwm site.\n\n"
+    },
+    {
+      "title": "Using Tilda with dwm",
+      "level": 3,
+      "content": "Tilda works best when added to all tags, and configured to be floating. To do so, add the following to your rules array in config.h:\n\n```\n{ \"Tilda\",        NULL,       NULL,                         0,              True,       -1 },\n```\n\nLaunch tilda with -C option:\n\n```\n$ tilda -C\n```\n\nNow you can configure Tilda, the following options are provided as a recommendation:\n\n```\nFont: Clean 9\nAppearance: Height: 50%, Width: 70%, Centered Horizontally\nExtras: Enable Transparency Level 15\nAnimated Pulldown: 1500 usec, Orientation: Top\nColors: Built-in Scheme \"Green on Black\"\nScrolling: Scrollbar is on the left, 2000 lines scrollback\nKey Binding: F9\n```\n\nIt is important you enable the pulldown-animation, otherwise Tilda will keep jumping down each time you unhide it, must be a dwm issue.\n\n"
+    },
+    {
+      "title": "Taking screenshots",
+      "level": 3,
+      "content": "Install the scrot package. Next create two scripts:\n\n```\n/path/to/scripts/screenshot.sh\n```\n\n```\n#!/bin/sh\nmkdir -p /path/to/pics && scrot /path/to/pics/%m-%d-%Y-%H%M%S.png\n```\n\nfor making screenshots and\n\n```\n/path/to/scripts/screenshotsel.sh\n```\n\n```\n#!/bin/sh\nmkdir -p /path/to/pics && scrot /path/to/pics/%m-%d-%Y-%H%M%S.png --select --line mode=edge\n```\n\nfor making screenshots with a selection box. Give them executable permissions. In config.h add the following:\n\n```\nstatic const Key keys[] = {\n       ...\n       \n       { 0,         XK_Print, spawn, SHCMD(\"/path/to/scripts/screenshot.sh\") },\n       { ShiftMask, XK_Print, spawn, SHCMD(\"/path/to/scripts/screenshotsel.sh\") },\n       \n       ...\n};\n```\n\nThis maps taking screenshots to the print key and taking screenshots with a selection box to the shift + print keys.\n\n"
+    },
+    {
+      "title": "Mapping multimedia keys",
+      "level": 3,
+      "content": "Add to the top of config.h,\n\n```\n#include <X11/XF86keysym.h>\n```\n\nto use multimedia keys. Now we can map common tasks to these keys.\n\n"
+    },
+    {
+      "title": "Adjusting volume",
+      "level": 4,
+      "content": "Install the pipewire package. Now in config.h we may add commands for mute and volume increase/decrease.\n\n```\nstatic const char *up_vol[]   = { \"pactl\", \"set-sink-volume\", \"@DEFAULT_SINK@\", \"+10%\",   NULL };\nstatic const char *down_vol[] = { \"pactl\", \"set-sink-volume\", \"@DEFAULT_SINK@\", \"-10%\",   NULL };\nstatic const char *mute_vol[] = { \"pactl\", \"set-sink-mute\",   \"@DEFAULT_SINK@\", \"toggle\", NULL };\n...\n\nstatic const Key keys[] = {\n       ...\n       \n       { 0, XF86XK_AudioMute,        spawn, {.v = mute_vol } },\n       { 0, XF86XK_AudioLowerVolume, spawn, {.v = down_vol } },\n       { 0, XF86XK_AudioRaiseVolume, spawn, {.v = up_vol } },\n       \n       ... \n};\n```\n\n"
+    },
+    {
+      "title": "Adjusting brightness",
+      "level": 4,
+      "content": "Install the brightnessctl package. Now in config.h we may add commands for dimming and brightening the screen.\n\n```\nstatic const char *brighter[] = { \"brightnessctl\", \"set\", \"10%+\", NULL };\nstatic const char *dimmer[]   = { \"brightnessctl\", \"set\", \"10%-\", NULL };\n...\n\nstatic const Key keys[] = {\n       ...\n       \n       { 0, XF86XK_MonBrightnessDown, spawn, {.v = dimmer } },\n       { 0, XF86XK_MonBrightnessUp,   spawn, {.v = brighter } },\n       \n       ...\n};\n```\n\n"
+    },
+    {
+      "title": "Autostart",
+      "level": 3,
+      "content": "A patch is available. It runs ~/.dwm/autostart_blocking.sh and ~/.dwm/autostart.sh & before entering the handler loop. One or both of these files can be omitted.\n\n"
+    },
+    {
+      "title": "Fixing misbehaving Java applications",
+      "level": 3,
+      "content": "See Java#Gray window, applications not resizing with WM, menus immediately closing.\n\n"
+    },
+    {
+      "title": "Fixing gaps around terminal windows",
+      "level": 3,
+      "content": "If there are empty gaps of desktop space outside terminal windows, it is likely due to the terminal's font size. Either adjust the size until finding the ideal scale that closes the gap, or toggle resizehints to 0 in config.h.\n\nThis will cause dwm to ignore resize requests from all client windows, not just terminals. The downside to this workaround is that some terminals may suffer redraw anomalies, such as ghost lines and premature line wraps, among others.\n\nAlternatively, if you use the st terminal emulator, you can apply the anysize patch and recompile st.\n\n"
+    },
+    {
+      "title": "Arabic Letter-shaping",
+      "level": 3,
+      "content": "dwm status bar does not have letter-shaping support. However, you can use tools like| fribidi for applying letter-shaping using Unicode Arabic Presentation Form-B. E.g instead of:\n\n```\nxsetroot -name \"لِخَـوْلَةَ أطْـلالٌ بِبُرْقَةِ ثَهْمَـدِ\"\n```\n\nUse:\n\n```\nxsetroot -name \"$(echo \"لِخَـوْلَةَ أطْـلالٌ بِبُرْقَةِ ثَهْمَـدِ\" | fribidi --nopad)\"\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- dwm's official website\n- Introduction to dwm video\n- dmenu - Simple application launcher from the developers of dwm\n- The dwm thread on the forums\n- Hacking dwm thread\n- Wallpaper thread in the forums for a selection of dwm wallpapers\n- Show off your dwm configuration forum thread\n\n"
+    }
+  ]
+}

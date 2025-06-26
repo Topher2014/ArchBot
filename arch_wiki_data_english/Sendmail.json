@@ -1,0 +1,66 @@
+{
+  "title": "Sendmail",
+  "url": "https://wiki.archlinux.org/title/Sendmail",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Mail server\n\nSendmail is the classic mail transfer agent from the Unix world. This article builds upon Mail server.\n\nThe goal of this article is to setup Sendmail for local user accounts, without using MySQL or other databases, and also allowing the creation of mail-only accounts.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nInstall the sendmailAUR, procmailAUR and m4 packages.\n\n"
+    },
+    {
+      "title": "Adding users",
+      "level": 2,
+      "content": "Create a Linux user for each user that wants to receive email at username@your-domain.com. To add mail-only accounts, that is, users who can get email, but cannot have shell access or login on X, you can add them like this:\n\n```\n# useradd -m -s /usr/bin/nologin username\n```\n\n"
+    },
+    {
+      "title": "Obtain TLS certificate",
+      "level": 3,
+      "content": "To obtain a certificate, see OpenSSL#Usage.\n\n"
+    },
+    {
+      "title": "sendmail.cf",
+      "level": 3,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nCreate the file /etc/mail/sendmail.mc. You can read all the options for configuring sendmail on the file /usr/share/sendmail-cf/README.\n\nNote: **non-TLS** \n\nHere is an example using auth over TLS. The example has comments explaing how it works. The comments start with dnl .\n\n```\n/etc/mail/sendmail.mc\n```\n\n```\ninclude(`/usr/share/sendmail-cf/m4/cf.m4')\ndefine(`confDOMAIN_NAME', `your-domain.com')dnl\nFEATURE(use_cw_file)\ndnl  The following allows relaying if the user authenticates,\ndnl  and disallows plaintext authentication (PLAIN/LOGIN) on\ndnl  non-TLS links:\ndefine(`confAUTH_OPTIONS', `A p y')dnl\ndnl\ndnl  Accept PLAIN and LOGIN authentications:\nTRUST_AUTH_MECH(`LOGIN PLAIN')dnl\ndefine(`confAUTH_MECHANISMS', `LOGIN PLAIN')dnl\ndnl\ndnl Make sure this paths correctly point to your SSL cert files:\ndefine(`confCACERT_PATH',`/etc/ssl/certs')\ndefine(`confCACERT',`/etc/ssl/cacert.pem')\ndefine(`confSERVER_CERT',`/etc/ssl/certs/server.crt')\ndefine(`confSERVER_KEY',`/etc/ssl/private/server.key')\ndnl\nFEATURE(`virtusertable', `hash /etc/mail/virtusertable.db')dnl\nOSTYPE(linux)dnl\nMAILER(local)dnl\nMAILER(smtp)dnl\n```\n\nThen process it with\n\n```\n# m4 /etc/mail/sendmail.mc > /etc/mail/sendmail.cf\n```\n\n"
+    },
+    {
+      "title": "local-host-names",
+      "level": 3,
+      "content": "Put your domains on the local-host-names file:\n\n```\n/etc/mail/local-host-names\n```\n\n```\nlocalhost\nyour-domain.com\nmail.your-domain.com\nlocalhost.localdomain\n```\n\nMake sure the domains are also resolved by your /etc/hosts file.\n\n"
+    },
+    {
+      "title": "access.db",
+      "level": 3,
+      "content": "Create the file /etc/mail/access and put there the base addresses where you want to be able to relay mail. Lets suppose you have a vpn on 10.5.0.0/24, and you want to relay mails from any ip in that range:\n\n```\n/etc/mail/access\n```\n\n```\n10.5.0 RELAY\n127.0.0 RELAY\n```\n\nThen process it with\n\n```\n# makemap hash /etc/mail/access.db < /etc/mail/access\n```\n\n"
+    },
+    {
+      "title": "aliases.db",
+      "level": 3,
+      "content": "Edit the file /etc/mail/aliases and uncomment the line #root: human being here and change it to be like this:\n\n```\n/etc/mail/aliases\n```\n\n```\nroot:         your-username\n```\n\nYou can add aliases for your usernames there, like:\n\n```\n/etc/mail/aliases\n```\n\n```\ncoolguy:      your-username\nsomedude:     your-username\n```\n\nThen process it with\n\n```\n# newaliases\n```\n\n"
+    },
+    {
+      "title": "virtusertable.db",
+      "level": 3,
+      "content": "Create your virtusertable file and put there aliases that includes domains (useful if your server is hosting several domains)\n\n```\n/etc/mail/virtusertable\n```\n\n```\nyour-username@your-domain.com         your-username\njoe@my-other.tld                      joenobody\n```\n\nThen process it with\n\n```\n# makemap hash /etc/mail/virtusertable.db < /etc/mail/virtusertable\n```\n\n"
+    },
+    {
+      "title": "Start on boot",
+      "level": 3,
+      "content": "Enable/start the following units.\n\n- saslauthd.service\n- sendmail.service\n- sm-client.service\n\n"
+    },
+    {
+      "title": "SASL authentication",
+      "level": 3,
+      "content": "Add a user to the SASL database for SMTP authentication.\n\n```\n# saslpasswd2 -c your-username\n```\n\n"
+    },
+    {
+      "title": "Forward all the mail of one domain to certain user",
+      "level": 3,
+      "content": "To forward all mail addressed to any user in the my-other.tld domain to your-username@your-domain.com:\n\n```\n/etc/mail/virtusertable\n```\n\n```\n@my-other.tld        your-username@your-domain.com\n```\n\nDo not forget to process it again with\n\n```\n# makemap hash /etc/mail/virtusertable.db < /etc/mail/virtusertable\n```\n\n"
+    }
+  ]
+}

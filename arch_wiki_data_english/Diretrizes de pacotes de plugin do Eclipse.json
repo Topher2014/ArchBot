@@ -1,0 +1,46 @@
+{
+  "title": "Diretrizes de pacotes de plugin do Eclipse",
+  "url": "https://wiki.archlinux.org/title/Diretrizes_de_pacotes_de_plugin_do_Eclipse",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Fonte – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust – Shell – VCS – Web – Wine\n\nHá muitas maneiras de instalar os plugins do Eclipse, especialmente desde a introdução do diretório dropins no Eclipse 3.4, mas alguns deles são confusos, e ter uma maneira padronizada e consistente de empacotamento é muito importante levar a uma estrutura de sistema limpa. Não é fácil, no entanto, conseguir isso sem que o empacotador saiba todos os detalhes sobre como os plug-ins do Eclipse funcionam. Esta página tem como objetivo definir uma estrutura padrão e simples para PKGBUILDs de plugins do Eclipse, para que a estrutura do sistema de arquivos permaneça consistente entre todos os plugins sem que o empacotador seja iniciado novamente para cada novo pacote.\n\n"
+    },
+    {
+      "title": "Estrutura e instalação de plugins do Eclipse",
+      "level": 2,
+      "content": "O plug-in típico do Eclipse contém dois diretórios, features e plugins e, desde o Eclipse 3.3, eles podem ser colocados apenas em /usr/lib/eclipse/. O conteúdo desses dois diretórios pode ser mesclado com o de outros plugins, e criou uma confusão e tornou a estrutura difícil de gerenciar. Também foi muito difícil dizer rapidamente qual pacote continha qual arquivo.\n\nAinda há suporte a esse método de instalação no Eclipse 3.4, mas o preferido agora está usando o diretório /usr/lib/eclipse/dropins/. Dentro deste diretório pode-se viver um número ilimitado de subdiretórios, cada um contendo seus próprios subdiretórios features e plugins. Isso permite manter uma estrutura limpa e arrumada e deve ser o modo de empacotamento padrão.\n\n"
+    },
+    {
+      "title": "Exemplo de PKGBUILD",
+      "level": 3,
+      "content": "Arquivo está um exemplo, nós vamos detalhar como personalizá-lo.\n\n```\nPKGBUILD-eclipse.proto\n```\n\n```\npkgname=eclipse-mylyn\npkgver=3.0.3\npkgrel=1\npkgdesc=\"A task-focused interface for Eclipse\"\narch=('any')\nurl=\"https://eclipse.org/mylyn/\"\nlicense=('EPL')\ndepends=('eclipse')\noptdepends=('bugzilla: ticketing support')\nsource=(https://download.eclipse.org/tools/mylyn/update/mylyn-${pkgver}-e3.4.zip)\nsha512sums=('aa6289046df4c254567010b30706cc9cb0a1355e9634adcb2052127030d2640f399caf20fce10e8b4fab5885da29057ab9117af42472bcc1645dcf9881f84236')\n\nprepare() {\n  # remove features and plug-ins containing sources\n  rm -f features/*.source_*\n  rm -f plugins/*.source_*\n  # remove gz files\n  rm -f plugins/*.pack.gz\n}\n\npackage() {\n  _dest=\"${pkgdir}/usr/lib/eclipse/dropins/${pkgname/eclipse-}/eclipse\"\n\n  # Features\n  find features -type f | while read -r _feature ; do\n    if [[ \"${_feature}\" =~ (.*\\.jar$) ]] ; then\n      install -dm755 \"${_dest}/${_feature%*.jar}\"\n      cd \"${_dest}/${_feature/.jar}\"\n      # extract features (otherwise they are not visible in about dialog)\n      jar xf \"${srcdir}/${_feature}\" || return 1\n    else\n      install -Dm644 \"${_feature}\" \"${_dest}/${_feature}\"\n    fi\n  done\n\n  # Plugins\n  find plugins -type f | while read -r _plugin ; do\n    install -Dm644 \"${_plugin}\" \"${_dest}/${_plugin}\"\n  done\n}\n```\n\n"
+    },
+    {
+      "title": "Como personalizar a compilação",
+      "level": 3,
+      "content": "A variável principal que precisa ser personalizada é o pkgname. Se você estiver empacotando um plug-in típico, essa é a única coisa que você precisa fazer: a maioria dos plug-ins é distribuída em arquivos zip que contêm apenas os dois subdiretórios features e plugins. Portanto, se você estiver empacotando o plug-in foo e o arquivo de origem contiver apenas features e plugins, você só precisará alterar pkgname para eclipse-foo e você está pronto.\n\nContinue lendo para ir aos componentes internos do PKGBUILD, que ajudam a entender como configurar a compilação para todos os outros casos.\n\n"
+    },
+    {
+      "title": "Nomenclatura de pacote",
+      "level": 4,
+      "content": "Os pacotes devem ser denominados eclipse-nomeplugin, para que sejam reconhecidos como pacotes relacionados ao Eclipse e seja fácil extrair o nome do plug-in com uma substituição de shell simples como ${pkgname/eclipse-}, não tendo que recorrer a uma variável desnecessária ${_realname}. O nome do plugin é necessário para arrumar tudo durante a instalação e evitar conflitos.\n\n"
+    },
+    {
+      "title": "Arquivos",
+      "level": 4,
+      "content": "Alguns plugins precisam que os recursos sejam extraídos dos arquivos jar. O utilitário jar, já incluído no JRE, é usado para fazer isso. No entanto, jar não pode extrair para diretórios diferentes do atual: isso significa que, após cada criação de diretório, é necessário cd dentro dele antes de extrair. A variável ${_dest} é usada neste contexto para melhorar a legibilidade e a limpeza do PKGBUILD.\n\nComo dissemos, os archives de origem fornecem dois diretórios, features e plugins, cada um com arquivos jar. A estrutura de dropins preferida deve ficar assim:\n\n```\n/usr/lib/eclipse/dropins/pluginname/eclipse/features/recurso1/...\n/usr/lib/eclipse/dropins/pluginname/eclipse/features/recurso2/...\n/usr/lib/eclipse/dropins/pluginname/eclipse/plugins/plugin1.jar\n/usr/lib/eclipse/dropins/pluginname/eclipse/plugins/plugin2.jar\n```\n\nEsta estrutura permite misturar diferentes versões de bibliotecas que podem ser necessárias por diferentes plugins, sendo claro sobre qual pacote possui o quê. Ele também evitará conflitos caso pacotes diferentes forneçam a mesma biblioteca. A única alternativa seria dividir cada pacote de suas bibliotecas, com toda a confusão extra que requer, e nem mesmo seria garantido que funcionasse por causa dos pacotes que precisavam de versões de bibliotecas mais antigas.\n\nOs recursos devem ser descompactados do arquivo jar, pois o Eclipse não os detectará de outra forma, e toda a instalação do plug-in não funcionará. Isso acontece porque o Eclipse trata os sites de atualização e as instalações locais de forma diferente (não pergunte por que, apenas faz).\n\n"
+    },
+    {
+      "title": "A função build()",
+      "level": 4,
+      "content": "A primeira coisa a ser notada é o comando cd ${srcdir}. Geralmente os arquivos fonte extraem as pastas features e plugins diretamente sob ${srcdir}, mas nem sempre é esse o caso. De qualquer forma, para a maioria dos plugins não padrão (de fato), esta é a única linha que precisa ser alterada.\n\nAlguns recursos lançados incluem suas fontes também. Para uma versão normal, essas fontes não são necessárias e podem ser removidas. Além disso, os mesmos recursos incluem arquivos *.pack.gz, que contêm os mesmos arquivos em comparação com os arquivos jar. Então, esses arquivos podem ser removidos também.\n\nA próxima é a seção features. Ele cria os diretórios necessários, um para cada arquivo jar, e extrai o jar no diretório correspondente. Da mesma forma, a seção plugins instala os arquivos jar em seus diretórios. Um ciclo de tempo é usado para evitar arquivos de nome engraçado.\n\n"
+    },
+    {
+      "title": "Solução de problemas",
+      "level": 2,
+      "content": "- Algumas vezes, a limpeza do Eclipse ajuda a corrigir alguns problemas: $ eclipse -clean\n- Se novos plug-ins instalados não aparecerem no Eclipse, tente com um diretório limpo ~/.eclipse, por exemplo, renomeando o existente. Esteja ciente de que isso, é claro, tornará todos os plugins instalados pelo usuário via Marketplace indisponíveis.\n\n```\n$ eclipse -clean\n```\n\n"
+    }
+  ]
+}

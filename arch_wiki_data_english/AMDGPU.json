@@ -1,0 +1,226 @@
+{
+  "title": "AMDGPU",
+  "url": "https://wiki.archlinux.org/title/AMDGPU",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- ATI\n- Xorg\n- Vulkan\n- AMDGPU PRO\n\nAMDGPU is the open source graphics driver for AMD Radeon graphics cards since the Graphics Core Next family.\n\n"
+    },
+    {
+      "title": "Selecting the right driver",
+      "level": 2,
+      "content": "Depending on the card you have, find the right driver in Xorg#AMD. This driver supports Southern Islands (GCN 1, released in 2012) cards and later. AMD has no plans to support pre-GCN GPUs.\n\nOwners of unsupported GPUs may use the open source ATI driver.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the mesa package, which provides both the DRI driver for 3D acceleration and VA-API/VDPAU drivers for accelerated video decoding.\n\n- For 32-bit application support, also install the lib32-mesa package from the multilib repository.\n- For the DDX driver (which provides 2D acceleration in Xorg), you can install the xf86-video-amdgpu package. It is not required since default modesetting driver exists.\n- For Vulkan support: Test with only vulkan-radeon first: although not appearing as the first provider of vulkan-driver (due to its alphabetical order), it avoids some issues that have repeatedly been reported about amdvlk. When the amdvlk package is installed, it sets itself as the default Vulkan driver: see Vulkan#Selecting via environment variable if you need to have both drivers installed (e.g. when having issues with vulkan-radeon). Optionally, for 32-bit application support, install the lib32-vulkan-radeon or lib32-amdvlk package to match the native package installed.\n\n- Test with only vulkan-radeon first: although not appearing as the first provider of vulkan-driver (due to its alphabetical order), it avoids some issues that have repeatedly been reported about amdvlk.\n- When the amdvlk package is installed, it sets itself as the default Vulkan driver: see Vulkan#Selecting via environment variable if you need to have both drivers installed (e.g. when having issues with vulkan-radeon).\n- Optionally, for 32-bit application support, install the lib32-vulkan-radeon or lib32-amdvlk package to match the native package installed.\n\n"
+    },
+    {
+      "title": "Experimental",
+      "level": 3,
+      "content": "It may be worthwhile for some users to use the upstream experimental build of mesa.\n\nInstall the mesa-gitAUR package, which provides the DRI driver for 3D acceleration.\n\n- For 32-bit application support, also install the lib32-mesa-gitAUR package from the mesa-git repository or the AUR.\n- For the DDX driver (which provides 2D acceleration in Xorg), install the xf86-video-amdgpu-gitAUR package.\n- For Vulkan support using the mesa-git repository, install the vulkan-radeon-git package. Optionally install the lib32-vulkan-radeon-git package for 32-bit application support. This should not be required if building mesa-gitAUR from the AUR.\n\n"
+    },
+    {
+      "title": "Enable Southern Islands (SI) and Sea Islands (CIK) support",
+      "level": 3,
+      "content": "Officially supported kernels enable AMDGPU support for cards of the Southern Islands (GCN 1, released in 2012) and Sea Islands (GCN 2, released in 2013). The amdgpu kernel driver needs to be loaded before the radeon one. You can check which kernel driver is loaded by running lspci -k. It should be like this:\n\n```\n$ lspci -k -d ::03xx\n```\n\n```\n01:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Curacao PRO [Radeon R7 370 / R9 270/370 OEM]\n\tSubsystem: Gigabyte Technology Co., Ltd Device 226c\n\tKernel driver in use: amdgpu\n\tKernel modules: radeon, amdgpu\n```\n\nIf the amdgpu driver is not in use, follow instructions in the next section.\n\n"
+    },
+    {
+      "title": "Load amdgpu driver",
+      "level": 4,
+      "content": "The module parameters of both amdgpu and radeon modules are cik_support= and si_support=.\n\nThey need to be set as kernel parameters or in a modprobe configuration file, and depend on the cards GCN version.\n\nYou can use both parameters if you are unsure which kernel card you have.\n\nSet one of the following kernel parameters:\n\n- Southern Islands (SI): radeon.si_support=0 amdgpu.si_support=1\n- Sea Islands (CIK): radeon.cik_support=0 amdgpu.cik_support=1\n\n"
+    },
+    {
+      "title": "Specify the correct module order",
+      "level": 4,
+      "content": "Make sure amdgpu has been set as first module in the Mkinitcpio#MODULES array, e.g. MODULES=(amdgpu radeon).\n\nFor Southern Islands (SI) use the si_support=1 kernel module parameter, for Sea Islands (CIK) use cik_support=1:\n\n```\n/etc/modprobe.d/amdgpu.conf\n```\n\n```\noptions amdgpu si_support=1\noptions amdgpu cik_support=1\n```\n\n```\n/etc/modprobe.d/radeon.conf\n```\n\n```\noptions radeon si_support=0\noptions radeon cik_support=0\n```\n\nMake sure modconf is in the HOOKS array in /etc/mkinitcpio.conf and regenerate the initramfs.\n\nWhen building or compiling a kernel, CONFIG_DRM_AMDGPU_SI=Y and/or CONFIG_DRM_AMDGPU_CIK=Y should be set in the config.\n\n"
+    },
+    {
+      "title": "ACO compiler",
+      "level": 3,
+      "content": "The ACO compiler is an open source shader compiler created and developed by Valve Corporation to directly compete with the LLVM compiler, the AMDVLK drivers, as well as Windows 10. It offers lesser compilation time and also performs better while gaming than LLVM and AMDVLK.\n\nSome benchmarks can be seen on GitHub and Phoronix (1) (2) (3).\n\nSince mesa version 20.2 ACO is the default shader compiler.\n\n"
+    },
+    {
+      "title": "Loading",
+      "level": 2,
+      "content": "The amdgpu kernel module is supposed to load automatically on system boot.\n\nIf it does not:\n\n- Make sure to #Enable Southern Islands (SI) and Sea Islands (CIK) support when needed.\n- Make sure you have the latest linux-firmware package installed. This driver requires the latest firmware for each model to successfully boot.\n- Make sure you do not have nomodeset or vga= as a kernel parameter, since amdgpu requires KMS.\n- Check that you have not disabled amdgpu by using any kernel module blacklisting.\n\nIt is possible it loads, but late, after the X server requires it. In this case see Kernel mode setting#Early KMS start.\n\n"
+    },
+    {
+      "title": "Xorg configuration",
+      "level": 2,
+      "content": "Xorg will automatically load the driver and it will use your monitor's EDID to set the native resolution. Configuration is only required for tuning the driver.\n\nIf you want manual configuration, create /etc/X11/xorg.conf.d/20-amdgpu.conf, and add the following:\n\n```\n/etc/X11/xorg.conf.d/20-amdgpu.conf\n```\n\n```\nSection \"OutputClass\"\n     Identifier \"AMD\"\n     MatchDriver \"amdgpu\"\n     Driver \"amdgpu\"\nEndSection\n```\n\nUsing this section, you can enable features and tweak the driver settings, see amdgpu(4) first before setting driver options.\n\n"
+    },
+    {
+      "title": "Tear free rendering",
+      "level": 3,
+      "content": "TearFree controls tearing prevention using the hardware page flipping mechanism. By default, TearFree will be on for rotated outputs, outputs with RandR transforms applied, and for RandR 1.4 slave outputs, and off for everything else. Or you can configure it to be always on or always off with true or false respectively.\n\n```\nOption \"TearFree\" \"true\"\n```\n\nYou can also enable TearFree temporarily with xrandr:\n\n```\n$ xrandr --output output --set TearFree on\n```\n\nWhere output should look like DisplayPort-0 or HDMI-A-0 and can be acquired by running xrandr -q.\n\n"
+    },
+    {
+      "title": "DRI level",
+      "level": 3,
+      "content": "DRI sets the maximum level of DRI to enable. Valid values are 2 for DRI2 or 3 for DRI3. The default is 3 for DRI3 if the Xorg version is >= 1.18.3, otherwise DRI2 is used:\n\n```\nOption \"DRI\" \"3\"\n```\n\n"
+    },
+    {
+      "title": "Variable refresh rate",
+      "level": 3,
+      "content": "See Variable refresh rate.\n\n"
+    },
+    {
+      "title": "10-bit color",
+      "level": 3,
+      "content": "Newer AMD cards support 10bpc color, but the default is 24-bit color and 30-bit color must be explicitly enabled. Enabling it can reduce visible banding/artifacts in gradients, if the applications support this too. To check if your monitor supports it search for \"EDID\" in your Xorg log file (e.g. /var/log/Xorg.0.log or ~/.local/share/xorg/Xorg.0.log):\n\n```\n[   336.695] (II) AMDGPU(0): EDID for output DisplayPort-0\n[   336.695] (II) AMDGPU(0): EDID for output DisplayPort-1\n[   336.695] (II) AMDGPU(0): Manufacturer: DEL  Model: a0ec  Serial#: 123456789\n[   336.695] (II) AMDGPU(0): Year: 2018  Week: 23\n[   336.695] (II) AMDGPU(0): EDID Version: 1.4\n[   336.695] (II) AMDGPU(0): Digital Display Input\n[   336.695] (II) AMDGPU(0): 10 bits per channel\n```\n\nTo check whether it is currently enabled search for \"Depth\"):\n\n```\n[   336.618] (**) AMDGPU(0): Depth 30, (--) framebuffer bpp 32\n[   336.618] (II) AMDGPU(0): Pixel depth = 30 bits stored in 4 bytes (32 bpp pixmaps)\n```\n\nWith the default configuration it will instead say the depth is 24, with 24 bits stored in 4 bytes.\n\nTo check whether 10-bit works, exit Xorg if you have it running and run Xorg -retro which will display a black and white grid, then press Ctrl-Alt-F1 and Ctrl-C to exit X, and run Xorg -depth 30 -retro. If this works fine, then 10-bit is working.\n\nTo launch in 10-bit via startx, use startx -- -depth 30. To permanently enable it, create or add to:\n\n```\n/etc/X11/xorg.conf.d/20-amdgpu.conf\n```\n\n```\nSection \"Screen\"\n\tIdentifier \"asdf\"\n\tDefaultDepth 30\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Reduce output latency",
+      "level": 3,
+      "content": "If you want to minimize latency you can disable page flipping and tear free:\n\n```\n/etc/X11/xorg.conf.d/20-amdgpu.conf\n```\n\n```\nSection \"OutputClass\"\n     Identifier \"AMD\"\n     MatchDriver \"amdgpu\"\n     Driver \"amdgpu\"\n     Option \"EnablePageFlip\" \"off\"\n     Option \"TearFree\" \"false\"\nEndSection\n```\n\nSee Gaming#Reducing DRI latency to further reduce latency.\n\n"
+    },
+    {
+      "title": "Video acceleration",
+      "level": 3,
+      "content": "See Hardware video acceleration#AMD/ATI.\n\n"
+    },
+    {
+      "title": "Monitoring",
+      "level": 3,
+      "content": "Monitoring your GPU is often used to check the temperature and also the P-states of your GPU.\n\n"
+    },
+    {
+      "title": "CLI",
+      "level": 4,
+      "content": "- amdgpu_top — Tool to display AMDGPU usage\n\n- nvtop — GPUs process monitoring for AMD, Intel and NVIDIA\n\n- radeontop — A GPU utilization viewer, both for the total activity percent and individual blocks\n\n"
+    },
+    {
+      "title": "GUI",
+      "level": 4,
+      "content": "- amdgpu_top — Tool to display AMDGPU usage\n\n- AmdGuid — A basic fan control GUI fully written in Rust.\n\n- Radeon Profile — A Qt5 tool to read and change current clocks of AMD Radeon cards.\n\n- TuxClocker — A Qt5 monitoring and overclocking tool.\n\n"
+    },
+    {
+      "title": "Manually",
+      "level": 4,
+      "content": "To check your GPU's P-states, execute:\n\n```\n$ cat /sys/class/drm/card0/device/pp_od_clk_voltage\n```\n\nTo monitor your GPU, execute:\n\n```\n# watch -n 0.5 cat /sys/kernel/debug/dri/0/amdgpu_pm_info\n```\n\nTo check your GPU utilization, execute:\n\n```\n$ cat /sys/class/drm/card0/device/gpu_busy_percent\n```\n\nTo check your GPU frequency, execute:\n\n```\n$ cat /sys/class/drm/card0/device/pp_dpm_sclk\n```\n\nTo check your GPU temperature, execute:\n\n```\n$ cat /sys/class/drm/card0/device/hwmon/hwmon*/temp1_input\n```\n\nTo check your VRAM frequency, execute:\n\n```\n$ cat /sys/class/drm/card0/device/pp_dpm_mclk\n```\n\nTo check your VRAM usage, execute:\n\n```\n$ cat /sys/class/drm/card0/device/mem_info_vram_used\n```\n\nTo check your VRAM size, execute:\n\n```\n$ cat /sys/class/drm/card0/device/mem_info_vram_total\n```\n\n"
+    },
+    {
+      "title": "Overclocking",
+      "level": 3,
+      "content": "Since Linux 4.17, once you have enabled the features at boot below, it is possible to adjust clocks and voltages of the graphics card via /sys/class/drm/card0/device/pp_od_clk_voltage.\n\n"
+    },
+    {
+      "title": "Boot parameter",
+      "level": 4,
+      "content": "It is required to unlock access to adjust clocks and voltages in sysfs by appending the Kernel parameter amdgpu.ppfeaturemask=0xffffffff.\n\nNot all bits are defined, and new features may be added over time. Setting all 32 bits may enable unstable features that cause problems such as screen flicker or broken resume from suspend. It should be sufficient to set the PP_OVERDRIVE_MASK bit, 0x4000, in combination with the default ppfeaturemask. To compute a reasonable parameter for your system, execute:\n\n```\n$ printf 'amdgpu.ppfeaturemask=0x%x\\n' \"$(($(cat /sys/module/amdgpu/parameters/ppfeaturemask) | 0x4000))\"\n```\n\n"
+    },
+    {
+      "title": "Manual",
+      "level": 4,
+      "content": "For in-depth information on all possible options, read the kernel documentation for amdgpu thermal control.\n\nTo enable manual overclocking, select the manual performance level as described in #Performance levels.\n\nTo set the GPU clock for the maximum P-state 7 on e.g. a Polaris GPU to 1209MHz and 900mV voltage, run:\n\n```\n# echo \"s 7 1209 900\" > /sys/class/drm/card0/device/pp_od_clk_voltage\n```\n\nThe same procedure can be applied to the VRAM, e.g. maximum P-state 2 on Polaris 5xx series cards:\n\n```\n# echo \"m 2 1850 850\" > /sys/class/drm/card0/device/pp_od_clk_voltage\n```\n\nTo apply, run:\n\n```\n# echo \"c\" > /sys/class/drm/card0/device/pp_od_clk_voltage\n```\n\nTo check if it worked out, read out clocks and voltage under 3D load:\n\n```\n# watch -n 0.5 cat /sys/kernel/debug/dri/0/amdgpu_pm_info\n```\n\nYou can reset to the default values using:\n\n```\n# echo \"r\" > /sys/class/drm/card0/device/pp_od_clk_voltage\n```\n\nIt is also possible to forbid the driver from switching to certain P-states, e.g. to workaround problems with deep powersaving P-states, such as flickering artifacts or stutter. To force the highest VRAM P-state on a card, while still allowing the GPU itself to run with lower clocks, first find the highest possible P-state, then set it:\n\n```\n$ cat /sys/class/drm/card0/device/pp_dpm_mclk\n```\n\n```\n0: 96Mhz *\n1: 456Mhz\n2: 675Mhz\n3: 1000Mhz\n```\n\n```\n# echo \"manual\" > /sys/class/drm/card0/device/power_dpm_force_performance_level\n# echo \"3\" >  /sys/class/drm/card0/device/pp_dpm_mclk\n```\n\nAllow only the three highest GPU P-states:\n\n```\n# echo \"5 6 7\" > /sys/class/drm/card0/device/pp_dpm_sclk\n```\n\nTo set the allowed maximum power consumption of the GPU to e.g. 50 Watts, run:\n\n```\n# echo 50000000 > /sys/class/drm/card0/device/hwmon/hwmon0/power1_cap\n```\n\n"
+    },
+    {
+      "title": "Assisted",
+      "level": 4,
+      "content": "If you are not inclined to fully manually overclock your GPU, there are some overclocking tools that are offered by the community to assist you to overclock and monitor your AMD GPU.\n\n- amdgpu-clocks — A script that can be used to monitor and set custom power states for AMD GPUs. It also offers a Systemd service to apply the settings automatically upon boot.\n\n- ruby-amdgpu_fan — A CLI for interacting with the amdgpu Linux driver written in Ruby.\n\n- TuxClocker — A Qt5 monitoring and overclocking tool.\n\n- CoreCtrl — A GUI overclocking tool with a WattMan-like UI that supports per-application profiles.\n\n- LACT — A GTK tool to view information and control your AMD GPU. Conflicts with power-profiles-daemon; disable amdgpu_dpm in the latter to avoid the conflict. [1]\n\n- Radeon Profile — A Qt5 tool to read and change current clocks of AMD Radeon cards.\n\n"
+    },
+    {
+      "title": "Startup on boot",
+      "level": 4,
+      "content": "One way is to use systemd units, if you want your settings to apply automatically upon boot, consider looking at this Reddit thread to configure and apply your settings on boot.\n\nAnother way is to use udev rules for some of the values, for example, to set a low performance level to save energy:\n\n```\n/etc/udev/rules.d/30-amdgpu-low-power.rules\n```\n\n```\nACTION==\"add\", SUBSYSTEM==\"drm\", DRIVERS==\"amdgpu\", ATTR{device/power_dpm_force_performance_level}=\"low\"\n```\n\n"
+    },
+    {
+      "title": "Performance levels",
+      "level": 3,
+      "content": "AMDGPU offers several performance levels, the file power_dpm_force_performance_level is used for this, it is possible to select between these levels:\n\n- auto: dynamically select the optimal power profile for current conditions in the driver.\n- low: clocks are forced to the lowest power state.\n- high: clocks are forced to the highest power state.\n- manual: user can manually adjust which power states are enabled for each clock domain (used for setting #Power profiles)\n- profile_standard, profile_min_sclk, profile_min_mclk, profile_peak: clock and power gating are disabled and the clocks are set for different profiling cases. This mode is recommended for profiling specific work loads\n\nTo set the AMDGPU device to use a low performance level, the following command can be executed:\n\n```\n# echo \"low\" > /sys/class/drm/card0/device/power_dpm_force_performance_level\n```\n\n"
+    },
+    {
+      "title": "Power profiles",
+      "level": 3,
+      "content": "AMDGPU offers several optimizations via power profiles, one of the most commonly used is the compute mode for OpenCL intensive applications. Available power profiles can be listed with:\n\n```\n$ cat /sys/class/drm/card0/device/pp_power_profile_mode\n```\n\n```\nNUM        MODE_NAME     SCLK_UP_HYST   SCLK_DOWN_HYST SCLK_ACTIVE_LEVEL     MCLK_UP_HYST   MCLK_DOWN_HYST MCLK_ACTIVE_LEVEL\n  0   BOOTUP_DEFAULT:        -                -                -                -                -                -\n  1   3D_FULL_SCREEN:        0              100               30                0              100               10\n  2     POWER_SAVING:       10                0               30                -                -                -\n  3            VIDEO:        -                -                -               10               16               31\n  4               VR:        0               11               50                0              100               10\n  5        COMPUTE *:        0                5               30               10               60               25\n  6           CUSTOM:        -                -                -                -                -                -\n```\n\nTo use a specific power profile you should first enable manual control over them with:\n\n```\n# echo \"manual\" > /sys/class/drm/card0/device/power_dpm_force_performance_level\n```\n\nThen to select a power profile by writing the NUM field associated with it, e.g. to enable COMPUTE run:\n\n```\n# echo \"5\" > /sys/class/drm/card0/device/pp_power_profile_mode\n```\n\n"
+    },
+    {
+      "title": "Enable GPU display scaling",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with xrandr.** This article or section is a candidate for merging with xrandr.\n\nThis article or section is a candidate for merging with xrandr.\n\nTo avoid the usage of the scaler which is built in the display, and use the GPU own scaler instead, when not using the native resolution of the monitor, execute:\n\n```\n$ xrandr --output output --set \"scaling mode\" scaling_mode\n```\n\nPossible values for \"scaling mode\" are: None, Full, Center, Full aspect.\n\n- To show the available outputs and settings, execute: $ xrandr --prop\n- To set scaling mode = Full aspect for just every available output, execute: $ for output in $(xrandr --prop | grep -E -o -i \"^[A-Z\\-]+-[0-9]+\"); do xrandr --output \"$output\" --set \"scaling mode\" \"Full aspect\"; done\n\n```\n$ xrandr --prop\n```\n\n```\n$ for output in $(xrandr --prop | grep -E -o -i \"^[A-Z\\-]+-[0-9]+\"); do xrandr --output \"$output\" --set \"scaling mode\" \"Full aspect\"; done\n```\n\n"
+    },
+    {
+      "title": "Module parameters",
+      "level": 3,
+      "content": "The amdgpu module stashes several config parameters (modinfo amdgpu | grep mask) in masks that are only documented in the kernel sources.\n\n"
+    },
+    {
+      "title": "Xorg or applications will not start",
+      "level": 3,
+      "content": "- \"(EE) AMDGPU(0): [DRI2] DRI2SwapBuffers: drawable has no back or front?\" error after opening glxgears, can open Xorg server but OpenGL applications crash.\n- \"(EE) AMDGPU(0): Given depth (32) is not supported by amdgpu driver\" error, Xorg will not start.\n\nSetting the screen's depth under Xorg to 16 or 32 will cause problems/crash. To avoid that, you should use a standard screen depth of 24 by adding this to your \"screen\" section:\n\n```\n/etc/X11/xorg.conf.d/10-screen.conf\n```\n\n```\nSection \"Screen\"\n       Identifier     \"Screen\"\n       DefaultDepth    24\n       SubSection      \"Display\"\n               Depth   24\n       EndSubSection\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Screen artifacts and frequency problem",
+      "level": 3,
+      "content": "Dynamic power management may cause screen artifacts to appear when displaying to monitors at higher frequencies (anything above 60Hz) due to issues in the way GPU clock speeds are managed[2][3].\n\nA workaround [4] is to set the high or low performance level as described in #Performance levels.\n\nChanging the kernel version can also help eliminate this issue. For example, it appears to be fixed in 6.12.9.\n\n"
+    },
+    {
+      "title": "Artifacts in Chromium",
+      "level": 4,
+      "content": "If you see artifacts in Chromium, forcing the vulkan-based backend might help. Go to chrome://flags and enable #ignore-gpu-blocklist and #enable-vulkan.\n\n"
+    },
+    {
+      "title": "R9 390 series poor performance and/or instability",
+      "level": 3,
+      "content": "If you experience issues [5] with a AMD R9 390 series graphics card, set radeon.cik_support=0 radeon.si_support=0 amdgpu.cik_support=1 amdgpu.si_support=1 amdgpu.dc=1 as kernel parameters to force the use of amdgpu driver instead of radeon.\n\nIf it still does not work, disabling DPM might help, add radeon.cik_support=0 radeon.si_support=0 amdgpu.cik_support=1 amdgpu.si_support=1 to the kernel parameters.\n\n"
+    },
+    {
+      "title": "Freezes with \"[drm] IP block:gmc_v8_0 is hung!\" kernel error",
+      "level": 3,
+      "content": "If you experience freezes and kernel crashes during a GPU intensive task with the kernel error \" [drm] IP block:gmc_v8_0 is hung!\" [6], a workaround is to set amdgpu.vm_update_mode=3 as kernel parameters to force the GPUVM page tables update to be done using the CPU. Downsides are listed here [7].\n\n"
+    },
+    {
+      "title": "Screen flickering white/gray",
+      "level": 3,
+      "content": "When you change resolution or connect to an external monitor, if the screen flickers or stays white, add amdgpu.sg_display=0 as a kernel parameter.\n\n"
+    },
+    {
+      "title": "System freeze or crash when gaming on Vega cards",
+      "level": 3,
+      "content": "Dynamic power management may cause a complete system freeze whilst gaming due to issues in the way GPU clock speeds are managed. [8] A workaround is to set the high performance level as described in #Performance levels.\n\n"
+    },
+    {
+      "title": "WebRenderer (Firefox) corruption",
+      "level": 3,
+      "content": "Artifacts and other anomalies may present themselves (e.g. inability to select extension options) when WebRenderer is force enabled by the user. Workaround is to fall back to OpenGL compositing.\n\n"
+    },
+    {
+      "title": "Double-speed or \"chipmunk\" audio, or no audio when a 4K@60Hz device is connected",
+      "level": 3,
+      "content": "This is sometimes caused by a communication issue between an AMDGPU device and a 4K display connected over HDMI. A possible workaround is to enable HDR or \"Ultra HD Deep Color\" via the display's built-in settings. On many Android based TVs, this means setting this to \"Standard\" instead of \"Optimal\".\n\n"
+    },
+    {
+      "title": "Issues with power management / dynamic re-activation of a discrete amdgpu graphics card",
+      "level": 3,
+      "content": "If you encounter issues where the kernel driver is loaded, but the discrete graphics card still is not available for games or becomes disabled during use (similar to [9]), you can workaround the issue by setting the kernel parameter amdgpu.runpm=0, which prevents the dGPU from being powered down dynamically at runtime.\n\n"
+    },
+    {
+      "title": "kfd: amdgpu: TOPAZ not supported in kfd",
+      "level": 3,
+      "content": "In the system journal or the kernel message keyring a critical level error message\n\n```\nkfd: amdgpu: TOPAZ not supported in kfd\n```\n\nmay appear. If you are not planning to use Radeon Open Compute, this can be safely ignored. It is not supported in TOPAZ, as they are old GPUs. [10] [11]\n\n"
+    },
+    {
+      "title": "High idle power draw due to MCLK locked at MAX (1000MHz), or MIN (96MHz) causing low game performance (on 6.4 kernel)",
+      "level": 3,
+      "content": "On high resolutions and refresh rates, the MCLK (vram / memory clock) may be locked at the highest clock rate (1000MHz) [12] [13] causing higher GPU idle power draw. On Linux kernel 6.4.x, MCLK clocks at the lowest (96MHz), causing low performance in games [14] [15].\n\nThis is likely due to a monitor not using Coordinated Video Timings (CVT) with a low V-Blank value for the affected resolutions and refresh rates, see this gist for a workaround.\n\n"
+    },
+    {
+      "title": "Failure to suspend to RAM",
+      "level": 3,
+      "content": "The amdgpu kernel module tries to buffer VRAM in RAM when the system enters S3 to prevent memory loss through VRAM decay which is not sufficiently refreshed.\n\nIf you are using a lot of VRAM and are short on free RAM this can fail despite sufficient SWAP memory would be available, because the IO subsystem might have been suspended before.\n\nYou will see something like:\n\n```\nkernel: systemd-sleep: page allocation failure: order:0, mode:0x100c02(GFP_NOIO|__GFP_HIGHMEM|__GFP_HARDWALL), nodemask=(null),cpuset=/,mems_allowed=0\nkernel: Call Trace:\nkernel:  <TASK>\nkernel:  dump_stack_lvl+0x47/0x60\nkernel:  warn_alloc+0x165/0x1e0\nkernel:  __alloc_pages_slowpath.constprop.0+0xd7d/0xde0\nkernel:  __alloc_pages+0x32d/0x350\nkernel:  ttm_pool_alloc+0x19f/0x600 [ttm 0bd92a9d9dccc3a4f19554535860aaeda76eb4f4]\n```\n\nAs a workaround, a userspace service can ensure to allocate enough RAM for the VRAM to be buffered by swapping out enough RAM before the system is suspended.\n\n"
+    },
+    {
+      "title": "Failure to shut down and to suspend",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nhid_sensor_*_3d group of kernel modules can cause system lockups on bootup, shutdown, and suspend. Process list will show multiple instances of udev-worker which then fail to freeze upon system sleep.\n\nYou will see something like:\n\n```\nkernel: PM: suspend entry (deep)\nkernel: Filesystems sync: 0.002 seconds\nkernel: Freezing user space processes\nkernel: Freezing user space processes failed after 20.004 seconds (1 tasks refusing to freeze, wq_busy=0):\nkernel: task:(udev-worker)   state:D stack:0     pid:479   tgid:479   ppid:422    flags:0x00004006\nkernel: Call Trace:\nkernel:  <TASK>\nkernel:  __schedule+0x3db/0x1520\nkernel:  ? srso_alias_return_thunk+0x5/0xfbef5\nkernel:  ? __wake_up_common+0x78/0xa0\nkernel:  ? srso_alias_return_thunk+0x5/0xfbef5\n```\n\nTo work around this problem, blacklist the problematic modules by creating e.g. /etc/modprobe.d/blacklist-hid_sensors.conf\n\n```\nblacklist hid_sensor_accel_3d\nblacklist hid_sensor_gyro_3d\nblacklist hid_sensor_magn_3d\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Gentoo:AMDGPU\n- AMDGPU issue tracker\n\n"
+    }
+  ]
+}

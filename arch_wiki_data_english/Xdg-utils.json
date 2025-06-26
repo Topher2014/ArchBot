@@ -1,0 +1,41 @@
+{
+  "title": "Xdg-utils",
+  "url": "https://wiki.archlinux.org/title/Xdg-utils",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "xdg-utils provides the official utilities for managing XDG MIME Applications.\n\n- xdg-desktop-menu(1) - Install desktop menu items\n- xdg-desktop-icon(1) - copies desktop entries to the user's desktop\n- xdg-email(1) - Compose a new email in the user's preferred email client, potentially with subject and other info filled in\n- xdg-icon-resource(1) - Install icon resources\n- xdg-mime(1) - Query and install MIME types and associations\n- xdg-open(1) - Open a file or URI in the user's preferred application\n- xdg-screensaver(1) - Enable, disable, or suspend the screensaver\n- xdg-settings(1) - Get or set the default web browser and URL handlers\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the xdg-utils package.\n\n"
+    },
+    {
+      "title": "Environment variables",
+      "level": 3,
+      "content": "xdg-utils attempts to integrate with your desktop environment by invoking the specialized programs it provides, where applicable. The evaluation of the current environment is as follows [1]:\n\n- If the standardized XDG_CURRENT_DESKTOP environment variable is set to a recognized desktop environment, the corresponding value is used.\n- If any classic fallbacks or environment-specific variables, such as KDE's KDE_FULL_SESSION, are present, then the corresponding value is used.\n- If the legacy DESKTOP_SESSION environment variable is set to a recognized desktop environment, the corresponding value is used.\n\nDuring this process, if any match is found, the DE variable is internally overwritten with the detected desktop environment's normalized value. Hence, DE is both a legacy environment variable, and an internal state variable for xdg-utils. As an example, if XDG_CURRENT_DESKTOP is KDE, xdg-utils will internally set DE to kde. If no match is found, then any pre-existing DE value will be used, in such a way that XDG_CURRENT_DESKTOP=KDE is equivalent to XDG_CURRENT_DESKTOP being unset, and having DE=kde. This implementation detail is worth noting because it has the consequence that a pre-set DE is ignored if a desktop environment is otherwise detected.\n\nValues of the variables that xdg-utils recognizes are:\n\nTable content:\nDesktop Environment | XDG_CURRENT_DESKTOP | DE | DESKTOP_SESSION\n– | X-Generic1 | generic | –\nCinnamon | Cinnamon, X-Cinnamon | cinnamon | –\nDeepin | Deepin, DEEPIN, deepin1 | deepin | –\nEnlightenment | ENLIGHTENMENT1 | enlightenment | –\nGNOME | GNOME2 | gnome | gnome\nGNOME Flashback | GNOME-Flashback, GNOME-Flashback:GNOME2 | gnome | gnome\nKDE Plasma | KDE | kde | –\nLXDE | LXDE | lxde | LXDE\nLXQt | LXQt | lxqt | –\nMATE | MATE | mate | mate\nXfce | XFCE | xfce | xfce, xfce4, Xfce Session\n\n1. This is not an environment registered with freedesktop.org.\n1. GNOME variations, including the GNOME Classic mode, are all regarded as the same by xdg-utils.\n\nNote that this is only a list of what the scripts provided by xdg-utils are capable of detecting. The scripts will still perform generic, environment-agnostic actions under the following conditions:\n\n- The generic routine was asked for, via XDG_CURRENT_DESKTOP=X-Generic or DE=generic.\n- Environment detection failed. All relevant environment variables were unrecognized or unset, and the classic fallbacks did not reveal anything.\n- Environment-specific actions were performed, but failed, e.g. due to a missing program.\n\n"
+    },
+    {
+      "title": "xdg-mime",
+      "level": 3,
+      "content": "xdg-mime(1) is a script for directly querying and modifying default MIME applications. It is used within other scripts, such as xdg-open, and is also a useful troubleshooting tool.\n\nDetermine a file's MIME type:\n\n```\n$ xdg-mime query filetype photo.jpeg\nimage/jpeg\n```\n\nDetermine the default application for a MIME type:\n\n```\n$ xdg-mime query default image/jpeg\ngimp.desktop\n```\n\nChange the default application for a MIME type:\n\n```\n$ xdg-mime default feh.desktop image/jpeg\n```\n\nTo set a file manager as the default file manager (for ex -Thunar) type:\n\n```\n$ xdg-mime default thunar.desktop inode/directory\n```\n\nDebug default application for MIME type:\n\n```\n$ env XDG_UTILS_DEBUG_LEVEL=10  xdg-mime query default text/html\nChecking /home/user/.config/mimeapps.list\nChecking /home/user/.local/share/applications/defaults.list and /home/user/.local/share/applications/mimeinfo.cache\nChecking /usr/local/share/applications/defaults.list and /usr/local/share/applications/mimeinfo.cache\nChecking /usr/share/applications/defaults.list and /usr/share/applications/mimeinfo.cache\nqutebrowser.desktop\n```\n\nWhen it is necessary to determine the MIME type of a file, xdg-mime attempts to use the right program for the desktop environment:\n\nTable content:\nDesktop Environment | Program | Package\nCinnamon | gio | glib2\nGNOME\nGNOME Flashback\nLXDE\nMATE\nXfce\nDeepin | – | –\nEnlightenment\nLXQt\nKDE Plasma | kmimetypefinder | kde-cli-tools\n\nIn the generic case, xdg-mime will:\n\n- Delegate to mimetype if present. Requires the perl-file-mimeinfo package to be installed.\n- Delegate to file if present.\n\n"
+    },
+    {
+      "title": "xdg-open",
+      "level": 3,
+      "content": "xdg-open(1) is a resource opener used by many applications, implementing the XDG MIME Applications standard while integrating with the system's desktop environment as much as possible.\n\nIf a desktop environment was detected, its provided handler will be invoked [2]:\n\nTable content:\nDesktop Environment | Program | Package\nCinnamon | gio | glib2\nGNOME\nGNOME Flashback\nMATE\nDeepin | dde-open | deepin-api\nEnlightenment | enlightenment_open | enlightenment\nKDE Plasma | kde-open1 | kde-cli-tools\nLXDE | pcmanfm | pcmanfm\nLXQt | – | –\nXfce | exo-open2 | exo\n\n1. If KDE_SESSION_VERSION is unset, then kfmclient from konqueror will be used instead. KDE Plasma should set this variable under any condition, though.\n1. gio from glib2 will also be tried.\n\nIn the generic case, xdg-open will:\n\n- Query #xdg-mime for the default desktop entry associated with the resource, parse the desktop entry, and execute its command.\n- Delegate to run-mailcap if present. Requires the run-mailcapAUR package to be installed.\n- Delegate to mimeopen if present. Requires the perl-file-mimeinfo package to be installed.\n\nSince xdg-mime relies on perl-file-mimeinfo package to implement the XDG MIME Applications standard, if you are not using a desktop environment, you should either install perl-file-mimeinfo, or consider a different resource opener.\n\n"
+    },
+    {
+      "title": "xdg-settings",
+      "level": 3,
+      "content": "See xdg-settings(1).\n\nShortcut to open all web MIME types with a single application:\n\n```\n$ xdg-settings set default-web-browser firefox.desktop\n```\n\nShortcut for setting the default application for a URL scheme:\n\n```\n$ xdg-settings set default-url-scheme-handler irc xchat.desktop\n```\n\n"
+    },
+    {
+      "title": "URL scheme handlers",
+      "level": 3,
+      "content": "To set the default application for a URL scheme you may also need to change the default application for the x-scheme-handler/* MIME types:\n\n```\n$ xdg-mime default firefox.desktop x-scheme-handler/https x-scheme-handler/http\n```\n\n"
+    }
+  ]
+}

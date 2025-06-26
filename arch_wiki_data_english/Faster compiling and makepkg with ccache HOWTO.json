@@ -1,0 +1,76 @@
+{
+  "title": "Faster compiling and makepkg with ccache HOWTO",
+  "url": "https://wiki.archlinux.org/title/Faster_compiling_and_makepkg_with_ccache_HOWTO",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Makepkg\n- Distcc\n\nccache is a compiler wrapper that stores on disk the compiled binaries and offers them back to speed up any eventual recompilation of the same code. While it may take a few seconds longer to compile a program the first time, subsequent compiles will be much faster as no proper compilation is made, only a lookup through the previously stored binaries. ccache is compatible with GCC and Clang.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the ccache package.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The default behavior can be overridden by configuration files. Priority of the configuration settings is as follows (where 1 is highest):\n\n1. Environment variables\n1. Cache-specific configuration file ($HOME/.config/ccache/ccache.conf)\n1. System-wide configuration file (/etc/ccache.conf)\n\nSee ccache(1) for details.\n\n"
+    },
+    {
+      "title": "Enable ccache for makepkg",
+      "level": 3,
+      "content": "To enable ccache when using makepkg edit /etc/makepkg.conf. In BUILDENV uncomment ccache (remove the exclamation mark) to enable caching. For example:\n\n```\n/etc/makepkg.conf\n```\n\n```\nBUILDENV=(!distcc color ccache check !sign)\n```\n\n"
+    },
+    {
+      "title": "Enable for command line",
+      "level": 3,
+      "content": "If you are compiling your code from the command line, and not building packages, then you will still want to use ccache to help speed things up.\n\nFor that, you can prefix each compilation command with ccache.\n\n```\n$ ccache cc hello_world.c\n```\n\nAlternatively, change your $PATH to include ccache's binaries before the path to your compiler:\n\n```\n$ export PATH=\"/usr/lib/ccache/bin:$PATH\"\n```\n\nYou may want to set this line as an environment variable for regular usage.\n\n"
+    },
+    {
+      "title": "Enable with colorgcc",
+      "level": 3,
+      "content": "Since colorgcc is also a compiler wrapper, some care needs to be taken to ensure each wrapper is called in the correct sequence.\n\n```\nexport PATH=\"/usr/lib/colorgcc/bin/:$PATH\"    # As per usual colorgcc installation, leave unchanged (don't add ccache)\nexport CCACHE_PATH=\"/usr/bin\"                 # Tell ccache to only use compilers here\n```\n\nThen colorgcc needs to be told to call ccache instead of the real compiler. Edit /etc/colorgcc/colorgccrc and change the /usr/bin paths to /usr/lib/ccache/bin for all the compilers in /usr/lib/ccache/bin:\n\n```\n/etc/colorgcc/colorgccrc\n```\n\n```\ng++: /usr/lib/ccache/bin/g++\ngcc: /usr/lib/ccache/bin/gcc\nc++: /usr/lib/ccache/bin/g++\ncc: /usr/lib/ccache/bin/cc\ng77:/usr/bin/g77\nf77:/usr/bin/g77\ngcj:/usr/bin/gcj\n```\n\nNewer versions of ccache will always enable color for GCC when GCC_COLORS is set. Color is enabled for Clang by default. If the output is not a TTY, ccache will ask the compiler to generate color, storing them in the cache, but stripping them from the output. There remains some issue in unifying -fdiagnostics-color.\n\n"
+    },
+    {
+      "title": "Sloppiness",
+      "level": 3,
+      "content": "ccache by default uses a very conservative comparison that minimizes both false positives and, for some projects, actual positives. Some of the comparisons are deemed useless and can be changed:\n\n```\n$ ccache --set-config=sloppiness=locale,time_macros\n```\n\nThis tells ccache to ignore the __FILE__ and time-related macros, which usually invalidate the cache and are considered harmful in reproducible builds. Locale differences are also ignored; ccache cares about it mainly because it determines the language of diagnostic messages.\n\nThe CCACHE_SLOPPINESS environment variable can be exported to override any pre-existing sloppiness settings.\n\nccache also by default caches the current directory being used for each build, which means cache misses for build pipelines that use a new, random temporary directory each time it is called. See the Compiling in different directories section of the ccache manual.\n\n"
+    },
+    {
+      "title": "Change the cache directory",
+      "level": 3,
+      "content": "You may want to move the cache directory to a faster location than the default ~/.cache/ccache directory, like an SSD or a ramdisk.\n\nTo change the cache location only in the current shell:\n\n```\n$ export CCACHE_DIR=/ramdisk/ccache\n```\n\nOr to change the location by default:\n\n```\n~/.config/ccache/ccache.conf\n```\n\n```\ncache_dir = /ramdisk/ccache\n```\n\n"
+    },
+    {
+      "title": "Set maximum cache size",
+      "level": 3,
+      "content": "The default value is 5 gigabyte, however it is possible to use a lower or even a higher value:\n\n```\n$ ccache --set-config=max_size=2.0G\n```\n\n"
+    },
+    {
+      "title": "Disable the cache via environment",
+      "level": 3,
+      "content": "If you wish to disable ccache, set the following environment variable:\n\n```\n$ export CCACHE_DISABLE=1\n```\n\n"
+    },
+    {
+      "title": "CLI",
+      "level": 3,
+      "content": "You can use the command-line utility ccache to show a statistics summary:\n\n```\n$ ccache -s\n```\n\nClear the cache completely:\n\n```\n$ ccache -C\n```\n\n"
+    },
+    {
+      "title": "makechrootpkg",
+      "level": 3,
+      "content": "It is also possible to use ccache with makechrootpkg from devtools package. To retain the cache when the chroot is cleaned the makechrootpkg option -d can be used to bind the cache directory from the regular system into the chroot, e.g.:\n\n```\n$ mkdir /path/of/chroot/ccache\n$ makechrootpkg -d /path/to/cache/:/ccache -r /path/of/chroot -- CCACHE_DIR=/ccache\n```\n\nThen ccache can be configured for the chroot in the same way as explained above for the regular system.\n\n"
+    },
+    {
+      "title": "Caveat",
+      "level": 2,
+      "content": "ccache is effective only when compiling exactly identical sources. (More exactly, preprocessed sources.)\n\nIn the Gentoo Linux community, a source based distribution, ccache has been notorious for its placebo effect, compilation failure (due to undesirable leftover objects), etc. Gentoo requires to turn off ccache before reporting compilation failure. See Gentoo:Handbook:Parts/Working/Features#Caching compilation objects and the blog post titled \"Debunking ccache myths\" by Diego Pettenò, an ex-Gentoo developer.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- ccache manual\n\n"
+    }
+  ]
+}

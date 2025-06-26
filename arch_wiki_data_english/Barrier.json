@@ -1,0 +1,151 @@
+{
+  "title": "Barrier",
+  "url": "https://wiki.archlinux.org/title/Barrier",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Deskflow lets you easily share a single mouse and keyboard between multiple computers (even with different operating systems) without the need for special hardware. It is intended for users with multiple computers on their desk since each system uses its own monitor(s).\n\nRedirecting the mouse and keyboard is as simple as moving the mouse off the edge of your screen. Deskflow also merges the clipboards of all the systems into one, allowing cut-and-paste between systems. Furthermore, it synchronizes screen savers so they all start and stop together and, if screen locking is enabled, only one screen requires a password to unlock them all.\n\nDeskflow is the official upstream of Synergy. The Deskflow project was established to cultivate community-driven development where everyone can collaborate. Synergy sponsors the Deskflow project by contributing code and providing financial support.\n\n"
+    },
+    {
+      "title": "Forks",
+      "level": 2,
+      "content": "Historically, a fork called Barrier was created to remove serial key code from the Synergy source code. After disagreements within the project leadership, the active maintainers created a new fork called input-leap.\n\n"
+    },
+    {
+      "title": "Deskflow",
+      "level": 3,
+      "content": "Install the deskflow package or deskflow-gitAUR.\n\nWayland: GNOME 46 or KDE 6.1+ is required for the input capture support.\n\n"
+    },
+    {
+      "title": "Input Leap or Barrier",
+      "level": 3,
+      "content": "You can install the input-leap or barrierAUR package.\n\n"
+    },
+    {
+      "title": "Synergy",
+      "level": 3,
+      "content": "Around June of 2023, Symless released Synergy 3 which is paid software. To install the latest version there is a user package synergy3-binAUR.\n\nOnce installed, run the GUI to setup your configuration. Then enable/start the synergy.service user unit.\n\nNow Synergy 3 will run without the GUI based on the configuration you setup. You can have the GUI open and the service will work along with it.\n\n"
+    },
+    {
+      "title": "Pre-configuration",
+      "level": 2,
+      "content": "First determine the IP addresses and host names for each machine and make sure each has a correct hosts file. (You may use IP addresses instead of hostnames as well.)\n\n```\n/etc/hosts\n```\n\n```\n10.10.66.1        archserver.localdomain       archserver\n10.10.66.100      archleft.localdomain         archleft\n10.10.66.105      archright.localdomain        archright\n```\n\n"
+    },
+    {
+      "title": "Server configuration",
+      "level": 2,
+      "content": "In Synergy, the computer with keyboard and mouse you want to share is called the server. See Synergy Configuration File Format for a detailed description of all available sections and options.\n\n"
+    },
+    {
+      "title": "Arch Linux",
+      "level": 3,
+      "content": "Synergy stores its configuration under /etc/synergy.conf, Barrier uses /etc/barrier.conf or $HOME/.local/share/barrier/.barrier.conf. If the configuration file does not exist, you can use the provided GUI (started with $ synergy or $ barrier, or the desktop launcher) to create it visually. Alternatively you may create it by copying /etc/synergy.conf.example or /usr/share/doc/barrier-headless/barrier.conf.example, whose comments should give you enough information for a basic configuration; if you need further reference or would like to use more advanced options not available from the GUI, read the guide mentioned above.\n\nIf you experience problems and you wish to run the server in the foreground, you can run the following command instead:\n\n```\n# synergys -f\n```\n\nThe synergy server process needs to attach to your user's X session, which means it needs to run as your user. Enable the synergys.service user unit.\n\n"
+    },
+    {
+      "title": "Set up encryption on server",
+      "level": 4,
+      "content": "To generate a certificate and fingerprint for the server to use.\n\nFor Barrier:\n\nNote: Barrier v2.4.0 introduced a new keyfile format, which requires a SHA256 fingerprint and \"v2:sha256:$fingerprint\" formatted lines. For older versions, make sure the fingerprints are SHA1 and do not include a prefix.\n\n```\n$ mkdir -p ~/.local/share/barrier/SSL/Fingerprints;\n$ openssl req -x509 -nodes -days 365 -subj /CN=Barrier -newkey rsa:4096 -keyout ~/.local/share/barrier/SSL/Barrier.pem -out ~/.local/share/barrier/SSL/Barrier.pem;\n$ fingerprint=$(openssl x509 -fingerprint -sha256 -noout -in ~/.local/share/barrier/SSL/Barrier.pem | cut -d\"=\" -f2);\n$ echo \"v2:sha256:$fingerprint\" > ~/.local/share/barrier/SSL/Fingerprints/Local.txt;\n```\n\nFor Synergy:\n\n```\n$ mkdir -p ~/.synergy/SSL/Fingerprints;\n$ openssl req -x509 -nodes -days 365 -subj /CN=Synergy -newkey rsa:4096 -keyout ~/.synergy/SSL/Synergy.pem -out ~/.synergy/SSL/Synergy.pem;\n$ fingerprint=$(openssl x509 -fingerprint -sha1 -noout -in ~/.synergy/SSL/Synergy.pem | cut -d\"=\" -f2);\n$ echo \"$fingerprint\" > ~/.synergy/SSL/Fingerprints/Local.txt;\n```\n\nTo activate the SSL plugin, add the --enable-crypto option. (Note that the Synergy GUI will not let you enable encryption without a valid license, whereas the Barrier GUI allows doing so.)\n\n- Starting from the command line:\n\n```\n$ synergys --enable-crypto\n```\n\n- Start the synergys.service user unit\n\n"
+    },
+    {
+      "title": "Windows",
+      "level": 3,
+      "content": "1. Open the Synergy program\n1. Select the option Server (share this computer's mouse and keyboard)\n1. Select Configure interactively\n1. Click the Configure Server... button\n1. This opens a window in which you can add screens depending on how many computers/screens you have: just drag the screen icon in the top-right corner to the screens area, and double-click it to edit its settings\n1. Click OK to close the screens window when you are ready, then click on Start to start the server\n\nOn Windows, configuration is saved by default in a synergy.sgc file, but its name and location can of course be changed at pleasure.\n\nIf you want to start the Synergy server everytime Windows starts, you have to launch the program as administrator, then go to Edit -> Services and select Install in the Server section; note that at the following reboot Synergy will indeed automatically start, but the tray icon will not display automatically (at least for version 1.4.2 beta on Windows 7). To uninstall the service, do the same thing but obviously select Uninstall.\n\nIf you want to start the server from the command-line, here is a Windows command you can place in a .bat file or just run from cmd.exe:\n\n```\nC:\\Program Files\\Synergy+\\bin\\synergys.exe  -f --debug ERROR --name left --log c:\\windows\\synergy.log -c C:/windows/synergy.sgc --address 10.66.66.2:24800\n```\n\n"
+    },
+    {
+      "title": "macOS",
+      "level": 3,
+      "content": "macOS has a similar configuration as Unix: check the official documentation for more information.\n\n"
+    },
+    {
+      "title": "Configuration examples",
+      "level": 3,
+      "content": "This is an example for a basic 3-computers setup:\n\n```\n/etc/synergy.conf\n```\n\n```\nsection: screens\n\tserver-fire:\n\tarchright-fire:\n\tarchleft-fire:\nend\n\nsection: links\n\tarchleft-fire:\n\t\tright = server-fire\n\tserver-fire:\n\t\tright = archright-fire\n\t\tleft = archleft-fire\n\tarchright-fire:\n\t\tleft = server-fire\nend\n```\n\nThis should be the example bundled with the Arch Linux package:\n\n```\n/etc/synergy.conf\n```\n\n```\nsection: screens\n        # three hosts named:  moe, larry, and curly\n        moe:\n        larry:\n        curly:\nend\n\nsection: links\n        # larry is to the right of moe and curly is above moe\n        moe:\n                right = larry\n                up    = curly\n\n        # moe is to the left of larry and curly is above larry.\n        # note that curly is above both moe and larry and moe\n        # and larry have a symmetric connection (they're in\n        # opposite directions of each other).\n        larry:\n                left  = moe\n                up    = curly\n\n        # larry is below curly.  if you move up from moe and then\n        # down, you'll end up on larry.\n        curly:\n                down  = larry\nend\n\nsection: aliases\n        # curly is also known as shemp\n        curly:\n                shemp\nend\n```\n\nThe following is a more customized example:\n\n```\nsynergy.sgc\n```\n\n```\nsection: screens\n\tleftpc:\n\t\thalfDuplexCapsLock = false\n\t\thalfDuplexNumLock = false\n\t\thalfDuplexScrollLock = false\n\t\txtestIsXineramaUnaware = false\n\t\tswitchCorners = none +top-left +top-right +bottom-left +bottom-right\n\t\tswitchCornerSize = 0\n\trightpc:\n\t\thalfDuplexCapsLock = false\n\t\thalfDuplexNumLock = false\n\t\thalfDuplexScrollLock = false\n\t\txtestIsXineramaUnaware = false\n\t\tswitchCorners = none +top-left +top-right +bottom-left +bottom-right\n\t\tswitchCornerSize = 0\nend\n\nsection: aliases\nleftpc:\n10.66.66.2\nrightpc:\n10.66.66.1\nend\n\nsection: links\n\tleftpc:\n\t\tright = rightpc\n\trightpc:\n\t\tleft = leftpc\nend\n\nsection: options\n\theartbeat = 1000\n\trelativeMouseMoves = false\n\tscreenSaverSync = false\n\twin32KeepForeground = false\n\tswitchCorners = none +top-left +top-right +bottom-left +bottom-right\n\tswitchCornerSize = 4\nend\n```\n\n"
+    },
+    {
+      "title": "Clients configuration",
+      "level": 2,
+      "content": "Note: **properly** \n\n"
+    },
+    {
+      "title": "Arch Linux",
+      "level": 3,
+      "content": "In a console window, type:\n\n```\n$ synergyc server-host-name\n```\n\nOr, to run synergy in the foreground:\n\n```\n$ synergyc -f server-host-name\n```\n\nHere, server-host-name is the host name of the server.\n\n"
+    },
+    {
+      "title": "Set up encryption on client",
+      "level": 4,
+      "content": "If you use the synergy command line client, copy the file containing the fingerprint ~/.synergy/SSL/Fingerprints/Local.txt from the server into the clients home directory ~/.synergy/SSL/Fingerprints/TrustedServers.txt. To start the synergy command line client with encryption, type:\n\n```\n$ synergyc --enable-crypto server-host-name\n```\n\nIf you want to enable the SSL trust without requiring the GUI on the client you can follow the steps below, but you should confirm the fingerprint that gets displays is the same one your server has in its GUI or in the ~/.synergy/SSL/Fingerprints/Local.txt on the server per above. The echo -n is required to avoid the openssl client hanging waiting for input.\n\nFor Barrier:\n\nNote: Barrier v2.4.0 introduced a new keyfile format, which requires a SHA256 fingerprint and a \"v2:sha256:$fingerprint\" line format. For older versions, make sure the fingerprints are SHA1 and do not include a prefix.\n\n```\n$ mkdir -p ~/.synergy/SSL/Fingerprints\n$ fingerprint=$(echo -n | openssl s_client -connect $YOUR_SYNERGY_SERVER:24800 2>/dev/null | openssl x509 -sha256 -noout -fingerprint | cut -d\"=\" -f2);\n$ echo \"v2:sha256:$fingerprint\" > ~/.synergy/SSL/Fingerprints/TrustedServers.txt\n```\n\nFor Synergy:\n\n```\n$ mkdir -p ~/.synergy/SSL/Fingerprints\n$ fingerprint=$(echo -n | openssl s_client -connect $YOUR_SYNERGY_SERVER:24800 2>/dev/null | openssl x509 -sha1 -noout -fingerprint | cut -d\"=\" -f2);\n$ echo \"$fingerprint\" > ~/.synergy/SSL/Fingerprints/TrustedServers.txt\n```\n\n- There is an open issue with the GUI client of synergy (see https://github.com/deskflow/deskflow/issues/4737). The dialog to prompt for confirmation of the server's fingerprint, only pops up if the logging level is set to INFO, DEBUG or DEBUG2.\n- The TrustedServers.txt could also reside here: ~/.local/share/synergy/SSL/Fingerprints/TrustedServers.txt, use this location if the one mentioned above does not work.\n\n"
+    },
+    {
+      "title": "Autostart",
+      "level": 4,
+      "content": "There exist several ways to automatically start the Synergy client, and they are actually the same that can be used for every other application.\n\n- You can add the next line to your xinitrc:\n\n```\n~/.xinitrc\n```\n\n```\n...\n\n#replace server-host-name with the real name\nsynergyc server-host-name\n```\n\nThe following is an alternative:\n\n```\n~/.xinitrc\n```\n\n```\nXINIT_CMD='/usr/bin/synergyc -d FATAL -n galileo-fire 10.66.66.2:24800'\n/usr/bin/pgrep -lxf \"$XINIT_CMD\" || ( ( $XINIT_CMD ) & )\n```\n\n- Otherwise, if you are using a display manager (GDM, SDDM, ...), or a stand-alone window manager (Openbox, ...), you could exploit its start-up script and add the following:\n\n```\nsynergyc server-host-name\n```\n\n- To start the Synergy client with systemd, create a service file:\n\n```\n~/.config/systemd/user/synergyc.service\n```\n\n```\n[Unit]\nDescription=Synergy Client Daemon\nAfter=network.target\n\n[Service]\nExecStart=/usr/bin/synergyc --no-daemon server-name\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n```\n\nThen do a daemon-reload and start the synergyc.service user unit.\n\nTo start the service at login for your user, enable it as a user unit.\n\nAutomatically starting Synergy is also documented in its official reference page.\n\n"
+    },
+    {
+      "title": "Windows",
+      "level": 3,
+      "content": "After installation, open the Synergy program, select the option Client (use another computer's keyboard and mouse) and type the host name of the server computer in the text box, then click Start to start the client.\n\nIf you want to start the Synergy client every time Windows starts, you have to launch the program as an administrator, then go to Edit -> Services and select Install in the Client section.\n\nIf you want to start the client from the command-line, here is a Windows command you can place in a .bat file or just run from cmd.exe. This points to a configuration file in C:\\synergy.sgc and runs in the background like a service.\n\n```\nSTART /MIN /D\"C:\\Program Files\\Synergy+\\bin\" synergys.exe -d ERROR -n m6300 -c C:\\synergy.sgc -a 10.66.66.2:24800\n```\n\n"
+    },
+    {
+      "title": "macOS",
+      "level": 3,
+      "content": "Locate the synergyc program in the synergyc folder and drag it onto the terminal window: the full path will appear in the terminal. Now append the host name of the server, so that the complete command will look like this:\n\n```\n/path/to/synergyc/synergyc server-host-name\n```\n\nThen press Enter.\n\n"
+    },
+    {
+      "title": "Known issues",
+      "level": 2,
+      "content": "If Arch is being used as a client in a Synergy installation, the server may not be able to wake the client monitor. There are some workarounds, such as executing the following via SSH, if ACPI is enabled (see: Display Power Management Signaling#Runtime settings):\n\n```\n# xset dpms force on\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "The official documentation has a FAQ and also a troubleshooting page.\n\n"
+    },
+    {
+      "title": "Keyboard AltGr",
+      "level": 3,
+      "content": "If you encounter problems with AltGr/ISO_Level3_Shift, add\n\n```\n/etc/synergys.conf\n```\n\n```\naltgr = alt       #1.8.2\naltgr = shift     #v1.8.3 and higher\n```\n\ninto the screen/client section.\n\n"
+    },
+    {
+      "title": "Keyboard repeat",
+      "level": 3,
+      "content": "If you experience problems with your keyboard repeat on the client machine (Linux host), simply type:\n\n```\n# /usr/bin/xset r on\n```\n\nin any console.\n\n"
+    },
+    {
+      "title": "Keyboard mapping",
+      "level": 3,
+      "content": "If you experience problems with the keyboard mapping when using the server's keyboard in a client window (e.g a terminal) then re-setting the X key map after starting synergyc may help. The following command sets the keymap to its current value:\n\n```\n# setxkbmap $(setxkbmap -query | grep \"^layout:\" | awk -F \": *\" '{print $2}')\n```\n\n"
+    },
+    {
+      "title": "No cursor in Gnome",
+      "level": 3,
+      "content": "When GNOME does not detect a mouse, it will default to touchscreen mode and hide the cursor. To enable run:\n\n```\n# dconf write /org/gnome/settings-daemon/plugins/cursor/active false\n```\n\nThis can be added to an init script or systemd unit:\n\n```\nExecStartPost=dconf write /org/gnome/settings-daemon/plugins/cursor/active false\n```\n\nMixing xorg and wayland environments also does not currently work. Try starting gnome in xorg for both client and server.\n\n"
+    },
+    {
+      "title": "Client is returning \"failed to verify server certificate fingerprint\"",
+      "level": 3,
+      "content": "You need to copy the content of server's ~/.synergy/SSL/Fingerprints/Local.txt into client's ~/.synergy/SSL/Fingerprints/TrustedServers.txt. See #Set up encryption on client.\n\n"
+    },
+    {
+      "title": "Scroll Lock LED does not light",
+      "level": 3,
+      "content": "When using Scroll Lock to lock to a client (or to enter relative mouse move mode), you may run into an issue with your keyboard's Scroll Lock LED not lighting. This can be solved by binding the Scroll_Lock key to an empty modifier key.\n\nFirst, find an empty modifier. In this case, mod3 is available:\n\n```\n$ xmodmap\n```\n\n```\nxmodmap:  up to 4 keys per modifier, (keycodes in parentheses):\n\nshift       Shift_L (0x32),  Shift_R (0x3e)\nlock        Caps_Lock (0x42)\ncontrol     Control_L (0x25),  Control_R (0x69)\nmod1        Alt_L (0x40),  Alt_R (0x6c),  Meta_L (0xcd)\nmod2        Num_Lock (0x4d)\nmod3\nmod4        Super_L (0x85),  Super_R (0x86),  Super_L (0xce),  Hyper_L (0xcf)\nmod5        ISO_Level3_Shift (0x5c),  Mode_switch (0xcb)\n```\n\nThen, add the new mapping.\n\n```\n$ xmodmap -e 'add mod3 = Scroll_Lock'\n$ echo \"add mod3 = Scroll_Lock\" >> ~/.Xmodmap\n```\n\nSee Xmodmap#Activating the custom table to have ~/.Xmodmap loaded on login.\n\nAfter making this change, test the LED and screen locking. If you find that you need to press Scroll Lock twice to lock screens, enable halfDuplexScrollLock on all screens in section: screens.\n\n"
+    },
+    {
+      "title": "Additional mouse buttons do not work in client",
+      "level": 3,
+      "content": "If you find that additional mouse buttons (i.e. Mouse4/Mouse5) do not translate to a client, try adding the following to section: options:\n\n```\nmousebutton(6) = mousebutton(4)\nmousebutton(7) = mousebutton(5)\n```\n\nThis will re-map the mouse keys to the proper number. If that does not fix the problem, remove the configuration, stop Synergy, and start it in the foreground with debug logging enabled:\n\n```\n$ synergys -f -d DEBUG1\n```\n\nThen, move your cursor to the screen of the client with the issue. Click the non-functioning keys, and watch for log entries like this:\n\n```\n[2017-09-30T14:56:45] DEBUG1: onMouseDown id=6\n...\n[2017-09-30T14:56:46] DEBUG1: onMouseUp id=6\n```\n\nThe id=... part will have the right number to use in mousebutton(...)\n\n"
+    },
+    {
+      "title": "Mouse fixed in certain games",
+      "level": 3,
+      "content": "In some applications (like Overwatch or other games) the cursor gets trapped in the middle of the screen.\n\nAccording to https://github.com/deskflow/deskflow/issues/2631 this is an issue that is known.\n\nJust set relative mouse movement in your settings and make sure to lock the screen.\n\n"
+    },
+    {
+      "title": "External links",
+      "level": 2,
+      "content": "- Synergy website: https://symless.com/synergy/\n- Official documentation: https://github.com/symless/synergy-core/wiki/User-Guide\n\n"
+    }
+  ]
+}

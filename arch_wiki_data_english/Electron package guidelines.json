@@ -1,0 +1,36 @@
+{
+  "title": "Electron package guidelines",
+  "url": "https://wiki.archlinux.org/title/Electron_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document covers standards and guidelines on writing PKGBUILDs for Electron.\n\n"
+    },
+    {
+      "title": "Using the system electron",
+      "level": 2,
+      "content": "Arch Linux provides global electron and versioned electron* packages that can be used to run an electron application via a shellscript wrapper:\n\n```\n#!/bin/sh\n\nexec electron /path/to/appname/ \"$@\"\n```\n\nThe appname/ directory, or alternatively a file bundle called appname.asar, can be found in a prebuilt electron application as the resources/app/ folder (or resources/app.asar). Everything else is just a copy of the electron runtime and can be removed from the final package.\n\n"
+    },
+    {
+      "title": "Building compiled extensions against the system electron",
+      "level": 3,
+      "content": "Some electron applications have compiled native extensions which link to the electron runtime, and must be built using the correct electron version. Since npm/yarn will always build against a private prebuilt copy of electron, patch the electron dependency from package.json to reference the same version as the system electron dependency. The build system will download the prebuilt copy it requires, compile the native extensions, and package everything into a final distribution, but this can be pruned during the package() step as usual.\n\nAlternatively, you can remove the electron dependency from package.json and set the correct environment variables before running npm:\n\n```\nexport npm_config_target=$(tail /usr/lib/electron/version)\nexport npm_config_arch=x64\nexport npm_config_target_arch=x64\nexport npm_config_disturl=https://electronjs.org/headers[dead link 2023-10-29 ⓘ]\nexport npm_config_runtime=electron\nexport npm_config_build_from_source=true\nHOME=\"$srcdir/.electron-gyp\" npm install\n```\n\nSet HOME to a path inside the $srcdir so the build process does not place any files in your real HOME directory. Make sure to adjust the path for all further commands that make use of the .electron-gyp cache.\n\n(more details in Electron docs).\n\n"
+    },
+    {
+      "title": "Using electron-builder with system electron",
+      "level": 3,
+      "content": "Many projects use electron-builder to build and package the Javascript file and Electron binaries. By default electron-builder downloads the entire electron version that is defined in the package management file (e.g. package.json). This might not be desired if you want to use the system electron and save the bandwidth since you are going to throw away the electron binaries anyway. The electron-builder provides the configurations electronDist and electronVersion, to specify a custom path of Electron and the version the application is packaged for respectively.\n\nFind the electron-builder configuration file (e.g. electron-builder.json) and add the following settings:\n\n- electronDist to /usr/lib/electron for electron or /usr/lib/electron2 for electron2AUR\n- electronVersion to the contents of /usr/lib/electron/version without the leading v\n\nPackages that apply this: rocketchat-desktopAUR ubports-installer-gitAUR\n\nelectron-builder configuration[dead link 2024-10-12 ⓘ]\n\nAlternatively you can use the CLI to change/add these settings like this:\n\n```\n./node_modules/.bin/electron-builder --linux --x64 --dir $dist -c.electronDist=$electronDist -c.electronVersion=$electronVer\n```\n\nNote that you have to specify all these options or it will not work.\n\n"
+    },
+    {
+      "title": "Architecture",
+      "level": 2,
+      "content": "See PKGBUILD#arch.\n\nAn Electron package that contains compiled native extensions is architecture-dependent. Otherwise it is most likely architecture-independent.\n\nIf the package contains a prebuilt copy of electron, it is always architecture-dependent.\n\n"
+    },
+    {
+      "title": "Directory structure",
+      "level": 2,
+      "content": "If the package is architecture-dependent, install the resources/app/ directory to /usr/lib/appname/. Otherwise use /usr/share/appname/.\n\nIf the package contains a prebuilt copy of electron, copy the final distribution in its entirety to /opt/appname.\n\n"
+    }
+  ]
+}

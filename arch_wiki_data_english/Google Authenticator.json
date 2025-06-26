@@ -1,0 +1,81 @@
+{
+  "title": "Google Authenticator",
+  "url": "https://wiki.archlinux.org/title/Google_Authenticator",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- OATH\n- pam_oath\n- Identity management\n\nGoogle Authenticator provides a two-step authentication procedure using one-time passcodes (OTP), initially standardized by the Initiative for Open Authentication (OATH). The authentication mechanism integrates into the Linux PAM system. This guide shows the installation and configuration of this mechanism.\n\nFor the reverse operation (generating codes compatible with Google Authenticator under Linux) see #Code generation below.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the libpam-google-authenticator package, which provides the client program google-authenticator(1) and the PAM module pam_google_authenticator.so. The development version is available with google-authenticator-libpam-gitAUR.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "This section covers configuring the system's PAM to require Google Authenticator OTP authentication for SSH and, optionally, desktop login.\n\n"
+    },
+    {
+      "title": "SSH",
+      "level": 3,
+      "content": "Usually one demands two-pass authentication only for remote login. The corresponding PAM configuration file is /etc/pam.d/sshd. In case you want to use Google Authenticator globally you would need to change /etc/pam.d/system-auth, however, in this case proceed with extreme caution to not lock yourself out. In this guide we proceed with editing /etc/pam.d/sshd which is most safely (but not necessarily) done in a local session.\n\nTo enter both, your unix password and your OTP, add pam_google_authenticator.so above the system-remote-login lines to /etc/pam.d/sshd:\n\n```\nauth            required        pam_google_authenticator.so\nauth            include         system-remote-login\naccount         include         system-remote-login\npassword        include         system-remote-login\nsession         include         system-remote-login\n```\n\nThis will ask for the OTP before prompting for your Unix password. Changing the order of the two modules will reverse this order.\n\nTo allow login with either the OTP or your Unix password use:\n\n```\nauth            sufficient      pam_google_authenticator.so\n```\n\nEnable keyboard interactive authentication in /etc/ssh/sshd_config.d/99-archlinux.conf:\n\n```\nKbdInteractiveAuthentication yes\n```\n\nFinally, reload sshd.service.\n\n"
+    },
+    {
+      "title": "Request OTP only when connecting from outside your local network",
+      "level": 4,
+      "content": "Sometimes, we just want to enable the 2FA capability just when we connect from outside our local network. To achieve this, create a file (e.g. /etc/security/access-local.conf) and add the networks where you want to be able to bypass the 2FA from:\n\n```\n# only allow from local IP range\n+ : ALL : 192.168.20.0/24\n# Additional network: VPN tunnel ip range (in case you have one)\n+ : ALL : 10.8.0.0/24\n+ : ALL : LOCAL\n- : ALL : ALL\n```\n\nThen edit your /etc/pam.d/sshd and add the line:\n\n```\n#%PAM-1.0\nauth [success=1 default=ignore] pam_access.so accessfile=/etc/security/access-local.conf\nauth      required  pam_google_authenticator.so\nauth      include   system-remote-login\naccount   include   system-remote-login\npassword  include   system-remote-login\nsession   include   system-remote-login\n```\n\n"
+    },
+    {
+      "title": "Desktop logins",
+      "level": 3,
+      "content": "The Google Authenticator PAM plugin can also be used for console logins and with GDM. Just add the following to /etc/pam.d/login or the /etc/pam.d/gdm-password file:\n\n```\nauth required pam_google_authenticator.so\n```\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Every user who wants to use two-pass authentication needs to\n\n- generate a secret key file in their home folder, and\n- setup their OTP generators accordingly\n\n"
+    },
+    {
+      "title": "Generating a secret key file",
+      "level": 3,
+      "content": "The google-authenticator generates a TOTP secret key file as follows:\n\n```\n$ google-authenticator\n```\n\n```\nDo you want authentication tokens to be time-based (y/n) y\ngenerated_QR_code_here\nYour new secret key is: ZVZG5UZU4D7MY4DH\nYour verification code is 269371\nYour emergency scratch codes are:\n  70058954\n  97277505\n  99684896\n  56514332\n  82717798\n\nDo you want me to update your \"/home/username/.google_authenticator\" file (y/n) y\n\nDo you want to disallow multiple uses of the same authentication\ntoken? This restricts you to one login about every 30s, but it increases\nyour chances to notice or even prevent man-in-the-middle attacks (y/n) y\n\nBy default, tokens are good for 30 seconds and in order to compensate for\npossible time-skew between the client and the server, we allow an extra\ntoken before and after the current time. If you experience problems with poor\ntime synchronization, you can increase the window from its default\nsize of 1:30min to about 4min. Do you want to do so (y/n) n\n\nIf the computer that you are logging into is not hardened against brute-force\nlogin attempts, you can enable rate-limiting for the authentication module.\nBy default, this limits attackers to no more than 3 login attempts every 30s.\nDo you want to enable rate-limiting (y/n) y\n```\n\nIt is recommended to store the emergency scratch codes safely (print them out and keep them in a safe location) as they are your only way to log in (via SSH) when you lost your mobile phone (i.e. your OTP-generator). They are also stored in ~/.google_authenticator, so you can look them up any time as long as you are logged in.\n\n"
+    },
+    {
+      "title": "Storage location",
+      "level": 4,
+      "content": "If you want to change the secret key files' storage path, you can use the flag --secret:\n\n```\n$ google-authenticator --secret=\"/path_folder/username\"\n```\n\nThen, do not forget to change the location path for PAM, in /etc/pam.d/sshd:\n\n```\n/etc/pam.d/sshd\n```\n\n```\nauth required pam_google_authenticator.so user=root secret=/path_folder/${USER}\n```\n\nuser=root is used to force PAM to search the file using root user.\n\nAlso, take care with the permissions of the secret key file. Indeed, the file must be only-readable by the owner (chmod: 400). Here, the owner is root.\n\n```\n$ chown root:root /path_file/secret_key_files\n$ chmod 400 /path_file/secret_key_files\n```\n\n"
+    },
+    {
+      "title": "Code generation",
+      "level": 3,
+      "content": "In the final setup step, each user has to associate the secret key file generated in their home directory with their choice of OTP-generators to serve the authentication codes. A user may set up generators on different devices for redundancy, for example in an OTP application on a mobile phone and a separate password manager, or decide to rely on the emergency scratch codes generated earlier as backup.\n\n"
+    },
+    {
+      "title": "Mobile phone generators",
+      "level": 4,
+      "content": "Install a generator application on your mobile phone (e.g.):\n\n- FreeOTP for Android (F-Droid, Google Play) or iOS (App Store).\n- FreeOTP+ for Android (F-Droid, Google Play).\n- Aegis for Android (F-Droid, Google Play).\n- Bitwarden for Android (F-Droid, Google Play) or iOS (App Store).\n- Google Authenticator for Android (Google Play) or iOS (App Store).\n\nIn the mobile application, create a new account and either scan the QR code from the URL you were told when generating the secret key file, or enter the secret key (in the example above 'ZVZG5UZU4D7MY4DH') manually.\n\nNow you should see a new passcode token being generated every 30 seconds on your phone.\n\nIf you have Google Authenticator configured with other systems, then losing your device can prevent you from being able to log in to those systems. Having additional ways to generate the codes can be helpful.\n\n"
+    },
+    {
+      "title": "Code managers",
+      "level": 4,
+      "content": "A script that enables the display, generation, storage and management of Google Authenticator codes is provided by gashellAUR. An alternative option is auther-gitAUR.\n\n"
+    },
+    {
+      "title": "KeePassXC",
+      "level": 4,
+      "content": "GUI password manager keepassxc allows associating Google Authenticator codes to its entries, and then it can generate OTP codes and export its keys via QR code.\n\n"
+    },
+    {
+      "title": "Command line",
+      "level": 4,
+      "content": "The easiest way to generate codes is with oathtool(1). It is available in the oath-toolkit package, and can be used as follows:\n\n```\n$ oathtool --totp --base32 secret_key\n```\n\nOn most Android systems with sufficient user access, the Google Authenticator database can be copied off the device and accessed directly, as it is an sqlite3 database. However, at some point in July 2022, the secret column on the accounts table started using encryption. If your database backup does not use this encryption, this shell script will read a Google Authenticator database and generate live codes for each key found:\n\n```\ngoogle-authenticator.sh\n```\n\n```\n#!/bin/sh\n\n# This is the path to the Google Authenticator app file.  It is typically\n# located in /data under Android.  Copy it to your PC in a safe location and\n# specify the path to it here.\nDB=\"/path/to/com.google.android.apps.authenticator/databases/databases\"\n\nsqlite3 \"$DB\" 'SELECT email,secret FROM accounts;' | while read A\ndo\n        NAME=`echo \"$A\" | cut -d '|' -f 1`\n        KEY=`echo \"$A\" | cut -d '|' -f 2`\n        CODE=`oathtool --totp -b \"$KEY\"`\n        echo -e \"\\e[1;32m$CODE\\e[0m - \\e[1;33m$NAME\\e[0m\"\ndone\n```\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 3,
+      "content": "SSH to your host from another machine and/or from another terminal window:\n\n```\n$ ssh hostname\nlogin as: username\nVerification code: generated/backup_code\nPassword: password\n$\n```\n\n"
+    }
+  ]
+}

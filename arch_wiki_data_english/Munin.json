@@ -1,0 +1,116 @@
+{
+  "title": "Munin",
+  "url": "https://wiki.archlinux.org/title/Munin",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Munin is a networked resource monitoring tool that can help analyze resource trends and bottlenecks. Munin has a master/node architecture in which the master regularly fetches the data from the nodes and presents the information in graphs through a web interface. A default installation provides a lot of graphs with almost no work and new graphs can be easily created added as plugins. [1]\n\nYou can check out OpenStreetMap's Munin install for an example.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the munin package on the master machine and munin-node on the devices that you whish to monitor.\n\nYou can also install them both on the same machine so that the master machine monitors itself.\n\nFurther documentation may be found on the Munin documentation wiki.\n\n"
+    },
+    {
+      "title": "Directories",
+      "level": 4,
+      "content": "Create a directory where the munin-master will write the generated HTML and graph images. The munin user must have write permission to this directory.\n\nThe following example uses /srv/http/munin, so the generated output can be viewed at http://localhost/munin/, provided that a web server is installed and running:\n\n```\n# mkdir /srv/http/munin\n# chown munin:munin /srv/http/munin\n```\n\nUncomment the htmldir entry in /etc/munin/munin.conf and change it to the directory created in the previous step:\n\n```\nhtmldir /srv/http/munin\n```\n\n"
+    },
+    {
+      "title": "Cron",
+      "level": 4,
+      "content": "Run the following to have Munin collect data and update the generated HTML and graph images every 5 minutes:\n\n```\n# crontab /etc/munin/munin-cron-entry -u munin\n```\n\nConfigure the email server to send mails to the munin user. If using postfix, add the following:\n\n```\n/etc/postfix/aliases\n```\n\n```\nmunin:    root\n```\n\nAnd run:\n\n```\n# newaliases\n```\n\nInstead of a cron job a systemd timer can be used.\n\nThis needs a service unit configuration:\n\n```\n/etc/systemd/system/munin-cron.service\n```\n\n```\n[Unit]\nDescription=Survey monitored computers\nAfter=network.target\n\n[Service]\nUser=munin\nExecStart=/usr/bin/munin-cron\n```\n\nAnd a timer unit configuration:\n\n```\n/etc/systemd/system/munin-cron.timer\n```\n\n```\n[Unit]\nDescription=Survey monitored computers every five minutes\n\n[Timer]\nOnCalendar=*-*-* *:00/5:00\n\n[Install]\nWantedBy=multi-user.target\n```\n\nNow, reload systemd configuration, enable/start munin-cron.timer and verify that everything is working:\n\n```\n# journalctl --unit munin-cron.service\n# less /var/log/munin/munin-update.log\n```\n\n"
+    },
+    {
+      "title": "Permissions",
+      "level": 4,
+      "content": "When graph_strategy cgi is enabled in /etc/munin/munin.conf ensure the directory /var/lib/munin/cgi-tmp is owned by user and group munin so that the /usr/share/munin/cgi/munin-cgi-graph script is able to write the png files to this directory.\n\n```\n# chown munin: /var/lib/munin/cgi-tmp\n```\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 4,
+      "content": "Once munin-cron is configured to run Munin will be ready to start generating graphs. Ensure the munin-node.service is running on each of the nodes. It may be useful to jump ahead to the #Munin node section and return here once the node are up and running.\n\nBy runnning the munin-cron command manually as the munin user, it will trigger the generation of HTML and graph images immediately without having to wait for the next cron run:\n\n```\n[munin]$ munin-cron\n```\n\nIf the munin logging is configured, the logs are usually found in /var/log/munin/. Watching the munin-update.log log in a seperate terminal after running the munin-cron command can be helpful in diagnosing issues.\n\n```\n# tail -f /var/log/munin/munin-update.log\n```\n\nAnd finally test the interface by pointing your browser to the output directory or http://localhost/munin/.\n\n"
+    },
+    {
+      "title": "Daemon",
+      "level": 4,
+      "content": "On the nodes, enable/start munin-node.service.\n\n"
+    },
+    {
+      "title": "IPv6",
+      "level": 4,
+      "content": "For IPv6 support on munin-node, using:\n\n```\n/etc/munin/munin-node.conf\n```\n\n```\nhost :::1\n```\n\nInstall:\n\n- perl-socket6\n- perl-io-socket-inet6\n\n"
+    },
+    {
+      "title": "Customization",
+      "level": 4,
+      "content": "Before running munin, you might want to setup the hostname of your system. In /etc/munin/munin.conf, the default hostname is myhostname. This can be altered to any preferred hostname. The hostname will be used to group and name the .rrd files in /var/lib/munin and further, used to group the html files and graphs in your selected munin-master directory.\n\n"
+    },
+    {
+      "title": "Plugins",
+      "level": 4,
+      "content": "Run munin-node-configure with the --suggest option to have Munin suggest plugins it thinks will work on your installation:\n\n```\n# munin-node-configure --suggest\n```\n\nIf there is a suggestion for a plugin you want to use, follow that suggestion and run the command again. When you are satisfied with the plugins suggested by munin-node-configure, run it with the --shell option to have the plugins configured:\n\n```\n# munin-node-configure --shell | sh\n```\n\nBasically all plugins are added in the following manner (although there are exceptions, review each plugin!):\n\nDownload a plugin, then copy or move it to /usr/lib/munin/plugins:\n\n```\n# cp plugin /usr/lib/munin/plugins/\n```\n\nThen link the plugin to /etc/munin/plugins:\n\n```\n# ln -s /usr/lib/munin/plugins/plugin /etc/munin/plugins/\n```\n\nNow test your plugin. You do not need to use the full path to the plugin, munin-run should be able to figure it out:\n\n```\n# munin-run plugin\n```\n\nAnd restart munin-node.service. Finally, refresh the web page.\n\nThere are many Munin plugins out there just waiting to be installed. The MuninExchange is an excellent place to start looking, and if you cannot find a plugin that does what you want it is easy to write your own. Have a look at Developing Plugins at the Munin documentation wiki to learn how.\n\nIf you want to remove a plugin, simply delete the linked file in /etc/munin/plugins - there is no need to remove the plugin from /usr/lib/munin/plugins.\n\n```\n# rm /etc/munin/plugins/plugin\n```\n\nIf you come across a plugin that is not working as expected (for example giving you no output at all) it might be interesting to run it directly. Fortunately there is a way to do this. Following the instructions until here, you will for example notice, that the plugin apache_accesses gives no output at all, when enabled. In order to run the plugin directly:\n\n```\n# munin-run apache_accesses\n```\n\nThe following error:\n\n```\nLWP::UserAgent not found at /etc/munin/plugins/apache_accesses line 86.\n```\n\nindicates that a perl function could not be found. To resolve the problem, install the missing library, in this case, perl-libwww.\n\n"
+    },
+    {
+      "title": "Permissions",
+      "level": 4,
+      "content": "Because many plugins read log files, it is useful to add munin user into log group:\n\n```\n# usermod -a -G log munin\n```\n\n"
+    },
+    {
+      "title": "Web server (optional)",
+      "level": 2,
+      "content": "This guide sets up Munin to generate static HTML and graph images and write them in a directory of your choosing. You can view these generated files locally with any web browser. If you want to view the generated files from a remote machine, then you will need to install and configure one of the following web servers:\n\n- Apache HTTP Server\n- Lighttpd\n- Nginx\n\nOr one of the other servers found in the web server category.\n\n"
+    },
+    {
+      "title": "Apache VirtualHost examples",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nBased on information found here:\n\n- http://guide.munin-monitoring.org/en/stable-2.0/example/webserver/apache-virtualhost.html\n- http://munin-monitoring.org/wiki/MuninConfigurationMasterCGI[dead link 2021-05-17 ⓘ]\n\nIn the next major release of Munin, things will be much simpler. Check it out:\n\n- https://web.archive.org/web/20180128051736/http://guide.munin-monitoring.org/en/latest/example/webserver/apache-virtualhost.html\n\n"
+    },
+    {
+      "title": "Basic static HTML",
+      "level": 4,
+      "content": "```\n<VirtualHost *:80>\n    ServerName localhost\n    ServerAdmin  root@localhost\n\n    DocumentRoot /srv/http/munin\n\n    ErrorLog /var/log/httpd/munin-error.log\n    CustomLog /var/log/httpd/munin-access.log combined\n</VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "Static HTML with DynaZoom feature",
+      "level": 4,
+      "content": "Install perl-cgi-fast.\n\nYou must enable one of these:\n\n- mod_cgid (or mod_cgi if using mpm_prefork_module) by uncommenting the line in httpd.conf.\n- Or install mod_fcgidAUR and add LoadModule fcgid_module modules/mod_fcgid.so in httpd.conf.\n\n```\n<VirtualHost *:80>\n   ServerName localhost\n   ServerAdmin  root@localhost\n\n   DocumentRoot /srv/http/munin\n\n   ErrorLog /var/log/httpd/munin-error.log\n   CustomLog /var/log/httpd/munin-access.log combined\n\n   # Rewrites\n   RewriteEngine On\n\n   # Images\n   RewriteRule ^/munin-cgi(.*) /usr/share/munin/cgi/$1 [L] \n\n   # Ensure we can run (fast)cgi scripts\n   <Directory \"/usr/share/munin/cgi\">\n       Require all granted\n       Options +ExecCGI\n       <IfModule mod_fcgid.c>\n           SetHandler fcgid-script\n       </IfModule>\n       <IfModule !mod_fcgid.c>\n           SetHandler cgi-script\n       </IfModule>\n   </Directory>\n</VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "DynaZoom Permissions",
+      "level": 4,
+      "content": "When Munin cannot draw graphs and logs a similar message to Could not draw graph \"/var/lib/munin/cgi-tmp/munin-cgi-graph/\" check to make sure group permissions are set on /var/lib/munin/cgi-tmp/munin-cgi-graph/ so the munin-cgi-graph directory has writeable group permissions such as drwxrwxr-x 3 munin http 4096 Aug 9 20:11 munin-cgi-graph.\n\nls -l /var/lib/munin/cgi-tmp/\n\nIf group permissions are not set, then\n\nchmod g+w /var/lib/munin/cgi-tmp/munin-cgi-graph/\n\n"
+    },
+    {
+      "title": "Full dynamic",
+      "level": 4,
+      "content": "Use this VirtualHost if you want to set html_strategy and graph_strategy to cgi. Page loads will take longer because all the HTML and PNG files will be dynamically generated, but the munin-cron run will take less time because it will not execute munin-html and munin-graph. This feature may become necessary for you if your master polls many nodes and the munin-cron risks taking more than 5 minutes.\n\nInstall perl-cgi-fast.\n\nYou must enable one of these:\n\n- mod_cgid (or mod_cgi if using mpm_prefork_module) by uncommenting the line in httpd.conf.\n- Or install mod_fcgidAUR and add LoadModule mod_fcgid modules/mod_fcgid.so in httpd.conf.\n\n```\n<VirtualHost *:80>\n   ServerName localhost\n   ServerAdmin  root@localhost\n\n   DocumentRoot /srv/http/munin\n\n   ErrorLog /var/log/httpd/munin-error.log\n   CustomLog /var/log/httpd/munin-access.log combined\n\n\n   # Rewrites\n   RewriteEngine On\n\n   # Static content in /static\n   RewriteRule ^/favicon.ico /etc/munin/static/favicon.ico [L] \n   RewriteRule ^/static/(.*) /etc/munin/static/$1          [L] \n\n   # HTML\n   RewriteCond %{REQUEST_URI} .html$ [or]\n   RewriteCond %{REQUEST_URI} =/\n   RewriteRule ^/(.*)          /usr/share/munin/cgi/munin-cgi-html/$1 [L] \n\n   # Images\n   RewriteRule ^/munin-cgi(.*) /usr/share/munin/cgi/$1 [L] \n\n   <Directory \"/etc/munin/static\">\n       Require all granted\n   </Directory>\n\n   # Ensure we can run (fast)cgi scripts\n   <Directory \"/usr/share/munin/cgi\">\n       Require all granted\n       Options +ExecCGI\n       <IfModule mod_fcgid.c>\n           SetHandler fcgid-script\n       </IfModule>\n       <IfModule !mod_fcgid.c>\n           SetHandler cgi-script\n       </IfModule>\n   </Directory>\n</VirtualHost>\n```\n\n"
+    },
+    {
+      "title": "Munin 2.0.x",
+      "level": 4,
+      "content": "This example Nginx setup is based on a Munin 2.0.x munin master installation. It requires FastCGI and uses the html_strategy cgi and graph_strategy cgi in the munin.conf configuration.\n\nInstall the nginx, perl-cgi-fast and perl-html-template-expr packages on the Munin-Master.\n\nAs we will be using the cgi strategy the systemd socket files need to be enabled. So the /run/munin/fcgi-graph.sock and /run/munin/fcgi-html.sock sockets are created for the Nginx FastCGI configuration to hook into.\n\nEnable/start munin-graph.socket and munin-html.socket.\n\nCreate the munin vhost configuration file\n\n```\n/etc/nginx/sites-available/munin\n```\n\n```\nserver {\n    server_name yourhost.example.com;\n    listen 80;\n    access_log /var/log/nginx/munin-access.log;\n    error_log /var/log/nginx/munin-error.log info;\n    location ^~ /munin-cgi/munin-cgi-graph/ {\n        fastcgi_split_path_info ^(/munin-cgi/munin-cgi-graph)(.*);\n        fastcgi_param PATH_INFO $fastcgi_path_info;\n        fastcgi_pass unix:/run/munin/fcgi-graph.sock;\n        include fastcgi_params;\n    }\n    location /munin/static/ {\n        alias /etc/munin/static/;\n    }\n    location /munin/ {\n        fastcgi_split_path_info ^(/munin)(.*);\n        fastcgi_param PATH_INFO $fastcgi_path_info;\n        fastcgi_pass unix:/run/munin/fcgi-html.sock;\n        include fastcgi_params;\n    }\n}\n```\n\nThen restart the webserver (nginx.service).\n\nIf all goes well, point your browser to your host http://yourhost.example.com/munin/ and you should see the Munin Overview page.\n\n"
+    },
+    {
+      "title": "Munin 2.1.x",
+      "level": 4,
+      "content": "Although Munin 2.1.x versions are not yet available in the Arch repository. It is worth mentioning that the 2.1.x series will no longer use FastCGI and will be replaced with munin-httpd This page already contains an example configuration.\n\n"
+    },
+    {
+      "title": "MySQL",
+      "level": 3,
+      "content": "The MySQL plugin has extra dependencies: perl-dbi, perl-dbd-mysql, perl-cache-cacheAUR, and perl-ipc-shareliteAUR\n\nAdditionally it is recommended to access the database through a separate MySQL user. To make another user via the following MySQL commands:\n\n```\nMariaDB> CREATE USER 'muninuser'@'localhost' IDENTIFIED BY 'muninpassword';\nMariaDB> GRANT SUPER,PROCESS ON *.* TO 'muninuser'@'localhost';\nMariaDB> GRANT SELECT ON mysql.* TO 'muninuser'@'localhost';\nMariaDB> FLUSH PRIVILEGES;\n```\n\nTo configure Munin to use this new user, create:\n\n```\n/etc/munin/plugin-conf.d/mysql_\n```\n\n```\n[mysql_*]\n     env.mysqlconnection DBI:mysql:mysql;host=127.0.0.1;port=3306\n     env.mysqluser muninuser\n     env.mysqlpassword muninpassword\n```\n\n"
+    },
+    {
+      "title": "S.M.A.R.T.",
+      "level": 3,
+      "content": "To enable monitoring of S.M.A.R.T. data, install the smartmontools package, and use:\n\n```\n/etc/munin/plugin-conf.d/munin-node\n```\n\n```\n[smart_*]\n    user root\n    group disk\n```\n\nThen create the appropriate symlink for each disk to be monitored. As an example for sda:\n\n```\n# ln -s /usr/lib/munin/plugins/smart_ /etc/munin/plugins/smart_sda\n```\n\n"
+    },
+    {
+      "title": "lm_sensors",
+      "level": 3,
+      "content": "Install lm_sensors and configure according to lm_sensors#Configuration. Assuming all goes correctly, create some symlinks:\n\n```\n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_fan \n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_temp\n# ln -s /usr/lib/munin/plugins/sensors_ /etc/munin/plugins/sensors_volt\n```\n\n"
+    }
+  ]
+}

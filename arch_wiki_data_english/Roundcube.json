@@ -1,0 +1,121 @@
+{
+  "title": "Roundcube",
+  "url": "https://wiki.archlinux.org/title/Roundcube",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Roundcube is a full-featured, PHP web-based mail client.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the roundcubemail package. Further you will need a database (e.g. MariaDB) and a web server with PHP-support.\n\n"
+    },
+    {
+      "title": "MariaDB",
+      "level": 3,
+      "content": "Here is an example on how you could setup a database for Roundcube with MariaDB called roundcubemail for the user roundcube identified by the password password:\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE DATABASE `roundcubemail` DEFAULT CHARACTER SET `utf8` COLLATE `utf8_unicode_ci`;\nCREATE USER `roundcube`@'localhost' IDENTIFIED BY 'password';\nGRANT ALL PRIVILEGES ON `roundcubemail`.* TO `roundcube`@`localhost`;\n\\q\n```\n\nFor any database you use, you will need to initialize the roundcubemail database tables. Here is an example of how to do this with MariaDB:\n\n```\n$ mysql -u root -p roundcubemail < /usr/share/webapps/roundcubemail/SQL/mysql.initial.sql\n```\n\n"
+    },
+    {
+      "title": "SQLite",
+      "level": 3,
+      "content": "A SQLite DB will be created automatically by Roundcube. Ensure the file specified in the configuration is located in a basedir location. Consider adding /var/lib/roundcubemail to your basedir definition. This implies creating the directory and chowning it to http.\n\n"
+    },
+    {
+      "title": "Other Databases",
+      "level": 3,
+      "content": "Roundcubemail has installation scripts for mssql, Oracle, and PostgreSQL.\n\n"
+    },
+    {
+      "title": "Roundcube",
+      "level": 3,
+      "content": "Copy the example configuration file and adjust it to your configuration:\n\n```\n# cd /etc/webapps/roundcubemail/config\n# cp config.inc.php.sample config.inc.php\n# chown http:http config.inc.php\n```\n\nSet your mail server settings, and set enable_installer to enable the setup wizard:\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['db_dsnw'] = 'mysql://roundcube:****@localhost/roundcubemail';\n$config['imap_host'] = 'ssl://localhost:993';\n$config['smtp_host'] = 'ssl://localhost:465';\n$config['des_key'] = 'some_awesome_long_semi_random_string';\n$config['enable_installer'] = true;\n```\n\nFor roundcube to be able to detect mime-types from filename extensions you need to point it to a mime.types file. Apache usually comes with one.\n\n```\n# cp /etc/httpd/conf/mime.types /etc/webapps/roundcubemail/config/mime.types\n# chown http:http /etc/webapps/roundcubemail/config/mime.types\n```\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['mime_types'] = RCUBE_INSTALL_PATH . 'config/mime.types';\n```\n\nIf you are not using Apache, check the information available in /etc/webapps/roundcubemail/config/defaults.inc.php.\n\n"
+    },
+    {
+      "title": "PHP",
+      "level": 3,
+      "content": "Make sure to adjust following variables to these minimal values in your PHP configuration:\n\n```\n/etc/php/php.ini\n```\n\n```\ndate.timezone = \"UTC\"\n```\n\nand uncomment\n\n```\nextension=iconv\n```\n\nIf you have configured open_basedir in php.ini, make sure it includes /etc/webapps and /usr/share/webapps, so PHP can open the required Roundcube files. If open_basedir is disabled/commented out (the default setting), you do not have to do anything.\n\n"
+    },
+    {
+      "title": "Webserver (Apache)",
+      "level": 3,
+      "content": "Copy the configuration file for Apache to its configuration directory:\n\n```\n# cp /etc/webapps/roundcubemail/apache.conf /etc/httpd/conf/extra/roundcube.conf\n```\n\nAnd include it at the bottom of\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\nInclude conf/extra/roundcube.conf\n```\n\nRestart Apache (httpd.service).\n\n"
+    },
+    {
+      "title": "Webserver (Nginx)",
+      "level": 3,
+      "content": "Add a location block for RoundCube\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nlocation /webmail {\n        alias /usr/share/webapps/roundcubemail;\n        access_log /var/log/nginx/roundcube_access.log;\n        error_log /var/log/nginx/roundcube_error.log;\n        expires 30d;\n        # Favicon\n        location ~ ^/webmail/favicon.ico$ {\n                root /usr/share/webapps/roundcubemail/skins/classic/images;\n                log_not_found off;\n                access_log off;\n                expires max;\n        }\n        # Robots file\n        location ~ ^/webmail/robots.txt {\n                allow all;\n                log_not_found off;\n                access_log off;\n        }\n        # Deny Protected directories \n        location ~ ^/webmail/(config|temp|logs)/ {\n                 deny all;\n        }\n        location ~ ^/webmail/(README|INSTALL|LICENSE|CHANGELOG|UPGRADING)$ {\n                deny all;\n        }\n        location ~ ^/webmail/(bin|SQL)/ {\n                deny all;\n        }\n        # Hide .md files\n        location ~ ^/webmail/(.+\\.md)$ {\n                deny all;\n        }\n        # Hide all dot files\n        location ~ ^/webmail/\\. {\n                deny all;\n                access_log off;\n                log_not_found off;\n        }\n        # Roundcube fastcgi config\n        location ~ /webmail(/.*\\.php)$ {\n                include fastcgi.conf;\n                fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n                fastcgi_split_path_info ^/webmail/(.+\\.php)(/.*)$;\n                fastcgi_index index.php;\n                fastcgi_param SCRIPT_FILENAME $request_filename;\n                fastcgi_param PATH_INFO $fastcgi_path_info;\n                fastcgi_param PHP_VALUE open_basedir=\"/tmp/:/var/cache/roundcubemail:/usr/share/webapps/roundcubemail:/etc/webapps/roundcubemail:/usr/share/pear/:/var/log/roundcubemail\";\n        }\n}\n```\n\nIn a more recent version of Roundcube, manually setting fastcgi_split_path_info and fastcgi_param PATH_INFO caused Roundcube to malfunction. $request_filename also did not work. The solution was this configuration:\n\n```\nlocation ~ /webmail/?$ {\n       include fastcgi.conf;\n       fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n       fastcgi_index index.php;\n       fastcgi_param SCRIPT_FILENAME /usr/share/webapps/roundcubemail/index.php;\n       fastcgi_param PHP_VALUE open_basedir=\"/tmp/:/var/cache/roundcubemail:/var/lib/roundcubemail:/usr/share/webapps/roundcubemail:/etc/webapps/roundcubemail:/usr/share/pear/:/var/log/roundcubemail:/var/lib/roundcubemail\";\n      }\n```\n\nUsing the different configuration will require an additional location block to access the installer:\n\n```\nlocation ~ /webmail/installer/?.*$ {\n       include fastcgi.conf;\n       fastcgi_pass unix:/run/php-fpm/php-fpm.sock;\n       fastcgi_index index.php;\n       fastcgi_param SCRIPT_FILENAME /usr/share/webapps/roundcubemail/installer/index.php;\n       fastcgi_param PHP_VALUE open_basedir=\"/tmp/:/var/cache/roundcubemail:/var/lib/roundcubemail:/usr/share/webapps/roundcubemail:/etc/webapps/roundcubemail:/usr/share/pear/:/var/log/roundcubemail:/var/lib/roundcubemail\";\n      }\n```\n\nFinally restart the nginx.service unit.\n\n"
+    },
+    {
+      "title": "Install Roundcube",
+      "level": 2,
+      "content": "Finally you can visit the Roundcube installation wizard in your browser: http://localhost/roundcube/installer or http://localhost/webmail/installer/ if the alternate nginx config was used.\n\nNote: **disable the installer when you have completed the wizard** \n\nBecause the ~/roundcube/config directory contains sensitive information about your server, it is also a good idea to disallow access to this directory by adding these lines, too.\n\n```\n/etc/httpd/conf/extra/roundcube.conf\n```\n\n```\n<Directory /usr/share/webapps/roundcubemail/config>\n     Options -FollowSymLinks\n     AllowOverride None\n     Require all denied\n  </Directory>\n```\n\n"
+    },
+    {
+      "title": "Setting Roundcube up for use with an IMAP/SMTP server that only allows TLS authentication",
+      "level": 3,
+      "content": "It is quite common for modern IMAP/SMTP servers to only allow secured (encrypted) connection, say using STARTTLS. If you are setting Roundcube up for TLS connection, the web-based installer will not help you. You will need to edit the /etc/webapps/roundcubemail/config/config.inc.php by hand, adding the following lines:\n\n```\n$config['imap_host'] = 'tls://mail.my_domain.org';\n // For STARTTLS IMAP\n $config['imap_conn_options'] = [\n     'ssl' => [\n       'cafile'  => '/etc/ssl/certs/Your_CA_certificate.pem',\n       // For Letsencrypt use the following line if ISRG_Root_X1 is indeed the corresponding root certificate:\n       //'cafile' => '/etc/ssl/certs/ISRG_Root_X1.pem',\n       // Needed for example if you're using `localhost` as imap_host but your imap server presents another host name:\n       //'peer_name'         => 'mail.my_domain.org',\n     ],\n ];\n // For STARTTLS SMTP\n $config['smtp_conn_options'] = [\n     'ssl' => [\n       'cafile'  => '/etc/ssl/certs/Your_CA_certificate.pem',\n       // For Letsencrypt use the following line if ISRG_Root_X1 is indeed the corresponding root certificate:\n       //'cafile' => '/etc/ssl/certs/ISRG_Root_X1.pem',\n       // Needed for example if you're using `localhost` as imap_host but your imap server presents another host name:\n       //'peer_name'         => 'mail.my_domain.org',\n     ],\n ];\n```\n\nwhere mail.my_domain.org is the CN host name in your SSL certificate (i.e. the hostname of your IMAP server), and /etc/ssl/certs/Your_CA_certificate.pem is the path to your SSL certificate.\n\nA complete list of PHP SSL configuration options can be found here. For example you might need to adjust the ciphers element to correspond to the ciphers allowed by your IMAP server.\n\n"
+    },
+    {
+      "title": "PDF and OpenDocument file preview",
+      "level": 3,
+      "content": "The following Roundcube extensions enable you to preview PDF or OpenDocument file attachements.\n\nInstall the roundcubemail-plugins-kolabAUR[broken link: package not found] package and adjust following configuration file to enable the extensions.\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['plugins'] = [\n    'pdfviewer',\n    'odfviewer'\n];\n```\n\nIf you encounter any file permission issues, than try this command:\n\n```\nchown -R http:http /usr/share/webapps/roundcubemail/plugins/odfviewer/files\n```\n\n"
+    },
+    {
+      "title": "Calendar Support",
+      "level": 3,
+      "content": "Install the roundcubemail-plugins-kolabAUR[broken link: package not found] package.\n\n"
+    },
+    {
+      "title": "Update the roundcube database",
+      "level": 4,
+      "content": "```\n# mysql -u root -p roundcubemail < /usr/share/webapps/roundcubemail/plugins/calendar/drivers/database/SQL/mysql.initial.sql\n```\n\n"
+    },
+    {
+      "title": "Configure the calendar service",
+      "level": 4,
+      "content": "The default configuration should suffice for most applications, however we still need to move it into place.\n\n```\n# cp /usr/share/webapps/roundcubemail/plugins/calendar/config.inc.php.dist /usr/share/webapps/roundcubemail/plugins/calendar/config.inc.php\n```\n\n"
+    },
+    {
+      "title": "Sabre\\VObject\\Property\\Text Not Found",
+      "level": 4,
+      "content": "If you get this error, it means that either Sabre was not included with the plugin or it is out of date\n\n```\n# cd /usr/share/webapps/roundcubemail ; composer update ; composer require sabre/dav ~3.1.3\n```\n\n"
+    },
+    {
+      "title": "Enable the Plugin",
+      "level": 4,
+      "content": "```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['plugins'] = [\n    'calendar'\n];\n```\n\n"
+    },
+    {
+      "title": "Synchronize address book with CardDav contacts",
+      "level": 3,
+      "content": "It is useful to use the Roundcube address book to have auto-completion features for address fields etc. If you have your contacts stored somewhere else and the remote application offers a CardDav server for synchronization, then you can use the roundcubemail-plugin-carddavAUR extension to access your remote address book in Roundcube. To enable it, adjust following lines in your configuration file:\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['plugins'] = [\n    'carddav'\n];\n```\n\nFurther usage instructions can be found here.\n\n"
+    },
+    {
+      "title": "Using Mark as Junk plugin to train SpamAssassin",
+      "level": 3,
+      "content": "The markasjunk plugin adds \"mark as spam\" or \"mark as not spam\" button to the message menu. This following setup uses such facility to easily train the SpamAssassin filter with sa-learn\n\nCreate a copy of /usr/share/webapps/roundcubemail/plugins/markasjunk/config.inc.php.dist as config.inc.php in the same directory and modify it to your needs. Now, make sure to have the following:\n\n```\n/usr/share/webapps/roundcubemail/plugins/markasjunk/config.inc.php\n```\n\n```\n$config['markasjunk_learning_driver'] = 'cmd_learn';\n$config['markasjunk_spam_cmd'] = '/usr/bin/vendor_perl/sa-learn --spam --username=%u %f';\n$config['markasjunk_ham_cmd'] = '/usr/bin/vendor_perl/sa-learn --ham --username=%u %f';\n```\n\nEnable the plugin:\n\n```\n/etc/webapps/roundcubemail/config/config.inc.php\n```\n\n```\n$config['plugins'] = [\n    'markasjunk'\n];\n```\n\n"
+    },
+    {
+      "title": "SMTP Error: Authentication failure",
+      "level": 3,
+      "content": "You may first try to disable(comment) the following settings in config.inc.php as shown:\n\n```\n//$config['smtp_user'] = '%u';\n//$config['smtp_pass'] = '%p';\n```\n\n"
+    },
+    {
+      "title": "Recipient address rejected",
+      "level": 3,
+      "content": "You may get one of these errors, depending if you use TLS or STARTTLS:\n\n```\n530 5.7.0 Must issue a STARTTLS command first\n 554 5.7.1 <>: Recipient address rejected: Access denied\n```\n\nIf that happens try adding the following lines to config.inc.php:\n\n```\n$config['smtp_user'] = '%u';\n$config['smtp_pass'] = '%p';\n```\n\n"
+    },
+    {
+      "title": "Running php8 and php7 on the same server with apache",
+      "level": 3,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf you run php7 and php8 on your server you have to run roundcube with php7-fpm. For this install the php7-fpm[broken link: package not found] package.\n\nAfter this you have to enable the mysql extensions:\n\n```\n/etc/php7/php.ini\n```\n\n```\nextension=mysqli\nextension=pdo_mysql\n```\n\nNow start/enable php-fpm7.service\n\nYou have to edit your Roundcube configuration:\n\n```\n/etc/httpd/conf/extra/roundcube.conf\n```\n\n```\n<Directory \"/usr/share/webapps/roundcubemail\">\n    AllowOverride All\n    Options FollowSymlinks\n    Require all granted\n    php_admin_value open_basedir \"/tmp/:/var/cache/roundcubemail:/usr/share/webapps/roundcubemail:/etc/webapps/roundcubemail:/usr/share/pear/:/var/log/roundcubemail\"\n        <FilesMatch \\.php$>\n             SetHandler \"proxy:unix:/var/run/php-fpm7/php-fpm.sock|fcgi://localhost/\"\n        </FilesMatch>\n</Directory>\n```\n\nThen restart httpd.service.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Roundcube Wiki: Configuration Howto\n- Official web page\n- Official installation manual\n\n"
+    }
+  ]
+}

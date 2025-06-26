@@ -1,0 +1,66 @@
+{
+  "title": "Lenovo Yoga 9i 2022 (14AiPI7)",
+  "url": "https://wiki.archlinux.org/title/Lenovo_Yoga_9i_2022_(14AiPI7)",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nGPU (Intel) |  | Yes\nWireless |  | Yes\nBluetooth |  | Yes\nAudio |  | Yes\nWebcam | 30c9:0057 | Yes\nFingerprint Reader | 27c6:550c | No\n\nThe Lenovo Yoga 9i 2022 (14IAP7) is a 2-in-1 convertible laptop powered by Intel's Alder Lake P-Series. It features a 14\" touchscreen (IPS or OLED variants).\n\nTo ensure you have this version, you can use dmidecode\n\n```\n# dmidecode -s system-version\n```\n\n```\nYoga 9 14IAP7\n```\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Before installing, disable Secure Boot in the BIOS.\n\n"
+    },
+    {
+      "title": "Accessibility",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nYou can access the BIOS by pressing F2 at the Splash screen. The boot menu can also be accessed by pressing F12.\n\n"
+    },
+    {
+      "title": "Wireless",
+      "level": 2,
+      "content": "For wireless to work, unblock rfkill.\n\nTo unblock wlan:\n\n```\n$ rfkill unblock wlan\n```\n\nTo unblock bluetooth:\n\n```\n$ rfkill unblock bluetooth\n```\n\n"
+    },
+    {
+      "title": "Audio",
+      "level": 2,
+      "content": "For audio to work, install Sound Open Firmware.\n\nThe bass speakers do not work by default. Create:\n\n```\n/etc/modprobe.d/snd.conf\n```\n\n```\noptions snd-sof-intel-hda-common hda_model=alc287-yoga9-bass-spk-pin\n```\n\nIn newer kernels, change the above to\n\n```\n/etc/modprobe.d/snd.conf\n```\n\n```\noptions snd-sof-intel-hda-generic hda_model=alc287-yoga9-bass-spk-pin\n```\n\nReboot and both the bass speakers and internal microphone should work.\n\n"
+    },
+    {
+      "title": "Power management",
+      "level": 2,
+      "content": "Battery Conservation Mode is a feature that limits battery charging to 55-60% of its capacity to improve battery life, being most useful when the laptop tends to run on external power much of the time. It can be controlled with ideapad-cmAUR. With battmngrAUR it is possible to control both Battery Conservation and System performance modes.\n\n"
+    },
+    {
+      "title": "Kernel method",
+      "level": 3,
+      "content": "Set the ideapad_laptop.allow_v4_dytc=1 kernel parameter.\n\nTo use without reboot:\n\n```\n# rmmod ideapad_laptop\n# modprobe ideapad_laptop allow_v4_dytc=1\n```\n\nRestart power-profiles-daemon.service. Now power-profiles-daemon can do everything below.\n\nApply this across reboots by setting it permanently.\n\n"
+    },
+    {
+      "title": "System performance mode",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with Laptop/Lenovo#Lenovo.** This article or section is a candidate for merging with Laptop/Lenovo#Lenovo.\n\nThis article or section is a candidate for merging with Laptop/Lenovo#Lenovo.\n\nThere are 3 modes available: Intelligent Cooling, Extreme Performance and Battery Saving. To toggle it, you need to call some ACPI methods.\n\nFirst install acpi_call (or acpi_call-lts for LTS kernel, acpi_call-dkms for other kernels) and load the kernel module:\n\n```\n# modprobe acpi_call\n```\n\nSet it to Intelligent Cooling mode:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.DYTC 0x000FB001' > /proc/acpi/call\n```\n\nSet it to Extreme Performance mode:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.DYTC 0x0012B001' > /proc/acpi/call\n```\n\nSet it to Battery Saving mode:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.DYTC 0x0013B001' > /proc/acpi/call\n```\n\nTo verify your setting:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.SPMO' > /proc/acpi/call\n# cat /proc/acpi/call; printf '\\n'\n```\n\nAs a result you get the value for the bit SPMO (either 0x0, 0x1 or 0x2).\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.SPMO.FCMO' > /proc/acpi/call\n# cat /proc/acpi/call; printf '\\n'\n```\n\nAs a result you get the value for the bit FCMO (either 0x0, 0x1 or 0x2). To interpret the results the following table can be used:\n\nTable content:\nSPMO | FCMO | Mode\n0x0 | 0x0 | Intelligent Cooling\n0x1 | 0x1 | Extreme Performance\n0x2 | 0x2 | Battery Saving\n\n"
+    },
+    {
+      "title": "Rapid charge",
+      "level": 3,
+      "content": "Make sure you have set up acpi_call.\n\nTurn on:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.SBMC 0x07' > /proc/acpi/call\n```\n\nTurn off:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.SBMC 0x08' > /proc/acpi/call\n```\n\nTo verify your setting:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.QCHO' > /proc/acpi/call\n# cat /proc/acpi/call; printf '\\n'\n```\n\nwhere 0x0 stands for off and 0x1 stands for on.\n\nSee the note at the end of #Battery conservation\n\n"
+    },
+    {
+      "title": "Battery conservation",
+      "level": 3,
+      "content": "Similarly to the #Rapid charge, make sure you have set up acpi_call.\n\nTurn on:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.SBMC 0x03' > /proc/acpi/call\n```\n\nTurn off:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.VPC0.SBMC 0x05' > /proc/acpi/call\n```\n\nTo verify your setting:\n\n```\n# echo '\\_SB.PC00.LPCB.EC0.BTSM' > /proc/acpi/call\n# cat /proc/acpi/call; printf '\\n'\n```\n\nwhere 0x0 stands for off and 0x1 stands for on.\n\nThere is also an alternative way to control the conservation mode of the battery.\n\n"
+    },
+    {
+      "title": "Function key",
+      "level": 3,
+      "content": "Table content:\nKey | Visible 1 | Marked 2 | Effect\nFn+Esc | No | Yes | Toggles Fn lock\nFn+F1 | Yes | Yes | XF86AudioMute\nFn+F2 | Yes | Yes | XF86AudioLowerVolume\nFn+F3 | Yes | Yes | XF86AudioRaiseVolume\nFn+F4 | Yes | Yes | XF86AudioMicMute\nFn+F5 | Yes | Yes | XF86MonBrightnessDown\nFn+F6 | Yes | Yes | XF86MonBrightnessUp\nFn+F7 | Yes | Yes | Super_L+p\nFn+F8 | Yes | Yes | XF86RFKill3\n\n1. The key is visible to xev and similar tools.\n1. The physical key has a symbol on it, which describes its function.\n1. Pressing Fn+F8 always hardware-toggles the Wifi and Bluetooth hardware.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Bass speaker issue\n\n"
+    }
+  ]
+}

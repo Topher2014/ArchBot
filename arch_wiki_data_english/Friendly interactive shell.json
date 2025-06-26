@@ -1,0 +1,126 @@
+{
+  "title": "Friendly interactive shell",
+  "url": "https://wiki.archlinux.org/title/Friendly_interactive_shell",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Command-line shell\n\nfish, the friendly interactive shell, is a commandline shell intended to be interactive and user-friendly.\n\nfish is intentionally not fully POSIX compliant, it aims at addressing POSIX inconsistencies (as perceived by the creators) with a simplified or a different syntax. This means that even simple POSIX compliant scripts may require some significant adaptation or even full rewriting to run with fish.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the fish package. For the development version, install the fish-gitAUR package.\n\nOnce installed, simply type fish to drop into the fish shell.\n\nDocumentation can be found by typing help from fish; it will be opened in a web browser. It is recommended to read at least the \"Syntax overview\" section, since fish's syntax is different from many other shells.\n\n"
+    },
+    {
+      "title": "System integration",
+      "level": 2,
+      "content": "One must decide whether fish is going to be the default user's shell, which means that the user falls directly in fish at login, or whether it is used in interactive terminal mode as a child process of the current default shell, here we will assume the latter is Bash. To elaborate on these two setups:\n\n- fish used as the default shell: this mode requires some basic understanding of the fish functioning and its scripting language. The user's current initialization scripts and environment variables need to be migrated to the new fish environment. To configure the system in this mode, follow #Setting fish as default shell.\n- fish used as an interactive shell only: this is the less disruptive mode, all the Bash initialization scripts are run as usual and fish runs on top of Bash in interactive mode connected to a terminal. To setup fish in this mode, follow #Setting fish as interactive shell only.\n\n"
+    },
+    {
+      "title": "Setting fish as default shell",
+      "level": 3,
+      "content": "If you decide to set fish as the default user shell, the first step is to set the shell of this particular user to /usr/bin/fish. This can be done by following the instructions in Command-line shell#Changing your default shell.\n\nThe next step is to port the current needed actions and configuration performed in the various Bash initialization scripts, namely /etc/profile, ~/.bash_profile, /etc/bash.bashrc and ~/.bashrc, into the fish framework.\n\nIn particular, the content of the $PATH environment variable, once directly logged under fish, should be checked and adjusted to one's need. In fish, $PATH is defined as a global environment variable: it has a global scope across all functions, it is lost upon reboot and it is an environment variable which means it is exported to child processes. The recommended way of adding additional locations to the path is by calling the fish_add_path command from config.fish. For example:\n\n```\n$ fish_add_path -p /first/path /second/path /third/one\n```\n\nThese three locations will be prepended to the path.\n\n"
+    },
+    {
+      "title": "Setting fish as interactive shell only",
+      "level": 3,
+      "content": "Not setting fish as system wide or user default allows the current Bash scripts to run on startup. It ensures the current user's environment variables are unchanged and are exported to fish which then runs as a Bash child. Below are several ways of running fish in interactive mode without setting it as the default shell.\n\n"
+    },
+    {
+      "title": "Modify .bashrc to drop into fish",
+      "level": 4,
+      "content": "Keep the default shell as Bash and simply add the line exec fish to the appropriate Bash#Configuration files, such as .bashrc. This will allow Bash to properly source /etc/profile and all files in /etc/profile.d. Because fish replaces the Bash process, exiting fish will also exit the terminal. Compared to the following options, this is the most universal solution, since it works both on a local machine and on a SSH server.\n\n- In this setup, use bash --norc to manually enter Bash without executing the commands from ~/.bashrc which would run exec fish and drop back into fish.\n- To have commands such as bash -c 'echo test' run the command in Bash instead of starting fish, you can write if [ -z \"$BASH_EXECUTION_STRING\" ]; then exec fish; fi instead.\n- In order to let fish know whether it is a login shell, you can detect login shell status in ~/.bashrc and pass on the --login option to fish. The fish shell command status can be used to show the status.\n- Drop in to fish only if the parent process is not fish. This allows to quickly enter in to bash by invoking bash command without losing ~/.bashrc configuration:\n\n```\nif [[ $(ps --no-header --pid=$PPID --format=comm) != \"fish\" && -z ${BASH_EXECUTION_STRING} && ${SHLVL} == 1 ]]\nthen\n\tshopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=''\n\texec fish $LOGIN_OPTION\nfi\n```\n\n"
+    },
+    {
+      "title": "Use terminal emulator options",
+      "level": 4,
+      "content": "Another option is to open your terminal emulator with a command line option that executes fish. For most terminals this is the -e switch, so for example, to open gnome-terminal using fish, change your shortcut to use:\n\n```\ngnome-terminal -e fish\n```\n\nWith terminal emulators that do not support setting the shell, for example lilyterm-gitAUR, it would look like this:\n\n```\nSHELL=/usr/bin/fish lilyterm\n```\n\nAlso, depending on the terminal, you may be able to set fish as the default shell in either the terminal configuration or the terminal profile.\n\n"
+    },
+    {
+      "title": "Use terminal multiplexer options",
+      "level": 4,
+      "content": "To set fish as the shell started in tmux, put this into your ~/.tmux.conf:\n\n```\nset-option -g default-shell \"/usr/bin/fish\"\n```\n\nWhenever you run tmux, you will be dropped into fish.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The configuration file runs at every login and is located at ~/.config/fish/config.fish. Adding commands or functions to the file will execute/define them when opening a terminal, similar to .bashrc. Note that whenever a variable needs to be preserved, it should be set as universal rather than defined in the aforementioned configuration file.\n\nThe user's functions are located in the directory ~/.config/fish/functions under the filenames function_name.fish.\n\n"
+    },
+    {
+      "title": "Web interface",
+      "level": 3,
+      "content": "The fish terminal colors, prompt, functions, variables, history, bindings and abbreviations can be set with the interactive web interface:\n\n```\nfish_config\n```\n\nIt may fail to start if IPv6 has been disabled. See [1] and IPv6#Disable IPv6.\n\n"
+    },
+    {
+      "title": "Command completion",
+      "level": 3,
+      "content": "fish can generate autocompletions from man pages. Completions are written to ~/.cache/fish/generated_completions (controlled by XDG_CACHE_HOME environment variable) and can be generated by calling:\n\n```\nfish_update_completions\n```\n\nYou can also define your own completions in ~/.config/fish/completions/. See /usr/share/fish/completions/ for a few examples.\n\nContext-aware completions for Arch Linux-specific commands like pacman, pacman-key, makepkg, pbget, pacmatic are built into fish, since the policy of the fish development is to include all the existent completions in the upstream tarball. The memory management is clever enough to avoid any negative impact on resources.\n\n"
+    },
+    {
+      "title": "Command substitution",
+      "level": 3,
+      "content": "fish does not implement Bash style history substitution (e.g. sudo !!), and the developers recommend in the fish faq to use the interactive history recall interface instead: the Up arrow recalls whole past lines and Alt+Up (or Alt+.) recalls individual arguments, while Alt+s prepends sudo to the existing line.\n\nHowever some workarounds are described in the fish wiki: while not providing complete history substitution, some functions replace !! with the previous command or !$ with the previous last argument.\n\n"
+    },
+    {
+      "title": "Disable greeting",
+      "level": 3,
+      "content": "By default, fish prints a greeting message at startup. To disable it, run once:\n\n```\n$ set -U fish_greeting\n```\n\nThis clears the universal fish_greeting variable, shared with all fish instances and which is preserved upon restart of the shell.\n\n"
+    },
+    {
+      "title": "Make su launch fish",
+      "level": 3,
+      "content": "If su starts with Bash because Bash is the target user's (root if no username is provided) default shell, one can define a function to redirect it to fish whatever the user's shell:\n\n```\n~/.config/fish/functions/su.fish\n```\n\n```\nfunction su\n   command su --shell=/usr/bin/fish $argv\nend\n```\n\n"
+    },
+    {
+      "title": "Start X at login",
+      "level": 3,
+      "content": "Add the following to the bottom of your ~/.config/fish/config.fish.\n\n```\n# Start X at login\nif status is-login\n    if test -z \"$DISPLAY\" -a \"$XDG_VTNR\" = 1\n        exec startx -- -keeptty\n    end\nend\n```\n\nFor those running fish in interactive mode, replace status is-login with status is-interactive in the above code.\n\n"
+    },
+    {
+      "title": "Put git status in prompt",
+      "level": 3,
+      "content": "If you would like fish to display the branch and dirty status when you are in a git directory, you can define the following fish_prompt function:\n\n```\n~/.config/fish/functions/fish_prompt.fish\n```\n\n```\nfunction fish_prompt\n  set -l last_status $status\n\n  if not set -q __fish_git_prompt_show_informative_status\n    set -g __fish_git_prompt_show_informative_status 1\n  end\n  if not set -q __fish_git_prompt_color_branch\n    set -g __fish_git_prompt_color_branch brmagenta\n  end\n  if not set -q __fish_git_prompt_showupstream\n    set -g __fish_git_prompt_showupstream \"informative\"\n  end\n  if not set -q __fish_git_prompt_showdirtystate\n    set -g __fish_git_prompt_showdirtystate \"yes\"\n  end\n  if not set -q __fish_git_prompt_color_stagedstate\n    set -g __fish_git_prompt_color_stagedstate yellow\n  end\n  if not set -q __fish_git_prompt_color_invalidstate\n    set -g __fish_git_prompt_color_invalidstate red\n  end\n  if not set -q __fish_git_prompt_color_cleanstate\n    set -g __fish_git_prompt_color_cleanstate brgreen\n  end\n\n  printf '%s%s %s%s%s%s ' (set_color $fish_color_host) (prompt_hostname) (set_color $fish_color_cwd) (prompt_pwd) (set_color normal) (fish_git_prompt)\n\n  if not test $last_status -eq 0\n    set_color $fish_color_error\n  end\n  echo -n '$ '\n  set_color normal\nend\n```\n\n"
+    },
+    {
+      "title": "Color the hostname in the prompt in SSH",
+      "level": 3,
+      "content": "To color the hostname in the prompt dynamically whenever connected through SSH, add the following lines in either the fish_prompt function or the fish configuration file, here using the red color:\n\n```\n~/.config/fish/functions/fish_prompt.fish\n```\n\n```\n...\nif set -q SSH_TTY\n  set -g fish_color_host brred\nend\n...\n```\n\nNote that the default fish prompt colors the hostname yellow when connected through SSH; additional modification to the prompt is not required for this functionality.\n\n"
+    },
+    {
+      "title": "Evaluate ssh-agent",
+      "level": 3,
+      "content": "In fish, eval (ssh-agent) generate errors due to how variables are set. To work around this, use the csh-style option -c:\n\n```\n$ eval (ssh-agent -c)\n```\n\n"
+    },
+    {
+      "title": "Evaluate keychain",
+      "level": 3,
+      "content": "Because keychain --eval uses the SHELL environment variable to format output, it should work with fish as the default shell. However, if using fish as an interactive shell only, this variable must be set:\n\n```\n$   SHELL=/bin/fish keychain --eval --quiet -Q id_ed25519 | source\n```\n\n"
+    },
+    {
+      "title": "The \"command not found\" hook",
+      "level": 3,
+      "content": "Fish includes a \"command not found\" hook that will automatically search the official repositories, when entering an unrecognized command. This hook will be run using pkgfile, falling back to pacman -F if it is not installed.\n\nSince 3.2.2, \"command not found\" will not fallback to pacman -F by default due to its bad performance.\n\nIf the delay this behavior introduces is undesirable, this hook can be overridden by redefining fish_command_not_found so that it only prints an error message:\n\n```\n$ function fish_command_not_found\n      __fish_default_command_not_found_handler $argv[1]\n  end\n```\n\nTo make this change permanent, the funcsave built-in can be used:\n\n```\n$ funcsave fish_command_not_found\n```\n\n"
+    },
+    {
+      "title": "Remove a process from the list of jobs",
+      "level": 3,
+      "content": "fish terminates any jobs put into the background when fish terminates. To keep a job running after fish terminates, first use the disown builtin. For example, the following starts firefox in the background and then disowns it:\n\n```\n$ firefox &\n$ disown\n```\n\nThis means firefox will not be closed when the fish process is closed. See disown(1) in fish for more details.\n\n"
+    },
+    {
+      "title": "Set a persistent alias",
+      "level": 3,
+      "content": "To quickly make a persistent alias, one can simply use the method showed in this example:\n\n```\n$ alias lsl \"ls -l\"\n$ funcsave lsl\n```\n\nalias supports the -s/--save option since fish version 3.0:\n\n```\n$ alias -s lsl \"ls -l\"\n```\n\nThis will create the function:\n\n```\nfunction lsl\n    ls -l $argv\nend\n```\n\nand will set the alias as a persistent shell function. To see all functions and/or edit them, one can simply use fish_config and look into the Function tab in the web configuration page.\n\nFor more detailed information, see alias - create a function — fish-shell.\n\n"
+    },
+    {
+      "title": "Source /etc/profile on login",
+      "level": 3,
+      "content": "Unlike bash, fish does not source /etc/profile on a tty login. If you need to source this file for the environment variables appended and declared in the /etc/profile.d directory, you can add the following to your config:\n\n```\n~/.config/fish/config.fish\n```\n\n```\n# source /etc/profile with bash\nif status is-login\n    exec bash -c \"test -e /etc/profile && source /etc/profile;\\\n    exec fish\"\nend\n```\n\nThis allows you to run fish as your login shell, while still having all the environment variables you would typically have in a bash login session.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- https://fishshell.com/ - Home page\n- https://fishshell.com/docs/current/ - Documentation\n- https://hyperpolyglot.org/unix-shells - Shell grammar correspondence table (\"shell rosetta\")\n- https://github.com/fish-shell/fish-shell - fish on GitHub\n\n"
+    }
+  ]
+}

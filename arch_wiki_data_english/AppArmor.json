@@ -1,0 +1,76 @@
+{
+  "title": "AppArmor",
+  "url": "https://wiki.archlinux.org/title/AppArmor",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Security\n- SELinux\n- TOMOYO Linux\n\nAppArmor is a Mandatory Access Control (MAC) system, implemented upon the Linux Security Modules (LSM).\n\nAppArmor, like most other LSMs, supplements rather than replaces the default Discretionary Access Control (DAC). As such it is impossible to grant a process more privileges than it had in the first place.\n\nUbuntu, SUSE and a number of other distributions use it by default. RHEL (and its variants) use SELinux which requires good userspace integration to work properly. SELinux attaches labels to all files, processes and objects and is therefore very flexible. However configuring SELinux is considered to be very complicated and requires a supported filesystem. AppArmor on the other hand works using file paths and its configuration can be easily adapted.\n\nAppArmor proactively protects the operating system and applications from external or internal threats and even zero-day attacks by enforcing a specific rule set on a per application basis. Security policies completely define what system resources individual applications can access, and with what privileges. Access is denied by default if no profile says otherwise. A few default policies are included with AppArmor and using a combination of advanced static analysis and learning-based tools, AppArmor policies for even very complex applications can be deployed successfully in a matter of hours.\n\nEvery breach of policy triggers a message in the system log, and AppArmor can be configured to notify users with real-time violation warnings popping up on the desktop.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "AppArmor is available in all officially supported kernels.\n\nInstall apparmor for userspace tools and libraries to control AppArmor. To load all AppArmor profiles on startup, enable apparmor.service.\n\nTo enable AppArmor as default security model on every boot, set the following kernel parameter:\n\n```\nlsm=landlock,lockdown,yama,integrity,apparmor,bpf\n```\n\n- Make sure that apparmor is the first \"major\" module in the list.[1] Examples of valid values and their order can be found in security/Kconfig.\n- capability should be omitted from lsm= as it will always get included automatically.\n\n"
+    },
+    {
+      "title": "Custom kernel",
+      "level": 3,
+      "content": "When compiling the kernel, it is required to set at least the following options:\n\n```\nCONFIG_SECURITY_APPARMOR=y\nCONFIG_AUDIT=y\n```\n\nTo enable the AppArmor Linux security model by default and omit the need to set kernel parameters, additionally set the CONFIG_LSM option and specify apparmor as the first \"major\" module in the list:\n\n```\nCONFIG_LSM=\"landlock,lockdown,yama,integrity,apparmor,bpf\"\n```\n\n"
+    },
+    {
+      "title": "Display current status",
+      "level": 3,
+      "content": "To test if AppArmor has been correctly enabled:\n\n```\n$ aa-enabled\n```\n\n```\nYes\n```\n\nTo display the current loaded status use aa-status(8):\n\n```\n# aa-status\n```\n\n```\napparmor module is loaded.\n44 profiles are loaded.\n44 profiles are in enforce mode.\n ...\n0 profiles are in complain mode.\n0 processes have profiles defined.\n0 processes are in enforce mode.\n0 processes are in complain mode.\n0 processes are unconfined but have a profile defined.\n```\n\nIn complain mode, policy violations of profiles are allowed but are logged. Complain mode is used for testing new profiles. Note that deny rules of profiles are enforced/blocked even in complain mode.\n\nIn enforce mode, policy violations of profiles are blocked and logged.\n\n"
+    },
+    {
+      "title": "Parsing profiles",
+      "level": 3,
+      "content": "To load (enforce or complain), unload, reload, cache and stat profiles use apparmor_parser. The default action (-a) is to load a new profile in enforce mode, loading it in complain mode is possible using the -C switch, in order to overwrite an existing profile use the -r option and to remove a profile use -R. Each action may also apply to multiple profiles. Refer to apparmor_parser(8) man page for more information.\n\n"
+    },
+    {
+      "title": "Disabling loading",
+      "level": 3,
+      "content": "Disable AppArmor by unloading all profiles for the current session:\n\n```\n# aa-teardown\n```\n\nTo prevent AppArmor profiles from loading at the next boot disable apparmor.service. To prevent the kernel from loading AppArmor, remove the lsm= kernel parameter that was added when setting up AppArmor.\n\n"
+    },
+    {
+      "title": "Auditing and generating profiles",
+      "level": 3,
+      "content": "To create new profiles the Audit framework should be running. This is because Arch Linux adopted systemd and does not do kernel logging to file by default. AppArmor can grab kernel audit logs from the userspace auditd daemon, allowing you to build a profile.\n\nNew AppArmor profiles can be created by utilizing aa-genprof(8) or aa-autodep(8). The profile is first created in complain mode: in this mode policy violations are only reported but not enforced. The rules are interactively created by the aa-logprof(8) tool available in apparmor package. Finally the profile should be set into enforce mode with aa-enforce(8). In this mode the policy defined by the rules in the respecting profile are enforced. If necessary, additional rules can be added by repeatedly executing aa-logprof(8), or the profile can be set back to complain mode with aa-complain(8). Detailed guide about using those tools is available at AppArmor wiki - Profiling with tools.\n\nNote that aa-logprof(8) also offers deny rules which are actually not strictly necessary as according to the basic AppArmor logic everything is forbidden which is not explicitly allowed by a rule. However, deny rules serve two purposes:\n\n1. deny rules take precedence over allow rules. They are often used in many abstractions located in /etc/apparmor.d/abstractions in order to block any access to important folders/files. This makes sure that inadvertently created allow rules do not make a profile too permissive.\n1. deny rules silence logging and make subsequent runs of aa-logprof less noisy. It is important to keep in mind that deny rules are enforced also in complain mode - hence, if an application does not work properly even in complain mode it should be checked if a deny rule in the profile or in one of the included abstractions is the culprit.\n\nAlternatively profiles may be also created manually, see guide available at AppArmor wiki - Profiling by hand.\n\nIn addition to the default profiles in /etc/apparmor.d/, there are more predefined profiles in /usr/share/apparmor/extra-profiles/. Note that those are not necessarily deemed production-ready, so manual intervention or usage of aa-logprof(8) may be required.\n\nAnother set of AppArmor profiles can be found in the apparmor.d project, however, as of writing, the project is not currently stable.\n\n"
+    },
+    {
+      "title": "Understanding profiles",
+      "level": 3,
+      "content": "Profiles are human readable text files residing under /etc/apparmor.d/ describing how binaries should be treated when executed. A basic profile looks similar to this:\n\n```\n/etc/apparmor.d/usr.bin.test\n```\n\n```\n#include <tunables/global>\n\nprofile test /usr/lib/test/test_binary {\n    #include <abstractions/base>\n\n    # Main libraries and plugins\n    /usr/share/TEST/** r,\n    /usr/lib/TEST/** rm,\n\n    # Configuration files and logs\n    @{HOME}/.config/ r,\n    @{HOME}/.config/TEST/** rw,\n}\n```\n\nStrings preceded by a @ symbol are variables defined by abstractions (/etc/apparmor.d/abstractions/), tunables (/etc/apparmor.d/tunables/) or by the profile itself. #include includes other profile-files directly. Paths followed by a set of characters are access permissions. Pattern matching is done using AppArmor's globbing syntax.\n\nMost common use cases are covered by the following statements:\n\n- r — read: read data\n- w — write: create, delete, write to a file and extend it\n- m — memory map executable: memory map a file executable\n- x — execute: execute file; needs to be preceded by a qualifier\n\nRemember that those permission do not allow binaries to exceed the permission dictated by the Discretionary Access Control (DAC).\n\nThis is merely a short overview, for a more detailed guide be sure to have a look at the apparmor.d(5) man page and documentation.\n\n"
+    },
+    {
+      "title": "Get desktop notification on DENIED actions",
+      "level": 3,
+      "content": "The notification daemon displays desktop notifications whenever AppArmor denies a program access. To automatically start aa-notify daemon on login follow below steps:\n\nInstall the Audit framework and enable and start the userspace Linux Audit daemon. Allow your desktop user to read audit logs in /var/log/audit by adding it to audit user group:\n\n```\n# groupadd -r audit\n# gpasswd -a user audit\n```\n\nAdd audit group to auditd.conf:\n\n```\n/etc/audit/auditd.conf\n```\n\n```\nlog_group = audit\n```\n\nInstall python-notify2 and python-psutil.\n\nCreate a desktop launcher with the below content:\n\n```\n~/.config/autostart/apparmor-notify.desktop\n```\n\n```\n[Desktop Entry]\nType=Application\nName=AppArmor Notify\nComment=Receive on screen notifications of AppArmor denials\nTryExec=aa-notify\nExec=aa-notify -p -s 1 -w 60 -f /var/log/audit/audit.log\nStartupNotify=false\nNoDisplay=true\n```\n\nReboot and check if the aa-notify process is running:\n\n```\n$ pgrep -ax aa-notify\n```\n\nFor more information, see aa-notify(8).\n\n"
+    },
+    {
+      "title": "Speed-up AppArmor start by caching profiles",
+      "level": 3,
+      "content": "Since AppArmor has to translate the configured profiles into a binary format it may significantly increase the boot time. You can check current AppArmor startup time with:\n\n```\n$ systemd-analyze blame | grep apparmor\n```\n\nTo enable caching AppArmor profiles, uncomment:\n\n```\n/etc/apparmor/parser.conf\n```\n\n```\n## Turn creating/updating of the cache on by default\nwrite-cache\n```\n\nTo change default cache location add:\n\n```\n/etc/apparmor/parser.conf\n```\n\n```\ncache-loc=/path/to/location\n```\n\nReboot and check AppArmor startup time again to see improvement:\n\n```\n$ systemd-analyze blame | grep apparmor\n```\n\n"
+    },
+    {
+      "title": "Failing to start Samba SMB/CIFS server",
+      "level": 3,
+      "content": "See Samba#Permission issues on AppArmor.\n\n"
+    },
+    {
+      "title": "Login impossible after upgrading to AppArmor v4",
+      "level": 3,
+      "content": "In rare cases, after upgrading to AppArmor version 4, it becomes impossible to log into any system account.\n\nThe system journal might contain errors like these:\n\n```\nunix_chkpwd[1612]: check pass; user unknown\nunix_chkpwd[1612]: password check failed for user (john)\ngdm-password][1574]: pam_unix(gdm-password:auth): authentication failure; logname= uid=0 euid=0 tty=/dev/tty1 ruser= rhost=  user=john\nkernel: audit: type=1400 audit(1730844640.468:171): apparmor=\"DENIED\" operation=\"capable\" class=\"cap\" profile=\"unix-chkpwd\" pid=1612 comm=\"unix_chkpwd\" capability=2  capname=\"dac_read_search\"\nkernel: audit: type=1400 audit(1730844640.468:172): apparmor=\"DENIED\" operation=\"capable\" class=\"cap\" profile=\"unix-chkpwd\" pid=1612 comm=\"unix_chkpwd\" capability=1  capname=\"dac_override\"\n```\n\nThis might be caused by /etc/shadow and/or /etc/gshadow not being readable by the root user (i.e. the permission bits of those files might be entirely unset). Thus, a possible solution would be to:\n\n1. Reboot, and disable AppArmor either by editing the appropriate boot loader entry during boot or by using fallback boot entry, which doesn't have AppArmor enabled.\n1. Log in as root, and set the correct file permissions: chmod 600 /etc/shadow /etc/gshadow\n1. Reboot once again.\n\n"
+    },
+    {
+      "title": "Differences between Linux distributions",
+      "level": 3,
+      "content": "Information you find often is about AppArmor on Ubuntu, which can be confusing, since Ubuntu carries a lot of kernel patches regarding AppArmor. Other distributions may also carry their own kernel patches, while Arch Linux uses a close-to-mainline kernel.\n\nFor example, while apparmor.d(5) already documents dbus rules, they require support from AppArmor userspace tools, kernel and D-Bus daemon[5]. The corresponding kernel patch[6] is applied by Ubuntu, but not included in mainline Linux and official Arch kernels. (Support also varies by D-Bus implementation.)\n\nAppArmor-specific kernel patches applied by Ubuntu can be found at (replace oracular with the codename of the Ubuntu version you are interested in):\n\n```\nhttps://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/oracular/log/?qt=grep&q=UBUNTU%3A+SAUCE%3A+apparmor\n```\n\nThe ABI versions supported by the userland tools can be found in /etc/apparmor.d/abi/. The ABI supported by the currently running kernel can be shown with:\n\n```\n$ aa-features-abi --extract\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wikipedia:AppArmor\n- AppArmor wiki\n- AppArmor Core Policy Reference — Detailed description of available options in a profile\n- Ubuntu Tutorial — General overview of available utilities and profile creation\n- Ubuntu Wiki — Basic command overview\n- AppArmor Versions — Version overview and links to the respective release notes\n- Kernel Interfaces — Low level interfaces to the AppArmor kernel module\n- wikipedia:Linux Security Modules — Linux kernel module on which basis AppArmor is build upon\n- AppArmor in openSUSE Security Guide\n\n"
+    }
+  ]
+}

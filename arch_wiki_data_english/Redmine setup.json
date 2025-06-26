@@ -1,0 +1,111 @@
+{
+  "title": "Redmine setup",
+  "url": "https://wiki.archlinux.org/title/Redmine_setup",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Ruby on Rails\n- RVM\n- MariaDB\n- Apache HTTP Server\n- Nginx\n\nRedmine is a free and open source, web-based project management and issue tracking tool. It handles multiple projects and subprojects. It features per project wikis and forums, time tracking, and flexible role based access control. It includes a calendar and Gantt charts to aid visual representation of projects and their deadlines. Redmine integrates with various version control systems and includes a repository browser and diff viewer.\n\nRedmine is written using the Ruby on Rails framework. It is cross-platform and cross-database and supports 34 languages.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "This document will guide you through the suggested installation process of Redmine.\n\nIf for some reason you want to setup redmine manually, it is recommended to follow the official Installation Guide.\n\nAlthough it is possible to run Redmine on its own for testing purposes, for production use it requires an SQL database as well as a web server. As database it is recommended to use MariaDB or PostgreSQL. The supported web servers are\n\n- Apache or nginx via Phusion Passenger\n- Ruby on Rails#Puma (with Nginx as reverse proxy server)\n- Ruby on Rails#Unicorn\n\n"
+    },
+    {
+      "title": "Build and Installation",
+      "level": 3,
+      "content": "Install the redmine package.\n\nIn the following we assume user under which the redmine will be running is http. The ruby commands are thus explicitly executed under this specific user's control.\n\n"
+    },
+    {
+      "title": "Database Configuration",
+      "level": 3,
+      "content": "Now, we will need to create the database that the Redmine will use to store your data. For now on, the database and its user will be named redmine. But this names can be changed to anything else.\n\n"
+    },
+    {
+      "title": "Database Creation",
+      "level": 4,
+      "content": "To create the database, the user and set privileges:\n\n```\n# mysql -u root -p\n```\n\n```\nCREATE DATABASE redmine CHARACTER SET UTF8;\nCREATE USER 'redmine'@'localhost' IDENTIFIED BY 'my_password';\nGRANT ALL PRIVILEGES ON redmine.* TO 'redmine'@'localhost';\n```\n\nFor PostgreSQL:\n\n```\nCREATE ROLE redmine LOGIN ENCRYPTED PASSWORD 'my_password' NOINHERIT VALID UNTIL 'infinity';\nCREATE DATABASE redmine WITH ENCODING='UTF8' OWNER=redmine;\n```\n\n"
+    },
+    {
+      "title": "Database Access Configuration",
+      "level": 4,
+      "content": "Now you need to configure Redmine to access the database we just created. To do that you have to copy /usr/share/webapps/redmine/config/database.yml.example to database.yml:\n\n```\n# cd /usr/share/webapps/redmine/config\n# cp database.yml.example database.yml\n```\n\nAnd then edit this file in order to configure your database settings for \"production\" environment (you can configure for the \"development\" and \"test\" environments too, just change the appropriate sections).\n\nExample for MariaDB and MySQL database:\n\n```\ndatabase.yml\n```\n\n```\nproduction:\n  adapter: mysql2\n  database: redmine\n  host: localhost\n  port: 3307   #If your server is not running on the standard port (3306), set it here, otherwise this line is unnecessary.\n  username: redmine\n  password: my_password\n```\n\nExample for PostgreSQL database:\n\n```\ndatabase.yml\n```\n\n```\nproduction:\n  adapter: postgresql\n  database: redmine\n  host: localhost\n  username: redmine\n  password: my_password\n  encoding: utf8\n  schema_search_path: <database_schema> (default - public)\n```\n\nExample for an SQL Server database:\n\n```\ndatabase.yml\n```\n\n```\nproduction:\n  adapter: sqlserver\n  database: redmine\n  host: localhost #Set not default host (localhost) here, otherwise this line is unnecessary.\n  port: 1433 #Set not standard port (1433) here, otherwise this line is unnecessary.\n  username: redmine\n  password: my_password\n```\n\n"
+    },
+    {
+      "title": "Ruby gems",
+      "level": 3,
+      "content": "Redmine requires some RubyGems, however redmine comes prepackaged with all requirements.\n\n"
+    },
+    {
+      "title": "Session Store Secret Generation",
+      "level": 3,
+      "content": "Now you must generate a random key that will be used by Rails to encode cookies that stores session data thus preventing their tampering:\n\n```\n# bundle exec rake generate_secret_token\n```\n\n"
+    },
+    {
+      "title": "Database Structure Creation",
+      "level": 3,
+      "content": "With the database created and the access configured for Redmine, now it is time to create the database structure. This is done by running the following command under the application root directory:\n\n```\n# cd /usr/share/webapps/redmine\n# chown -R http:http db # migration requires write access to db/schema.rb\n# sudo -u http -g http RAILS_ENV=production bundle exec rake db:migrate\n```\n\nThese command will create tables by running all migrations one by one then create the set of the permissions and the application administrator account, named admin.\n\n"
+    },
+    {
+      "title": "Database Population with Default Data",
+      "level": 3,
+      "content": "Now you may want to insert the default configuration data in database, like basic types of task, task states, groups, etc. To do so execute the following:\n\n```\n# sudo -u http -g http RAILS_ENV=production bundle exec rake redmine:load_default_data\n```\n\nRedmine will prompt for the data set language that should be loaded; you can also define the REDMINE_LANG environment variable before running the command to a value which will be automatically and silently picked up by the task:\n\n```\n# sudo -u http -g http RAILS_ENV=production REDMINE_LANG=de bundle exec rake redmine:load_default_data\n```\n\n"
+    },
+    {
+      "title": "File System Permissions",
+      "level": 3,
+      "content": "The user account running the application must have write permission on the following subdirectories:\n\n- files: storage of attachments.\n- log: application log file production.log.\n- tmp and tmp/pdf: used to generate PDF documents among other things (create these ones if not present).\n\nThe redmine comes preconfigured with permissions for user http. In case you like to use a different user you need to change the ownership, e.g.\n\n```\n# chown -R redmine:redmine files/ log/ tmp/\n```\n\n"
+    },
+    {
+      "title": "Test the installation",
+      "level": 3,
+      "content": "To test your new installation using WEBrick web server run the following in the Redmine folder:\n\n```\n# sudo -u http -g http ruby bin/rails server webrick -e production\n```\n\nOnce WEBrick has started, point your browser to http://localhost:3000/. You should now see the application welcome page. Use default administrator account to log in: admin/admin. You can go to Administration menu and choose Settings to modify most of the application settings.\n\n"
+    },
+    {
+      "title": "Puma / Unicorn",
+      "level": 4,
+      "content": "Puma and Unicorn are web servers based on Mongrel. For its increased speed and smaller memory footprint Puma is recommended. Both are very simple to setup, but for production use should be used in combination with a reverse proxy (Apache, Nginx, lighttpd, etc.).\n\n```\n# gem install puma\n# sudo -u http -g http /opt/ruby2.6/bin/puma\n```\n\nFor production, puma can be started as a systemd service:\n\n```\n/etc/systemd/system/redmine.service\n```\n\n```\n[Unit]\nDescription=Redmine\nAfter=network.target\n\n[Service]\nUser=http\nGroup=http\nRestartSec=1\nRestart=always\nStartLimitInterval=10\nStartLimitBurst=10\nWorkingDirectory=/usr/share/webapps/redmine/\nExecStart=/opt/ruby2.6/bin/puma -e production -p 9292\n\n[Install]\nWantedBy=multi-user.target\n```\n\nDo a complete daemon-reload, then start/enable redmine.service.\n\n"
+    },
+    {
+      "title": "Phusion Passenger",
+      "level": 4,
+      "content": "For Apache and Nginx, it is recommended to use Phusion Passenger. Passenger is a module available for Nginx and Apache HTTP Server.\n\nStart by installing the 'passenger' gem:\n\n```\n# gem install passenger\n```\n\nNow you have to look at your passenger gem installation directory to continue. If you do not known where it is, type:\n\n```\n# gem env\n```\n\nAnd look at the GEM PATHS to find where the gems are installed. If you followed this guide and installed RVM, you can have more than one path, look at the one you are using.\n\nFor this guide so far, the gem path is /usr/local/rvm/gems/ruby-2.0.0-p247@global.\n\n```\n# cd /usr/local/rvm/gems/ruby-2.0.0-p247@global/gems/passenger-4.0.23\n```\n\nIf you are aiming to use Apache HTTP Server, run:\n\n```\n# passenger-install-apache2-module\n```\n\nIn case a rails application is deployed with a sub-URI, like http://example.com/yourapplication, some additional configuration is required, see the Passenger documentation\n\nFor Nginx:\n\n```\n# passenger-install-nginx-module\n```\n\nAnd finally, the installer will provide you with further information regarding the installation (such as installing additional libraries). So, to setup your server, simply follow the output from the passenger installer.\n\n"
+    },
+    {
+      "title": "Updating",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nBackup the files used in Redmine:\n\n```\n# tar czvf ~/redmine_files.tar.gz -C /usr/share/webapps/redmine/ files\n```\n\nBackup the plugins installed in Redmine:\n\n```\n# tar czvf ~/redmine_plugins.tar.gz -C /usr/share/webapps/redmine/ plugins\n```\n\nBackup the database:\n\n```\n# mysqldump -u root -p <redmine_database> | gzip > ~/redmine_db.sql.gz\n```\n\nUpdate the redmine package as normal.\n\nUpdate the gems requirements:\n\n```\n#  bundle update\n```\n\nFor a clean gems environment, you may want to remove all the gems and reinstall them. To go through this, do:\n\n```\n# for x in `gem list --no-versions`; do gem uninstall $x -a -x -I; done\n```\n\nIf you did the last step and removed all the gems, now you will need to reinstall them all:\n\n```\n# gem install bundler\n# bundle install --without development test\n```\n\nCopy the saved files:\n\n```\n# tar xzvf ~/redmine_files.tar.gz -C /usr/share/webapps/redmine/\n```\n\nCopy the installed plugins:\n\n```\n# tar xzvf ~/redmine_plugins.tar.gz -C /usr/share/webapps/redmine/\n```\n\nRegenerate the secret token:\n\n```\n# cd /usr/share/webapps/redmine\n# bundle exec rake generate_secret_token\n```\n\nCheck for any themes that you may have installed in the public/themes directory. You can copy them over but checking for updated version is ideal.\n\nUpdate the database. This step is the one that could change the contents of your database. Go to your new redmine directory, then migrate your database:\n\n```\n# RAILS_ENV=production REDMINE_LANG=pt-BR bundle exec rake db:migrate\n```\n\nIf you have installed any plugins, you should also run their database migrations:\n\n```\n# RAILS_ENV=production REDMINE_LANG=pt-BR bundle exec rake redmine:plugins:migrate\n```\n\nNow, it is time to clean the cache and the existing sessions:\n\n```\n# RAILS_ENV=production bundle exec rake tmp:cache:clear tmp:sessions:clear\n```\n\nRestart the application server (e.g. puma, thin, passenger, etc). And finally go to \"Admin -> Roles & permissions\" to check/set permissions for the new features, if any.\n\n"
+    },
+    {
+      "title": "Runtime error complaining that RMagick was configured with older version",
+      "level": 3,
+      "content": "If you get the following runtime error after upgrading ImageMagick This installation of RMagick was configured with ImageMagick 6.8.7 but ImageMagick 6.8.8-1 is in use. then you only need to reinstall (or rebuild as shown above if it is the case).\n\n"
+    },
+    {
+      "title": "Error when installing gems: Cannot load such file -- mysql2/mysql2",
+      "level": 3,
+      "content": "If you see an error like cannot load such file -- mysql2/mysql2, you are having a problem with the installation of the database gem. Probably a misconfiguration in the Database Access Configuration step. In this case you should verify the database.yml file.\n\nIf this does not work, you can manually install the database gem by:\n\n```\n# gem install mysql2\n```\n\nAs a last resort, you can try to comment the line of the database gem and add a new one as below:\n\n```\n<path-to-mysql2-gem-directory>/lib/mysql2/mysql2.rb\n```\n\n```\n# require 'mysql2/mysql2'\nrequire '<path-to-mysql2-gem-directory>/lib/mysql2/mysql2.so'\n```\n\n"
+    },
+    {
+      "title": "Checkout SVN Source",
+      "level": 3,
+      "content": "Get the Redmine source (Download instructions). Here is method of installing Redmine directly from subversion in /srv/http/redmine/\n\n```\n# useradd -d /srv/http/redmine -s /bin/false redmine\n# mkdir -p /srv/http/redmine\n# svn checkout https://svn.redmine.org/redmine/branches/2.1-stable /srv/http/redmine\n# chown -R redmine: /srv/http/redmine\n```\n\n"
+    },
+    {
+      "title": "Automating The Update Process",
+      "level": 3,
+      "content": "Example of an after-update script:\n\n```\n#!/usr/bin/bash\nexport RAILS_ENV=production\ngrep -E \"^gem 'thin'\" Gemfile || echo \"gem 'thin'\" >> Gemfile\nbundle update && bundle exec rake generate_secret_token db:migrate redmine:plugins:migrate tmp:cache:clear tmp:sessions:clear\n```\n\n"
+    },
+    {
+      "title": "Creating a Systemd Unit",
+      "level": 3,
+      "content": "If you want to automatically run your application server when system starts, you need to create a systemd unit file.\n\n```\n/etc/systemd/system/redmine.service\n```\n\n```\n[Unit]\nDescription=Redmine server\nAfter=network.target\n\n[Service]\nType=simple\nUser=redmine2\nGroup=redmine2\nEnvironment=GEM_HOME=/home/redmine2/.gem/\nExecStart=/usr/bin/ruby /usr/share/webapps/redmine/bin/rails server webrick -e production\n\n# Give a reasonable amount of time for the server to start up/shut down\nTimeoutSec=300\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Redmine Official Site\n- Redmine Features\n- Official install guide from Redmine Wiki\n\n"
+    }
+  ]
+}

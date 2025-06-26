@@ -1,0 +1,101 @@
+{
+  "title": "StrongSwan",
+  "url": "https://wiki.archlinux.org/title/StrongSwan",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Openswan L2TP/IPsec VPN client setup\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n- Practically all information in the article is obsolete and it recommends known vulnerable settings.\n- The article uses a deprecated configuration format in the form of ipsec.conf based on [1]. This has been replaced in the package in 2019 and is not documented anymore either. The cryptographic algorithm proposals listed below are insecure, DH \"modp\" with less than 2048 or even 3072 bit is considered broken due to the LogJam vulnerability. (Discuss in Talk:StrongSwan#Rewrite of the article)\n\nIPSec is an encryption and authentication standard that can be used to build secure Virtual Private Networks (VPNs).\n\nIt is natively supported by the Linux kernel, but configuration of encryption keys is left to the user. The IKE protocols are therefore used in IPSec VPNs to automatically negotiate key exchanges securely using a variety of means, including certificates, pre-shared keys or both.\n\nThey are typically implemented in userspace daemons on the server side. strongSwan is an IKE daemon with full support for IKEv1 and IKEv2. It is natively supported by most modern clients, including Linux, Windows 7, Apple iOS, Mac OSX, FreeBSD and BlackBerry OS.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the strongswan package.\n\n"
+    },
+    {
+      "title": "Certificates",
+      "level": 2,
+      "content": "The first step is to generate the X.509 certificates, including a certificate authority (CA), a server certificate, and at least one client certificate.\n\n"
+    },
+    {
+      "title": "Certificate Authority",
+      "level": 3,
+      "content": "Let us start by creating a self-signed root CA certificate:\n\n```\n$ cd /etc/ipsec.d/\n$ ipsec pki --gen --type rsa --size 4096 --outform pem > private/strongswanKey.pem\n$ chmod 600 private/strongswanKey.pem\n$ ipsec pki --self --ca --lifetime 3650 --outform pem \\\n            --in private/strongswanKey.pem --type rsa \\\n            --dn \"C=CH, O=strongSwan, CN=strongSwan Root CA\" \\\n      > cacerts/strongswanCert.pem\n```\n\nThe result is a 4096 bit RSA private key strongswanKey.pem (line 2) and a self-signed CA certificate strongswanCert.pem (line 7) with a validity of 10 years (3650 days). The files are stored in PEM encoded format.\n\nYou can change the Distinguished Name (DN) to more relevant values for country (C), organization (O), and common name (CN), but you do not have to.\n\nTo list the properties of your newly generated certificate, type in the following command:\n\n```\n$ ipsec pki --print --in cacerts/strongswanCert.pem\n```\n\n```\ncert:      X509\nsubject:  \"C=CH, O=strongSwan, CN=strongSwan Root CA\"\nissuer:   \"C=CH, O=strongSwan, CN=strongSwan Root CA\"\nvalidity:  not before Nov 22 11:55:41 2013, ok\n           not after  Nov 20 11:55:41 2023, ok (expires in 3649 days)\nserial:    65:39:93:df:a0:f8:40:03\nflags:     CA CRLSign self-signed\nauthkeyId: 45:30:11:da:a4:0e:0b:0a:a3:41:a5:81:41:ab:d8:04:7a:40:6c:c0\nsubjkeyId: 45:30:11:da:a4:0e:0b:0a:a3:41:a5:81:41:ab:d8:04:7a:40:6c:c0\npubkey:    RSA 4096 bits\nkeyid:     dc:15:91:95:04:07:a5:13:69:5f:77:65:26:d7:02:3f:60:ec:73:c8\nsubjkey:   45:30:11:da:a4:0e:0b:0a:a3:41:a5:81:41:ab:d8:04:7a:40:6c:c0\n```\n\n"
+    },
+    {
+      "title": "Host Certificate",
+      "level": 3,
+      "content": "This certificate will be used to authenticate the VPN server. Run the following commands:\n\n```\n$ cd /etc/ipsec.d/\n$ ipsec pki --gen --type rsa --size 2048 --outform pem > private/vpnHostKey.pem\n$ chmod 600 private/vpnHostKey.pem\n$ ipsec pki --pub --in private/vpnHostKey.pem --type rsa | \\\n      ipsec pki --issue --lifetime 730 --outform pem \\\n                --cacert cacerts/strongswanCert.pem \\\n                --cakey private/strongswanKey.pem \\\n                --dn \"C=CH, O=strongSwan, CN=vpn.example.com\" \\\n                --san vpn.example.com \\\n                --flag serverAuth --flag ikeIntermediate \\\n          > certs/vpnHostCert.pem\n```\n\nThe result is a 2048 bit RSA private key vpnHostKey.pem (line 2). In line 4 we extract its public key and pipe it over to issue vpnHostCert.pem (line 11), a host certificate signed by your CA. The certificate has a validity of two years (730 days). It identifies the VPN host by its Fully Qualified Domain Name (FQDN) (here: vpn.example.com).\n\nNote: **vpn.example.com** \n\nNote: In addition, OS X 10.7.3 or older requires the ikeIntermediate flag, which we also added here.\n\nIn addition, OS X 10.7.3 or older requires the ikeIntermediate flag, which we also added here.\n\nLet us take a look at the properties of our newly generated certificate.\n\n```\n$ ipsec pki --print --in certs/vpnHostCert.pem\n```\n\n```\ncert:      X509\nsubject:  \"C=CH, O=strongSwan, CN=vpn.example.com\"\nissuer:   \"C=CH, O=strongSwan, CN=strongSwan Root CA\"\nvalidity:  not before Nov 22 21:16:51 2013, ok\n           not after  Nov 22 21:16:51 2015, ok (expires in 729 days)\nserial:    0c:05:d7:d5:57:0e:d9:48\naltNames:  vpn.example.com\nflags:     serverAuth iKEIntermediate \nauthkeyId: 9b:57:35:fb:cd:9e:2d:20:37:1d:61:4c:e7:c4:5b:5e:dc:64:ad:fc\nsubjkeyId: 5f:12:c2:06:ee:2b:1e:cc:5f:78:54:ff:f0:f3:7b:a0:2b:c0:b4:d6\npubkey:    RSA 2048 bits\nkeyid:     6f:a7:99:60:27:27:09:96:02:c1:b9:d9:7d:c1:b0:10:e3:e1:d5:45\nsubjkey:   5f:12:c2:06:ee:2b:1e:cc:5f:78:54:ff:f0:f3:7b:a0:2b:c0:b4:d6\n```\n\n"
+    },
+    {
+      "title": "Client Certificate",
+      "level": 3,
+      "content": "Any client will require a personal certificate in order to use the VPN. The process is analogous to generating a host certificate, except that we identify a client certificate by the client's e-mail address rather than a hostname.\n\n```\n$ cd /etc/ipsec.d/\n$ ipsec pki --gen --type rsa --size 2048 --outform pem > private/ClientKey.pem\n$ chmod 600 private/ClientKey.pem\n$ ipsec pki --pub --in private/ClientKey.pem --type rsa | \\\n      ipsec pki --issue --lifetime 730 --outform pem \\\n                --cacert cacerts/strongswanCert.pem \\\n                --cakey private/strongswanKey.pem \\\n                --dn \"C=CH, O=strongSwan, CN=myself@example.com\" \\\n                --san myself@example.com \\\n          > certs/ClientCert.pem\n```\n\nThe result is a 2048 bit RSA private key ClientKey.pem (line 2). In line 6 we extract its public key and pipe it over to issue ClientCert.pem (line 10), the first client certificate signed by your CA. The certificate has a validity of two years (730 days) and identifies the client by its e-mail address (here: myself@example.com).\n\nFinally we will bundle all needed certificates and keys into a PKCS#12 file with a passphrase, which is the most convenient format for clients.\n\n```\n$ openssl pkcs12 -export -name \"My own VPN client certificate\" \\\n                 -inkey private/ClientKey.pem \\\n                 -in certs/ClientCert.pem  \\\n                 -certfile cacerts/strongswanCert.pem \\\n                 -caname \"strongSwan Root CA\" \\\n                 -out Client.p12\n```\n\n"
+    },
+    {
+      "title": "VPN Variants",
+      "level": 2,
+      "content": "The easiest configuration to get running with is IPSec in tunnel mode, described below.\n\n"
+    },
+    {
+      "title": "IPSec in tunnel mode",
+      "level": 3,
+      "content": "VPN configuration can be found in /etc/ipsec.conf. The following contains the necessary options to build a basic, functional VPN server:\n\n```\n/etc/ipsec.conf\n```\n\n```\n# ipsec.conf - strongSwan IPsec configuration file\nconfig setup\n\n  # By default only one client can connect at the same time with an identical\n  # certificate and/or password combination. Enable this option to disable\n  # this behavior.\n  # uniqueids=never\n\n  # Slightly more verbose logging. Very useful for debugging.\n  charondebug=\"cfg 2, dmn 2, ike 2, net 2\"\n\n# Default configuration options, used below if an option is not specified.\n# See: https://wiki.strongswan.org/projects/strongswan/wiki/ConnSection\nconn %default\n\n  # Use IKEv2 by default\n  keyexchange=ikev2\n\n  # Prefer modern cipher suites that allow PFS (Perfect Forward Secrecy)\n  ike=aes128-sha256-ecp256,aes256-sha384-ecp384,aes128-sha256-modp2048,aes128-sha1-modp2048,aes256-sha384-modp4096,aes256-sha256-modp4096,aes256-sha1-modp4096,aes128-sha256-modp1536,aes128-sha1-modp1536,aes256-sha384-modp2048,aes256-sha256-modp2048,aes256-sha1-modp2048,aes128-sha256-modp1024,aes128-sha1-modp1024,aes256-sha384-modp1536,aes256-sha256-modp1536,aes256-sha1-modp1536,aes256-sha384-modp1024,aes256-sha256-modp1024,aes256-sha1-modp1024!\n  esp=aes128gcm16-ecp256,aes256gcm16-ecp384,aes128-sha256-ecp256,aes256-sha384-ecp384,aes128-sha256-modp2048,aes128-sha1-modp2048,aes256-sha384-modp4096,aes256-sha256-modp4096,aes256-sha1-modp4096,aes128-sha256-modp1536,aes128-sha1-modp1536,aes256-sha384-modp2048,aes256-sha256-modp2048,aes256-sha1-modp2048,aes128-sha256-modp1024,aes128-sha1-modp1024,aes256-sha384-modp1536,aes256-sha256-modp1536,aes256-sha1-modp1536,aes256-sha384-modp1024,aes256-sha256-modp1024,aes256-sha1-modp1024,aes128gcm16,aes256gcm16,aes128-sha256,aes128-sha1,aes256-sha384,aes256-sha256,aes256-sha1!\n\n  # Dead Peer Discovery\n  dpdaction=clear\n  dpddelay=300s\n\n  # Do not renegotiate a connection if it is about to expire\n  rekey=no\n\n  # Server side\n  left=%any\n  leftsubnet=0.0.0.0/0\n  leftcert=vpnHostCert.pem\n\n  # Client side\n  right=%any\n  rightdns=8.8.8.8,8.8.4.4\n  rightsourceip=%dhcp\n\n# IKEv2: Newer version of the IKE protocol\nconn IPSec-IKEv2\n  keyexchange=ikev2\n  auto=add\n\n# IKEv2-EAP\nconn IPSec-IKEv2-EAP\n  also=\"IPSec-IKEv2\"\n  rightauth=eap-mschapv2\n  rightsendcert=never\n  eap_identity=%any\n\n# IKEv1 (Cisco-compatible version)\nconn CiscoIPSec\n  keyexchange=ikev1\n  # forceencaps=yes\n  rightauth=pubkey\n  rightauth2=xauth\n  auto=add\n```\n\n"
+    },
+    {
+      "title": "IPSec in transport mode",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nCompared to tunnel mode, transport mode does not encrypt the original IP header from its point of view. This is useful if something else (i.e. GRE) has already encapsulated the original packet to be transported through a tunnel, before IPSec gets it. From the point of view of IPSec, the IP header it thinks is the original is actually the IP header already setup for the tunneling, and it will encrypt what is truly the original IP header as just part of the encapsulated packet payload, without realizing it is doing it.\n\n"
+    },
+    {
+      "title": "IPSec/L2TP",
+      "level": 3,
+      "content": "The L2TP/IPsec VPN client setup page describes how to setup a client to connect to an IPSec/L2TP server. This variant of an IPSec VPN has the advantage of allowing to tunnel non-IP packets, contrary to pure IPSec, but at the expense of having to run an additional L2TP daemon.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Secrets",
+      "level": 2,
+      "content": "The server's private key needs to be configured in /etc/ipsec.secrets, like the following example:\n\n```\n/etc/ipsec.secrets\n```\n\n```\n# RSA private key for this host\n: RSA vpnHostKey.pem\n```\n\nWhenever you edit /etc/ipsec.secrets while strongSwan is running, you must reload the file:\n\n```\n$ ipsec rereadsecrets\n```\n\n"
+    },
+    {
+      "title": "Networking",
+      "level": 2,
+      "content": "You’re almost done setting up your server. There are a few things left to make your VPN server properly route the VPN tunnel:\n\n```\n/etc/sysctl.d/10-net-forward.conf\n```\n\n```\n# VPN\nnet.ipv4.ip_forward = 1\nnet.ipv4.conf.all.accept_redirects = 0\nnet.ipv4.conf.all.send_redirects = 0\n```\n\nThe VPN configuration above automatically assigns an IP address to the client using DHCP, so you need to have a working DHCP server. If the server is running on the same host as strongSwan, you may need to edit /etc/strongswan.d/charon/dhcp.conf like this:\n\n```\n/etc/strongswan.d/charon/dhcp.conf\n```\n\n```\ndhcp {\n force_server_address = yes\n server = 192.168.0.255\n}\n```\n\nYou may also need to allow the following protocols in your firewall:\n\n- ESP (Encrypted Secure Payload): Standard IPSec traffic\n- UDP 4500: IPSec traffic in \"NAT Traversal\" mode\n- UDP 500: Key exchanges (IKE)\n\n"
+    },
+    {
+      "title": "Starting",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nFinally, you can start and enable strongswan-starter.service.\n\n"
+    },
+    {
+      "title": "Running Strongswan in a Container",
+      "level": 3,
+      "content": "For running strongswan in a container like systemd-nspawn you need the following service file:\n\n```\n/etc/systemd/system/systemd-nspawn@.service.d/override.conf}\n```\n\n```\n[Service]\nExecStart=\nExecStart=/usr/bin/systemd-nspawn --quiet --keep-unit --boot --link-journal=try-guest --settings=override --machine=%I --capability=CAP_NET_ADMIN --network-veth\n```\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Routing issues",
+      "level": 3,
+      "content": "If you are having troubles with routing traffic from client (road warrior) to the remote network, try disabling the bypass-lan plugin on the server. This plugin is enabled by default in the official Arch package since version 5.6.0. See the associated issue in strongswan bugtracker.\n\n```\n/etc/strongswan.d/charon/bypass-lan.conf\n```\n\n```\n# Whether to load the plugin. Can also be an integer to increase the\n# priority of this plugin.\nload = no\n```\n\n"
+    },
+    {
+      "title": "SSL Handshake Timeouts",
+      "level": 3,
+      "content": "Some users have had intermittent SSL handshake timeouts, such as:\n\n- curl -v https://example.com getting stuck at \"TLSv1.3 (OUT), TLS handshake, Client hello (1):\"\n- Firefox stalling loading a page, showing \"Performing a TLS handshake to www.example.com\"\n\nSome users have fixed (or worked around?) this problem by decreasing their network interface mtu to be in the 1422-1438 range, even if they do not need to do so without a VPN or when using OpenVPN. [2] [3]\n\nLowering mtu could potentially cause other problems, so your mileage may vary. This fix/workaround will likely somewhat decrease internet and internal network performance. (But, SSL handshakes will stop stalling.) If you are using jumbo frames, this may significantly decrease internal network performance.\n\nCheck your interface's mtu: (The one being used to connect to the VPN)\n\n```\n$ ip link\n```\n\nConsider this default (probably 1500) bad.\n\nYou can efficiently try to find a mtu that prevents an SSL timeout by repeating this process, perhaps starting with a really low trial-mtu like 1300, or lower if that still fails: (interface is the name shown above by ip link, not a full path like /dev/device)\n\n```\n# ip link set dev interface mtu trial-mtu\n$ while(curl -v https://example.com); do\n> sleep 2\n> done\n```\n\nIf it succeeds enough times for you to be confident an intermittent failure should have happened, consider this mtu as good, and hit CTRL+C. Re-run the above commands with a trial-mtu halfway between this one and your closest known bad mtu.\n\nIf it gets stuck on a TLS handshake, consider this as bad, and hit CTRL+C. Re-run the above with halfway between this one and your closest known good mtu.\n\n"
+    },
+    {
+      "title": "Connection established but no traffic",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nIn certain setups, like KDE, you might get a established connection using ipsec up but you cannot reach any outside machine. This could be due to the openresolv package not being installed. It is an optional dependency, but it might be required for your situation.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- strongSwan 5: How to create your own VPN — The source used to write the initial revision of this article, with permission from the original author.\n- How to Set Up an IKEv2 VPN Server with StrongSwan on Ubuntu 16.04\n\n"
+    }
+  ]
+}

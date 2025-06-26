@@ -1,0 +1,116 @@
+{
+  "title": "Configuration du clavier dans Xorg",
+  "url": "https://wiki.archlinux.org/title/Configuration_du_clavier_dans_Xorg",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- X keyboard extension\n- Linux console (Français)/Keyboard configuration (Français)\n- Extra keyboard keys\n- Xorg (Français)\n- Keyboard shortcuts (Français)\n\nCet article décrit les bases de la configuration du clavier Xorg. Pour les sujets plus avancés tels que la modification de la disposition du clavier ou les mappages de touches supplémentaires, consultez respectivement X keyboard extension ou Extra keyboard keys.\n\nLe serveur Xorg utilise l'extension X keyboard extension (XKB) pour définir la disposition du clavier. (XKB) pour définir les dispositions de clavier. En option, xmodmap peut être utilisé pour accéder directement à la table de clavier interne, bien que cela ne soit pas recommandé pour les tâches complexes. De plus, localectl de systemd peut être utilisé pour définir la disposition du clavier à la fois pour le serveur Xorg et la console virtuelle.\n\n"
+    },
+    {
+      "title": "Visualisation des paramètres du clavier",
+      "level": 2,
+      "content": "Vous pouvez utiliser la commande suivante pour consulter les paramètres actuels de XKB :\n\n```\n$ setxkbmap -print -verbose 10\n```\n\n```\nSetting verbose level to 10\nlocale is C\nApplied rules from evdev:\nmodel:      evdev\nlayout:     us\noptions:    terminate:ctrl_alt_bksp\nTrying to build keymap using the following components:\nkeycodes:   evdev+aliases(qwerty)\ntypes:      complete\ncompat:     complete\nsymbols:    pc+us+inet(evdev)+terminate(ctrl_alt_bksp)\ngeometry:   pc(pc104)\nxkb_keymap {\n        xkb_keycodes  { include \"evdev+aliases(qwerty)\" };\n        xkb_types     { include \"complete\"      };\n        xkb_compat    { include \"complete\"      };\n        xkb_symbols   { include \"pc+us+inet(evdev)+terminate(ctrl_alt_bksp)\"    };\n        xkb_geometry  { include \"pc(pc104)\"     };\n};\n```\n\n"
+    },
+    {
+      "title": "Utilitaires tiers",
+      "level": 3,
+      "content": "Il existe quelques utilitaires \"non officiels\" qui permettent d'imprimer des informations spécifiques sur la disposition de clavier actuellement utilisée.\n\n- xkb-switch-gitAUR :\n\n```\n$ xkb-switch\n```\n\n```\nus\n```\n\n- xkblayout-state-gitAUR :\n\n```\n$ xkblayout-state print \"%s\"\n```\n\n```\nde\n```\n\n"
+    },
+    {
+      "title": "Configurer la disposition du clavier",
+      "level": 2,
+      "content": "La disposition du clavier dans Xorg peut être définie de plusieurs façons. Voici une explication des options utilisées :\n\n- XkbModel sélectionne le modèle de clavier. Cela n'a d'influence que sur les touches supplémentaires que votre clavier peut avoir. Les options de secours les plus sûres sont pc104 ou pc105. Mais par exemple, les ordinateurs portables ont généralement des touches supplémentaires, et parfois vous pouvez les faire fonctionner en définissant simplement un modèle approprié.\n- XkbLayout sélectionne la disposition du clavier. Plusieurs dispositions peuvent être spécifiées dans une liste séparée par des virgules, par exemple si vous voulez passer rapidement d'une disposition à l'autre.\n- XkbVariant sélectionne une variante de disposition spécifique disponible pour le XkbLayout. Par exemple, la variante par défaut sk (slovaque) est qwertz, mais vous pouvez spécifier manuellement qwerty, etc.\n- XkbOptions contient quelques options supplémentaires (séparées par des virgules). Utilisées pour spécifier le changement de disposition, le voyant de notification, le mode de composition, etc. Consultez la section #Options XKB fréquemment utilisées pour des exemples.\n\nLe nom de la disposition est généralement un code de pays à deux lettres. Pour consulter la liste complète des modèles de claviers, des dispositions, des variantes et des options, ainsi qu'une courte description, ouvrez /usr/share/X11/xkb/rules/base.lst. Alternativement, vous pouvez utiliser l'une des commandes suivantes pour consulter une liste sans description :\n\n- localectl list-x11-keymap-models\n- localectl list-x11-keymap-layouts\n- localectl list-x11-keymap-variants [layout]}\n- localectl list-x11-keymap-options\n\nLes exemples des sous-sections suivantes auront le même effet, ils définiront le modèle pc104, cz comme disposition principale, us comme disposition secondaire, la variante dvorak pour la disposition us et la combinaison Win+Space pour basculer entre les dispositions. Consultez xkeyboard-config(7) pour des informations plus détaillées.\n\n"
+    },
+    {
+      "title": "Utilisation de setxkbmap",
+      "level": 3,
+      "content": "La commande setxkbmap définit la disposition du clavier pour la session X actuelle uniquement, mais peut être rendue persistante dans [[Xinit (Français)#xinitrc|xinitrc]] ou xprofile. Cela remplace la configuration du système spécifiée à la suite de #Utilisation des fichiers de configuration de X. Cependant, la persistance ne s'applique pas aux claviers tels que les claviers externes, à moins que leur identifiant de périphérique ait été spécifié lors de l'exécution de setxkbmap. Ou qu'ils constituent le périphérique de clavier principal du serveur X.\n\nL'utilisation est la suivante (consultez setxkbmap(1)) :\n\n```\n$ setxkbmap [-model xkb_model] [-layout xkb_layout] [-variant xkb_variant] [-option xkb_options]\n```\n\nPour modifier uniquement la disposition (-layout est l'option par défaut) :\n\n```\n$ setxkbmap xkb_layout\n```\n\nPour de multiples personnalisations :\n\n```\n$ setxkbmap -model pc104 -layout cz,us -variant ,dvorak -option grp:win_space_toggle\n```\n\n"
+    },
+    {
+      "title": "Utilisation des fichiers de configuration de X",
+      "level": 3,
+      "content": "La syntaxe des fichiers de configuration X est expliquée dans Xorg (Français)#Configuration. Cette méthode crée une configuration à l'échelle du système qui est persistante lors des redémarrages.\n\nVoici un exemple :\n\n```\n/etc/X11/xorg.conf.d/00-keyboard.conf\n```\n\n```\nSection \"InputClass\"\n        Identifier \"system-keyboard\"\n        MatchIsKeyboard \"on\"\n        Option \"XkbLayout\" \"cz,us\"\n        Option \"XkbModel\" \"pc104\"\n        Option \"XkbVariant\" \",dvorak\"\n        Option \"XkbOptions\" \"grp:win_space_toggle\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Utilisation de localectl",
+      "level": 4,
+      "content": "Pour des raisons de commodité, l'outil localectl peut être utilisé au lieu d'éditer manuellement les fichiers de configuration de X. Il enregistrera la configuration dans /etc/X11/xorg.conf.d/00-keyboard.conf, ce fichier ne doit pas être modifié manuellement, car localectl écrasera les changements au prochain démarrage.\n\nL'utilisation est la suivante :\n\n```\n# localectl [--no-convert] set-x11-keymap layout [model [variant [options]]]]\n```\n\nPour définir un modèle, une variante ou des options, tous les champs précédents doivent être spécifiés, mais les champs précédents peuvent être ignorés en passant une chaîne vide avec \"\". À moins que l'option --no-convert ne soit passée, le clavier spécifié est également converti en clavier de console le plus proche et appliqué à la configuration de la console dans vconsole.conf. Consultez localectl(1) pour plus d'informations.\n\nPour créer un /etc/X11/xorg.conf.d/00-keyboard.conf comme celui ci-dessus :\n\n```\n# localectl --no-convert set-x11-keymap cz,us pc104 ,dvorak grp:win_space_toggle\n```\n\n"
+    },
+    {
+      "title": "Passage d'une disposition de clavier à une autre",
+      "level": 3,
+      "content": "Pour pouvoir facilement changer de disposition de clavier, spécifiez d'abord plusieurs dispositions entre lesquelles vous voulez basculer (la première est celle par défaut). Ensuite, spécifiez une touche (ou une combinaison de touches) qui sera utilisée pour la commutation. Par exemple, pour passer d'une disposition américaine à une disposition suédoise en utilisant la touche CapsLock, utilisez us,se comme argument de XkbLayout et grp:caps_toggle comme argument de XkbOptions. Le nombre de XkbLayouts doit correspondre à celui des XkbVariants - si vous voulez passer uniquement d'une variante à l'autre, dupliquez la disposition en conséquence (par exemple, de,de).\n\nVous pouvez utiliser d'autres combinaisons de touches que CapsLock, elles sont listées dans /usr/share/X11/xkb/rules/base.lst, commencent par grp: et se terminent par toggle. Pour obtenir la liste complète des options disponibles, exécutez la commande suivante :\n\n```\n$ grep \"grp :.*toggle\" /usr/share/X11/xkb/rules/base.lst\n```\n\nNotez que l'option grp:alts_toggle est peu fiable et peu susceptible d'être corrigée ; préférez d'autres combinaisons !\n\n"
+    },
+    {
+      "title": "Terminer Xorg avec Ctrl+Alt+Backspace",
+      "level": 3,
+      "content": "Par défaut, la combinaison de touches Ctrl+Alt+Backspace est désactivée. Vous pouvez l'activer en passant terminate:ctrl_alt_bksp à XkbOptions. Vous pouvez également le faire en liant une touche à Terminate_Server dans xmodmap (ce qui annule tout paramètre existant de XkbOptions). Pour que l'une ou l'autre de ces méthodes fonctionne, il faut également que DontZap ait la valeur \"off\" dans ServerFlags ; cependant, depuis 2004 [1], c'est la valeur par défaut.\n\n"
+    },
+    {
+      "title": "Échanger le verrouillage des majuscules avec le contrôle gauche",
+      "level": 3,
+      "content": "Pour permuter le verrouillage des majuscules avec la touche de contrôle gauche, ajoutez ctrl:swapcaps à XkbOptions. Exécutez la commande suivante pour consulter les options similaires ainsi que leurs descriptions :\n\n```\n$ grep -E \"(ctrl|caps) :\" /usr/share/X11/xkb/rules/base.lst\n```\n\n"
+    },
+    {
+      "title": "Activation des touches souris",
+      "level": 3,
+      "content": "Les «touches souris», à ne pas confondre avec les touches de la souris, est désactivé par défaut et doit être activé manuellement en passant keypad:pointerkeys à XkbOptions. Ainsi, le raccourci Shift+NumLock permet de faire basculer les «touches souris».\n\nConsultez également X keyboard extension#Mouse control pour une configuration avancée.\n\n"
+    },
+    {
+      "title": "Configuration de la touche de composition",
+      "level": 3,
+      "content": "Bien que cela ne soit généralement pas le cas sur les claviers traditionnels, une touche de composition peut être configurée sur une touche existante.\n\nLa touche Compose commence une séquence d'appui sur une touche qui implique (généralement deux) appuis supplémentaires. Elle est généralement utilisée pour saisir des caractères dans une langue pour laquelle le clavier n'a pas été conçu, ou pour d'autres caractères moins utilisés qui ne sont pas couverts par le modificateur AltGr. Par exemple, l'appui sur Compose. ' e produit é, ou Compose - - - produira un \"em dash\" : -.\n\nBien que quelques claviers plus excentriques disposent d'une touche Compose, sa disponibilité est généralement assurée par la substitution d'une touche existante. Par exemple, pour transformer la touche {ic|Menu}} en touche {ic|Compose}}, utilisez la configuration de l'environnement de bureau, ou passez compose:menu à XkbOptions (ou setxkbmap : setxkbmap -option compose:menu). Les substitutions de touches autorisées sont définies dans /usr/share/X11/xkb/rules/base.lst :\n\n```\n$ grep \"compose:\" /usr/share/X11/xkb/rules/base.lst\n```\n\nSi le mappage souhaité n'est pas trouvé dans ce fichier, une alternative est d'utiliser xmodmap pour mapper la touche souhaitée sur le keysym Multi_key, qui agit comme une touche de composition par défaut (notez que les paramètres de xmodmap sont réinitialisés par setxkbmap).\n\n"
+    },
+    {
+      "title": "Combinaisons de touches",
+      "level": 4,
+      "content": "Les combinaisons par défaut des touches de composition dépendent de la locale configurée pour la session et sont stockées dans /usr/share/X11/locale/used_locale/Compose, où used_locale est par exemple en_US.UTF-8.\n\nVous pouvez définir vos propres combinaisons de touches de composition en copiant le fichier par défaut dans ~/.XCompose et en le modifiant. Vous pouvez également créer un ~/.XCompose vide et inclure le fichier par défaut en utilisant include \"%L\", par exemple :\n\n```\n~/.XCompose\n```\n\n```\ninclude \"%L\"\n\n<Multi_key> <g> <a> : \"α\"\n<Multi_key> <g> <b> : \"β\"\n<Multi_key> <g> <g> : \"γ\"\n```\n\nLa touche de composition (désignée par <Multi_key> dans le fichier ~/.XCompose) fonctionne avec n'importe lequel des milliers de caractères Unicode valides, y compris ceux qui ne font pas partie du plan multilingue de base. Jetez un coup d'œil à la page de manuel Compose(5), elle explique le format des fichiers XCompose.\n\nCependant, GTK n'utilise pas XIM par défaut et ne suit donc pas les clés ~/.XCompose. Cela peut être corrigé en forçant GTK à utiliser XIM en ajoutant export GTK_IM_MODULE=xim et/ou export XMODIFIERS=\"@im=none\" à ~/.xprofile.\n\n"
+    },
+    {
+      "title": "Signe de la devise sur une autre touche",
+      "level": 3,
+      "content": "Sur la plupart des claviers européens, le signe Euro (€) est imprimé sur la touche 5. Par exemple, pour y accéder avec Alt+5, utilisez les options lv3:lalt_switch et eurosign:5.\n\nLe signe de la roupie (₹) peut être utilisé de la même manière avec rupeesign:4.\n\n"
+    },
+    {
+      "title": "Changement d'état immédiat lorsque la touche Caps Lock est enfoncée",
+      "level": 3,
+      "content": "Ceux qui préfèrent taper des lettres majuscules avec la touche Caps Lock peuvent ressentir un court délai lorsque l'état de Caps Lock est changé, résultant en deux ou plusieurs lettres majuscules (par exemple THe, ARch LInux). Cela se produit parce que le verrouillage des majuscules est activé immédiatement après avoir appuyé sur la touche de verrouillage des majuscules, mais n'est désactivé qu'après avoir relâché la deuxième pression sur la touche. Ce comportement s'inspire des machines à écrire où la fonction de verrouillage des majuscules était obtenue en verrouillant physiquement les barres de caractères décalées en place, et le relâchement d'une pression sur la touche shift était l'action qui provoquait la libération du verrouillage.\n\nCertains systèmes d'exploitation plus populaires ont supprimé ce comportement, soit volontairement (car il peut être source de confusion pour certains), soit par erreur, mais c'est une question de préférence. Des rapports de bugs ont été déposés sur le bug tracker de Xserver, car il n'y a actuellement aucun moyen facile de passer au comportement reflété par ces autres systèmes d'exploitation. Pour ceux qui souhaitent suivre ce problème, les rapports de bogue et les derniers progrès réalisés peuvent être trouvés sur [2] et [3].\n\n"
+    },
+    {
+      "title": "Palliatif",
+      "level": 4,
+      "content": "Tout d'abord, exportez vos configurations de clavier dans un fichier :\n\n```\n$ xkbcomp -xkb $DISPLAY xkbmap\n```\n\nDans le fichier xkbmap, localisez la section Caps Lock qui commence par key <CAPS> :\n\n```\nkey <CAPS> { [ Caps_Lock ] } ;\n```\n\net remplacez toute la section par le code suivant :\n\n```\ntouche <CAPS> {\n    repeat=no,\n    type[group1]=\"ALPHABÉTIQUE\",\n    symboles[group1]=[ Caps_Lock, Caps_Lock],\n    actions[group1]=[ LockMods(modifiers=Lock), Private(type=3,data[0]=1,data[1]=3,data[2]=3)]]\n} ;\n```\n\nSauvegarder et recharger les configurations du clavier :\n\n```\n$ xkbcomp -w 0 xkbmap $DISPLAY\n```\n\nPensez à en faire un service qui se lance après le démarrage de X, car les configurations rechargées ne survivent pas à un redémarrage du système.\n\n"
+    },
+    {
+      "title": "Fonctions des touches en un clic",
+      "level": 2,
+      "content": "Pour attribuer une fonction supplémentaire à une touche de modification, vous pouvez utiliser xcape. Par exemple, il est possible de faire fonctionner CapsLock comme Escape lorsqu'elle est enfoncée seule, et comme Control lorsqu'elle est utilisée avec une autre touche. Commencez par définir la permutation Control en utilisant setxkbmap comme mentionné précédemment, et xcape pour définir l'association Escape :\n\n```\n$ xcape -e 'Caps_Lock=Escape'\n```\n\nVous pouvez définir plusieurs associations séparées par un point-virgule, par ex : Caps_Lock=Escape;Shift_L=Escape.\n\nSi vous maintenez une touche pendant une durée supérieure à la valeur du délai d'attente (500 ms par défaut), xcape ne générera pas d'événement de touche.\n\n"
+    },
+    {
+      "title": "Réglage du délai et du taux de répétition",
+      "level": 2,
+      "content": "Le délai typographique indique la durée (généralement en millisecondes) pendant laquelle une touche doit être maintenue enfoncée pour que le processus de répétition commence. Une fois le processus de répétition déclenché, le caractère sera répété à une certaine fréquence (généralement exprimée en Hz) spécifiée par le taux typographique. Notez que ces paramètres sont configurés séparément pour Xorg et pour la console virtuelle.\n\n"
+    },
+    {
+      "title": "Utilisation de xset",
+      "level": 3,
+      "content": "L'outil xset peut être utilisé pour définir le délai et le taux de frappe d'un serveur X actif, certaines actions pendant l'exécution peuvent cependant amener le serveur X à réinitialiser ces changements et à revenir à ses valeurs par défaut.\n\nUtilisation :\n\n```\n$ xset r rate delay [rate] (en anglais)\n```\n\nPar exemple, pour définir un délai typographique de 200 ms et un taux typographique de 30 Hz, utilisez la commande suivante (utilisez xinitrc pour la rendre permanente) :\n\n```\n$ xset r rate 200 30\n```\n\nL'exécution de la commande sans spécifier le délai et le taux réinitialisera les valeurs typographiques à leurs valeurs par défaut respectives, soit un délai de 660 ms et un taux de 25 Hz :\n\n```\n$ xset r rate\n```\n\n"
+    },
+    {
+      "title": "Utilisation de l'option de configuration AutoRepeat",
+      "level": 3,
+      "content": "Pour faire persister la configuration et modifier les seat defaults, vous pouvez créer un fichier de configuration Xorg comme décrit dans #Utilisation des fichiers de configuration de X, et ajouter une entrée pour la section AutoRepeat : [4]\n\n```\n/etc/X11/xorg.conf.d/00-keyboard.conf\n```\n\n```\n].\nSection \"InputClass\n        ...\n        Option \"AutoRepeat\" \"200 30\"\n        ...\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Utilisation des options de démarrage de XServer",
+      "level": 3,
+      "content": "Une autre méthode de configuration consiste à transmettre les paramètres souhaités au serveur X lors de son démarrage à l'aide des options suivantes :\n\n- -ardelay millisecondes - définit le délai de répétition automatique (durée en millisecondes pendant laquelle une touche doit être enfoncée avant que la répétition automatique ne commence).\n- -arinterval milliseconds - définit l'intervalle d'autorepeat (durée en millisecondes qui doit s'écouler entre les frappes générées par autorepeat).\n\nConsultez Xserver(1) pour obtenir une liste complète des options du serveur X et consultez votre gestionnaire d'affichage pour savoir comment passer ces options.\n\n"
+    },
+    {
+      "title": "Voir aussi",
+      "level": 2,
+      "content": "- Guide Madduck sur l'extension de XKB (archivé sur Wayback Machine)\n\n"
+    }
+  ]
+}
