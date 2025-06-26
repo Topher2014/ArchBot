@@ -1,0 +1,26 @@
+{
+  "title": "XWiki",
+  "url": "https://wiki.archlinux.org/title/XWiki",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "XWiki is an open-source enterprise-ready wiki written in Java, with a focus on extensibility.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Feel free to follow along on the XWiki Installation Guide. These instructions assume you will be using Tomcat and PostgreSQL. It should not be too difficult to apply these guidelines to other combinations.\n\n- Install PostgreSQL.\n- For easier PostgreSQL administration, install phpPgAdmin.\n- Install tomcat. (Do not forget tomcat-native.)\n- Download the XWiki WAR file.\n- Rename the WAR file to xwiki.\n- Move the WAR file into the /var/lib/tomcatn/webapps directory.\n- Tomcat should automatically extract the WAR file. If not, restart Tomcat.\n- At this point, you may find that a data directory has appeared in /var/lib/tomcatn/webapps. Delete it.\n- As root:\n\n```\n# cd /var/lib/tomcatn\n# mkdir data\n# chown tomcatn:tomcatn data\n```\n\n- Inside the /var/lib/tomcatn/webapps/xwiki/WEB-INF directory: Open the xwiki.properties file and alter the environment.permanentDirectory field to read /var/lib/tomcatn/data/xwiki. Open the hibernate.cfg.xml file and: Comment-out the section entitled \"Configuration for the default database\". Uncomment the section entitled \"PostgreSQL Configuration\". Modify the database name (in connection.url), username, and password as desired.\n- Create a role and database in PostgreSQL to match the hibernate configuration.\n- Install postgresql-jdbcAUR from the Arch User Repository.\n- As root:\n\n- Open the xwiki.properties file and alter the environment.permanentDirectory field to read /var/lib/tomcatn/data/xwiki.\n- Open the hibernate.cfg.xml file and: Comment-out the section entitled \"Configuration for the default database\". Uncomment the section entitled \"PostgreSQL Configuration\". Modify the database name (in connection.url), username, and password as desired.\n\n- Comment-out the section entitled \"Configuration for the default database\".\n- Uncomment the section entitled \"PostgreSQL Configuration\".\n- Modify the database name (in connection.url), username, and password as desired.\n\n```\n# cd /usr/share/java/tomcatn\n# ln -s /usr/share/java/postgresql-jdbc/postgresql-jdbc41.jar\n```\n\n- Restart tomcatn.service.\n- Launch the XWiki application by clicking on /xwiki in Tomcat Manager.\n- The XWiki is started with XWiki Wizard Guide to finish your configuration.\n\n"
+    },
+    {
+      "title": "Nginx proxy configuration - Solution 1",
+      "level": 2,
+      "content": "The official Nginx guide for XWiki is not correct. There is an alternative solution which works for XWiki.\n\n- Configure nginx site xwiki configuration file.\n\n```\n/etc/nginx/sites-available/xwiki\n```\n\n```\nserver {\n  listen 80 default_server;\n  server_name xwiki.<domain-name>;\n  return 301 https://$host$request_uri;\n}\n\nserver {\n  listen [::]:443 ssl;\n  listen 443 ssl;\n\n  server_name xwiki.<domain-name>;\n\n  # SSL Certificate section\n  ssl_certificate ...\n  ssl_certificate_key ...\n\n  location = / {\n    return 301 https://$host/xwiki;\n  }\n\n  location /xwiki {\n    proxy_set_header   X-Real-IP $remote_addr;\n    proxy_set_header   Host      $host;\n    proxy_http_version 1.1;\n    proxy_set_header   Upgrade $http_upgrade;\n    proxy_set_header   Connection 'upgrade';\n    proxy_cache_bypass $http_upgrade;\n    proxy_set_header   X-Forwarded-Host $host;\n    proxy_set_header   X-Forwarded-Server $host;\n    proxy_set_header   X-Real-IP $remote_addr;\n    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;\n    proxy_set_header   X-Forwarded-Proto $scheme;\n    proxy_pass         http://127.0.0.1:8080/xwiki;\n  }\n}\n```\n\n- Activate a server block in sites-enabled directory ln -s /etc/nginx/sites-available/xwiki /etc/nginx/sites-enabled/xwiki.\n- Restart Nginx.\n\n"
+    },
+    {
+      "title": "Nginx proxy configuration - Solution 2",
+      "level": 2,
+      "content": "I found that instructing nginx to proxy to http://localhost:8080/xwiki/ did not work: the generated URLs were incorrect. Contrary to what is indicated in the XWiki documentation, I could not make the URLs correct through the use of HTTP headers.\n\nThe only solution I'm aware of so far is to create a new Host element in Tomcat's server.xml file:\n\n- Duplicate the existing Host element and alter the name attribute to read xwiki.\n- Alter the appBase attribute to read /var/lib/tomcat7/webapps-xwiki.\n- Move the xwiki application from /var/lib/tomcat7/webapps/xwiki to /var/lib/tomcat7/webapps-xwiki/ROOT.\n- Restart Tomcat\n- Add xwiki as an alias to localhost in /etc/hosts (add it to the end of the 127.0.0.1 line).\n- Instruct Nginx to proxy to http://xwiki:8080/ instead.\n\n"
+    }
+  ]
+}

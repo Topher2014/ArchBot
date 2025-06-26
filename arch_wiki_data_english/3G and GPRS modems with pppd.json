@@ -1,0 +1,101 @@
+{
+  "title": "3G and GPRS modems with pppd",
+  "url": "https://wiki.archlinux.org/title/3G_and_GPRS_modems_with_pppd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nRelated articles\n\n- USB 3G Modem\n\nWhy not to use a pppd wrapper (like wvdial or similar)?. I particularly switched to direct pppd because my previous software sometimes silently exited instead of reconnecting, as it was configured to do, requiring me to travel to manually perform the reconnection.\n\nYou may be reading this page by the same reason it was written for: you may have finally concluded that the lesser the layers, the less likely the troubles.\n\n"
+    },
+    {
+      "title": "Prerequisites and tested hardware",
+      "level": 2,
+      "content": "The only requirement is the ppp package (2.4.5-1 tested). The method described supports easy switching between several carriers and 3G and GPRS modes. It has been tested and directly works with no modifications (except for the device name) with:\n\n- Huawei EM770 MiniPCIe modem (Asus Eee PC 1000H Go internal integrated modem).\n- Huawei E220 and E1552 external USB dongles.\n- Nokia N73 (USB tethering; select \"PC Suite\" when the phone asks).\n- Nokia CS-15 (lsusb says 0421:0612 Nokia Mobile Phones)\n- Alcatel x310e (carrier: Wind IT)\n\nThis guide assumes that your modem hardware is properly detected and working. You simply may look at /var/log/messages to discover the device names appeared when the modem is plugged in. Alternatively:\n\n```\nroot@quark:~# dmesg | grep GSM | grep attached\nusb 1-6: GSM modem (1-port) converter now attached to ttyUSB0\nusb 1-6: GSM modem (1-port) converter now attached to ttyUSB1\nusb 1-6: GSM modem (1-port) converter now attached to ttyUSB2\nusb 2-2: GSM modem (1-port) converter now attached to ttyUSB3\nusb 2-2: GSM modem (1-port) converter now attached to ttyUSB4\n```\n\nIn this computer there are 2 devices available: a internal 3G modem (ttyUSB0) and a external 3G dongle (ttyUSB3). The Nokia phones use other device names, like ttyACM0. The extra devices created are useful to get and query the internal modem state while the main one is in use (you may try the cat command on them).\n\nTo enable some modems you may need the usb_modeswitch package (see the USB 3G Modem wiki for more information).\n\n"
+    },
+    {
+      "title": "/etc/ppp/options-mobile",
+      "level": 3,
+      "content": "Create this file:\n\n```\n/etc/ppp/options-mobile\n```\n\n```\nttyUSB0\n921600\nlock\ncrtscts\nmodem\npassive\nnovj\ndefaultroute\nnoipdefault\nusepeerdns\nnoauth\nhide-password\npersist\nholdoff 10\nmaxfail 0\ndebug\n```\n\nThe first line is the modem device (ttyUSB0 in the example) and it will be a permanent option while your hardware does not change. You may want to modify some options (see man pppd). The proposed setup tries to keep the connection permanently established, reconnecting when necessary.\n\n"
+    },
+    {
+      "title": "/etc/ppp/peers",
+      "level": 3,
+      "content": "Add these files:\n\n```\nroot@quark:/etc/ppp/peers# ll\ntotal 8\n-rw-r----- 1 root root 141 Jun 20 19:29 mobile-auth\n-rw-r----- 1 root root 104 Jun 20 19:29 mobile-noauth\nlrwxrwxrwx 1 root root  13 Jun 20 19:30 provider -> mobile-noauth\n```\n\nThe provider symlink defines the default peer for pppd, and as you see it points to the mobile-noauth file. It is possible to setup a different file with user/password for each carrier (with mobile-auth being a example) but it seems that this is not necessary (at least, not for Vodafone or Simyo in Spain).\n\n```\n/etc/ppp/peers/mobile-auth\n```\n\n```\nfile /etc/ppp/options-mobile\nuser \"your_usr\"\npassword \"your_pass\"\nconnect \"/usr/sbin/chat -v -t15 -f /etc/ppp/chatscripts/mobile-modem.chat\"\n```\n\n```\n/etc/ppp/peers/mobile-noauth\n```\n\n```\nfile /etc/ppp/options-mobile\nconnect \"/usr/sbin/chat -v -t15 -f /etc/ppp/chatscripts/mobile-modem.chat\"\n```\n\n"
+    },
+    {
+      "title": "/etc/ppp/chatscripts",
+      "level": 3,
+      "content": "Since the chatscripts directory does not exists in Arch, manually create it to place a few new files there:\n\n```\nroot@quark:/etc/ppp/chatscripts# ll\ntotal 44\nlrwxrwxrwx 1 root root  15 Jun 19 19:17 apn -> apn.es.vodafone\n-rw-r--r-- 1 root root  37 Jun 19 16:27 apn.es.simyo\n-rw-r--r-- 1 root root  35 Jun 19 16:27 apn.es.vodafone\n-rw-r--r-- 1 root root 394 Jun 20 19:29 mobile-modem.chat\nlrwxrwxrwx 1 root root  12 Jun 19 18:59 mode -> mode.3G-only\n-rw-r--r-- 1 root root  29 Jun 19 22:12 mode.3G-only\n-rw-r--r-- 1 root root  28 Jun 19 17:05 mode.3G-pref\n-rw-r--r-- 1 root root  29 Jun 19 17:05 mode.GPRS-only\n-rw-r--r-- 1 root root  28 Jun 19 17:06 mode.GPRS-pref\n-rw-r--r-- 1 root root   3 Jun 19 23:40 mode.NONE\nlrwxrwxrwx 1 root root   8 Jun 20 19:29 pin -> pin.CODE\n-rw------- 1 root root  13 Jun 20 19:29 pin.CODE\n-rw-r--r-- 1 root root   3 Jun 19 23:37 pin.NONE\n```\n\nThe core script is mobile-modem.chat, which dialogues with the modem and properly inserts another tiny scripts for selecting the APN, GPRS/3G and the PIN code. You probably will not need to modify it. This script is interpreted by the limited (but powerful enough) chat tool, included in the standard ppp package. With the proposed method, you will keep a little personal file-based \"database\" of settings.\n\nIf you exchange the SIM card, to select the new carrier you only need to update the apn symlink to point to the correct apn file and restart the ppp network (for example with killall -HUP pppd). The same for changing between 3G/GPRS forced modes (mode symlink).\n\nThe other files consist in a single line, which in some cases you may need to modify in order to customize it.\n\n```\n/etc/ppp/chatscripts/mobile-modem.chat\n```\n\n```\nABORT 'BUSY'\nABORT 'NO CARRIER'\nABORT 'VOICE'\nABORT 'NO DIALTONE'\nABORT 'NO DIAL TONE'\nABORT 'NO ANSWER'\nABORT 'DELAYED'\nREPORT CONNECT\nTIMEOUT 6\n'' 'ATQ0'\n'OK-AT-OK' 'ATZ'\nTIMEOUT 3\n'OK' @/etc/ppp/chatscripts/pin\n'OK\\d-AT-OK' 'ATI'\n'OK' 'ATZ'\n'OK' 'ATQ0 V1 E1 S0=0 &C1 &D2 +FCLASS=0'\n'OK' @/etc/ppp/chatscripts/mode\n'OK-AT-OK' @/etc/ppp/chatscripts/apn\n'OK' 'ATDT*99***1#'\nTIMEOUT 30\nCONNECT ''\n```\n\n```\n/etc/ppp/chatscripts/apn.es.vodafone\n```\n\n```\nAT+CGDCONT=1,\"IP\",\"ac.vodafone.es\"\n```\n\n```\n/etc/ppp/chatscripts/apn.es.simyo\n```\n\n```\nAT+CGDCONT=1,\"IP\",\"gprs-service.com\"\n```\n\n```\n/etc/ppp/chatscripts/apn.no.telenor\n```\n\n```\nAT+CGDCONT=1,\"IP\",\"Telenor\"\n```\n\n(of course, you will have to create your own apn files, replacing \"ac.vodafone.es\" or \"gprs-service.com\" by your own APN strings on them).\n\nFor Telenor, use your mobile phone number (without country code) for both user and password in /etc/ppp/peers/mobile-noauth.\n\n```\n/etc/ppp/chatscripts/pin.CODE\n```\n\n```\nAT+CPIN=1234\n```\n\n```\n/etc/ppp/chatscripts/pin.NONE\n```\n\n```\nAT\n```\n\nIf your SIM card has the PIN code disabled, you should symlink pin to pin.NONE to avoid sending it. When a SIM card has the PIN code enabled, it is only required to be sent the first time after power on. There is a modem command to query about this, but since I did not find a reliable way to use it in the chat script, the PIN, when enabled, is always sent. This has no drawbacks, other than a little additional delay also due to the chat script limitations while recovering from the modem error response (if the PIN was no longer required).\n\n```\n/etc/ppp/chatscripts/mode.3G-only\n```\n\n```\nAT\\^SYSCFG=14,2,3fffffff,0,1\n```\n\n```\n/etc/ppp/chatscripts/mode.3G-pref\n```\n\n```\nAT\\^SYSCFG=2,2,3fffffff,0,1\n```\n\n```\n/etc/ppp/chatscripts/mode.GPRS-only\n```\n\n```\nAT\\^SYSCFG=13,1,3fffffff,0,0\n```\n\n```\n/etc/ppp/chatscripts/mode.GPRS-pref\n```\n\n```\nAT\\^SYSCFG=2,1,3fffffff,0,0\n```\n\n```\n/etc/ppp/chatscripts/mode.NONE\n```\n\n```\nAT\n```\n\nThe SYSCFG line in the mode.* files is device-dependent, and likely Huawei-specific. It does not works in Nokia phones (you may symlink mode to mode.NONE, which only sends the AT command with no effect). I had to investigate before achieving success with both EM770 and E220 modems. Despite many forums reporting a \"4\" trailing code, it seems that the trailing 0/1 number, while optional in E220, becomes mandatory in EM770 for truly switching the mode. At the end of this guide there are explained the available options for this command. As previously said, you may simply link to mode.NONE and use your modem defaults in case of problems.\n\n"
+    },
+    {
+      "title": "Easy wizard configuration",
+      "level": 3,
+      "content": "Instead of manually creating pppd configuration, pppconfigAUR can be used to create pppd configuration and chatscripts easily. Editing chatscript is needed to provide APN name, e.g. adding AT+CDGCONT=1,\"IP\",\"apnname\" on specific chatscript profile, e.g. /etc/chatscripts/mobile.\n\n"
+    },
+    {
+      "title": "Start the pppd",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nTo start the pppd daemon, either run pon/poff or /etc/rc.d/ppp start|stop. In Arch this can be automated to occur at system boot by adding \"@ppp\" after \"network\" in the DAEMONS line of /etc/rc.conf (the \"@\" places it in background, since pppd start may be a bit slow).\n\nThe log is stored in /var/log/messages.\n\nWith the above proposed setup, while the new ppp0 interface is up, pppd will automatically set your default route (if none previously existing) as well as the /etc/resolv.conf contents. It seems very reliable handling DNS switchings (the backup is kept in resolv.conf.backup.ppp0, but I never had to manually restore it, even after a power failure).\n\n"
+    },
+    {
+      "title": "Patch for modem availability after booting",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nIf you automate the pppd start, it may occur that the modem device does not exists at the moment of the pppd launch during the computer boot. This may occur even when the USB modem module load is manually setup in rc.conf: that helps, but the device may be still not always available when pppd comes into scene. The pppd daemon rejects to start when the configured device does not exists, and it does not seems to have an option to force it to start (note that in case the device disappears once pppd is already running, for example by momentarily disconnecting the external 3G USB modem, pppd will continue running and will reconnect once it appears again).\n\nThe following script may be useful to wait until the hardware is ready. It will typically wait for 0-2 seconds. The modem device is assumed to be the first line on /etc/ppp/options-mobile. It takes an argument with the maximum wait (in seconds). Optionally admits a second argument with a profile name (from /etc/ppp/peers) which will be used to re-run pppd. Do not forget to make the script executable:\n\n```\n/etc/ppp/wait-dialup-hardware\n```\n\n```\n!/bin/sh\nINTERFACE=\"/dev/$(head -1 /etc/ppp/options-mobile)\"\nMAX_SECONDS_TIMEOUT=$1\nPEER_NAME=$2\ndsec=$((MAX_SECONDS_TIMEOUT * 10))\nretry=0\nwhile [ \"$retry\" -lt \"$dsec\" ]\ndo\n    retry=$((retry+1))\n    if [ -c \"${INTERFACE}\" ]; then\n        logger \"$0: OK existing required device ${INTERFACE} (in $((retry / 10)).$((100 * (retry % 10) / 10)) seconds)\"\n        break\n    else\n        sleep 0.1\n    fi\ndone\nif [ ! -c \"${INTERFACE}\" ]; then\n    logger \"$0: ERROR timeout waiting for required device ${INTERFACE}\"\n    exit 1\nfi\nif [ -n \"${PEER_NAME}\" ]; then\n  logger \"$0: starting pppd for ${PEER_NAME}\"\n  setsid nohup pon \"${PEER_NAME}\" > /dev/null 2>&1 < /dev/null &\nfi\nexit 0\n```\n\nThe script will add a line to /var/log/messages:\n\n```\nJun  1 22:52:08 parsec logger: /etc/ppp/wait-dialup-hardware: OK existing required device /dev/ttyUSB0 (in 1.25 seconds)\n```\n\n"
+    },
+    {
+      "title": "network hook",
+      "level": 3,
+      "content": "Users of traditional network setup (instead of netcfg) can use the following trick to launch the wait-dialup-hardware script from the standard /etc/rc.d/ppp service. The example is intended to run the mobile-noauth profile:\n\n```\n/etc/ppp/peers/mobile-noauth.wait\n```\n\n```\nnoauth\npty \"/etc/ppp/wait-dialup-hardware 10 mobile-noauth\"\n```\n\nUpdating the default provider symlink to point to the new intermediate (fake) mobile-noauth.wait profile, it will simply run the wait-dialup-hardware script from within pppd and, in turn, will restart pppd with the final (non fake) mobile-noauth profile once the hardware is ready. Note that the noauth option in the first line of the fake profile is necessary (even if the final profile does requires authentication).\n\n"
+    },
+    {
+      "title": "Troubleshooting",
+      "level": 2,
+      "content": "In case of using a wrong PIN, my modem consistently rejects the APN setting phase (no error in the steps before). This is how /var/log/messages looks like:\n\n```\nJun 20 00:17:30 quark chat[3348]: send (AT+CGDCONT=1,\"IP\",\"ac.vodafone.es\"^M)\nJun 20 00:17:31 quark chat[3348]: expect (OK)                                \nJun 20 00:17:31 quark chat[3348]: ^M\nJun 20 00:17:31 quark chat[3348]: AT+CGDCONT=1,\"IP\",\"ac.vodafone.es\"^M^M\nJun 20 00:17:31 quark chat[3348]: ERROR^M                               \nJun 20 00:17:34 quark chat[3348]: alarm\nJun 20 00:17:34 quark chat[3348]: Failed\n```\n\nIt would be a long story, but I will simply abbreviate it: if you have just set or changed the PIN in a phone, please reboot the phone and try it in the phone before placing the SIM card in the modem (I'm not sure if the PIN updates take effect just at the moment they are done in the phone menus).\n\nIn case of frequent manual pppd restarts, as for example when testing configuration options, the EM770 (firmware upgraded to 11.104.16.12.00) sometimes becomes confused. Despite it responds to the AT commands, it gets stuck in a \"NO CARRIER\" reply (while the 3G network is ok, as a mobile phone may report). This not occurs with the proposed scripts (in case of connection lost, they wait enough time before retrying). With the modem stuck, powering OFF and then ON the computer solves the problem. This is perhaps a firmware bug. Also, when using a PIN, this modem returns a NO CARRIER reply in the first connection try (it seems that a huge wait after setting the PIN helps; anyway the same effect is achieved by the ordinary connection retry). While running, the EM770 is stable, but the E220 or the Nokia phones are far more reliable in the connection phase. Your mileage may vary depending on your hardware.\n\nAt least for Huawei E870 issuing AT+CFUN=1,1 (meaning restart and go to online mode) seems to fix being stuck with no NO CARRIER without having to reboot. This might be related to network registration being done after restart. You can check AT+COPS? to see if you are actually registered but note you also want a service state of 2 (meaning \"valid service\" - this is automatically reported by the card as ^SRVST:X on the second ttyUSB) otherwise trying to dial out is hopeless. In the rare case of the card becoming completely stuck (doesnt respond to AT commands anymore) this can be fixed by using pccardctl (pccardctl eject [slot-number]; pccardctl insert [slot-number]). Of course this only works for pcmcia cards but maybe there is a similar trick for USB dongles.\n\n"
+    },
+    {
+      "title": "AT^SYSCFG Huawei command reference",
+      "level": 2,
+      "content": "To see the supported values, you can query your own modem sending the \"AT^SYSCFG=?\" command.\n\n```\nAT^SYSCFG=$mode,$acqOrder,$band,$roam,$srvDomain\n\n$mode\n2=Auto-Select\n13=GSM only\n14=WCDMA only\n16=no Change\n\n$acqOrder\n0=Automatic\n1=GSM prefered\n2=WCDMA prefered\n3=no Change\n\n$band\n3fffffff = All\nother (query list with \"AT^SYSCFG=?\")\n\n$roam\n0=Not Supported\n1=Supported\n2=no Change\n\n$srvDomain\n0=Circuit-Switched only\n1=Packet-Switched only\n2=Circuit- & Packet-Switched\n3=Any\n4=no Change\n```\n\nAT^SYSCFG=? command output on Huawei EM770:\n\n```\n^SYSCFG:(2,13,14,16),(0-3),((80000,\"GSM850\"),(200000,\"GSM1900\"),(400380,\"GSM900/GSM1800/WCDMA2100\"),(4a80000,\"GSM850/GSM1900/WCDMA850/WCDMA1900\"),(3fffffff,\"All Bands\")),(0-2),(0-4)\n```\n\n"
+    },
+    {
+      "title": "Huawei unsolicited report command reference",
+      "level": 2,
+      "content": "These appear on the second ttyUSB.\n\n"
+    },
+    {
+      "title": "^SRVST",
+      "level": 3,
+      "content": "Reports the type of service the network your currently registered to is providing (it seems normal to first report 1 and then switch to 2). Depending on the device there might be more types.\n\n```\n0=No service\n1=Restricted service\n2=Valid service\n```\n\n"
+    },
+    {
+      "title": "^MODE",
+      "level": 3,
+      "content": "Reports the mode you are currently transmitting in. Depending on the device there might be more modes. Note: It seems normal for the device to only go to 5,5/5,6/5,7 when transmitting and fall back to 5,4 when idle.\n\n```\n0,0=No service\n3,1=GSM\n3,2=GPRS\n3,3=EDGE\n5,4=WCDMA\n5,5=HSDPA\n5,6=HSUPA\n5,7=HSDPA+HSUPA\n```\n\n"
+    },
+    {
+      "title": "^RSSI",
+      "level": 3,
+      "content": "Reports strength of the mobile signal in form of $rssi,[$ber]. This info can also be optained by issuing AT+CSQ but unless you are registered to a network it seems this just returns the value for the strongest network whenever you are able to use it or not. To give some meaning to this you can convert it to percent by RSSI / 31 * 100. RSSI of 3/4 (about 10% reception) seems to be the absolute minimum to get a (rather flaky) HDSPA connection.\n\n```\n$rssi=0-31 (-113dBm + $rssi * 2) or 99 (unknown or not measurable)\n$ber=Bit-error-rate (only returned by AT+CSQ - always 99?)\n```\n\n"
+    },
+    {
+      "title": "Automatic PPP",
+      "level": 2,
+      "content": "For the Nokia CS-15, create (or add to) /etc/udev/rules.d/99-nokia.rules with this line:\n\n```\nSUBSYSTEM==\"net\", ACTION==\"add\", ATTRS{idVendor}==\"0421\", ATTRS{idProduct}==\"0612\", DEVPATH==\"*/ttyACM0\", RUN+=\"pon\"\n```\n\nand it will connect ppp as soon as you plug in the device. You can probably do something similar for the other modems.\n\n"
+    },
+    {
+      "title": "Listing",
+      "level": 3,
+      "content": "AT+COPS=? returns a list of all available networks in the format of $state,$longname,$shortname,$id,$tech.\n\n```\n$state\n0=unknown\n1=available\n2=current\n3=forbidden\n\n$longname\nlong alphanumeric operator name\n\n$shortname\nshort alphanumeric operator name\n\n$id\nnumeric operator id\n\n$tech\n0=GSM (at best you get EDGE here)\n2=UTRAN (supports WCDMA/HSDPA/HSUPA)\n7=EUTRAN (?)\n```\n\n"
+    },
+    {
+      "title": "Manual selection",
+      "level": 3,
+      "content": "You can lock the device to only connect to a specific operator by issuing AT+COPS=1,$format,$operator command. Note: Even the numeric id needs to be quoted.\n\n```\n$format\n0=long alphanumeric operator name\n1=short alphanumeric operator name\n2=numeric operator id\n\n$operator\noperator name/id as specfied by $format\n```\n\n"
+    },
+    {
+      "title": "Automatic selection",
+      "level": 3,
+      "content": "To let the device decide which operator to use issue AT+COPS=0 command.\n\n"
+    }
+  ]
+}

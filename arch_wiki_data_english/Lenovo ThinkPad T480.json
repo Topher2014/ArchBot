@@ -1,0 +1,56 @@
+{
+  "title": "Lenovo ThinkPad T480",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_T480",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nHardware | PCI/USB ID | Working?\nGPU (Intel) | 8086:5917 | Yes\nGPU (NVIDIA) | 10de:1d10 | Yes\nEthernet | 8086:15d7 | Yes\nWireless | 8086:24fd | Yes\nAudio | 8086:9d71 | Yes\nTrackPoint | PS/2 | Yes\nTouchpad | 001d:06cb | Yes\nWebcam | 0c45:6366 | Yes\nBluetooth | 8087:0a2b | Yes\nSmart Card reader | 058f:9540 | Yes\nMobile internet | 2cb7:0210 | Yes\nMobile internet | 8086:7360 | No¹\nFingerprint Sensor | 06cb:009a | Yes²\nNo working Linux driver for Fibocom L850-GL. See this thread and this thread for more info. Supported on Kernel 5.8.1 with libfprint-tod-git. See this Reddit thread for more info.\n\n1. No working Linux driver for Fibocom L850-GL. See this thread and this thread for more info.\n1. Supported on Kernel 5.8.1 with libfprint-tod-git. See this Reddit thread for more info.\n\nThis article covers the installation and configuration of Arch Linux on a Lenovo T480 laptop. Everything seems to work pretty much out the box.\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "TrackPoint and Touchpad",
+      "level": 2,
+      "content": "TrackPoint and Touchpad work out of the box and do not seem to have the same issues as the X1 Carbon Gen 6.\n\nHowever one could benefit from having greatly increased event reporting frequency by enabling psmouse kernel module option synaptics_intertouch=1.\n\nThis can be made permanent with:\n\n```\n/etc/modprobe.d/psmouse.conf\n```\n\n```\noptions psmouse synaptics_intertouch=1\n```\n\nFor two-finger scrolling activity this gives a boost from 40 Hz to 135 Hz on average which is more than threefold increase. This boost greatly contributes to the Desktop environment scrolling performance and smoothness.\n\n(evhz-gitAUR) may be of use to find out how frequently Touchpad reports events. For example after enabling said option:\n\n```\n# evhz\n```\n\n```\nPress CTRL-C to exit.\n...\n^C\nAverage for Synaptics TM3276-022:   137Hz\n```\n\nNote that units adorned with the \"glass Touchpad mod\" [1] [2] will not benefit from the elevated Touchpad performance with the procedure above. Running evhz will also indicate a different Touchpad identifier:\n\n```\n# evhz\n```\n\n```\n...\nAverage for Synaptics TM3625-010:    42Hz\n```\n\n"
+    },
+    {
+      "title": "Power management/Throttling issues",
+      "level": 2,
+      "content": "Due to missing Intel Dynamic Platform and Thermal Framework (DPTF) support for Linux, a feature which should detect whether the laptop is used on a desk or on the lap so it can throttle the CPU in the latter case to reduce the temperature is not working and the CPU is always throttled. An Lenovo employee explained the situation and the solution Lenovo is building in a PDF posted in their forum (archive.org backup of the PDF). The firmware and EFI fixes have been released for a different model and Lenovo has recognized that the T480 is affected, so there is hope the T480 will get the fix too.\n\nAn interim fix is throttled (Github).\n\nAlso see:\n\n- Lenovo ThinkPad X1 Carbon (Gen 6)#Power management/Throttling\n- Lenovo ThinkPad T480s#Thermal throttling\n\n"
+    },
+    {
+      "title": "CPU stuck at minimum frequency",
+      "level": 3,
+      "content": "A signal called BD PROCHOT inside the laptop can force the CPU to the lowest power state (400 MHz in case of the T470s) regardless of the governor. This is meant to protect the system and can be triggered by many reasons -- the CPU temperature rising above 60 °C, using a third party battery... Luckily, it can be ignored by writing a value to a register [3]. This script is an alternative to the app ThrottleStop on Windows. Install msr-tools and execute this script after every boot (or make a systemd Oneshot service).\n\n```\n/usr/local/bin/throttlestop\n```\n\n```\n#!/bin/bash\n# Disable BD PROCHOT signal on ThinkPads to prevent throttling the CPU to min. freq.\nmodprobe msr\nreg=\"$(rdmsr -d 0x1FC)\"         # commands rdmsr and wrmsr provided by msr-tools on Arch\nif [ $((reg%2)) -eq 1 ]; then   # basically reg & 0xFFFE\n\twrmsr 0x1FC $((reg-1))\nfi\n```\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "Lenovo provides firmware updates for this device through the Linux Vendor Firmware Service (LVFS).\n\nAvailable updates and changelogs can be found on the LVFS website. These include security patches for the Intel Management Engine and the system firmware.\n\nThe updates can be installed using fwupd.\n\n"
+    },
+    {
+      "title": "Screen backlight",
+      "level": 2,
+      "content": "Without the intel driver (xf86-video-intel), neither xbacklight or xrandr brightness control are working.\n\nHowever, the package acpilightAUR provides a drop-in replacement for xbacklight. Apart from installing the package (which conflicts with xorg-xbacklight), you have to add your user to the video group and add the following udev rule:\n\n```\n/etc/udev/rules.d/90-backlight.rules\n```\n\n```\nSUBSYSTEM==\"backlight\", ACTION==\"add\", \\\n  RUN+=\"/bin/chgrp video /sys/class/backlight/%k/brightness\", \\\n  RUN+=\"/bin/chmod g+w /sys/class/backlight/%k/brightness\"\n\nSUBSYSTEM==\"leds\", ACTION==\"add\", KERNEL==\"*::kbd_backlight\", \\\n  RUN+=\"/bin/chgrp video /sys/class/leds/%k/brightness\", \\\n  RUN+=\"/bin/chmod g+w /sys/class/leds/%k/brightness\"\n```\n\nThis allows you to control the backlight with xbacklight command provided by acpilight, as well as control the various LEDs on your T480.\n\n"
+    },
+    {
+      "title": "Encryption and keyboard",
+      "level": 2,
+      "content": "Assuming encrypted installation, during boot process you are prompted to enter password to decrypt disk. In some cases you may not be able to enter password, because at this time keyboard driver is not loaded yet.\n\nTo fix this, add the atkbd module to the mkinitcpio MODULES array:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES = (... atkbd)\n```\n\nRegenerate the initramfs afterwards.\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 2,
+      "content": "Install python-validityAUR and register fingerprints with:\n\n```\n$ fprintd-enroll\n```\n\nRefer, for example, to the entry on fingerprint sensor of the similar Lenovo ThinkPad X270 for general procedures if list_devices failed is returned. You might also try referring to these steps, which are nominally for Fedora but which appear to work on Arch as well.\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nSome special buttons are not supported by X server due to keycode number limit. Certain keys are also handled by other devices other than the keyboard.\n\nTable content:\nKey | Visible? | Marked? | Keycode1 | Effect2 | Device\nFn | Yes | Yes | KEY_WAKEUP | XF86WakeUp | AT Translated Set 2 Keyboard\nFn+Esc | No | Yes |  | Toggles Fn Lock | AT Translated Set 2 Keyboard\nFn+F1 | Yes | Yes | KEY_MUTE | XF86AudioMute | AT Translated Set 2 Keyboard\nFn+F2 | Yes | Yes | KEY_VOLUMEDOWN | XF86AudioLowerVolume | AT Translated Set 2 Keyboard\nFn+F3 | Yes | Yes | KEY_VOLUMEUP | XF86AudioRaiseVolume | AT Translated Set 2 Keyboard\nFn+F4 | Yes | Yes | KEY_F20 | XF86AudioMicMute | Thinkpad Extra Buttons\nFn+F5 | Yes | Yes | KEY_BRIGHTNESSDOWN | XF86MonBrightnessDown | Video Bus\nFn+F6 | Yes | Yes | KEY_BRIGHTNESSUP | XF86MonBrightnessUp | Video Bus\nFn+F7 | Yes | Yes | KEY_SWITCHVIDEOMODE | XF86Display | Thinkpad Extra Buttons\nFn+F8 | Yes | Yes | KEY_WLAN | XF86WLAN | Thinkpad Extra Buttons\nFn+F9 | Yes | Yes | KEY_CONFIG | XF86Tools | Thinkpad Extra Buttons\nFn+F10 | Yes | Yes | KEY_BLUETOOTH | XF86Bluetooth | Thinkpad Extra Buttons\nFn+F11 | Yes | Yes | KEY_KEYBOARD | XF86Keyboard | ThinkPad Extra Buttons\nFn+F12 | Yes | Yes | KEY_BOOKMARKS | XF86Favorites | ThinkPad Extra Buttons\nFn+PrtSc | Yes | No | KEY_PROG2 | XF86Launch2 | Thinkpad Extra Buttons\nFn+B | Yes | No | KEY_PAUSE | Break | AT Translated Set 2 Keyboard\nFn+K | Yes | No | *** | Scroll_Lock | AT Translated Set 2 Keyboard\nFn+P | Yes | No | KEY_PAUSE | Pause | AT Translated Set 2 Keyboard\nFn+S | Yes | No | KEY_SYSRQ | Sys_Req | AT Translated Set 2 Keyboard\nFn+LeftArrow | Yes | No | KEY_HOME | Home | AT Translated Set 2 Keyboard\nFn+RightArrow | Yes | No | KEY_END | End | AT Translated Set 2 Keyboard\nFn+4 | Yes | No | KEY_SLEEP | XF86Sleep | Thinkpad Extra Buttons\nFn+Spc | No | Yes |  | Toggles Keyboard Backlight | \n\n1. As reported by Libinput\n1. As reported by Wayland Event Viewer\n\n"
+    },
+    {
+      "title": "Special buttons",
+      "level": 3,
+      "content": "See Laptop/Lenovo#Special buttons.\n\n"
+    }
+  ]
+}

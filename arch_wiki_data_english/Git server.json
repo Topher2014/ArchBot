@@ -1,0 +1,66 @@
+{
+  "title": "Git server",
+  "url": "https://wiki.archlinux.org/title/Git_server",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "This article gives an overview on how to host a Git server. For more information, refer to the Git on the Server chapter of the Pro Git book.\n\n"
+    },
+    {
+      "title": "Protocols",
+      "level": 2,
+      "content": "Refer to Git on the Server - The Protocols for a detailed description along with pros and cons.\n\n"
+    },
+    {
+      "title": "General",
+      "level": 3,
+      "content": "Step by Step Guide on Setting Up git Server describes setting up an unsecured server on Arch.\n\nBy default, the git user is expired (\"Your account has expired; please contact your system administrator\"). Use chage to remove the expiration condition, e.g. as follows:\n\n```\n# chage -E -1 git\n```\n\n"
+    },
+    {
+      "title": "SSH",
+      "level": 3,
+      "content": "You only need to set up an SSH server.\n\nYou are able to secure the SSH user account even more allowing only push and pull commands on this user account. This is done by replacing the default login shell by git-shell. Described in Setting Up the Server.\n\nWhen securing the git server created using the instructions in #General with the instructions of this clause (#SSH), the following additional steps are needed on Arch:\n\n1. Change the home directory: In order for ssh to be able to read /srv/git/.ssh/authorized_keys, the home directory for git in /etc/passwd needs to be changed from / to /srv/git.\n1. Change the base path when home directory is corrected: In order for git to serve the repositories, the --base-path in git-daemon\\@.service need to be changed to /srv/git if the repositories are served from git's home directory.\n\n"
+    },
+    {
+      "title": "Dumb HTTP",
+      "level": 3,
+      "content": "\"Dumb\" in this context means that only WebDAV is involved in pulls and pushes.\n\n"
+    },
+    {
+      "title": "nginx",
+      "level": 4,
+      "content": "Follow the basic WebDAV instructions for nginx. Pushing via WebDAV also requires Locking. Here is an example location block:\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\nlocation /repos/ {\n        auth_basic \"Authorized Personnel Only!\";\n        auth_basic_user_file /etc/nginx/htpasswd;\n        dav_methods PUT DELETE MKCOL COPY MOVE;\n        dav_ext_methods PROPFIND OPTIONS LOCK UNLOCK;\n        dav_access user:rw group:rw all:r;\n        dav_ext_lock zone=general;\n        create_full_put_path on;\n        client_body_temp_path /tmp;\n    }\n```\n\nNote the dav_ext_lock zone. Add the specified locking zone to the http section of your config:\n\n```\n/etc/nginx/nginx.conf\n```\n\n```\ndav_ext_lock_zone zone=general:10m;\n```\n\nNow do the usual steps when preparing a git repo for the server:\n\n- git clone --bare /path/to/myrepo myrepo.git\n- copy the bare repo to the server\n- run git update-server-info in the bare repo\n- chown the repo to be owned by http:http\n\nYou might have noticed that I added HTTP Basic Authentication to have at lease some means of access control. Everyone who has an password entry in the htaccess file can push.\n\nNow you can clone as usual:\n\n```\n$ git clone https://www.example.com/repos/myrepo.git\nCloning into 'myrepo'...\n$\n```\n\nMake some changes, add, commit, and push:\n\n```\n$ git push origin main\nerror: Cannot access URL https://www.example.com/repos/myrepo.git/, return code 22\nfatal: git-http-push failed\nerror: failed to push some refs to 'https://www.example.com/repos/myrepo.git'\n```\n\nOh noes! For some reason PROPFIND reports 401 Unauthorized and that's all. Nothing in the nginx error logs. Appearently the git client has a problem passing the username and password for all subsequent requests. Running a git credential cache does not help. The only solution that works so far is editing the ~/.netrc (obviously git uses curl for http):\n\n```\n~/.netrc\n```\n\n```\nmachine www.example.com\nlogin git\npassword topsecret\n```\n\n```\n$  > git push origin main\nFetching remote heads...\n refs/\n refs/heads/\n refs/tags/\nupdating 'refs/heads/main'\n from 03f8860418facfbecedd5e0a81b480131b31bcba\n to   ec5536091e31ebf172a34c6d1ebddfc36e3bd3a6\n   sending 3 objects\n   done\nUpdating remote server info\nTo https://www.example.com/repos/myrepo.git\n  0318860..ec55560  main -> main\n```\n\nDon't even think to specify the clone URL as https://username:password@www.example.com/repos/myrepo.git. This works for the initial clone but for a subsequent push you get an error message in your error log stating that the destination URL is handled by a different repository.\n\n"
+    },
+    {
+      "title": "Smart HTTP",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nThe git-http-backend(1) is a CGI program, allowing efficient cloning, pulling and pushing over HTTP(S).\n\n"
+    },
+    {
+      "title": "Apache",
+      "level": 4,
+      "content": "The setup for this is rather simple as all you need to have installed is the Apache HTTP Server (with mod_cgi, mod_alias, and mod_env enabled) and of course, git.\n\nOnce you have your basic setup running, add the following to your Apache configuration file, which is usually located at:\n\n```\n/etc/httpd/conf/httpd.conf\n```\n\n```\n<Directory \"/usr/lib/git-core\">\n    Require all granted\n</Directory>\n \nSetEnv GIT_PROJECT_ROOT /srv/git\nSetEnv GIT_HTTP_EXPORT_ALL\nScriptAlias /git/ /usr/lib/git-core/git-http-backend/\n```\n\nThis assumes your Git repositories are located at /srv/git and that you want to access them via something like: http(s)://your_address.tld/git/your_repo.git.\n\nFor more detailed documentation, visit the following links:\n\n- https://git-scm.com/book/en/v2/Git-on-the-Server-Smart-HTTP\n- https://git-scm.com/docs/git-http-backend\n\n"
+    },
+    {
+      "title": "Git",
+      "level": 3,
+      "content": "The Git protocol is not encrypted or authenticated, and only allows read access.\n\nThe Git daemon (git-daemon(1)) can be started with git-daemon.socket.\n\nThe service uses the --export-all and --base-path parameters to serve all repositories placed in /srv/git/.\n\n"
+    },
+    {
+      "title": "Access control",
+      "level": 2,
+      "content": "For fine-grained access control, the following solutions are available:\n\n- Gitolite — An access control layer on top of Git, written in Perl.\n\n- Gitosis — Software for hosting Git repositories, written in Python.\n\nNote that if you are willing to create user accounts for all of the people that should have access to the repositories and do not need access control at the level of git objects (like branches), you can also use standard file permissions for access control.[1]\n\n"
+    },
+    {
+      "title": "Simple web applications",
+      "level": 3,
+      "content": "- Gitweb — the default web interface that comes with Git\n- cgit — A web interface for git written in plain C.\n\n"
+    },
+    {
+      "title": "Advanced web applications",
+      "level": 3,
+      "content": "- Forgejo — Self-hosted lightweight software forge. Community managed fork of Gitea.\n\n- Gitea — Painless self-hosted Git service. It was originally born as a community-managed fork of Gogs, but in 2022 it became owned by Gitea Limited with a commercial model.\n\n- GitLab — Project management and code hosting application, written in Ruby.\n\n- Gogs — Self Hosted Git Service, written in Go.\n\n"
+    }
+  ]
+}

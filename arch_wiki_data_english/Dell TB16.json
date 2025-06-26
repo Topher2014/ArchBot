@@ -1,0 +1,51 @@
+{
+  "title": "Dell TB16",
+  "url": "https://wiki.archlinux.org/title/Dell_TB16",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Dell's TB16 is a popular Thunderbolt Dock with power-delivery, ethernet, USB, audio, HDMI, DisplayPort, mini-DP and VGA. It generally works well in Linux when configured correctly with up-to-date firmware, but works better with some notebooks than others. If you are in the market for a new dock, you are better off purchasing Dell's newer WD19 series, which has reviewed more positively and does not suffer from the various issues reported against the TB16. See also Dell's note on their Official TB16 Ubuntu Support[dead link 2025-03-15 ⓘ] and its limitations.\n\n"
+    },
+    {
+      "title": "Thunderbolt Security",
+      "level": 3,
+      "content": "You should either:\n\n- Disable Thunderbolt security in the BIOS (recommended)\n- Use boltctl to temporarily authorize or permanently enroll the dock and cable.\n\nThunderbolt security \"works\" but may result in random instability, particularly system freezes on resume, and USB HID devices (mouse, keyboard) behaving erratically. It is suggested to ensure your system is completely stable before enabling this.\n\n"
+    },
+    {
+      "title": "Dell Type-C Dock Configuration",
+      "level": 3,
+      "content": "The TB16 is commonly used with Dell laptops, which have a special BIOS option which may cause stability issues. You should disable the following option:\n\n- Dell Type-C Dock Configuration Always Allow Dell Docks (uncheck this)\n\n- Always Allow Dell Docks (uncheck this)\n\n"
+    },
+    {
+      "title": "Firmware Updates",
+      "level": 2,
+      "content": "The firmware updates provided for Windows at Dell's TB16 Support: Drivers page include firmware that cannot be updated in Linux, such as the ASMedia USB Host Controller firmware which fixes numerous instability USB issues and Synaptics controller (DisplayPort).\n\nTo summarize jasondclinton's post on reddit:\n\n1. The NVM updates to the TB controller can be flashed by Linux (using the standard nvm_nonactive nvm_authenticate sysfs interface)\n1. There is no way to install the ASMedia, Synaptics, etc firmwares - so you might as well flash everything from Windows.\n1. You need all the latest updates for the docker firmware updater to even see the TB16.\n\nEnsure you have the latest:\n\n1. BIOS firmware\n1. Windows Update\n1. Dell Update\n1. Thunderbolt NVM firmware (for the Thunberbolt controller on your device) - should be covered by Windows & Dell updates\n1. TB16 firmware updater from the drivers page above.\n\nEven after having used the firmware updater, there are still other firmwares from the same Dell support page, which supersede the versions included in the firmware updater, that should be downloaded and installed afterwards, e.g. the ASMedia driver / firmware. If in doubt, install all updates on the page.\n\njasondclinton also notes that the official NVM updates are often far behind Intel's latest releases (e.g. TB16's 1.0.0 firmware includes NVM 16 wherehas Intel had already released NVM 33 at time of writing). It is unknown if there is an easy way to update these independently.\n\n"
+    },
+    {
+      "title": "Bus issues",
+      "level": 3,
+      "content": "Issues such as the USB bus (and all connected devices) failing when plugging/unplugging devices are improved by following all the instructions above (notably, *disabling* Thunderbolt Security, \"Dell Type-C Dock configuration options\" and firmware updates). Read the firmware updates section carefully: not all updates are possible via Linux.\n\nSome devices behave differently in the dock vs directly on laptop's USB ports, e.g. Microsoft's keyboard receiver is erratically put to sleep, or gets stuck repeating a particular key. The un-intuitive fix for this is to disable Thunderbolt security (see note about this above).\n\n"
+    },
+    {
+      "title": "Disabling PCIE power manage",
+      "level": 4,
+      "content": "Issues with the USB bus failing can also be mitigated by disabling PCIE power management in the TLP config. Create an /etc/tlp.d/01-tb16.conf with the following line:\n\n```\n# lspci -nnd 1b21:1142\n# 3f:00.0 USB controller [0c03]: ASMedia Technology Inc. ASM1042A USB 3.0 Host Controller [1b21:1142]\nRUNTIME_PM_BLACKLIST=\"3f:00.0\"\n```\n\nVerify that you have the correct serial using lspci as in the comments.\n\nRun tlp start as root to reload the configuration.\n\n"
+    },
+    {
+      "title": "Unbinding and Rebinding",
+      "level": 4,
+      "content": "You can use this script to recover from bus failures without rebooting. Useful for laptops without great compatibility with the TB16, especially after resuming from suspend:\n\n```\n#!/bin/sh\n\n# 0b:00.0 USB controller [0c03]: ASMedia Technology Inc. ASM1042A USB 3.0 Host Controller [1b21:1142]\nSERIAL=$(lspci -Dd \"1b21:1142\" | awk '{ print $1 }')\nDRIVER=\"/sys/bus/pci/drivers/xhci_hcd\"\n\necho -n $SERIAL | sudo tee $DRIVER/unbind\nsleep 4\necho -n $SERIAL | sudo tee $DRIVER/bind\n```\n\n"
+    },
+    {
+      "title": "Blank screen on boot with Nvidia drivers",
+      "level": 3,
+      "content": "If, when using Nvidia drivers, you get a black screen on boot with the dock and 3 external monitors connected, there is a good chance the machine is trying to use the 3 external displays plus the internal display of the laptop. This can be resolved by writing a block into ~/.xinitrc or your display manager's custom xstart scripts e.g. for SDDM the default for KDE. the file is /usr/share/sddm/scripts/Xsetup\n\n```\n/usr/share/sddm/scripts/Xsetup\n```\n\n```\nxrandr --setprovideroutputsource modesetting NVIDIA-0\n\ninternaldisp=\"<name of laptop display>\"\nif [ `xrandr | grep \" connected \" | wc -l` -gt 3 ]; then\n        xdisplays=`xrandr | grep \" connected \" | awk '{print $1}'`\n        for xdisplay in $xdisplays; do\n                if [[ \"$xdisplay\" == \"$internaldisp\"* ]]; then\n                        xrandr --output $xdisplay --off\n                else\n                        xrandr --output $xdisplay --auto\n                fi\n        done\nelse\n        xrandr --auto\nfi\n```\n\n"
+    },
+    {
+      "title": "External Links",
+      "level": 2,
+      "content": "- Reddit r/sysadmin: Dell TB16 Dock Rant - Seriously don't buy this thing...\n- Reddit r/Dell: If Dell pushed out firmware update v1.00 for the TB16...\n\n"
+    }
+  ]
+}

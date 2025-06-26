@@ -1,0 +1,46 @@
+{
+  "title": "Keepalived",
+  "url": "https://wiki.archlinux.org/title/Keepalived",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nKeepalived is a failover and monitoring daemon for Linux virtual server (LVS) clusters that provides high availability functionality and load balancing using the Virtual Router Redundancy Protocol (VRRP).\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the keepalived package.\n\nEnable keepalived.service.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The service is configured in /etc/keepalived/keepalived.conf.\n\n"
+    },
+    {
+      "title": "Master and backup failover setup",
+      "level": 3,
+      "content": "The following provides a basic configuration to setup a high availability cluster with two servers/routers sharing a virtual IP address. Both need to be running keepalived.\n\nOn host A:\n\n```\n/etc/keepalived/keepalived.conf\n```\n\n```\nvrrp_instance VI_1 {\n    state MASTER\n    interface eth0\n    virtual_router_id 101\n    priority 255\n    advert_int 1\n    authentication {\n        auth_type PASS\n        auth_pass pass1234 \n    }\n    virtual_ipaddress {\n        172.16.0.100\n    }\n}\n```\n\nOn host B:\n\n```\n/etc/keepalived/keepalived.conf\n```\n\n```\nvrrp_instance VI_1 {\n    state BACKUP\n    interface eth0\n    virtual_router_id 101\n    priority 150\n    advert_int 1\n    authentication {\n        auth_type PASS\n        auth_pass pass1234\n    }\n    virtual_ipaddress {\n        172.16.0.100\n    }\n}\n```\n\nThe state sets the initial role of the host when the service is started and before multicast advertisements are processed to determine the host with the highest priority which will take the master role. This setup means that the host A with the higher priority will manage the VIP (virtual IP address) and only if host A stops responding will host B take over the VIP. The default transition time until takeover is one second.\n\n"
+    },
+    {
+      "title": "Failover setup with monitoring",
+      "level": 3,
+      "content": "The following provides a failover cluster for service (sshd) running on the same hosts as keepalived.\n\nThis setup provides a more dynamic cluster for the sshd service running on the failover host itself. Both servers start in the backup state and the nopreempt option allows the server with the lower priority to keep the master role even when the server with the higher priority returns after a failure. This prevents the interruption of connections to the VIP when the former master server comes back alive. The configuration also includes process tracking to reduce the priority of a server when the target service crashes. Since the weight option in the process section is omitted, the server enters the failed state as soon as the tracked process is no longer available and the delay timer has run out.\n\nOn host A:\n\n```\n/etc/keepalived/keepalived.conf\n```\n\n```\nglobal_defs {\n   notification_email {\n     admin@example.net\n   }\n   notification_email_from lb1@example.net\n   smtp_server mail.example.net\n   smtp_connect_timeout 30\n}\n\n# enter failed state when the sshd process is down\nvrrp_track_process track_sshd {\n    process sshd\n    delay 1\n}\n\nvrrp_instance VI_1 {\n    state BACKUP\n    nopreempt\n    interface eth0\n    virtual_router_id 101\n    priority 200\n    advert_int 1\n    authentication {\n        auth_type AH\n        auth_pass key12345\n    }\n    virtual_ipaddress {\n        172.16.0.100\n    }\n    track_process {\n        track_sshd\n    }\n    smtp_alert\n}\n```\n\nOn host B:\n\n```\n/etc/keepalived/keepalived.conf\n```\n\n```\nglobal_defs {\n   notification_email {\n     admin@example.net\n   }\n   notification_email_from lb2@example.net\n   smtp_server mail.example.net\n   smtp_connect_timeout 30\n}\n\n# enter failed state when the sshd process is down\nvrrp_track_process track_sshd {\n    process sshd\n    delay 1\n}\n\nvrrp_instance VI_1 {\n    state BACKUP\n    nopreempt\n    interface eth0\n    virtual_router_id 101\n    priority 150\n    advert_int 1\n    authentication {\n        auth_type AH\n        auth_pass key12345\n    }\n    virtual_ipaddress {\n        172.16.0.100\n    }\n    track_process {\n        track_sshd\n    }\n    smtp_alert\n}\n```\n\n"
+    },
+    {
+      "title": "Failover with load-balancing",
+      "level": 3,
+      "content": "Keepalived also provides load balancing with a number of possible algorithms (see keepalived.conf(5)).\n\nThis would be a simple example for HTTP load balancing that can be added to the above configuration:\n\n```\n/etc/keepalived/keepalived.conf\n```\n\n```\nvirtual_server 172.16.0.100 80 {\n    delay_loop 6\n    lvs_sched rr\n    lvs_method NAT\n    protocol TCP\n\n    real_server 172.16.1.20 80 {\n        TCP_CHECK {\n                connect_timeout 10\n        }\n    }\n    real_server 172.16.1.21 80 {\n        TCP_CHECK {\n                connect_timeout 10\n        }\n    }\n    real_server 172.16.1.22 80 {\n        TCP_CHECK {\n                connect_timeout 10\n        }\n    }\n    real_server 172.16.1.23 80 {\n        TCP_CHECK {\n                connect_timeout 10\n        }\n    }\n}\n```\n\nAlternatively, keepalived can also be used for failover with HAproxy acting as the loadbalancer.\n\n"
+    },
+    {
+      "title": "Security considerations",
+      "level": 2,
+      "content": "The VRRP protocol used by keepalived does not provide significant security against attackers who are already on the same subnet. The main benefit of using authentication in this service is to protect against accidentally adding servers that disrupt an existing cluster. When using auth_type PASS, the password is sent in plaintext over the local subnet with every multicast packet. Using auth_type AH (IP Authentication Header) will provide slightly better resilience against attacks but basic disruption and attacks such as ARP spoofing are still possible. Use network restrictions to protect the VRRP traffic if security is a high priority for you, e.g. use an isolated subnet for the cluster and block VRRP traffic from other networks in your firewall.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Load Balancer Administration\n- Configuring, Attacking and Securing VRRP on Linux\n\n"
+    }
+  ]
+}

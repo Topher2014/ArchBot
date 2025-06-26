@@ -1,0 +1,51 @@
+{
+  "title": "Ad-hoc networking",
+  "url": "https://wiki.archlinux.org/title/Ad-hoc_networking",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Network configuration\n- Wireless network configuration\n- Software access point\n- Internet sharing\n\nAn IBSS (Independent Basic Service Set) network, often called an ad-hoc network, is a way to have a group of devices talk to each other wirelessly, without a central controller. It is an example of a peer-to-peer network, in which all devices talk directly to each other, with no inherent relaying.\n\nFor example, ad-hoc networking may be used to share an internet connection.\n\n"
+    },
+    {
+      "title": "Requirements",
+      "level": 2,
+      "content": "- An nl80211 compatible wireless device (e.g. ath9k) on all devices which will connect to the network\n\n"
+    },
+    {
+      "title": "Wi-Fi link layer",
+      "level": 2,
+      "content": "Since IBSS network is a peer-to-peer network, the steps necessary to set up the Wi-Fi link layer should be the same on all devices.\n\n"
+    },
+    {
+      "title": "Manual method",
+      "level": 3,
+      "content": "Note: **unencrypted** \n\nSee Wireless network configuration#iw for a better explanation of the following commands. Make sure that iw is installed.\n\nSet the operation mode to ibss:\n\n```\n# iw interface set type ibss\n```\n\nBring the interface up (an additional step like rfkill unblock wifi might be needed):\n\n```\n# ip link set interface up\n```\n\nNow you can create an ad-hoc network. Replace your_ssid with the name of the network and frequency with the frequency in MHz, depending on which channel you want to use. See the Wikipedia page List of WLAN channels for a table showing frequencies of individual channels.\n\n```\n# iw interface ibss join your_ssid frequency\n```\n\n"
+    },
+    {
+      "title": "wpa_supplicant",
+      "level": 3,
+      "content": "Ensure that wpa_supplicant is installed, and create a configuration file for it (see wpa_supplicant for details).\n\n```\n/etc/wpa_supplicant-adhoc.conf\n```\n\n```\nctrl_interface=DIR=/run/wpa_supplicant GROUP=wheel\n\n# use 'ap_scan=2' on all devices connected to the network\n# this is unnecessary if you only want the network to be created when no other networks are available\nap_scan=2\n\nnetwork={\n    ssid=\"MySSID\"\n    mode=1\n    frequency=2432\n    proto=RSN\n    key_mgmt=WPA-PSK\n    pairwise=CCMP\n    group=CCMP\n    psk=\"secret passphrase\"\n}\n```\n\nRun wpa_supplicant on all devices connected to the network with the following command:\n\n```\n# wpa_supplicant -B -i interface -c /etc/wpa_supplicant-adhoc.conf -D nl80211,wext\n```\n\n"
+    },
+    {
+      "title": "Network configuration",
+      "level": 2,
+      "content": "The final step is to assign an IP address to all devices in the network. There are multiple ways to do this:\n\n- Assign static IP addresses. See Network configuration#Static IP address for details.\n- Running DHCP server on one device. See Router#DNS and DHCP for details.\n- Running avahi-autoipd. See Avahi#Obtaining IPv4LL IP address for details.\n\nIf you want to share an internet connection to the ad-hoc network, see Internet sharing.\n\n"
+    },
+    {
+      "title": "Using NetworkManager",
+      "level": 3,
+      "content": "If you use NetworkManager, you can use nm-applet for ad-hoc network configuration instead of the manual method described above. See NetworkManager#Sharing internet connection over Wi-Fi for details.\n\n"
+    },
+    {
+      "title": "Custom systemd service (with wpa_supplicant and static IP)",
+      "level": 3,
+      "content": "You can use the following templates to enable wireless ad-hoc networking:\n\n```\n/etc/conf.d/network-wireless-adhoc@interface\n```\n\n```\naddr=192.168.0.2\nmask=24\n```\n\n```\n/etc/systemd/system/network-wireless-adhoc@.service\n```\n\n```\n[Unit]\nDescription=Ad-hoc wireless network connectivity (%i)\nWants=network.target\nBefore=network.target\nBindsTo=sys-subsystem-net-devices-%i.device\nAfter=sys-subsystem-net-devices-%i.device\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nEnvironmentFile=/etc/conf.d/network-wireless-adhoc@%i\n\n# perhaps rfkill is not needed for you\nExecStart=/usr/bin/rfkill unblock wifi\nExecStart=/usr/bin/ip link set %i up\nExecStart=/usr/bin/wpa_supplicant -B -i %i -D nl80211,wext -c /etc/wpa_supplicant-adhoc.conf\nExecStart=/usr/bin/ip addr add ${addr}/${mask} dev %i\n\nExecStop=/usr/bin/ip addr flush dev %i\nExecStop=/usr/bin/ip link set %i down\n\n[Install]\nWantedBy=multi-user.target\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Ubuntu community wiki WifiDocs/Adhoc\n- Manual about creating an Ad-Hoc network on UbuntuGeek\n- Share your 3G Internet connection over wifi\n\n"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "title": "Usbguard",
+  "url": "https://wiki.archlinux.org/title/Usbguard",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "USBGuard offers a white/black-listing mechanism for USB-devices. Inspiration for this is drawn from exploits like BadUSB. It makes use of a device blocking infrastructure included in the Linux kernel and consists of a daemon and some front-ends.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the usbguard package, or usbguard-gitAUR for the development version.\n\nThe official Qt applet was removed from USBGuard and substituted with usbguard-notifierAUR. An unofficial, forked version of the Qt applet is available as usbguard-qtAUR.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "The main configuration file is found in /etc/usbguard/usbguard-daemon.conf.\n\nIf you want to control the daemon via IPC, be sure to add your username to IPCAllowedUsers or your group to IPCAllowedGroups to make rules persistent. In most cases, you want this.\n\nBy default, the PresentDevicePolicy is set to apply-policy so that USBGuard evaluates the ruleset for every connected device. This is the most secure setting, which ensures security even when the daemon hits a restart. Alternatively, the key may be set to allow in order to block all newly connected devices but leave devices connected before daemon as is. To temporary allow new devices use usbguard set-parameter ImplicitPolicyTarget allow.\n\nWith the key ImplicitPolicyTarget you can configure the default treatment of devices, if no rules match. The most secure option here is block.\n\nFor an in-depth documentation of configuration see the very well commented configuration file.\n\n"
+    },
+    {
+      "title": "Rules",
+      "level": 3,
+      "content": "To configure USBGuard to your needs, you can edit /etc/usbguard/rules.conf. However manual editing of the rules is normally not necessary. You can generate a ruleset based on your currently attached USB devices by executing usbguard generate-policy > /etc/usbguard/rules.conf as root.\n\nThe rules syntax is formally explained here. An example for a hp printer connected via USB can look like this:\n\n```\nallow id 03f0:0c17 serial \"00CNFD234631\" name \"hp LaserJet 2020\" hash \"a0ef07fceb6fb77698f79a44a450121m\" parent-hash \"69d19c1a5733a31e7e6d9530e6k434a6\" with-interface { 07:01:03 07:01:02 07:01:01 }\n```\n\nA rule begins with a policy. allow whitelists a device, block stops the device from being processed now and reject removes the device from the system. Then follows a set of attributes with their options, as detailed below.\n\nTable content:\nAttribute | Description\nid usb-device-id | Match a USB device ID.\nid [operator] { usb-device-id ... } | Match a set of USB device IDs.\nhash \"value\" | Match a hash computed from the device attribute values and the USB descriptor data. The hash is computed for every device by USBGuard.\nhash [operator] { \"value\" ... } | Match a set of device hashes.\nparent-hash \"value\" | Match a hash of the parent device.\nparent-hash [operator] { \"value\" ... } | Match a set of parent device hashes.\nname \"device-name\" | Match the USB device name attribute.\nname [operator] { \"device-name\" ... } | Match a set of USB device names.\nserial \"serial-number\" | Match the USB iSerial device attribute.\nserial [operator] { \"serial-number\" ... } | Match a set of USB iSerial device attributes.\nvia-port \"port-id\" | Match the USB port through which the device is connected. Note that some systems have unstable port numbering which change after the system reboots or certain kernel modules are reloaded (and maybe in other cases). Use the parent-hash attribute if you want to ensure that a device is connected via a specific parent device.\nvia-port [operator] { \"port-id\" ... } | Match a set of USB ports.\nwith-interface interface-type | Match an interface type that the USB device provides.\nwith-interface [operator] { interface-type interface-type ... } | Match a set of interface types against the set of interfaces that the USB device provides.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "USBGuard has a core daemon, a CLI, a DBUS interface and an API via libusbguard.\n\nIf you want to use the Qt GUI or another program communicating via DBUS (which includes the GNOME integration), enable and start usbguard-dbus.service.\n\nIf you only want to communicate via API (with the CLI tool or another software using libusbguard) enable and start usbguard.service.\n\n"
+    },
+    {
+      "title": "CLI",
+      "level": 3,
+      "content": "The CLI is available via usbguard.\n\nSee the according man pages for more info.\n\n"
+    },
+    {
+      "title": "Allow Bluetooth controllers",
+      "level": 4,
+      "content": "If USBGuard is set to block all USB devices by default, it will also block btusb controllers by default since they communicate using a USB bus. Since many motherboards' Bluetooth cards are btusb controllers, it may not be obvious that Bluetooth is blocked by USBGuard. For Bluetooth to work, you need to set USBGuard to allow these btusb controllers.\n\nFind and display information about the USB buses in the system using lsusb (part of usbutils). This should display something like\n\n```\n$ lsusb\n```\n\n```\nBus 001 Device 001: ID 0000:0001 Linux Foundation 2.0 root hub\nBus 001 Device 002: ID 0000:0002 Intel Corp. Bluetooth 9460/9560 Jefferson Peak (JfP)\nBus 002 Device 001: ID 0000:0003 Linux Foundation 3.0 root hub\n```\n\nWe are interested in the Bluetooth device. Note its ID (in this case, 0000:0002, but this may vary) and set USBGuard to allow this ID:\n\n```\n# usbguard allow-device -p 0000:0002\n```\n\n"
+    },
+    {
+      "title": "GNOME integration",
+      "level": 3,
+      "content": "GNOME has had USBGuard support baked in since 3.36. It requires polkit rule configuration to grant GNOME access, and dconf modification to always block devices as the default is set to allow and only block on lockscreen.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\n"
+    },
+    {
+      "title": "Grant GNOME access to the USBGuard daemon",
+      "level": 4,
+      "content": "Authorize GNOME Shell running under users with the wheel group assigned access to USBGuard, by creating the following file:\n\n```\n/etc/polkit-1/rules.d/70-allow-usbguard.rules\n```\n\n```\n// Allow users in wheel group to communicate with USBGuard\npolkit.addRule(function(action, subject) {\n    if ((action.id == \"org.usbguard.Policy1.listRules\" ||\n         action.id == \"org.usbguard.Policy1.appendRule\" ||\n         action.id == \"org.usbguard.Policy1.removeRule\" ||\n         action.id == \"org.usbguard.Devices1.applyDevicePolicy\" ||\n         action.id == \"org.usbguard.Devices1.listDevices\" ||\n         action.id == \"org.usbguard1.getParameter\" ||\n         action.id == \"org.usbguard1.setParameter\") &&\n        subject.active == true && subject.local == true &&\n        subject.isInGroup(\"wheel\")) {\n            return polkit.Result.YES;\n    }\n});\n```\n\nChanges to polkit rules are picked up automatically by the polkit daemon itself.\n\n"
+    },
+    {
+      "title": "Turn GNOME USB Protection on",
+      "level": 4,
+      "content": "If the USBGuard service is present and this setting is enabled, USB devices will be protected as configured in the usb-protection-level setting. Enable it by running the command below:\n\n```\n$ gsettings set org.gnome.desktop.privacy usb-protection true\n```\n\n"
+    },
+    {
+      "title": "Block all USB devices by default",
+      "level": 4,
+      "content": "If set to lockscreen, only when the lock screen is present new USB devices will be rejected; if set to always, all new USB devices will always be rejected. Reject all new USB devices by running the command below:\n\n```\n$ gsettings set org.gnome.desktop.privacy usb-protection-level always\n```\n\n"
+    },
+    {
+      "title": "Related projects",
+      "level": 2,
+      "content": "- usbkill-gitAUR (an anti-forensic kill-switch that waits for a change on your USB ports and then immediately shuts down your computer)\n- silk-guardian-dkmsAUR (kill switch for unknown usb devices (DKMS))\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- USBGuard repository\n- USBGuard component diagram\n- BadUSB background info\n- Kernel interface for USB device control\n- GNOME USB Protection background info\n- gnome-settings-daemon usb-protection plugin source\n\n"
+    }
+  ]
+}

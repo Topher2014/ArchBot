@@ -1,0 +1,186 @@
+{
+  "title": "Snapper",
+  "url": "https://wiki.archlinux.org/title/Snapper",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Yabsnap\n- mkinitcpio\n\nSnapper is a tool created by openSUSE's Arvin Schnell that helps with managing snapshots of Btrfs subvolumes and thin-provisioned LVM volumes. It can create and compare snapshots, revert between snapshots, and supports automatic snapshots timelines.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the snapper package. The development version snapper-gitAUR is also available.\n\nAdditionally, GUIs are available with snapper-gui-gitAUR, btrfs-assistantAUR, and snapper-toolsAUR.\n\n"
+    },
+    {
+      "title": "Creating a new configuration",
+      "level": 2,
+      "content": "Before creating a snapper configuration for a Btrfs subvolume, the subvolume must already exist. If it does not, you should create it before generating a snapper configuration.\n\nTo create a new snapper configuration named config for the Btrfs subvolume at /path/to/subvolume, run:\n\n```\n# snapper -c config create-config /path/to/subvolume\n```\n\nThis will:\n\n- Create a configuration file at /etc/snapper/configs/config based on the default template from /usr/share/snapper/config-templates.\n- Create a subvolume at /path/to/subvolume/.snapshots where future snapshots for this configuration will be stored. A snapshot's path is /path/to/subvolume/.snapshots/#/snapshot, where # is the snapshot number.\n- Add config to SNAPPER_CONFIGS in /etc/conf.d/snapper.\n\nFor example, to create a configuration file for the subvolume mounted at /, run:\n\n```\n# snapper -c root create-config /\n```\n\n- Unmount the @.snapshots subvolume and delete the existing mountpoint.\n- Create the Snapper config.\n- Delete the subvolume created by Snapper.\n- Re-create the /.snapshots mount point and re-mount the @.snapshots subvolume.\n\nAt this point, the configuration is active. If your cron daemon is running, snapper will take #Automatic timeline snapshots. If you do not use a cron daemon, you will need to use the systemd service and timer. See #Enable/disable.\n\nSee also snapper-configs(5).\n\n"
+    },
+    {
+      "title": "Automatic timeline snapshots",
+      "level": 3,
+      "content": "A snapshot timeline can be created with a configurable number of hourly, daily, weekly, monthly, and yearly snapshots kept. When the timeline is enabled, by default a snapshot gets created once an hour. Once a day the snapshots get cleaned up by the timeline cleanup algorithm. Refer to the TIMELINE_* variables in snapper-configs(5) for details.\n\n"
+    },
+    {
+      "title": "Enable/disable",
+      "level": 4,
+      "content": "If you have a cron daemon, this feature should start automatically. To disable it, edit the configuration file corresponding with the subvolume you do not want to have this feature and set:\n\n```\nTIMELINE_CREATE=\"no\"\n```\n\nIf you do not have a cron daemon, you can use the provided systemd units. Start and enable snapper-timeline.timer to start the automatic snapshot timeline. Additionally, start and enable snapper-cleanup.timer to periodically clean up older snapshots.\n\n"
+    },
+    {
+      "title": "Set snapshot limits",
+      "level": 4,
+      "content": "The default settings will keep 10 hourly, 10 daily, 10 monthly and 10 yearly snapshots. You may want to change this in the configuration, especially on busy subvolumes like /. See #Preventing slowdowns.\n\nHere is an example section of a configuration named config with only 5 hourly snapshots, 7 daily ones, no monthly and no yearly ones:\n\n```\n/etc/snapper/configs/config\n```\n\n```\nTIMELINE_MIN_AGE=\"1800\"\nTIMELINE_LIMIT_HOURLY=\"5\"\nTIMELINE_LIMIT_DAILY=\"7\"\nTIMELINE_LIMIT_WEEKLY=\"0\"\nTIMELINE_LIMIT_MONTHLY=\"0\"\nTIMELINE_LIMIT_YEARLY=\"0\"\n```\n\n"
+    },
+    {
+      "title": "Change snapshot and cleanup frequencies",
+      "level": 4,
+      "content": "If you are using the provided systemd timers, you can edit them to change the snapshot and cleanup frequency.\n\nFor example, when editing the snapper-timeline.timer, add the following to make the frequency every five minutes, instead of hourly:\n\n```\n[Timer]\nOnCalendar=\nOnCalendar=*:0/5\n```\n\nWhen editing snapper-cleanup.timer, you need to change OnUnitActiveSec. To make cleanups occur every hour instead of every day, add:\n\n```\n[Timer]\nOnUnitActiveSec=1h\n```\n\nSee systemd/Timers and systemd#Drop-in files.\n\n"
+    },
+    {
+      "title": "Single snapshots",
+      "level": 4,
+      "content": "By default snapper takes snapshots that are of the single type, having no special relationship to other snapshots.\n\nTo take a snapshot of a subvolume manually, do:\n\n```\n# snapper -c config create --description desc\n```\n\nThe above command does not use any cleanup algorithm, so the snapshot is stored permanently or until deleted.\n\nTo set a cleanup algorithm, use the -c flag after create and choose either number, timeline, pre, or post. number sets snapper to periodically remove snapshots that have exceeded a set number in the configuration file. For example, to create a snaphot that uses the number algorithm for cleanup do:\n\n```\n# snapper -c config create -c number\n```\n\nSee #Automatic timeline snapshots for how timeline snapshots work and see #Pre/post snapshots on how pre and post work.\n\n"
+    },
+    {
+      "title": "Pre/post snapshots",
+      "level": 4,
+      "content": "The other type of snapshots - pre/post snapshots - are intended to be created as a pair, one before and one after a significant change (such as a system update).\n\nIf the significant change is/can be invoked by a single command, then snapper create --command can be used to invoke the command and automatically create pre/post snapshots:\n\n```\n# snapper -c config create --command cmd\n```\n\nAlternatively, the pre/post snapshots can be created manually.\n\nFirst create a pre snapshot:\n\n```\n# snapper -c config create -t pre -p\n```\n\nNote the number of the new snapshot (it is required to create the post snapshot).\n\nNow perform the actions that will modify the filesystem (*e.g.*, install a new program, upgrade, etc.).\n\nFinally, create the post snapshot, replacing N with the number of the pre snapshot:\n\n```\n# snapper -c config create -t post --pre-number N\n```\n\nSee also #Wrapping pacman transactions in snapshots.\n\n"
+    },
+    {
+      "title": "Snapshots on boot",
+      "level": 3,
+      "content": "To have snapper take a snapshot of the root configuration, enable snapper-boot.timer. (These snapshots are of type single.)\n\n"
+    },
+    {
+      "title": "List configurations",
+      "level": 3,
+      "content": "To list all configurations that have been created do:\n\n```\n# snapper list-configs\n```\n\n"
+    },
+    {
+      "title": "List snapshots",
+      "level": 3,
+      "content": "To list snapshots taken for a given configuration config do:\n\n```\n# snapper -c config list\n```\n\n"
+    },
+    {
+      "title": "Restore snapshot",
+      "level": 3,
+      "content": "A file may be kept as is when restoring a snapshot, either because was not included in the snapshot (e.g. it resides on another subvolume), or because a filter configuration excluded the file.\n\n"
+    },
+    {
+      "title": "Filter configuration",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nSome files keep state information of the system, e.g. /etc/mtab. Such files should never be reverted. The default configuration in arch linux ensures this. To help users, snapper allows one to ignore these files. Each line in all files /etc/snapper/filters/*.txt and /usr/share/snapper/filters/*.txt specifies a pattern. When snapper computes the difference between two snapshots it ignores all files and directories matching any of those patterns. Note that filters do not exclude files or directories from being snapshotted. For that, use subvolumes or mount points.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nSee also the Directories That Are Excluded from Snapshots[dead link 2024-03-03 ⓘ] in SLES documentation.\n\n"
+    },
+    {
+      "title": "Restore using the default layout",
+      "level": 4,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nIf you are using the default layout of snapper, each snapshot is sub-subvolume in the .snapshots directory of a subvolume, e.g. @home.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nTo restore /home using one of snapper's snapshots, first boot into a live Arch Linux USB/CD.\n\nMount btrfs root-volume into /mnt using the UUID:\n\n```\n# mount -t btrfs -o subvol=/ /dev/disk/by-uuid/UUID_of_root_volume /mnt\n# cd /mnt\n```\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nIf the snapper service is running on a running system, stop it. Check if any snapper-unit.timers are running, then stop them.\n\nMove a broken/old subvolume out of the way e.g. @home to @home-backup:\n\n```\n# mv @home @home-backup\n```\n\nFind the number of the snapshot that you want to recover (there is one line for each snapshot, so you can easily match up number and date of each snapshot):\n\n```\n# grep -r '<date>'  /mnt/@home-backup/.snapshots/*/info.xml\n```\n\n```\n...\n/mnt/@home-backup/.snapshots/number/info.xml:  <date>2021-07-26 22:00:00</date>\n...\n```\n\nRemember the number.\n\nCreate a new snapshot @home from snapshot number number to be restored.\n\n```\n# btrfs subvolume snapshot @home-backup/.snapshots/number/snapshot @home\n```\n\nGet the directory .snapshots back to the healthy subvolume, e.g. @home\n\n```\n# mv @home-backup/.snapshots @home/\n```\n\nIf subvolid was used for the /home mount entry option in fstab, instead of /path/to/subvolume, change subvolid in the /mnt/@/etc/fstab file (assuming that @ is the subvolume that is mounted as / in the system) to the new subvolid that can be found with btrfs subvolume list /mnt | grep @home$.\n\nReboot.\n\nCheck if your system is working as intended, the delete the old/broken snapshot (e.g. @home-backup) if desired. You should check if it contains useful data that you can get back.\n\n"
+    },
+    {
+      "title": "Delete a snapshot",
+      "level": 3,
+      "content": "To delete a snapshot number N do:\n\n```\n# snapper -c config delete N\n```\n\nMultiple snapshots can be deleted at one time. For example, to delete snapshots 65 and 70 of the root configuration do:\n\n```\n# snapper -c root delete 65 70\n```\n\nTo delete a range of snapshots, in this example between snapshots 65 and 70 of the root configuration do:\n\n```\n# snapper -c root delete 65-70\n```\n\nTo free the space used by the snapshot(s) immediately, use --sync:\n\n```\n# snapper -c root delete --sync 65\n```\n\nTo delete all snapshots, the .snapshots subvol and the snapper configuration files for a configuration:\n\n```\n# snapper -c config delete-config\n```\n\n"
+    },
+    {
+      "title": "Access for non-root users",
+      "level": 3,
+      "content": "Each config is created with the root user, and by default, only root can see and access it.\n\nTo be able to list the snapshots for a given config for a specific user, simply change the value of ALLOW_USERS in your /etc/snapper/configs/config file. You should now be able to run snapper -c config list as a normal user.\n\nEventually, you want to be able to browse the .snapshots directory with a user, but the owner of this directory must stay root. Therefore, you should change the group owner by a group containing the user you are interested in, such as users for example:\n\n```\n# chmod a+rx .snapshots\n# chown :users .snapshots\n```\n\n"
+    },
+    {
+      "title": "Wrapping pacman transactions in snapshots",
+      "level": 3,
+      "content": "There are a couple of packages used for automatically creating snapshots upon a pacman transaction:\n\n- snap-pac — Makes pacman automatically use snapper to create pre/post snapshots like openSUSE's YaST. Uses pacman hooks.\n\n- grub-btrfs — Includes a daemon (grub-btrfsd) that can be enabled via systemctl to look for new snapshots and automatically includes them in the GRUB menu.\n\n- snap-pac-grub — Additionally updates GRUB entries for grub-btrfs after snap-pac made the snapshots. Also uses pacman hooks.\n\n- refind-btrfs — Adds entries to rEFInd after snap-pac made the snapshots.\n\n- snp — Wraps any shell command in a snapper pre-post snapshot (e.g. snp pacman -Syu), with better output than the native --command option of snapper (see #Pre/post snapshots).\n\n- limine-snapper-sync — Adds snapper entries to Limine bootloader after snap-pac made the snapshots.\n\n"
+    },
+    {
+      "title": "Booting into read-only snapshots",
+      "level": 4,
+      "content": "Users who rely on grub-btrfs or snap-pac-grubAUR or limine-snapper-syncAUR should note that by default, Snapper's snapshots are read-only, and there are some inherent difficulties booting into read-only snapshots. Many services, such as a desktop manager, require a writable /var directory, and will fail to start when booted from a read-only snapshot.\n\nTo work around this, you can either make the snapshots writable, or use the developer-approved method of booting the snapshots with overlayfs, causing the snapshot to behave similar to a live CD environment.\n\nTo boot snapshots with overlayfs:\n\n- Ensure grub-btrfs is installed on your system.\n- Add grub-btrfs-overlayfs to the end of the HOOKS array in /etc/mkinitcpio.conf. For example: HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck grub-btrfs-overlayfs)Note: Because grub-btrfs-overlayfs only provides a runtime hook and no systemd unit, it is not compatible with a systemd based initramfs. Make sure you use a Busybox based initramfs instead. See this GitHub issue for more details.\n- Regenerate the initramfs.\n\n```\nHOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck grub-btrfs-overlayfs)\n```\n\nNote: **not** \n\nFurther reading:\n\n- grub-btrfs README (includes instructions for those who use dracut instead of mkinitcpio)\n- Discussion on Github\n\n"
+    },
+    {
+      "title": "Backup non-Btrfs boot partition on pacman transactions",
+      "level": 4,
+      "content": "If your /boot partition is on a non Btrfs filesystem (e.g. an ESP) you are not able to do snapper backups with it. See System backup#Snapshots and /boot partition to copy the boot partition automatically on a kernel update to your Btrfs root with a hook. This also plays nice together with snap-pac.\n\n"
+    },
+    {
+      "title": "Incremental backup to external drive",
+      "level": 3,
+      "content": "Some tools can use snapper to automate backups. See Btrfs#Incremental backup to external drive.\n\n"
+    },
+    {
+      "title": "Suggested filesystem layout",
+      "level": 3,
+      "content": "Here is a suggested file system layout for easily restoring the subvolume @ that is mounted at root to a previous snapshot:\n\nTable content:\nSubvolume | Mountpoint\n@ | /\n@home | /home\n@snapshots | /.snapshots\n@var_log | /var/log\n\n```\nsubvolid=5\n  |\n  ├── @ -|\n  |     contained directories:\n  |       ├── /usr\n  |       ├── /bin\n  |       ├── /.snapshots\n  |       ├── ...\n  |\n  ├── @home\n  ├── @snapshots\n  ├── @var_log\n  └── @...\n```\n\nThe subvolumes @... are mounted to any other directory that should have its own subvolume.\n\n- When taking a snapshot of @ (mounted at the root /), other subvolumes are not included in the snapshot. Even if a subvolume is nested below @, a snapshot of @ will not include it. Create snapper configurations for additional subvolumes besides @ of which you want to keep snapshots.\n- Due to a Btrfs limitation, snapshotted volumes cannot contain swap files. Either put the swap file on another subvolume or create a swap partition.\n\nIf you were to restore your system to a previous snapshots of @, these other subvolumes will remain unaffected. For example, this allows you to restore @ to a previous snapshot while keeping your /home unchanged, because of the subvolume that is mounted at /home.\n\nThis layout allows the snapper utility to take regular snapshots of /, while at the same time making it easy to restore / from an Arch Live CD if it becomes unbootable.\n\nIn this scenario, after the initial setup, snapper needs no changes, and will work as expected.\n\n- Consider creating subvolumes for other directories that contain data you do not want to include in snapshots and rollbacks of the @ subvolume, such as /var/cache, /var/spool, /var/tmp, /var/lib/machines (systemd-nspawn), /var/lib/docker (Docker), /var/lib/postgres (PostgreSQL), and other data directories under /var/lib/. It is up to you if you want to follow the flat layout or create nested subvolumes. On the other hand, the pacman database in /var/lib/pacman must stay on the root subvolume (@).\n- You can run Snapper on @home and any other subvolume to have separate snapshot and rollback capabilities for data.\n\n"
+    },
+    {
+      "title": "Configuration of snapper and mount point",
+      "level": 4,
+      "content": "It is assumed that the subvolume @ is mounted at root /. It is also assumed that /.snapshots is not mounted and does not exist as folder, this can be ensured by the commands:\n\n```\n# umount /.snapshots\n# rm -r /.snapshots\n```\n\nThen create a new configuration for /. Snapper create-config automatically creates a subvolume .snapshots with the root subvolume @ as its parent, that is not needed for the suggested filesystem layout, and can be deleted.\n\n```\n# btrfs subvolume delete /.snapshots\n```\n\nAfter deleting the subvolume, recreate the directory /.snapshots.\n\n```\n# mkdir /.snapshots\n```\n\nNow mount @snapshots to /.snapshots. For example, for a file system located on /dev/sda1:\n\n```\n# mount -o subvol=@snapshots /dev/sda1 /.snapshots\n```\n\nTo make this mount permanent, add an entry to your fstab.\n\nOr if you have an existing fstab entry remount the snapshot subvolume:\n\n```\n# mount -a\n```\n\nGive the folder 750 permissions.\n\nThis will make all snapshots that snapper creates be stored outside of the @ subvolume, so that @ can easily be replaced anytime without losing the snapper snapshots.\n\n"
+    },
+    {
+      "title": "Restoring / to its previous snapshot",
+      "level": 4,
+      "content": "To restore / using one of snapper's snapshots, first boot into a live Arch Linux USB/CD.\n\nMount the toplevel subvolume (subvolid=5). That is, omit any subvolid or subvol mount flags.\n\nFind the number of the snapshot that you want to recover:\n\n```\n# grep -r '<date>' /mnt/@snapshots/*/info.xml\n```\n\nThe output should look like so, there is one line for each snapshot, so you can easily match up number and date of each snapshot.\n\n```\n/mnt/@snapshots/number/info.xml:  <date>2021-07-26 22:00:00</date>\n```\n\nRemember the number.\n\nNow, move @ to another location (e.g. /@.broken) to save a copy of the current system. Alternatively, simply delete @ using btrfs subvolume delete /mnt/@.\n\nCreate a read-write snapshot of the read-only snapshot snapper took:\n\n```\n# btrfs subvolume snapshot /mnt/@snapshots/number/snapshot /mnt/@\n```\n\nWhere number is the number of the snapper snapshot you wish to restore.\n\nIf subvolid was used for the / mount entry option in fstab, instead of /path/to/subvolume, change subvolid in the /mnt/@/etc/fstab file to the new subvolid that can be found with btrfs subvolume list /mnt | grep @$. Also change the boot loader configuration such as refind_linux.conf, if it contains the subvolid.\n\nFinally, unmount the top-level subvolume (ID=5), then mount @ to /mnt and your ESP or boot partition to the appropriate mount point. Change root to your restored snapshot in order to regenerate your initramfs image.\n\nYour / has now been restored to the previous snapshot. Now just simply reboot.\n\n"
+    },
+    {
+      "title": "Restoring other subvolumes to their previous snapshot",
+      "level": 4,
+      "content": "See #Restore snapshot.\n\n"
+    },
+    {
+      "title": "Deleting files from snapshots",
+      "level": 3,
+      "content": "If you want to delete a specific file or folder from past snapshots without deleting the snapshots themselves, snappersAUR is a script that adds this functionality to Snapper. This script can also be used to manipulate past snapshots in a number of other ways that Snapper does not currently support.\n\nIf you want to remove a file without using an extra script, you just need to make your snapshot subvolume read-write, which you can do with:\n\n```\n# btrfs property set /path/to/.snapshots/<snapshot_num>/snapshot ro false\n```\n\nVerify that ro=false:\n\n```\n# btrfs property get /path/to/.snapshots/<snapshot_num>/snapshot\nro=false\n```\n\nYou can now modify files in /path/to/.snapshots/<snapshot_num>/snapshot like normal. You can use a shell loop to work on your snapshots in bulk.\n\n"
+    },
+    {
+      "title": "Preventing slowdowns",
+      "level": 3,
+      "content": "Keeping many snapshots for a large timeframe on a busy filesystem like /, where many system updates happen over time, can cause serious slowdowns. You can prevent it by:\n\n- Creating subvolumes for things that are not worth being snapshotted, like /var/cache/pacman/pkg, /var/abs, /var/tmp, and /srv.\n- Editing the default settings for hourly/daily/monthly/yearly snapshots when using #Automatic timeline snapshots.\n\n"
+    },
+    {
+      "title": "updatedb",
+      "level": 4,
+      "content": "By default, updatedb (see locate) will also index the .snapshots directory created by snapper, which can cause serious slowdown and excessive memory usage if you have many snapshots. You can prevent updatedb from indexing over it by editing:\n\n```\n/etc/updatedb.conf\n```\n\n```\nPRUNENAMES = \".snapshots\"\n```\n\n"
+    },
+    {
+      "title": "Disable quota groups",
+      "level": 4,
+      "content": "There are reports of significant slow downs being caused by quota groups, if for instance snapper ls takes many minutes to return a result this could be the cause. See [3].\n\nTo determine whether or not quota groups are enabled use the following command:\n\n```\n# btrfs qgroup show /\n```\n\nQuota groups can then be disabled with:\n\n```\n# btrfs quota disable /\n```\n\n"
+    },
+    {
+      "title": "Count the number of snapshots",
+      "level": 4,
+      "content": "If disabling quota groups did not help with slow down, it may be helpful to count the number of snapshots, this can be done with:\n\n```\n# btrfs subvolume list -s / | wc -l\n```\n\n"
+    },
+    {
+      "title": "Create subvolumes for user data and logs",
+      "level": 3,
+      "content": "It is recommended to store directories on their own subvolume, rather than the root subvolume /, if they contain user data e.g. emails, or logs. That way if a snapshot of / is restored, user data and logs will not also be reverted to the previous state. A separate timeline of snapshots can be maintained for user data. It is not recommended to create snapshots of logs in /var/log. This makes it easier to troubleshoot.\n\nDirectories can also be skipped during a restore using #Filter configuration. See the SLES documentation for examples and reasons to skip certain paths.\n\n"
+    },
+    {
+      "title": "Cleanup based on disk usage",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Snapper logs",
+      "level": 3,
+      "content": "Snapper writes all activity to /var/log/snapper.log - check this file first if you think something goes wrong.\n\nIf you have issues with hourly/daily/weekly snapshots, the most common cause for this so far has been that the cronie service (or whatever cron daemon you are using) was not running.\n\n"
+    },
+    {
+      "title": "IO error",
+      "level": 3,
+      "content": "If you get an 'IO Error' when trying to create a snapshot please make sure that the .snapshots directory associated to the subvolume you are trying to snapshot is a subvolume by itself.\n\nAnother possible cause is that .snapshots directory does not have root as an owner (You will find Btrfs.cc(openInfosDir):219 - .snapshots must have owner root in the /var/log/snapper.log).\n\n"
+    },
+    {
+      "title": "Orphaned snapshots causing wasted disk space",
+      "level": 3,
+      "content": "It is possible for snapshots to get 'lost', where they still exist on disk but are not tracked by snapper. This can result in a large amount of wasted, unaccounted-for disk space. To check for this, compare the output of\n\n```\n# snapper -c <config> list\n```\n\nto\n\n```\n# btrfs subvolume list -o <parent subvolume>/.snapshots\n```\n\nAny subvolume in the second list which is not present in the first is an orphan and can be deleted manually.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Snapper homepage\n- openSUSE Snapper portal\n- Btrfs homepage\n- Linux.com: Snapper: SUSE's Ultimate Btrfs Snapshot Manager\n\n"
+    }
+  ]
+}

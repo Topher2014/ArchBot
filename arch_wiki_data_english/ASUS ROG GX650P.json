@@ -1,0 +1,46 @@
+{
+  "title": "ASUS ROG GX650P",
+  "url": "https://wiki.archlinux.org/title/ASUS_ROG_GX650P",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nBluetooth | 14c3:0616 | Yes\nWi-Fi | 14c3:0616 | Yes\nEthernet | 10ec:8125 | Yes\nGPU (NVIDIA) | 10de:2820 | Yes\nGPU (AMD) | 1002:164e | Yes\nSpeakers | 1043:1433 | Yes\n\nNote: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Press the Esc key when the ROG logo appears to enter the laptop's UEFI. To boot into the installation medium, disable Secure Boot in the UEFI interface by deleting all related keys after backing up your keys. It is recommended to use a wired network during installation because wireless network connections can be non-trivial to deal with for now (see #Bluetooth and Wi-Fi).\n\n"
+    },
+    {
+      "title": "Bluetooth and Wi-Fi",
+      "level": 2,
+      "content": "Both the Bluetooth and Wi-Fi on this device are supported by MediaTek mt7922, which is driven by mt7921e. As of kernel 6.4.2 in July 2023, two kernel patches and firmware updates are still required. First check your device with:\n\n```\n$ lspci -k | grep --after-context=2 MT7922\n```\n\n```\n04:00.0 Network controller: MEDIATEK Corp. MT7922 802.11ax PCI Express Wireless Network Adapter\n\tSubsystem: Foxconn International, Inc. MT7922 802.11ax PCI Express Wireless Network Adapter\n\tKernel driver in use: mt7921e\n\tKernel modules: mt7921e\n```\n\nIt is likely that one will lack the line Kernel modules: mt7921e without further setup since the kernel module is not properly loaded.\n\nStart with a fresh boot, i.e. completely shutdown your device and boot your device; one might encounter an error log similar to this in the journal:\n\n```\n[59007.600714] mt7921e 0000:02:00.0: ASIC revision: 79220010\n[59010.889773] mt7921e 0000:02:00.0: Message 00000010 (seq 1) timeout\n[59010.889786] mt7921e 0000:02:00.0: Failed to get patch semaphore\n[59014.217839] mt7921e 0000:02:00.0: Message 00000010 (seq 2) timeout\n```\n\nIt is recommended to patch to fix device init failed so that Wi-Fi can work. Further, to support Bluetooth, another kernel patch should be applied.\n\n"
+    },
+    {
+      "title": "Speaker",
+      "level": 2,
+      "content": "Due to the insufficient amplifier setup (Cirrus Logic CS35L41) on Linux, the sound turned out to be tiny. Follow the guide on asus-linux and add quick with this kernel patch (for 6.4.2) to fix the issue. In general, one might need to\n\n1. Dump ACPI table and patch SSDT\n1. Install and load the SSDT patch with the corresponding boot-loader\n1. Apply the aforementioned kernel patch\n\nWhen all the problems have been solved, the log might look like this,\n\n```\n# dmesg | grep cs35l41\n```\n\n```\n[    5.669095] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: Cirrus Logic CS35L41 (35a40), Revision: B2\n[    5.669886] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.1: Reset line busy, assuming shared reset\n[    5.721313] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.1: Cirrus Logic CS35L41 (35a40), Revision: B2\n[    5.741694] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: Firmware version: 3\n[    5.741697] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: cirrus/cs35l41-dsp1-spk-prot-10431433.wmfw: Fri 27 Aug 2021 14:58:19 W. Europe Daylight Time\n[    6.208691] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: Firmware: 400a4 vendor: 0x2 v0.43.1, 2 algorithms\n[    6.209774] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: 0: ID cd v29.63.1 XM@94 YM@e\n[    6.209777] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: 1: ID f20b v0.1.0 XM@176 YM@0\n[    6.209779] cs35l41-hda i2c-CSC3551:00-cs35l41-hda.0: DSP1: spk-prot: C:\\[masked]\\10431433_221125_V01_A0.bin\n```\n\nIf there is a lack of some line, e.g. the firmware is not successfully loaded, one should check if the kernel patch is patched successfully.\n\n"
+    },
+    {
+      "title": "ASUS Linux",
+      "level": 3,
+      "content": "ASUS Linux is a project that enhances ASUS laptops' user experience with a series of utils, including:\n\n"
+    },
+    {
+      "title": "amd-pstate CPU performance scaling driver",
+      "level": 3,
+      "content": "Since amd-pstate driver is not enabled by default, instead, the legacy acpi_cpufreq driver is used. It is recommended to enable the new amd-pstate-epp driver since Linux 6.3 by adding kernel parameters amd_pstate=active. For more information to make maximum use of your CPU, refer to CPU frequency scaling.\n\n"
+    },
+    {
+      "title": "Known issues",
+      "level": 2,
+      "content": "- mini-led is not enabled if amdgpu is used even after this kernel patch, while booting with AsusMuxDgpu in supergfxctl works well.\n- Booting with discrete GPU results in a black second display.\n- The refresh rate under KDE with the Xorg backend is significantly low. Wayland is recommended for two screens, with DPI scales of 1.0 and 1.5, correspondingly.\n- S0ix mode (see Power management/Suspend and hibernate) is not working.\n- After upgrading to BIOS version 306 (released in 2023/07/19), the screen turns white in KDE and flash under Wayland. The solution is to add amdgpu.sg_display=0 to kernel parameters.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- ASUS Linux home page: https://asus-linux.org/\n- ASUS Linux blog on how to fix the cirrus amp issue: https://asus-linux.org/guides/cirrus-amps/\n- GX650PI Hardware Probe: https://linux-hardware.org/?probe=ee5ef8132f\n\n"
+    }
+  ]
+}

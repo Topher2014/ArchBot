@@ -1,0 +1,141 @@
+{
+  "title": "DisplayLink",
+  "url": "https://wiki.archlinux.org/title/DisplayLink",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "DisplayLink is a technology for connecting displays using USB and Wi-Fi.\n\nDisplayLink devices on Linux still only have experimental support. While some people have had success in using them, it is generally not an easy process and not guaranteed to work. The steps on this page describe the generally most successful methods of using external monitors with DisplayLink.\n\nAlso be warned that even over USB 3.0, a DisplayLink monitor may exhibit noticeably more lag than e.g. a DisplayPort monitor, especially when large portions of the screen are being redrawn.\n\n"
+    },
+    {
+      "title": "USB 2.0 DL-1x5, DL-1x0 Devices",
+      "level": 3,
+      "content": "The kernel DRM driver for DisplayLink is udl, a rewrite of the original udlfb driver. It allows configuring DisplayLink monitors using xrandr.\n\nThis should work without any configuration changes on linux 4.14.9-1 and later. If you are using an earlier version of that package or have CONFIG_FB_UDL=m set in your kernel config, you need to blacklist the old kernel module, udlfb, which may attempt to load itself first.\n\n"
+    },
+    {
+      "title": "USB 3.0 DL-6xxx, DL-5xxx, DL-41xx, DL-3xxx Devices",
+      "level": 3,
+      "content": "1. Install evdiAUR for the kernel module (after configuring DKMS). As stated on the DKMS page, don't forget to install either linux-headers or another relevant package otherwise nothing will happen. If you encounter issues, there is the development version.\n1. Install the displaylinkAUR driver. For Xorg it allows configuring DisplayLink monitors using xrandr in the same manner as the udl driver; for Wayland no configuration is necessary.\n1. Enable displaylink.service.\n1. For Xorg use the \"modesetting\" driver with AccelMethod \"none\" and MatchDriver \"evdi\".\n\nCreate a file with the following content:\n\n```\n/etc/X11/xorg.conf.d/20-evdi.conf\n```\n\n```\nSection \"OutputClass\"\n\tIdentifier \"DisplayLink\"\n\tMatchDriver \"evdi\"\n\tDriver \"modesetting\"\n\tOption \"AccelMethod\" \"none\"\nEndSection\n```\n\nA reboot may be required for the setting to be effective. After reboot, see if the Displaylink screens are displaying in your display settings. If not, continue on the next steps, which will attach the DVI-I inputs to your GPU.\n\n"
+    },
+    {
+      "title": "Setting up X Displays",
+      "level": 3,
+      "content": "After that, run:\n\n```\n$ xrandr --listproviders\n```\n\n```\nProviders: number : 2\nProvider 0: id: 0x49 cap: 0xb, Source Output, Sink Output, Sink Offload crtcs: 2 outputs: 8 associated providers: 0 name:Intel\nProvider 1: id: 0x13c cap: 0x2, Sink Output crtcs: 1 outputs: 1 associated providers: 0 name:modesetting\n```\n\nIn the above output, we can see that provider 0 is the system's regular graphics provider (Intel), and provider 1 (modesetting) is the DisplayLink provider. To use the DisplayLink device, connect provider 1 to provider 0:\n\n```\n$ xrandr --setprovideroutputsource 1 0\n```\n\nand xrandr will add a DVI output you can use as normal with xrandr. This is still experimental but supports hotplugging and when works, it is by far the simplest setup. If it works then everything below is unnecessary.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "These instructions assume that you already have an up and running X server and are simply adding a monitor to your existing setup.\n\n"
+    },
+    {
+      "title": "Load the framebuffer device",
+      "level": 3,
+      "content": "Before your system will recognize your DisplayLink device, the udl kernel module must be loaded. To do this, run\n\n```\n# modprobe udl\n```\n\nIf your DisplayLink device is connected, it should show some visual indication of this. Although a green screen is the standard indicator of this, other variations have been spotted and are perfectly normal. Most importantly, the output of dmesg should show something like the following, indicating a new DisplayLink device was found:\n\n```\n# dmesg\n```\n\n```\nusb 2-1.1: new high-speed USB device number 7 using ehci-pci\nusb 2-1.1: New USB device found, idVendor=17e9, idProduct=03e0\nusb 2-1.1: New USB device strings: Mfr=1, Product=2, SerialNumber=3\nusb 2-1.1: Product: Lenovo LT1421 wide\nusb 2-1.1: Manufacturer: DisplayLink\nusb 2-1.1: SerialNumber: 6V9BBRM1\n[drm] vendor descriptor length:17 data:17 5f 01 00 15 05 00 01 03 00 04\nudl 2-1.1:1.0: fb1: udldrmfb frame buffer device\n[drm] Initialized udl 0.0.1 20120220 on minor 1\n```\n\nFurthermore, /dev should contain a new fb device, likely /dev/fb1 if you already had a framebuffer for your primary display.\n\nInstead of loading udl manually, you can load the module at boot.\n\n"
+    },
+    {
+      "title": "Configuring X Server",
+      "level": 3,
+      "content": "Use xrandr or your desktop environment's display setup graphical interface to configure your USB monitors running either the udl or displaylink driver.\n\n"
+    },
+    {
+      "title": "xrandr",
+      "level": 4,
+      "content": "Once the driver is loaded, the DisplayLink monitor is listed as an output provider:\n\n```\n$ xrandr --listproviders\n```\n\n```\nProviders: number : 2\nProvider 0: id: 0x43 cap: 0xb, Source Output, Sink Output, Sink Offload crtcs: 2 outputs: 2 associated providers: 1 name:Intel\nProvider 1: id: 0xcb cap: 0x2, Sink Output crtcs: 1 outputs: 1 associated providers: 1 name:modesetting\n```\n\nIn the above example, provider 1 is the DisplayLink device, and provider 0 is the default display. Running xrandr --current gives a list of available screens:\n\n```\n$ xrandr --current\n```\n\n```\nScreen 0: minimum 320 x 200, current 1600 x 900, maximum 8192 x 8192\nLVDS1 connected 1600x900+0+0 (normal left inverted right x axis y axis) 309mm x 174mm\n   1600x900       60.0*+   40.0  \n   1440x900       59.9  \n   1360x768       59.8     60.0  \n   1152x864       60.0  \n   1024x768       60.0  \n   800x600        60.3     56.2  \n   640x480        59.9  \nVGA1 disconnected (normal left inverted right x axis y axis)\nDVI-1-0 connected (normal left inverted right x axis y axis)\n   1366x768       60.0 +\n   1368x768_59.90   59.9  \n  1368x768_59.90 (0xd0)   85.7MHz\n        h: width  1368 start 1440 end 1584 total 1800 skew    0 clock   47.6KHz\n        v: height  768 start  769 end  772 total  795           clock   59.9Hz\n```\n\nIf the above does not list the DisplayLink screen, then you will need to offload DisplayLink to the main GPU:\n\n```\n$ xrandr --setprovideroutputsource 1 0\n```\n\nOnce the screen is available, refer to xrandr for info on setting it up. For automating the configuration process, see displaylink.sh.\n\n"
+    },
+    {
+      "title": "Enabling DVI output on startup",
+      "level": 4,
+      "content": "The DisplayLink provider will not be automatically connected to the main provider in most cases, therefore the DVI output device will not be available. It can be helpful to automatically do this when X starts to facilitate automatic display configuration by the window manager.\n\nEdit your desktop manager's startup configuration and add commands similar to:\n\n```\n$(xrandr --listproviders | grep -q \"modesetting\") && xrandr --setprovideroutputsource 1 0\n```\n\nFor example, the appropriate startup configuration file for SDDM is /usr/share/sddm/scripts/Xsetup.\n\nAvoid placing these commands in ~/.xprofile as this breaks the display configuration of some window managers. Instead these commands should be run prior to any display output or setup.\n\n"
+    },
+    {
+      "title": "Switching between displaylink and NVIDIA/nouveau driver",
+      "level": 4,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nAs of displaylink version 1.3.54-1 it is not possible to use displaylink device and NVIDIA/nouveau driver simultaneously on Optimus based laptops. Currently to be able to use displaylink device on Intel GPU, you should create a configuration file (see #Troubleshooting below). However, with that configuration file it is not possible to use primusrun. Bumblebee service is running, but it cannot work. Also, the laptop fans are becoming very noisy and the laptop temperature becomes very high. When you want to switch back to activate NVIDIA driver, comment everything in that file and reboot.\n\nTo simplify process of switching, you can install dl-switchAUR and add an additional menu entry to your boot loader using the kernel parameter systemd.unit=displaylink.target, thus activating displaylink workaround.\n\nTo check which driver is used for your discrete video card, run lspci -nnk -s xx:xx.x (replace xx:xx.x with your NVIDIA GPU PCI id).\n\n"
+    },
+    {
+      "title": "Not working configuration",
+      "level": 3,
+      "content": "These are tested on Xfce using Display settings (included in XFCE4 package) and external tool - arandr. XFCE4 Display settings are likely to crash, so ARandR might help.\n\nWhen you connect display link device via USB to your computer, the computer should show monitors in Display settings. There are few troubleshooting steps that you should try:\n\n- Check #Setting up X Displays. If you cannot find any external monitors recognized, you should try to make them visible by some of the following commands: $ xrandr --setprovideroutputsource 1 0 $ xrandr --setprovideroutputsource 2 0 $ xrandr --setprovideroutputsource 3 0 ... This will make them visible and recognized in Display settings.\n- Restart displaylink.service.\n- Re-connect the USB cable.\n- Check if udl driver is loaded and monitors are connected.\n\n```\n$ xrandr --setprovideroutputsource 1 0\n$ xrandr --setprovideroutputsource 2 0\n$ xrandr --setprovideroutputsource 3 0\n...\n```\n\n"
+    },
+    {
+      "title": "Screen redraw is broken",
+      "level": 3,
+      "content": "If you are using udl as your kernel driver and the monitor appears to work, but is only updating where you move the mouse or when windows change in certain places, then you probably have the wrong modeline for your screen. Getting a proper modeline for your screen with a command like:\n\n```\n$ gtf 1366 768 59.9\n```\n\nwhere 1366 and 768 are the horizontal and vertical resolutions for your monitor, and 59.9 is the refresh rate from its specs. To use this, create a new mode with xrandr like follows:\n\n```\n$ xrandr --newmode \"1368x768_59.90\"  85.72  1368 1440 1584 1800  768 769 772 795  -HSync +Vsync\n```\n\nand add it to xrandr:\n\n```\n$ xrandr --addmode DVI-0 1368x768_59.90\n```\n\nThen tell the monitor to use that mode for the DisplayLink monitor, and this should fix the redraw issues. Check the xrandr page for information on using a different mode.\n\nIf this does not solve the problem (or if the correct modeline was already in place because of correct DDC data), it can help to run a compositor.\n\n"
+    },
+    {
+      "title": "Ghosting",
+      "level": 3,
+      "content": "If you experience ghosting caused by moving the cursor around, it might happen that your compositor configuration is causing the problem. Changing settings may give you a working setup, such as turning off your compositor on start up can resolve it.\n\nUsers have reported that logging out and logging in (to refresh the display manager) corrects the issue temporarily. A longer lasting solution can be implemented into your system by doing the following:\n\n```\n/etc/systemd/system/display-manager.service\n```\n\n```\n[Service]\n# ...\nExecStartPre=/bin/sleep 10\n```\n\nDelaying by 10 seconds seems to work for some users, but a shorter sleep is likely possible to implement. Users report turning off autologin fixes the issue in GNOME.\n\nAdditionally, it can possibly be fixed by enabling or disabling Zoom in Accessibility. Users report turning it off fixed it, while others report turning it on sometimes fixed it (with scaling set to 1.0).\n\n"
+    },
+    {
+      "title": "DisplayLink refresh rate is extremely slow with GNOME",
+      "level": 3,
+      "content": "If once you set up your DisplayLink your entire desktop becomes slow, try setting a \"simpler\" background image, such as complete black. Additionally, there have been reports since 2019 that rotated Displaylink screens are inherently laggy, so see if setting the monitor to normal orientation corrects the issue as well.\n\n"
+    },
+    {
+      "title": "All displays are capped to 1 FPS when disabling builtin screen",
+      "level": 3,
+      "content": "Applying the patch from https://gitlab.freedesktop.org/xorg/xserver/-/issues/1028#note_504826 to xorg-server seems to fix the problem.\n\n"
+    },
+    {
+      "title": "Slow redraw/Unresponsiveness in Google Chrome and Webkit2-based Applications",
+      "level": 3,
+      "content": "This is to be associated with bugs in hardware acceleration, which can be tested by running glxgears in the displaylink screen resulting in 1fps. There is currently no complete fix available, but turning off Hardware-Acceleration in affected applications can work as a temporary fix.\n\nThis can be done in applications without a hardware-acceleration option by prepending the LIBGL_ALWAYS_SOFTWARE=1 environment variable.\n\n"
+    },
+    {
+      "title": "Impossible to activate displaylink's screen",
+      "level": 3,
+      "content": "In case you are able to see attached monitor via DisplayLink device in your screen settings, but after you turn it on and apply settings, it becomes deactivated, then try blacklist nouveau module and reboot:\n\n```\n/etc/modprobe.d/nouveau.conf\n```\n\n```\nblacklist nouveau\noptions nouveau modeset=0\n```\n\n"
+    },
+    {
+      "title": "Suspend problem",
+      "level": 3,
+      "content": "Displaylink is not working after suspend. Unplug and then plug again displaylink's usb cable to your computer. Monitor that is connected via DisplayLink will remain black. If you have lock screen, login to the system and then picture will appear at that monitor and you will be able to use displaylink as normal.\n\n"
+    },
+    {
+      "title": "DisplayLink is not working when usb hot plugged",
+      "level": 3,
+      "content": "To be able to use DisplayLink monitors, its usb cable should be attached to laptop during boot time. Otherwise it can behave like they are available and mouse can be moved there, but its picture is frozen, even with correct configuration (see workaround 1). If it was not attached at boot time, attach it and reboot.\n\n"
+    },
+    {
+      "title": "DisplayLink driver does not work with Intel GPUs after recent X upgrades",
+      "level": 3,
+      "content": "As this support page says, upgrading the X Window Server to a version newer than 1.18.3 will make the system not compatible with DisplayLink by default. This applies to systems using an integrated Intel GPU, or a combination of integrated Intel GPU and a discrete GPU. Until fixes in X Windows System will be released, there are two workarounds:\n\n"
+    },
+    {
+      "title": "Using the older intel driver as a fallback",
+      "level": 4,
+      "content": "Use the \"intel\" driver for the integrated GPU instead of \"modesetting\", which is now the default.\n\nCreate a file with the following content:\n\n```\n/usr/share/X11/xorg.conf.d/20-displaylink.conf\n```\n\n```\nSection \"Device\" \n  Identifier \"Intel Graphics\"\n  Driver \"intel\"\nEndSection\n```\n\nA reboot is required for the setting to be effective.\n\nYou may need the evdi-gitAUR package.\n\n"
+    },
+    {
+      "title": "Temporarily disabling PageFlip for modesetting",
+      "level": 4,
+      "content": "For users that prefer to keep using \"modesetting\" driver, disabling page flipping should also help. Create a file with the following content or extend the PageFlip option to an existing configuration file (e.g. 20-evdidevice.conf):\n\n```\n/usr/share/X11/xorg.conf.d/20-displaylink.conf\n```\n\n```\nSection \"Device\"\n  Identifier \"DisplayLink\"\n  Driver \"modesetting\"\n  Option \"PageFlip\" \"false\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Displays disconnect at random intervals when using the Dell D6000 docking station",
+      "level": 3,
+      "content": "User's have reported that when using the Dell D6000 docking station, their display(s) may disconnect at random intervals during usage. This will require physically reconnecting the dock in order to reinitialise the displays.\n\nThis issue appears to be caused by PulseAudio's module-suspend-on-idle module, which automatically suspends sinks/sources on idle.\n\nTo disable loading of the module-suspend-on-idle module, comment out the following line in the configuration file in use (~/.config/pulse/default.pa or /etc/pulse/default.pa):\n\n```\n/etc/pulse/default.pa\n```\n\n```\n### Automatically suspend sinks/sources that become idle for too long\n# load-module module-suspend-on-idle\n```\n\n"
+    },
+    {
+      "title": "Only 1 Display is recognized after boot",
+      "level": 3,
+      "content": "In case multiple displays are connected to a DisplayLink Docking station, but only 1 is recognized after bootup, a possible fix is to force evdi to search for multiple displays at boot by adding the evdi module to /etc/modules-load.d/evdi.conf and \"options evdi initial_device_count=2\" to /etc/modprobe.d/dkms.conf\n\n"
+    },
+    {
+      "title": "DisplayLink and NVIDIA dGPU on X11 (Optimus+DL)",
+      "level": 3,
+      "content": "If a laptop using NVIDIA Optimus is in a more permanent setting (using X11), it is nice to permanently set video outputs to use the dGPU. nvidia-xconfig might produce the following:\n\n```\n/etc/X11/xorg.conf\n```\n\n```\nSection \"ServerLayout\"\n    Identifier     \"Layout0\"\n    Screen      0  \"Screen0\"\n    InputDevice    \"Keyboard0\" \"CoreKeyboard\"\n    InputDevice    \"Mouse0\" \"CorePointer\"\nEndSection\n\n# ...\n# Keyboard0\n# Mouse0\n# ...\n\nSection \"Monitor\"\n    Identifier     \"Monitor0\"\n    VendorName     \"Unknown\"\n    ModelName      \"Unknown\"\n    Option         \"DPMS\"\nEndSection\n\nSection \"Device\"\n    Identifier     \"Device0\"\n    Driver         \"nvidia\"\n    VendorName     \"NVIDIA Corporation\"\n    BusID          \"PCI:1:0:0\"\nEndSection\n\nSection \"Screen\"\n    Identifier     \"Screen0\"\n    Device         \"Device0\"\n    Monitor        \"Monitor0\"\n    DefaultDepth    24\n    SubSection     \"Display\"\n        Depth       24\n    EndSubSection\nEndSection\n```\n\nEven after installing both evdiAUR and displaylinkAUR packages, the DisplayLink connected displays still might not appear. Manually, we can instruct Xorg to use the modesetting(4) plugin with the video interface given by the displaylinkAUR driver.\n\nIdentify which DRI device. The easiest way to identify which device is to list all DRI devices by their path:\n\n```\n$ ls -al /dev/dri/by-path\n```\n\n```\ntotal 0\ndrwxr-xr-x 2 root root 160 May 11 19:10 .\ndrwxr-xr-x 3 root root 180 May 10 16:03 ..\nlrwxrwxrwx 1 root root   8 May 10 16:03 pci-0000:00:02.0-card -> ../card0\nlrwxrwxrwx 1 root root  13 May 10 16:03 pci-0000:00:02.0-render -> ../renderD128\nlrwxrwxrwx 1 root root   8 May 11 19:10 pci-0000:01:00.0-card -> ../card1\nlrwxrwxrwx 1 root root  13 May 10 16:03 pci-0000:01:00.0-render -> ../renderD129\nlrwxrwxrwx 1 root root   8 May 10 16:03 platform-evdi.0-card -> ../card2\nlrwxrwxrwx 1 root root   8 May 10 16:03 platform-evdi.1-card -> ../card3\n```\n\nAs you can see, the first evdiAUR device is /dev/dri/card2.\n\nAdd the following to the Xorg config:\n\n```\n/etc/X11/xorg.conf\n```\n\n```\n# Add the following to the ServerLayout section after Screen0\n# ...\n    Screen      1  \"Screen1\"\n# ...\n# ... at the end, add:\nSection \"Device\"\n    Identifier    \"usbdev\"\n    Driver        \"modesetting\"\n    Option        \"kmsdev\" \"/dev/dri/card2\"\nEndSection\n\n\nSection \"Screen\"\n    Identifier    \"Screen1\"\n    Device        \"usbdev\"\nEndSection\n```\n\nRestart the X server to see changes.\n\nThe DL displays should appear. Configure using xrandr as necessary.\n\n"
+    },
+    {
+      "title": "USB 2.0 DisplayLink is not working",
+      "level": 3,
+      "content": "udl is quite finicky. Some USB 2 devices work with it, some do not. As an example, the HP NL571AA,Lenovo LT1421 wide has been tested to work. If your USB 2.0 device is not working with udl (for example the EVGA \"UV PLUS+16\"), you will get the following error in your journal:\n\n```\n[drm] vendor descriptor length:e0 data:00 00 00 00 00 00 00 00 00 00 00\n[drm:udl_init [udl]] *ERROR* Unrecognized vendor firmware descriptor\n[drm] Initialized udl 0.0.1 20120220 for 1-1.3:1.0 on minor 1\n[drm] Initialized udl on minor 1\nudl 1-1.3:1.0: [drm] fb1: udldrmfb frame buffer device\nusbcore: registered new interface driver udl\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- DisplayLink Open Source: Official DisplayLink open source support forum\n\n"
+    }
+  ]
+}

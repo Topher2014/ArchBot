@@ -1,0 +1,96 @@
+{
+  "title": "Solid State Drives/NVMe",
+  "url": "https://wiki.archlinux.org/title/Solid_State_Drives/NVMe",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section is a candidate for moving to NVMe.** This article or section is a candidate for moving to NVMe.\n\nThis article or section is a candidate for moving to NVMe.\n\nRelated articles\n\n- Solid state drive\n\nNVM Express (NVMe) is a specification for accessing SSDs attached through the PCI Express bus. As a logical device interface, NVM Express has been designed from the ground up, capitalizing on the low latency and parallelism of PCI Express SSDs, and mirroring the parallelism of contemporary CPUs, platforms and applications.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "NVMe devices should show up as /dev/nvme*. See Device file#NVMe for an explanation on their naming.\n\nExtra userspace NVMe tools can be found in nvme-cli or nvme-cli-gitAUR.\n\nSee Solid state drive for supported filesystems, maximizing performance, minimizing disk reads/writes, etc.\n\n"
+    },
+    {
+      "title": "Management",
+      "level": 2,
+      "content": "List all the NVMe SSDs attached with name, serial number, size, LBA format and serial:\n\n```\n# nvme list\n```\n\nList information about a drive and features it supports in a human-friendly way:\n\n```\n# nvme id-ctrl -H /dev/nvme0\n```\n\nList information about a namespace and features it supports:\n\n```\n# nvme id-ns /dev/nvme0n1\n```\n\nOutput the NVMe error log page:\n\n```\n# nvme error-log /dev/nvme0\n```\n\nDelete a namespace:\n\n```\n# nvme delete-ns /dev/nvme0n1\n```\n\nCreate a new namespace, e.g creating a smaller size namespace to overprovision an SSD for improved endurance, performance, and latency:\n\n```\n# nvme create-ns /dev/nvme0\n```\n\nSee nvme help and nvme(1) for a list of all commands along with a terse description.\n\n"
+    },
+    {
+      "title": "SMART",
+      "level": 3,
+      "content": "Output the NVMe SMART log page for health status, temp, endurance, and more:\n\n```\n# nvme smart-log /dev/nvme0\n```\n\nNVMe support was added to smartmontools in version 6.5.\n\nCurrently implemented features (as taken from the wiki):\n\n- Basic information about controller name, firmware, capacity (smartctl -i)\n- Controller and namespace capabilities (smartctl -c)\n- SMART overall-health self-assessment test result and warnings (smartctl -H)\n- NVMe SMART attributes (smartctl -A)\n- NVMe error log (smartctl -l error[,NUM])\n- Ability to fetch any nvme log (smartctl -l nvmelog,N,SIZE)\n- The smartd daemon tracks health (-H), error count (-l error) and temperature (-W DIFF,INFO,CRIT)\n\nSee S.M.A.R.T. and the official wiki entry for more information, and see this article for contextual information about the output.\n\n"
+    },
+    {
+      "title": "Secure erase",
+      "level": 3,
+      "content": "See Solid state drive/Memory cell clearing#NVMe drive.\n\n"
+    },
+    {
+      "title": "Generic",
+      "level": 4,
+      "content": "Firmware can be managed using nvme-cli. To display available slots and check whether Slot 1 is read-only:\n\n```\n# nvme fw-log /dev/nvme0\n```\n\n```\nFirmware Log for device:nvme0\nafi  : 0x11\nfrs1 : 0x32303132345a3553 (S5Z42102)\nfrs2 : 0x32303132345a3553 (S5Z42102)\n```\n\n```\n# nvme id-ctrl /dev/nvme0 -H | grep Firmware\n```\n\n```\n[9:9] : 0x1\tFirmware Activation Notices Supported\n  [4:4] : 0x1\tFirmware Activate Without Reset Supported\n  [3:1] : 0x2\tNumber of Firmware Slots\n  [0:0] : 0\tFirmware Slot 1 Read/Write\n```\n\nDownload and commit firmware to specified slot. In the example below, firmware is first committed without activation (-a 0). Next, an existing image is activated (-a 2). Refer to the NVMe specification for details on firmware commit action values.\n\n```\n# nvme fw-download -f S5Z42_fw_S5Z42105.bin /dev/nvme0\n```\n\n```\nFirmware download success\n```\n\n```\n# nvme fw-commit -s 2 -a 0 /dev/nvme0\n```\n\n```\nSuccess committing firmware action:0 slot:2\n```\n\n```\n# nvme fw-log /dev/nvme0\n```\n\n```\nFirmware Log for device:nvme0\nafi  : 0x21\nfrs1 : 0x32303132345a3553 (S5Z42102)\nfrs2 : 0x35303132345a3553 (S5Z42105)\n```\n\n```\n# nvme fw-commit -s 2 -a 2 /dev/nvme0\n```\n\n```\nSuccess committing firmware action:2 slot:2\n```\n\nFinally reset the controller to load the new firmware:\n\n```\n# nvme reset /dev/nvme0\n```\n\nThis can also be done manually if needed:\n\n```\n# echo 1 > /sys/class/nvme/nvme0/reset_controller\n```\n\n"
+    },
+    {
+      "title": "Intel/Solidigm",
+      "level": 4,
+      "content": "After Intel SSD business was acquired by SK Hynix[2][3], its \"Memory and Storage Tool\" (Intel MAS) lost support for SSDs and can now only be used to manage Optane devices.[4]\n\nSolidigm, the US subsidiary formed from Intel's SSD business acquisition, provides a new utility to manage former Intel SSDs: \"The Solidigm Storage Tool, also called SST, assists with managing Solidigm SSDs. It provides access to drive information and health, SMART Attributes, Firmware Updates, diagnostic scans, and secure erase.\"[5]\n\nInstall solidigm-sst-storage-tool-cliAUR, then check whether your drive has an update available:\n\n```\n# sst show -ssd\n```\n\n```\n- ABCD012345NS512A -\n\nCapacity : 512.11 GB (512,110,190,592 bytes)\nDevicePath : /dev/nvme0n1\nDeviceStatus : Healthy\nFirmware : 004C\nFirmwareUpdateAvailable : 005C\nIndex : 0\nMaximumLBA : 1000215215\nModelNumber : INTEL SSDPEKNW512G8\nProductFamily : Intel SSD 660p Series\nSMARTEnabled : True\nSectorDataSize : 512\nSerialNumber : ABCD012345NS512A\n```\n\nIf so execute the load command as follows, using the index value given in the previous command:\n\n```\n# sst load -ssd index\n```\n\n```\nWARNING! You have selected to update the drives firmware! \nProceed with the update? (Y|N): Y\nUpdating firmware...\nFirmware update successful\n```\n\nFor more information, refer to the user guide provided on the tool's aforementioned official page.\n\n"
+    },
+    {
+      "title": "Kingston",
+      "level": 4,
+      "content": "Kingston does not provide separate firmware downloads on their website, instead referring users to a Windows only utility. Firmware files appear to use a predictable naming scheme based on the firmware revision:\n\nhttps://media.kingston.com/support/downloads/S5Z42105.zip\n\nThen proceed with the generic flashing instructions.\n\n"
+    },
+    {
+      "title": "Samsung",
+      "level": 4,
+      "content": "Next to \"Samsung Magician Software\" for Windows users Samsung also provides SSD firmware as bootable ISO images:\n\nhttps://semiconductor.samsung.com/consumer-storage/support/tools/\n\nThey can be written onto a bootable CD or USB drive, or you can unpack the image and do everything live:\n\n```\n$ curl -OL https://samsung.com/.../xxx.iso\n$ bsdtar -xf xxx.iso initrd\n$ bsdtar -xf initrd root\n# ./root/fumagician/fumagician\n```\n\nInstead of using the manufacturer's program you might prefer to use nvme-cli.\n\nAs of January 2025, the firmware files on the ISO are encrypted by an AES key hidden inside the fumagician binary [6][7]. You will find two encrypted files next to it:\n\n```\n$ ls -1 root/fumagician/*.enc\n```\n\n```\nroot/fumagician/2B2QKXG7.enc\nroot/fumagician/DSRD.enc\n```\n\nThe actual firmware file is:\n\n1. encrypted by an AES key,\n1. then it is inserted into a ZIP file,\n1. and the ZIP file is encrypted again, yielding the 2B2QKXG7.enc file. The exact file name may differ between SSD models.\n\nYou first need to determine the AES key used. The key can be extracted from the fumagician utility by running [8]\n\n```\n$ strings root/fumagician/fumagician | grep -E '^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$' | base64 -d | xxd -p -c 32\n```\n\n```\nbde8eedf5d75327b516decd4d2723209697c4c3e30550d98253319076b4d649a\n```\n\nYou can then use the samdecrypt.sh utility to decrypt the file. First, insert the key found above into the script. Then, decrypt the ZIP file (the result will be written into root/fumagician/2B2QKXG7.bin):\n\n```\n$ ./samdecrypt.sh root/fumagician/1B2QJXD7.enc\n```\n\nDecompress the ZIP file:\n\n```\n$ unzip -d ssd_firmware root/fumagician/2B2QKXG7.bin\n```\n\n```\nArchive:  root/fumagician/2B2QKXG7.bin\n  inflating: ssd_firmware/2B2QKXG7_20241112.enc\n```\n\nFinally, decrypt the inner file, yielding ssd_firmware/2B2QKXG7_20241112.bin:\n\n```\n$ ./samdecrypt.sh ssd_firmware/2B2QKXG7_20241112.enc\n```\n\nYou can now upload the firmware image in ssd_firmware/2B2QKXG7_20241112.bin manually as explained in the previous section. However, you will need to provide an extra --xfer argument to the download operation [9]:\n\n```\n# nvme fw-download /dev/nvme0 --fw ssd_firmware/2B2QKXG7_20241112.bin --xfer 0x8000\n```\n\nAfterwards, the commit operation should work normally.\n\n"
+    },
+    {
+      "title": "Western Digital",
+      "level": 4,
+      "content": "Western Digital only supports updating via their Windows based Dashboard software. However, the firmware can be downloaded directly if you know where to look.[10]\n\nFirst, navigate to the list of all drives and find your drive (model=model_number).\n\nUnder your particular drive model there will be one or more <url> entries. If there are multiple URLs then you may need to try each one using the directions below and check the <dependency> tag for your current firmware version.\n\nNow, download the drive-specific XML file:\n\n```\n$ curl https://wddashboarddownloads.wdc.com/url_entry\n```\n\nInside this drive-specific XML file should be a <fwfile> tag with a xxxx.fluf filename. This is the name of the file you want; you can download it by replacing device_properties.xml from the previous URL with this filename.\n\nA full URL example for a SN850X drive:\n\n```\n$ curl --remote-name https://wddashboarddownloads.wdc.com/wdDashboard/firmware/WD_BLACK_SN850X_2000GB/620331WD/620331WD.fluf\n```\n\nOnce you have the .fluf file, updating can be performed using the generic flashing instructions. Be aware that this is not officially supported by Western Digital, may not work correctly, and could possibly damage your device. Be extra careful that you are updating with the correct drive and version of firmware.\n\n"
+    },
+    {
+      "title": "Sector size",
+      "level": 3,
+      "content": "See Advanced Format#NVMe solid state drives.\n\n"
+    },
+    {
+      "title": "Airflow",
+      "level": 3,
+      "content": "NVMe SSDs are known to be affected by high operating temperatures and will throttle performance over certain thresholds.[11]\n\n"
+    },
+    {
+      "title": "Testing",
+      "level": 3,
+      "content": "Raw device performance tests can be run with hdparm:\n\n```\n# hdparm -Tt --direct /dev/nvme0n1\n```\n\n"
+    },
+    {
+      "title": "Allow drive to enter low-power states (APST)",
+      "level": 3,
+      "content": "To check NVMe power states, install nvme-cli or nvme-cli-gitAUR, and run nvme get-feature /dev/nvme[0-9] -f 0x0c -H:\n\n```\n# nvme get-feature /dev/nvme0 -f 0x0c -H\n```\n\n```\nget-feature:0xc (Autonomous Power State Transition), Current value:0x000001\n        Autonomous Power State Transition Enable (APSTE): Enabled\n        Auto PST Entries        .................\n\n...\n```\n\nWhen APST is enabled the output should contain \"Autonomous Power State Transition Enable (APSTE): Enabled\" and there should be non-zero entries in the table below indicating the idle time before transitioning into each of the available states.\n\nIf APST is enabled but no non-zero states appear in the table, the latencies might be too high for any states to be enabled by default. The output of nvme id-ctrl /dev/nvme[0-9] (as the root user) should show the available non-operational power states of the NVME controller. If the total latency of any state (enlat + xlat) is greater than 25000 (25ms) you must pass a value at least that high as parameter default_ps_max_latency_us for the nvme_core kernel module. This should enable APST and make the table in nvme get-feature (as the root user) show the entries.\n\n"
+    },
+    {
+      "title": "Control background processing during low-power states (NOPPM)",
+      "level": 3,
+      "content": "A drive's low-power states may be non-operational states in which the drive accepts only certain management commands. Version 1.3 of the NVMe specification introduced the Non-Operational Power State Permissive Mode (NOPPM) feature to control background processing in non-operational power states. When enabled and the drive is in a non-operational power state, the drive may exceed the current power state's declared power limit (but not the limit of the lowest operational power state) to perform background processing, such as garbage collection or refreshing old data. When disabled, the drive will respect the current state's power limit and defer such processing until it next enters an operational power state, possibly reducing performance until that processing is done. The default setting is vendor- and drive-specific.\n\nTo check if your drive supports NOPPM, use nvme id-ctrl /dev/nvme0 -H | grep 'Non-Operational Power State Permissive'; the output will include Not Supported or Supported. To change the setting, use nvme set-feature /dev/nvme0 -f 0x11 -V <value>, where <value> is 0x0 to disable NOPPM (prefer power saving) or 0x1 to enable NOPPM (prefer performance). By default, the setting will revert to default when the drive is reset (on reboot, and possibly on waking from sleep). If your drive supports the Save and Select Feature Support (SSFS) feature, you can make your change persistent by appending the --save option to the nvme set-feature command.\n\n"
+    },
+    {
+      "title": "Controller failure due to broken APST support",
+      "level": 3,
+      "content": "Some NVMe devices may exhibit issues related to power saving (APST). This is a known issue for Kingston A2000 [12] as of firmware S5Z42105 and has previously been reported on Samsung NVMe drives (Linux v4.10) [13][14]. Also reported for some WesternDigital/Sandisk devices [15].\n\nA failure renders the device unusable until system reset, with kernel logs similar to:\n\n```\nnvme nvme0: I/O 566 QID 7 timeout, aborting\n nvme nvme0: I/O 989 QID 1 timeout, aborting\n nvme nvme0: I/O 990 QID 1 timeout, aborting\n nvme nvme0: I/O 840 QID 6 timeout, reset controller\n nvme nvme0: I/O 24 QID 0 timeout, reset controller\n nvme nvme0: Device not ready; aborting reset, CSTS=0x1\n ...\n nvme nvme0: Device not ready; aborting reset, CSTS=0x1\n nvme nvme0: Device not ready; aborting reset, CSTS=0x1\n nvme nvme0: failed to set APST feature (-19)\n```\n\nOther symptoms are Btrfs storage becoming read-only and Ext4 reporting I/O errors.\n\nAs a workaround, add the kernel parameter nvme_core.default_ps_max_latency_us=0 to completely disable APST, or set a custom threshold to disable specific states.\n\nIf setting latency still does not works, try adding pcie_aspm=off and pcie_port_pm=off (as suggested by [16]).\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nSince March 2021 a firmware update 9 from Kingston is available. As Kingston only supports Windows, downloads for Linux can be found via heise.de or github. It is expected that, as long as the kernel workaround is in place, the firmware update will not do much as the deepest powersaving states are not reached anyway.\n\n```\n# smartctl -c /dev/nvme0\n```\n\n```\nSupported Power States\nSt Op     Max   Active     Idle   RL RT WL WT  Ent_Lat  Ex_Lat\n 0 +     9.00W       -        -    0  0  0  0        0       0\n 1 +     4.60W       -        -    1  1  1  1        0       0\n 2 +     3.80W       -        -    2  2  2  2        0       0\n 3 -   0.0450W       -        -    3  3  3  3     2000    2000\n 4 -   0.0040W       -        -    4  4  4  4    15000   15000\n```\n\nThe value passed is the maximum exit latency (Ex_Lat). For example, to disable PS4 set nvme_core.default_ps_max_latency_us=2000.\n\n"
+    },
+    {
+      "title": "Controller failure due to broken suspend support",
+      "level": 3,
+      "content": "Some users (for example, see Laptop/HP) have reported suspend failures with certain NVMe drives. As above, the failure renders the device inoperable until system reset, with kernel messages\n\n```\nnvme nvme0: Device not ready; aborting reset, CSTS=0x3\nnvme nvme0: Removing after probe failure status: -19\n```\n\nAs a workaround, add the kernel parameter iommu=soft to use a software replacement for the hardware IOMMU. (For further details, see this documentation[dead link 2025-03-15 ⓘ].) This has the potential to cause some slight processing overhead.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nAlso you can try kernel parameter amd_iommu=off or better amd_iommu=fullflush on HP laptops with AMD CPU and KIOXIA KBG40ZN* nvme's, after you get I/O error with messages like this:\n\n```\nFailed to rotate /var/log/journal/*/system.journal: Read-only file system\nnvme nvme0: Device not ready; aborting reset, CSTS=0x3\nBTRFS error (device nvme0n1): bdev /dev/nvme0n1p* errs: wr 2, rd 0, flush 0, corrupt 0, gen 0\n```\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Open Source NVMe™ Management Utility – NVMe Command Line Interface (NVMe-CLI)\n- A Quick Tour of NVM Express (NVMe)\n- NVM Express Base Specification, Revision 1.4b\n\n"
+    }
+  ]
+}

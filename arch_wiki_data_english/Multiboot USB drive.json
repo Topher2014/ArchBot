@@ -1,0 +1,91 @@
+{
+  "title": "Multiboot USB drive",
+  "url": "https://wiki.archlinux.org/title/Multiboot_USB_drive",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- GRUB\n- Syslinux\n- Archiso\n\nA multiboot USB flash drive allows booting multiple ISO files from a single device. The ISO files can be copied to the device and booted directly without unpacking them first. There are multiple methods available, but they may not work for all ISO images.\n\n"
+    },
+    {
+      "title": "Using GRUB and loopback devices",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nAdvantages:\n\n- only a single partition required\n- all ISO files are found in one directory\n- adding and removing ISO files is simple\n\nDisadvantages:\n\n- not all ISO images are compatible\n- the original boot menu for the ISO file is not shown\n- it can be difficult to find a working boot entry\n\n"
+    },
+    {
+      "title": "Preparation",
+      "level": 3,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nCreate at least one partition and a filesystem supported by GRUB on the USB drive. See Partitioning and File systems#Create a file system. Choose the size based on the total size of the ISO files that you want to store on the drive, and plan for extra space for the bootloader.\n\n"
+    },
+    {
+      "title": "Simple installation",
+      "level": 4,
+      "content": "Mount the filesystem located on the USB drive:\n\n```\n# mount /dev/sdXY /mnt\n```\n\nCreate the directory /boot:\n\n```\n# mkdir /mnt/boot\n```\n\nInstall GRUB on the USB drive:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/mnt/boot /dev/sdX\n```\n\nIn case you want to boot ISOs in UEFI mode, you have to install grub for the UEFI target:\n\n```\n# grub-install --target=x86_64-efi --removable --boot-directory=/mnt/boot --efi-directory=/mnt\n```\n\nFor UEFI, the partition has to be the first one in an MBR partition table and formatted with FAT32.\n\n"
+    },
+    {
+      "title": "Hybrid UEFI GPT + BIOS GPT/MBR boot",
+      "level": 4,
+      "content": "Note: **This article or section is being considered for removal.** This article or section is being considered for removal.\n\nThis article or section is being considered for removal.\n\nThis configuration is useful for creating a universal USB key, bootable everywhere. First of all you must create a GPT partition table on your device. You need at least 3 partitions:\n\n1. A BIOS boot partition (gdisk type code EF02). This partition must be 1 MiB in size\n1. An EFI system partition (gdisk type code EF00 with a FAT32 filesystem). This partition can be as small as 50 MiB.\n1. Your data partition (use a filesystem supported by GRUB). This partition can take up the rest of the space of your drive.\n\nNext you must create a hybrid MBR partition table. Without it, a BIOS MBR based system will not boot. It will not find the partitions it expects to find.\n\nHybrid MBR partition table creation example using gdisk:\n\n```\n# gdisk /dev/sdX\n```\n\n```\nCommand (? for help): r\nRecovery/transformation command (? for help): h\n\nWARNING! Hybrid MBRs are flaky and dangerous! If you decide not to use one,\njust hit the Enter key at the below prompt and your MBR partition table will\nbe untouched.\n\nType from one to three GPT partition numbers, separated by spaces, to be added to the hybrid MBR, in sequence: 1 2 3\nPlace EFI GPT (0xEE) partition first in MBR (good for GRUB)? (Y/N): N\n\nCreating entry for GPT partition #1 (MBR partition #1)\nEnter an MBR hex code (default EF):\nSet the bootable flag? (Y/N): N\n\nCreating entry for GPT partition #2 (MBR partition #2)\nEnter an MBR hex code (default EF):\nSet the bootable flag? (Y/N): N\n\nCreating entry for GPT partition #3 (MBR partition #3)\nEnter an MBR hex code (default 83):\nSet the bootable flag? (Y/N): Y\n\nRecovery/transformation command (? for help): x\nExpert command (? for help): h\nExpert command (? for help): w\n\nFinal checks complete. About to write GPT data. THIS WILL OVERWRITE EXISTING\nPARTITIONS!!\n\nDo you want to proceed? (Y/N): Y\n```\n\nDo not forget to format the partitions:\n\n```\n# mkfs.fat -F32 /dev/sdX2\n# mkfs.ext4 /dev/sdX3\n```\n\nYou can now install GRUB to support both EFI + GPT and BIOS + GPT/MBR. The GRUB configuration (--boot-directory) can be kept in the same place.\n\nFirst, you need to mount the EFI system partition and the data partition of your USB drive.\n\nAn example of this would be as follows:\n\n```\n# mount /dev/sdX3 /mnt\n# mkdir /mnt/boot /mnt/efi\n# mount /dev/sdX2 /mnt/efi\n```\n\nThen, you can install GRUB for UEFI with:\n\nIn most cases EFI_MOUNTPOINT will correspond to the /mnt/efi directory on your mounted USB disk. DATA_MOUNTPOINT is where your data partition is mounted. In this example it would be the mount point of sdX3, /mnt.\n\n```\n# grub-install --target=x86_64-efi --recheck --removable --efi-directory=/EFI_MOUNTPOINT --boot-directory=/DATA_MOUNTPOINT/boot\n```\n\nAnd for BIOS with:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/DATA_MOUNTPOINT/boot /dev/sdX\n```\n\nAs an additional fallback, you can also install GRUB on your MBR-bootable data partition:\n\n```\n# grub-install --target=i386-pc --recheck --boot-directory=/DATA_MOUNTPOINT/boot /dev/sdX3\n```\n\n"
+    },
+    {
+      "title": "Using a template",
+      "level": 4,
+      "content": "There are some git projects which provide some pre-existing GRUB configuration files, and a nice generic grub.cfg which can be used to load the other boot entries on demand, showing them only if the specified ISO files - or folders containing them - are present on the drive.\n\nMultiboot USB: https://github.com/hackerncoder/multibootusb\n\nGLIM (GRUB2 Live ISO Multiboot): https://github.com/thias/glim\n\n"
+    },
+    {
+      "title": "Manual configuration",
+      "level": 4,
+      "content": "For the purpose of multiboot USB drive it is easier to edit grub.cfg by hand instead of generating it. Alternatively, make the following changes in /etc/grub.d/40_custom or /mnt/boot/grub/custom.cfg and generate /mnt/boot/grub/grub.cfg using grub-mkconfig.\n\nAs it is recommend to use a persistent name instead of /dev/sdxY to identify the partition on the USB drive where the image files are located, define a variable for convenience to hold the value. If the ISO images are on the same partition as GRUB, use the following to read the UUID at boot time:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# path to the partition holding ISO images (using UUID)\nprobe -u $root --set=rootuuid\nset imgdevpath=\"/dev/disk/by-uuid/$rootuuid\"\n```\n\nOr specify the UUID explicitly:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# path to the partition holding ISO images (using UUID)\nset imgdevpath=\"/dev/disk/by-uuid/UUID_value\"\n```\n\nAlternatively, use the device label instead of UUID:\n\n```\n/mnt/boot/grub/grub.cfg\n```\n\n```\n# path to the partition holding ISO images (using labels)\nset imgdevpath=\"/dev/disk/by-label/label_value\"\n```\n\nThe necessary UUID or label can be found using lsblk -f. Do not use the same label as the Arch ISO for the USB device, otherwise the boot process will fail.\n\nTo complete the configuration, a boot entry for each ISO image has to be added below this header, see the next section for examples.\n\n"
+    },
+    {
+      "title": "Boot entries",
+      "level": 3,
+      "content": "It is assumed that the ISO images are stored in the /boot-isos directory on the same filesystem where GRUB is installed. Otherwise it would be necessary to prefix the path to ISO file with device identification when using the loopback command, for example loopback loop (hd1,2)$iso_path. As this identification of devices is not persistent, it is not used in the examples in this section.\n\nOne can use persistent block device naming like so. Replace the UUID according to your ISO filesystem UUID.\n\n```\n# define globally (i.e outside any menuentry)\ninsmod search_fs_uuid\nsearch --no-floppy --set=isopart --fs-uuid 123-456\n# later use inside each menuentry instead\nloopback loop ($isopart)$iso_path\n```\n\n"
+    },
+    {
+      "title": "Arch Linux monthly release",
+      "level": 4,
+      "content": "The ISO provides loopback.cfg.\n\n```\nmenuentry '[loopback]archlinux-2023.10.14-x86_64.iso' {\n\tset iso_path='/boot-isos/archlinux-2023.10.14-x86_64.iso'\n\texport iso_path\n\tsearch --set=root --file \"$iso_path\"\n\tloopback loop \"$iso_path\"\n\troot=(loop)\n\tconfigfile /boot/grub/loopback.cfg\n\tloopback --delete loop\n}\n```\n\nAlso see archiso.\n\n"
+    },
+    {
+      "title": "MemTest86+",
+      "level": 4,
+      "content": "MemTest86+ is included in the monthly ISO.\n\n```\nmenuentry '[loopback]archlinux-2023.03.01-x86_64.iso MemTest86+' {\n\tset iso_path='/boot-isos/archlinux-2023.03.01-x86_64.iso'\n\tloopback loop $iso_path\n\tlinux (loop)/boot/memtest86+/memtest.efi\n}\n```\n\n"
+    },
+    {
+      "title": "Archboot",
+      "level": 4,
+      "content": "See Archboot Homepage.\n\n```\nmenuentry '[loopback]archlinux-2014.11-1-archboot' {\n\tset iso_path='/boot-isos/archlinux-2014.11-1-archboot.iso'\n\tloopback loop $iso_path\n\tlinux (loop)/boot/vmlinuz_x86_64 iso_loop_dev=$imgdevpath iso_loop_path=$iso_path\n\tinitrd (loop)/boot/initramfs_x86_64.img\n}\n```\n\n"
+    },
+    {
+      "title": "Using Syslinux and memdisk",
+      "level": 2,
+      "content": "Using the memdisk module, the ISO image is loaded into memory, and its bootloader is loaded. Make sure that the system that will boot this USB drive has sufficient amount of memory for the image file and running operating system.\n\n"
+    },
+    {
+      "title": "Preparation",
+      "level": 3,
+      "content": "Make sure that the USB drive is properly partitioned and that there is a partition with file system supported by Syslinux, for example fat32 or ext4. Then install Syslinux to this partition, see Syslinux#BIOS systems.\n\n"
+    },
+    {
+      "title": "Install the memdisk module",
+      "level": 3,
+      "content": "The memdisk module was not installed during Syslinux installation, it has to be installed manually. Mount the partition where Syslinux is installed to /mnt/ and copy the memdisk module to the same directory where Syslinux is installed:\n\n```\n# cp /usr/lib/syslinux/bios/memdisk /mnt/boot/syslinux/\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 3,
+      "content": "After copying the ISO files on the USB drive, edit the Syslinux configuration file and create menu entries for the ISO images. The basic entry looks like this:\n\n```\nboot/syslinux/syslinux.cfg\n```\n\n```\nLABEL some_label\n    LINUX memdisk\n    INITRD /path/to/image.iso\n    APPEND iso\n```\n\nSee memdisk on Syslinux wiki for more configuration options.\n\n"
+    },
+    {
+      "title": "Automated tools",
+      "level": 2,
+      "content": "- GRUB2 Live ISO Multiboot (GLIM) — A set of GRUB configuration files to turn a VFAT formatted USB memory stick with GNU/Linux distribution ISO images into a multiboot USB drive.\n\n- liveusb-builder — A script suite to create multiboot USB stick for GNU/Linux distributions\n\n- MultiBootUSB — A cross platform Python software with CLI and GUI interfaces which allows you to install and remove multiple live Linux images on a USB stick.\n\n- Ventoy — An open source tool to create bootable USB drive for ISO/WIM/IMG/VHD(x)/EFI files. You do not need to format the disk over and over, you just need to copy the files to the USB drive and boot them directly.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- GRUB: https://help.ubuntu.com/community/Grub2/ISOBoot/Examples https://help.ubuntu.com/community/Grub2/ISOBoot GRUB Live ISO Multiboot - GRUB configurations for booting ISO images\n- Syslinux: Boot an ISO image\n\n- https://help.ubuntu.com/community/Grub2/ISOBoot/Examples\n- https://help.ubuntu.com/community/Grub2/ISOBoot\n- GRUB Live ISO Multiboot - GRUB configurations for booting ISO images\n\n- Boot an ISO image\n\n"
+    }
+  ]
+}

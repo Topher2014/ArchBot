@@ -1,0 +1,61 @@
+{
+  "title": "Iniciar X no login",
+  "url": "https://wiki.archlinux.org/title/Iniciar_X_no_login",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Gerenciador de exibição\n- Xorg\n- xprofile\n- Xresources\n\nDo Wikipédia:\n\nxinit é normalmente usado para iniciar os gerenciadores de janela ou ambientes de desktop. Embora você também possa usar o xinit para executar aplicativos GUI sem um gerenciador de janelas, muitos aplicativos gráficos esperam um gerenciador de janelas compatível com EWMH. O gerenciador de exibição inicia o Xorg para você e geralmente obtém o xprofile.\n\n"
+    },
+    {
+      "title": "Instalação",
+      "level": 2,
+      "content": "Instale o pacote xorg-xinit.\n\n"
+    },
+    {
+      "title": "Configuração",
+      "level": 2,
+      "content": "xinit e startx aceitam um argumento opcional do programa cliente, veja #Sobrescrever xinitrc. Se você não fornecer um, eles procurarão ~/.xinitrc para executar como um script de shell para inicializar os programas clientes.\n\n"
+    },
+    {
+      "title": "xinitrc",
+      "level": 3,
+      "content": "O ~/.xinitrc é útil para executar programas dependendo do X e definir variáveis de ambiente na inicialização do servidor X. Se ele estiver presente no diretório home de um usuário, startx e xinit o executa. Do contrário, startx executará o /etc/X11/xinit/xinitrc padrão.\n\nEste xinitrc padrão iniciará um ambiente básico com Twm, xorg-xclock e Xterm (supondo que os pacotes necessários estejam instalados). Portanto, para iniciar um gerenciador de janelas ou ambiente de desktop diferente, primeiro crie uma cópia do xinitrc padrão em seu diretório inicial:\n\n```\n$ cp /etc/X11/xinit/xinitrc ~/.xinitrc\n```\n\nEntão, edite o arquivo e substitua os programas padrão pelos comandos desejados. Lembre-se que as linhas que seguem um comando usando exec serão ignoradas. Por exemplo, para iniciar xscreensaver em segundo plano e, em seguida, iniciar openbox, use o seguinte:\n\n```\n~/.xinitrc\n```\n\n```\n...\nxscreensaver &\nexec openbox-session\n```\n\nProgramas de execução longa iniciados antes do gerenciador de janelas, como um aplicativo de proteção de tela e de papel de parede, devem ser separados ou executados em segundo plano anexando um sinal de &. Caso contrário, o script pararia e aguardaria a saída de cada programa antes de executar o gerenciador de janelas ou o ambiente de área de trabalho. Note que alguns programas não devem ser bifurcados (fork), para evitar bugs de corrida, como é o caso do xrdb. Acrescentar exec antes do comando substituirá o processo do script pelo processo do gerenciador de janelas, de modo que o X não saia mesmo que esse processo se bifurque ao segundo plano.\n\n"
+    },
+    {
+      "title": "xserverrc",
+      "level": 3,
+      "content": "O arquivo xserverrc é um script de shell responsável por inicializar o servidor X. Ambos startx e xinit executam ~/.xserverrc se ele existir; caso contrário, startx usará /etc/X11/xinit/xserverrc.\n\nPara manter um sessão autenticada com logind e para evitar contornar o bloqueio de tela alternando os terminais, o Xorg deve ser iniciado no mesmo terminal virtual onde ocorreu o login [1]. Portanto, é recomendado especificar vt$XDG_VTNR no arquivo ~/.xserverrc:\n\n```\n~/.xserverrc\n```\n\n```\n#!/bin/sh\n\nexec /usr/bin/Xorg -nolisten tcp \"$@\" vt$XDG_VTNR\n```\n\nVeja Xserver(1) para uma lista de todas as opções de linha de comando.\n\nAlternativamente, se você deseja que o X seja exibido em um console separado daquele onde o servidor é invocado, você pode fazê-lo usando o wrapper do servidor X fornecido por /usr/lib/systemd/systemd-multi-seat-x. Por conveniência, xinit e startx podem ser configurados para usar este wrapper modificando seu ~/.xserverrc.\n\n"
+    },
+    {
+      "title": "Uso",
+      "level": 2,
+      "content": "Para executar o Xorg como um usuário comum, use:\n\n```\n$ startx\n```\n\nou se #xserverrc estiver configurado:\n\n```\n$ xinit -- :1\n```\n\nSeu gerenciador de janela (ou ambiente de desktop) deve ser iniciado corretamente agora.\n\nPara sair do X, execute a função de saída do seu gerenciador de janela (supondo que ele tenha uma). Se não tiver essa funcionalidade, execute:\n\n```\n$ pkill -15 Xorg\n```\n\n```\n$ pkill -15 -t tty\"$XDG_VTNR\" Xorg\n```\n\nVeja também signal(7).\n\n"
+    },
+    {
+      "title": "Sobrescrever xinitrc",
+      "level": 3,
+      "content": "Se você tem um ~/.xinitrc funcionando, mas quer apenas tentar outro gerenciador de janela ou ambiente de desktop, você pode executá-lo emitindo startx seguido pelo caminho para o gerenciador de janela, por exemplo:\n\n```\n$ startx /usr/bin/i3\n```\n\nSe o binário recebe argumentos, eles precisam ser citados para serem reconhecidos como parte do primeiro parâmetro de startx:\n\n```\n$ startx \"/usr/bin/aplicativo --chave valor\"\n```\n\nNote que o caminho completo é obrigatório. Você também pode especificar opções personalizadas para o script #xserverrc anexando-as após o sinal de traço duplo --:\n\n```\n$ startx /usr/bin/enlightenment -- -br +bs -dpi 96\n```\n\nVeja também startx(1).\n\n"
+    },
+    {
+      "title": "Inicializar automaticamente o X no login",
+      "level": 3,
+      "content": "Certifique-se de que startx esteja apropriadamente configurado.\n\nPara o Bash, adicione o seguinte ao final do ~/.bash_profile. Se o arquivo não existir, copie uma versão esqueleto de /etc/skel/.bash_profile. Para Zsh, adicione-o a ~/.zprofile.\n\n```\nif systemctl -q is-active graphical.target && [[ ! $DISPLAY && $XDG_VTNR -eq 1 ]]; then\n  exec startx\nfi\n```\n\nVocê pode substituir a comparação -eq por uma como -le 3 (de vt1 a vt3) se quiser usar logins gráficos em mais de um terminal virtual.\n\nCondições alternativas para detectar o terminal virtual incluem \"$(tty)\" = \"/dev/tty1\", que não permite comparação com -le, e \"$(fgconsole 2>/dev/null || echo -1)\" -eq 1, que não funciona em consoles seriais.\n\nSe você quiser de permanecer autenticado quando a sessão X terminar, remova exec.\n\nVeja também Fish#Start X at login e Systemd/User#Automatic login into Xorg without display manager.\n\n"
+    },
+    {
+      "title": "Alternando entre ambientes de desktop/gerenciadores de janela",
+      "level": 3,
+      "content": "Se você estiver alternando com frequência entre diferentes ambientes de desktop ou gerenciadores de janela, é conveniente usar um gerenciador de exibição ou expandir ~/.xinitrc para tornar a troca possível.\n\nO seguinte exemplo mostra como iniciar um determinado ambiente de desktop ou gerenciador de janela com um argumento:\n\n```\n~/.xinitrc\n```\n\n```\n...\n\n# Aqui o Xfce é mantido como padrão\nsession=${1:-xfce}\n\ncase $session in\n    i3|i3wm           ) exec i3;;\n    kde               ) exec startplasma-x11;;\n    xfce|xfce4        ) exec startxfce4;;\n    # Nenhuma sessão conhecida, tenta como comando\n    *                 ) exec $1;;\nesac\n```\n\nPara passar o argumento sessão:\n\n```\n$ xinit sessão\n```\n\nou\n\n```\n$ startx ~/.xinitrc sessão\n```\n\n"
+    },
+    {
+      "title": "Inicializando aplicativos sem um gerenciador de janela",
+      "level": 3,
+      "content": "É possível iniciar apenas aplicativos específicos sem um gerenciador de janela, embora provavelmente isso seja útil apenas com um único aplicativo mostrado no modo de tela cheia. Por exemplo:\n\n```\n~/.xinitrc\n```\n\n```\n...\n\nexec chromium\n```\n\nAlternativamente, o binário pode ser chamado diretamente a partir do prompt de comando, conforme descrito em #Sobrescrever xinitrc.\n\nCom esse método, você precisa definir a geometria de cada janela do aplicativo por meio de seus próprios arquivos de configuração (se possível).\n\nVeja também also Gerenciador de exibição#Iniciando aplicativos sem um gerenciador de janela.\n\n"
+    },
+    {
+      "title": "Faça redirecionamento usando startx",
+      "level": 3,
+      "content": "Veja Xorg#Redirecionamento do log da sessão para detalhes.\n\n"
+    }
+  ]
+}

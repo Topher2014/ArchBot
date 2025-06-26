@@ -1,0 +1,151 @@
+{
+  "title": "Mac/Troubleshooting",
+  "url": "https://wiki.archlinux.org/title/Mac/Troubleshooting",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Mac\n- General troubleshooting\n- Laptop/Apple\n\nThis page contains troubleshooting solutions for Apple Macs. Most models have their own section in Laptop/Apple for even more specific issues.\n\n"
+    },
+    {
+      "title": "Video",
+      "level": 2,
+      "content": "Different Mac models have different graphic cards. To see which graphics card you have type:\n\n```\n$ lspci -d ::03xx\n```\n\n- If it returns a string containing Intel, read Intel graphics.\n- If it returns NVIDIA, read NVIDIA.\n- If it returns two lines, with both NVIDIA and Intel, your Mac has dual graphics. See MacBookPro10,x#Graphics for an example of one such setup that might apply in other cases.\n\n- Otherwise if it returns ATI or AMD, read ATI or AMDGPU.\n\n"
+    },
+    {
+      "title": "NVIDIA",
+      "level": 3,
+      "content": "If you boot in EFI mode and NVIDIA binary drivers are working only in BIOS mode (e.g. you get black screen on EFI boot), try the approach described on Ask Ubuntu.\n\nFor the backlight to work properly you may need the nvidia-bl-dkmsAUR package. If backlight control does not work afterwards, you should blacklist the apple_bl kernel module. If backlight control does not work even this way, try setting options nvidia_bl max_level=0x1ffff shift=11 in /etc/modprobe.d/nvidia_bl.conf.\n\nAlternatively, you can choose to use the pommed-lightAUR package. If you do so, you may wish to change the step settings in /etc/pommed.conf.mactel to something around 5000-10000 depending on how many levels of brightness you desire (the max brightness is around 80000).\n\nIf the brightness does not function correctly through pommed, make sure you have installed the nvidia-bl-dkmsAUR package and insert\n\n```\n$ find . -name \"*\" -exec sed -i 's/mbp_backlight/nvidia_backlight/' '{}' \\;\n```\n\ninto the second line of the pommed PKGBUILD build() function and rebuild the package. See the following forum post for details.\n\nAnother possible solution is:\n\n```\n$ find . -name \"*\" -exec sed -i 's/nvidia_backlight/apple_backlight/' '{}' \\;\n```\n\nAlternatively, run nvidia-settings, edit /etc/X11/xorg.conf and add this line into the Device section:\n\n```\nOption \"RegistryDwords\" \"EnableBrightnessControl=1\"\n```\n\nSave, reboot and check if the backlight control works. See Ubuntu's Wiki page for the MacBookPro5,5 for details.\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 2,
+      "content": "The touchpad should have basic functionality by default. A true multitouch driver which behaves very similarly to native macOS is included in the xf86-input-mtrack-gitAUR package. Configuration options are documented in the readme.\n\nThe following mtrack options work well on a MacBook7,1:\n\n```\nOption \"Thumbsize\" \"50\"\nOption \"ScrollDistance\" \"100\"\n```\n\nProbably, you also need to add:\n\n```\nMatchDevicePath \"/dev/input/event10\"\n```\n\nTo disable tap-to-click (that is, to press down to click) by default, add the following to your mtrack configuration section\n\n```\nOption \"TapButton1\" \"0\"  \nOption \"TapButton2\" \"0\"\nOption \"TapButton3\" \"0\"\n```\n\n"
+    },
+    {
+      "title": "Natural scrolling",
+      "level": 3,
+      "content": "To configure natural two finger scrolling similar to macOS, refer to Touchpad Synaptics#Natural scrolling.\n\nIf you are using xf86-input-mtrack-gitAUR, you can simply swap the scroll up and scroll down buttons (along with the scroll left and scroll right):\n\n```\n/etc/X11/xorg.conf.d/10-mtrack.conf\n```\n\n```\nOption \"ScrollUpButton\" \"5\"\nOption \"ScrollDownButton\" \"4\"\nOption \"ScrollLeftButton\" \"7\"\nOption \"ScrollRightButton\" \"6\"\n```\n\n"
+    },
+    {
+      "title": "Older MacBook models",
+      "level": 3,
+      "content": "On older MacBook models (pre-multitouch, e.g. MacBook2,1), the touchpad will not function properly until you install xf86-input-synaptics. See Touchpad Synaptics for details.\n\n"
+    },
+    {
+      "title": "Keyboard",
+      "level": 2,
+      "content": "Mac keyboards work by default. For swapping Fn keys with Fx keys see Apple Keyboard.\n\nMap them with xbindkeys or through desktop environment preferences. Alternatively, install the pommed-lightAUR package.\n\nEdit the /etc/pommed.conf according to your hardware, building it from /etc/pommed.conf.mac or /etc/pommed.conf.ppc example files.\n\nNote that you can also run it without a configuration file, the defaults may work for you. Then enable/start pommed.service.\n\n"
+    },
+    {
+      "title": "Keyboard backlight",
+      "level": 3,
+      "content": "The keyboard backlight is controlled by /sys/class/leds/smc::kbd_backlight. Write the desired value to brightness in that directory. See Keyboard backlight for detailed information. Common choices for backlight control are brightnessctl and lightAUR.\n\nEnsuring the keyboard backlight is on when entering the LUKS decryption password\n\nThis can be done via initcpio hooks. First, create an executable install script:\n\n```\n/etc/initcpio/install/mac_kb_backlight\n```\n\n```\n#!/usr/bin/env bash\n\nbuild() {\n  add_module applesmc\n  add_runscript\n}\n```\n\nNext, create an executable hook:\n\n```\n/etc/initcpio/hooks/mac_kb_backlight\n```\n\n```\n#!/usr/bin/env bash\n\nrun_hook() {\n  if [ -f \"/sys/class/leds/smc::kbd_backlight/brightness\" ]; then\n    echo 100 > \"/sys/class/leds/smc::kbd_backlight/brightness\"\n  fi\n}\n```\n\nFinally, add this custom hook to the HOOKS array in /etc/mkinitcpio.conf, and ensure it is placed before the encrypt hook:\n\n```\nHOOKS=(... mac_kb_backlight encrypt ...)\n```\n\nRemember to regenerate the initramfs images after these steps to include the custom script.\n\n"
+    },
+    {
+      "title": "Wi-Fi",
+      "level": 2,
+      "content": "Different Mac models have different wireless cards.\n\nCheck what card you have:\n\n```\n# lspci -d ::0280\n```\n\n- If you have an Atheros card, all should work out-of-the-box.\n- If you have a Broadcom card, follow Broadcom wireless#Installation.\n- 5.0 and 6.0 generation Macs may have a BCM43xx, follow Broadcom wireless#broadcom-wl. If you have the correct Broadcom DKMS driver (i.e. broadcom-wl-dkms) installed and your Wi-Fi card is still not being recognized, try rebuilding the driver (See Dynamic Kernel Module Support).\n\n- If you have the correct Broadcom DKMS driver (i.e. broadcom-wl-dkms) installed and your Wi-Fi card is still not being recognized, try rebuilding the driver (See Dynamic Kernel Module Support).\n\n- If your connection frequently drops, you may have to turn off Wi-Fi power management.\n- Eduroam or similar may crash your network manager. Simply delaying the connection after login should do the trick.\n\n"
+    },
+    {
+      "title": "Fan Control",
+      "level": 2,
+      "content": "macfand-gitAUR is a fan control daemon that supports most Intel Macs, its configuration file is located at /etc/macfand.conf.\n\nmbpfan-gitAUR is available for MacBook Pro users.\n\n"
+    },
+    {
+      "title": "Power management",
+      "level": 2,
+      "content": "TLP is a very simple set of scripts that will maximize your battery duration. A MacBook Air 2013 with TLP provides about 11 hours of light usage with just TLP installed. All the usual power management recommendations apply as well.\n\n"
+    },
+    {
+      "title": "Disabling Thunderbolt",
+      "level": 3,
+      "content": "Linux still has poor power management for Thunderbolt adapters on Macs. This can cause the TB adapter(s) to be always-on and prevent the CPU from going into the deepest power-saving states [1], drawing ca. 2W additional power even when not in use [2]. An easy way to see the CPU states is using powertop. The problem arises when the CPU does not go below C3 as a package (Pkg%pc3).\n\nOne workaround is to add acpi_osi=!Darwin to the kernel parameters, thereby telling the firmware that the system is not compatible with macOS [3]. This should disable the TB adapter (at least on older Macs), and thus reduce power consumption greatly, but will probably come with side-effects (e.g. no Thunderbolt, maybe others?).\n\nIt is also possible to blacklist the thunderbolt module and then putting the controllers to sleep with\n\n```\n# echo auto > /sys/bus/pci/devices/0000:07:00.0/power/control\n```\n\nCheck the correct device number with lspci. This can also be automated. This method reduces power consumption slightly, but still consumes 0.9 W more than the previous method on a MacBook Air 2013.\n\n"
+    },
+    {
+      "title": "Suspend and hibernate",
+      "level": 3,
+      "content": "Issues were reported where the machine would \"suspend immediately after resume\" in certain conditions when suspending by closing the lid. This was solved by setting the option \"sleep-inactive-ac-type\" to \"nothing\" using dconf-editor, option path: org → gnome → settings-daemon → plugins → power).\n\nSee Suspend and hibernate for details on how to configure hibernation. Noticeably, you will need a swap partition or file (see the mentioned article for further instructions).\n\nSlow wake ups from a suspend state can be resolved by disabling Thunderbolt. See #Disabling Thunderbolt.\n\n"
+    },
+    {
+      "title": "Wake up after suspend",
+      "level": 3,
+      "content": "Occasionally a Mac laptop may wake up immediately after suspending. This may not be immediately evident as the screen may stay off despite the system being awake, and can be checked by seeing whether the keyboard backlight stays on.\n\nIn /proc/acpi/wakeup, check to see that XHC1 and LID0 are enabled. If they are, one can temporarily disable just LID0 with the following to see if the issue resolves\n\n```\n# echo LID0 > /proc/acpi/wakeup\n```\n\nTo make the change persistent, create:\n\n```\n/etc/systemd/system/suspend-fix.service\n```\n\n```\n[Unit]\nDescription=Fix for the suspend issue\n[Service]\nType=oneshot\nExecStart=/bin/sh -c \"echo LID0 > /proc/acpi/wakeup\"\n[Install]\nWantedBy=multi-user.target\n```\n\nAnd then enable/start suspend-fix.service. To wake the system from this point, use the keyboard.\n\nIf this does not resolve the issue, XHC1 may be the issue and one can disable both it and LID0 temporarily with the following to see if it goes away.\n\n```\n# echo XHC1 > /proc/acpi/wakeup && echo LID0 > /proc/acpi/wakeup\n```\n\nDisabling only XHC1 is not recommended if you have this bug, since it may result in glitchy behavior. Disable both on every boot as follows:\n\n```\n/etc/systemd/system/suspend-fix.service\n```\n\n```\n[Unit]\nDescription=Fix for the suspend issue\n[Service]\nType=oneshot\nExecStart=/bin/sh -c \"echo XHC1 > /proc/acpi/wakeup && echo LID0 > /proc/acpi/wakeup\"\n[Install]\nWantedBy=multi-user.target\n```\n\nTo wake the system from this point, only the power button can be used.\n\n"
+    },
+    {
+      "title": "Light sensor",
+      "level": 2,
+      "content": "The values can be read from /sys/devices/platform/applesmc.768/light: it returns two-tuples like (4,0).\n\nIf you want to use the built in light sensor to automatically adjust screen and keyboard backlight brightness:\n\n- mackbook-lighter — Macbook screen/keyboard backlight CLI and auto-adjust on ambient light.\n\n- Lightum — Requires Gnome or KDE but is older and more complete than Lighter\n\n"
+    },
+    {
+      "title": "Sound",
+      "level": 2,
+      "content": "First of all follow ALSA wiki page, then if something does not work correctly, continue reading this part.\n\n"
+    },
+    {
+      "title": "Kernel options",
+      "level": 3,
+      "content": "Edit your /etc/modprobe.d/50-sound.conf or /etc/modprobe.d/modprobe.conf appending this line:\n\n```\noptions snd_hda_intel model=intel-mac-auto\n```\n\nThis should automatically specify the codec in your Mac.\n\nSpecific models may need more help. You can try specifying other options according to your hardware. All possible settings are listed in Kernel Documentation, available online:\n\n- Advanced Linux Sound Architecture - Driver Configuration guide\n- HD-Audio\n- HD-Audio Codec-Specific Models\n\n"
+    },
+    {
+      "title": "Model-specifics",
+      "level": 4,
+      "content": "Note: **This article or section is a candidate for merging with Laptop/Apple.** This article or section is a candidate for merging with Laptop/Apple.\n\nThis article or section is a candidate for merging with Laptop/Apple.\n\nFor example, if you have a MacBookPro12,1, you might need\n\n```\noptions snd-hda-intel index=1,0\n```\n\ninstead. Alternatively, for MacBookPro5,X, you can use:\n\n```\noptions snd_hda_intel model=mb5\n```\n\n(note that the jack output is controlled with \"HP\").\n\nIf you have an iMac8,1, you should instead use\n\n```\noptions snd-hda-intel model=mbp3 position_fix=2\n```\n\nFor Aluminium iMacs, see iMac Aluminium#Getting sound to work right\n\nFor MacBook2,1 (late 2008/early 2009)s with a SigmaTel STAC9221 A1 chip, use\n\n```\noptions snd_hda_intel model=macbook\n```\n\n"
+    },
+    {
+      "title": "Disabling S/PDIF",
+      "level": 3,
+      "content": "Some (most?) Mac models have an optical S/PDIF audio jack in the same jack as the headphone jack. You can see it when it is active as a red light glowing out of the headphone jack. It can trick PulseAudio into preferring it and routing all your audio out it.\n\nIf you are not getting any sound in or out, confirm that pavucontrol > Configuration > Profile says \"Analog Stereo Duplex\" instead of \"Digital\"\n\nor just run\n\n```\n$ pacmd set-card-profile 0 output:analog-stereo+input:analog-stereo\n```\n\nAlso check if you need to edit /usr/share/alsa-card-profile/mixer/paths/ to workaround faulty plug detection causing PulseAudio to failover to \"Digital\".\n\nSee Laptop/Apple#Microphone for how to edit this to get the MacBook2,1's microphone to work.\n\n"
+    },
+    {
+      "title": "Auto-Mute Mode",
+      "level": 3,
+      "content": "The internal speaker might not be disabled when using the headphone jack. To solve this, enable \"Auto-Mute Mode\".\n\nYou can either do this using alsamixer:\n\n1. Run alsamixer\n1. Press F6 and pick default:0 HDA Intel to get more detailed controls\n1. Use the arrow keys to select \"Auto-Mute Mode\"\n1. Press Space to enable it\n\nor with amixer:\n\n```\n$ amixer -c 0 cset name='Auto-Mute Mode' 1\n```\n\nOptionally, run alsactl store as root to make the change permanent.\n\n"
+    },
+    {
+      "title": "USB audio interface",
+      "level": 3,
+      "content": "In some cases, it can actually be easier to set up sound using a USB audio interface rather than the jack directly.\n\nWith pavucontrol, go to Configuration, choose Off for all devices and choose Analog Stereo Duplex for your USB device. You can then use the headphone jack on the USB device for speakers or headphones. This should work immediately and on startup.\n\n"
+    },
+    {
+      "title": "Bluetooth",
+      "level": 2,
+      "content": "Bluetooth should work out-of-the box. See the article on Bluetooth to install and configure all software needed.\n\n"
+    },
+    {
+      "title": "Magic Mouse",
+      "level": 2,
+      "content": "If you use a magic mouse you will find it works nicely out of the box. You might want to tweak some settings such as scroll-speed or acceleration. There is no GUI for this at this time. The only way to set these settings is to instruct the kernel driver (hid_magicmouse) with parameters. Create a modprobe config file for your mouse.\n\n```\n/etc/modprobe.d/magicmouse.conf\n```\n\n```\noptions hid_magicmouse scroll-speed=55 scroll-acceleration=1 emulate_3button=0\n```\n\nThis will instruct the driver to have a fast scroll-speed, do exponential acceleration and do not emulate a 3 button mouse. You can find an overview of all parameters and their current settings in /sys/module/hid_magicmouse/parameters.\n\nTo try different settings without rebooting you can also set them through the command line:\n\n```\n# echo 55 > /sys/module/hid_magicmouse/parameters/scroll_speed\n```\n\n"
+    },
+    {
+      "title": "iSight",
+      "level": 3,
+      "content": "Note: **MBP 6,2+ (Kernel ~2.6.37+) iSight works out of the box** \n\niSight webcams on MacBooks or pre 6,2 MacBook Pros (6,2 came out around 2010) require the Apple's proprietary firmware that cannot be redistributed. It must be extracted from macOS and loaded onto Arch.\n\nThere is a pre-extracted copy available in the form of the isight-firmwareAUR package.\n\nIf you want to do it yourself you will need to install isight-firmware-toolsAUR to extract the firmware. This package also includes a udev rule and ELF binary that are necessary, even once you have extracted the firmware file into /lib/firmware/isight.fw, for the file to be loaded every time you boot your computer (namely /etc/udev/rules.d/isight.rules which uses /usr/lib/udev/ift-load).\n\nInstructions:\n\nFirst you need to get the firmware out of a particular file located on your macOS install. It is located in /System/Library/Extensions/IOUSBFamily.kext/Contents/PlugIns/AppleUSBVideoSupport.kext/Contents/MacOS/AppleUSBVideoSupport.\n\nTo mount the macOS drive if multi-booting:\n\n```\n# mkdir /media/macOS\n# mount -t hfsplus /dev/sda2 /media/macOS\n```\n\nYou can also download a copy of the file from https://archive.org/details/AppleUSBVideoSupport.\n\nThen, install the isight-firmware-toolsAUR package.\n\nLocate the AppleUSBVideoSupport file in the macOS directory listed above. Either copy it over to your Arch system (Any macOS installation should do, such as an iMac, not just one specific to your system) or, if multi-booting, mount the macOS drive and navigate to the directory. (On 10.6 (Snow Leopard) and 10.7 (Lion) the directory is /System/Library/Extensions/IOUSBFamily.kext/Contents/PlugIns/AppleUSBVideoSupport.kext/Contents/MacOS.) In that directory you can go ahead and extract the driver:\n\n```\n# ift-extract --apple-driver AppleUSBVideoSupport\n```\n\nWhen it is done, check that the firmware has been found:\n\n```\n# ls /usr/lib/firmware/isight.fw\n```\n\nOnce successful, completely shutdown your Mac and start it back up again (to clear the hardware state of the webcam). Do not reboot.\n\nIt should be automatically loaded at boot; if it is not you can load the uvcvideo module manually or load it at boot.\n\n"
+    },
+    {
+      "title": "FaceTime HD Camera",
+      "level": 3,
+      "content": "Recent Macs include the FaceTime HD Camera, which may be connected by PCIe. You can confirm this by looking for \"FaceTime HD Camera\" in the output of lspci. The facetimehd-dkmsAUR and facetimehd-dataAUR packages installs a facetimehd module (and firmware) to support these devices. The module should be loaded automatically after installation.\n\nIf the webcam shows incorrect colors, this may be due to missing sensor calibration files. Instructions for extracting the calibration files from Apple BootCamp drivers are given in this page: https://github.com/patjak/facetimehd/wiki/Extracting-the-sensor-calibration-files\n\nSee Multimedia#Webcam for applications with which to test.\n\n"
+    },
+    {
+      "title": "Temperature sensors",
+      "level": 2,
+      "content": "For reading temperature just install lm_sensors. See lm_sensors for more information.\n\n"
+    },
+    {
+      "title": "Avoid long EFI wait before booting",
+      "level": 2,
+      "content": "If your Mac spends 30 seconds with \"white screen\" before booting you need to tell the firmware where the booting partition is.\n\nBoot macOS, if you do not have it installed, you can use the install DVD (select language, then click Utilities->Terminal) or another Mac with macOS (connect the two computers via firewire or thunderbolt, start the other Mac while holding the T button, boot your Mac while holding the Options button (alt)).\n\nEither way, once you have got a macOS terminal running on your Mac you need to execute the following command if the booting partition is EFI:\n\n```\n# bless --device /dev/diskXsY --setBoot\n```\n\nor if the booting partition is not EFI:\n\n```\n# bless --device /dev/diskXsY --setBoot --legacy\n```\n\nSee also https://bbs.archlinux.org/viewtopic.php?pid=833215.\n\n"
+    },
+    {
+      "title": "kworker using high CPU",
+      "level": 2,
+      "content": "Sometime with the addition of Yosemite, some users found that kworker CPU usage will spike, as discussed here. This is sometimes the result of runaway ACPI interrupts.\n\nTo check and see, you can count the number of recent ACPI interrupts and see if any of them are out of control.\n\n```\n$ grep . -r /sys/firmware/acpi/interrupts/\n```\n\nIf you see that one particular interrupt is out of control (possibly GPE66), i.e., registering hundreds of thousands of lines, you can try disabling it (replace XX with the runaway interrupt):\n\n```\n# echo \"disable\" > /sys/firmware/acpi/interrupts/gpeXX\n```\n\nDisabling random ACPI interrupts could cause all kinds of problems, so do this at your own risk. If this fixes the problem, there is discussion about how to make a systemd service that automatically disables an interrupt at every boot here.\n\n"
+    },
+    {
+      "title": "Mavericks upgrade breaks Arch boot option",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nFor some multi-boot users who utilize a separate Linux boot partition, the OS X Mavericks upgrade may overwrite the boot partition with Apple's own recovery boot filesystem. This breaks the Arch Linux boot option in rEFIt/rEFInd. The best way to proceed in this situation is to abandon a separate boot partition and use the EFI system partition (ESP) to install the boot loader of your choice. It is also recommended that you use rEFInd instead of rEFIt as development on the latter has halted.\n\nAssuming grub2 as the boot loader:\n\nUse the Arch LiveCD to boot to a shell and chroot to your broken Arch Linux environment.\n\nMount the ESP on /boot.\n\nEdit the fstab and remove the old boot partition and make ESP the new boot partition. Now mount the ESP as the new /boot partition.\n\n```\n# mount -a\n```\n\nReinstall the linux package.\n\nCreate a new initramfs and vmlinuz in /boot.\n\n```\n# mkinitcpio -p linux\n```\n\nInstall grub.\n\n```\n# grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=grub --recheck --debug\n```\n\nCreate a new grub.cfg file.\n\n```\n# grub-mkconfig -o /boot/EFI/grub/grub.cfg\n```\n\nMake sure that grub.cfg is in the same directory as grubx64.efi.\n\nGenerate a new refind_linux.conf file in /boot simply by running mkrlconf.sh which comes with rEFInd.\n\nExit the chroot environment.\n\nReboot. You should see a new entry for Arch Linux in rEFInd and it should boot to your Arch Linux installation.\n\n"
+    }
+  ]
+}

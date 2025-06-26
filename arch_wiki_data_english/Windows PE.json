@@ -1,0 +1,91 @@
+{
+  "title": "Windows PE",
+  "url": "https://wiki.archlinux.org/title/Windows_PE",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Windows PE is a lightweight version of Windows intended to be used for installation of Windows Vista and later versions of Windows, as well as for system maintenance. It runs entirely from memory and can be booted from the network.\n\nWindows PE images are normally created in Windows using the Windows ADK. This page describes how customized Windows PE images can be created, and optionally published on the network, using an (Arch) Linux machine. This might be useful if :\n\n- you need to install Windows from the network, or boot Windows PE from the network for system administration, using an Arch Linux-based server. This may be because you do not have a Windows-based server, or you prefer using a Linux server because of its improved security and configurability, or you are already using a Linux server for other purposes.\n- you need to run a Windows environment to run Win32 programs, you do not have a Windows machine available, and you do not want to use Wine or the programs will not run correctly with Wine.\n- you need to update firmware for which your device manufacturer only provides Windows binaries.\n\n"
+    },
+    {
+      "title": "Creating a bootable Windows PE image",
+      "level": 2,
+      "content": "Install wimlib.\n\n"
+    },
+    {
+      "title": "Obtain a Windows ISO or WAIK image",
+      "level": 3,
+      "content": "You need a copy of Windows installation media, in order to extract the boot.wim file that contains the initial copy of Windows PE, along with some boot files. Different versions of Windows contain different versions of Windows PE. For the relationship between Windows versions and Windows PE versions, refer to Wikipedia.\n\nThe simplest method is to download the latest Windows 11 ISO.\n\n- For a 32-bit version of Windows PE, download a Windows 10 iso, as Windows 11 has dropped support for 32-bit.\n- For versions prior to Windows 8, you can download the Windows Automated Installation Kit (WAIK) image instead. See [1], [2]\n- It may be possible to use httpfs to avoid downloading the entire image file.\n\n"
+    },
+    {
+      "title": "Prepare a bootable Windows PE ISO",
+      "level": 3,
+      "content": "Mount the installation image, e.g.:\n\n```\n# mount --mkdir winimg.iso /media/winimg\n```\n\nUse the mkwinpeimg script provided with wimlib to create a bootable Windows PE ISO :\n\n```\n$ mkwinpeimg --iso --windows-dir=/media/winimg winpe.iso\n```\n\nSee mkwinpeimg(1) for more information, including the --overlay option to copy files into the image. You may want to do this to add additional Windows applications that you want to run in Windows PE, or to add any additional drivers that Windows PE needs. Drivers can be loaded using the drvload command within Windows PE.\n\nUnmount the source ISO:\n\n```\n# umount /media/winimg\n```\n\n"
+    },
+    {
+      "title": "Prepare bootable Windows PE media for UEFI systems",
+      "level": 3,
+      "content": "mkwinpeimg cannot build a bootable UEFI system natively, but the necessary UEFI boot files are included in the Windows installation media.\n\nThese can be used for creating a bootable USB key or a bootable ISO file for UEFI systems.\n\nThe following steps assume that winimg.iso is still mounted at /media/winimg.\n\nCreate a directory winpe_uefi which will contain the files necessary for creating UEFI boot media.\n\nMount the newly created Windows PE ISO file and copy the necessary files over to winpe_uefi:\n\n```\n# mount --mkdir winpe.iso /media/winpe\n# cp -r /media/winpe/* winpe_uefi\n# cp -r /media/winimg/efi winpe_uefi\n```\n\n"
+    },
+    {
+      "title": "Option 1: Create an ISO file for UEFI systems",
+      "level": 4,
+      "content": "Use the following command to create a version of the ISO file which can be booted from UEFI systems:\n\n```\n$ mkisofs \\\n    -no-emul-boot \\\n    -b \"efi/microsoft/boot/efisys.bin\" \\\n    -iso-level 4 \\\n    -udf \\\n    -joliet \\\n    -disable-deep-relocation \\\n    -omit-version-number \\\n    -relaxed-filenames \\\n    -output \"winpe_uefi.iso\" \\\n    winpe_uefi\n```\n\nYou can now unmount all ISO. Your winpe_uefi.iso file is ready to boot on UEFI systems now.\n\n"
+    },
+    {
+      "title": "Option 2: Create an USB key for UEFI systems",
+      "level": 4,
+      "content": "On a USB key, create a GPT partition table with a single partition of type EFI System, and format the partition to FAT32.\n\nCopy the files prepared in the winpe_uefi directory over to the USB key:\n\n```\n# mount --mkdir /dev/sdX1 /media/usb\n# cp -r winpe_uefi/* /media/usb/\n```\n\nYou can now umount all ISO and the USB key, your USB key is ready to boot.\n\n"
+    },
+    {
+      "title": "Booting Windows PE",
+      "level": 2,
+      "content": "After creating a bootable ISO of Windows PE (winpe.iso) as described in the previous section, you may want to boot Windows PE in the following ways:\n\n"
+    },
+    {
+      "title": "In virtual machine",
+      "level": 3,
+      "content": "Run a virtual machine with winpe.iso attached as a CD-ROM. Be sure to give it adequate memory, definitely more than the size of the ISO, since Windows PE runs from memory. See Category:Hypervisors for a list of available virtualization software.\n\n"
+    },
+    {
+      "title": "From USB key",
+      "level": 3,
+      "content": "If you have prepared a USB key for UEFI systems according to the guide above, it should just boot. It may take some time to boot (10 to 20 seconds is not uncommon, depending on your USB key) because the loader seems to copy some/all data to RAM.\n\n"
+    },
+    {
+      "title": "From CD",
+      "level": 3,
+      "content": "Simply burn winpe.iso onto a CD, and you can boot from it.\n\n"
+    },
+    {
+      "title": "From Network",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with PXE.** This article or section is a candidate for merging with PXE.\n\nThis article or section is a candidate for merging with PXE.\n\nWindows PE can be booted from the network using PXELINUX and its MEMDISK module on BIOS systems. For UEFI systems, wimboot and iPXE can be used.\n\nInstall syslinux and tftp-hpa.\n\nCopy needed PXELINUX files to the TFTP server root directory.\n\n```\n# rsync -aq /usr/lib/syslinux/bios/ /var/tftpboot/\n```\n\nPut winpe.iso in the TFTP server root directory.\n\n```\n# mv winpe.iso /var/tftpboot\n```\n\nCreate a configuration file for PXELINUX similar to the following:\n\n```\n/var/tftpboot/pxelinux.cfg/default\n```\n\n```\nUI         menu.c32\nMENU TITLE Network Boot\nTIMEOUT    50\n\nLABEL      winpe\nMENU LABEL Boot Windows PE from network\nKERNEL     /memdisk\nINITRD     winpe.iso\nAPPEND     iso raw\n\nLABEL      localboot\nMENU LABEL Boot from local disk\nLOCALBOOT  0\n```\n\nStart the TFTP server.\n\nConfigure your DHCP server (such as Dhcpd or Dnsmasq) to point to pxelinux.0 as the boot file, with the Linux server's IP address. Beware: if your DHCP server is on a router, it may not be possible to do this without installing custom firmware.\n\nAfter completing the above steps, you should be able to boot Windows PE from the network.\n\n"
+    },
+    {
+      "title": "Installing Windows from Windows PE",
+      "level": 2,
+      "content": "Once booted into Windows PE, you can install Windows from an installation media.\n\nThe installation media can be a network share (Samba). See Samba for seting up a Samba server on another machine on the LAN. To share the installation image mounted at /media/winimg, add the following share definition to /etc/samba/smb.conf:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[REMINST]\nbrowsable = true\nread only = no\nguest ok = yes\npath = /media/winimg\n```\n\nOnce booted into Windows PE command prompt, run the following command to initialize the network interface, obtain the IP of the Samba server (assuming Windows PE was booted over PXE from a machine that runs the DHCP, TFTP, and Samba server, the server IP will usually be the Gateway IP), mount the share, and launch the GUI setup:\n\n```\n> wpeinit\n > ipconfig\n > net use I: \\\\IP.ADDRESS.OF.SAMBA.SERVER\\REMINST\n > I:\\setup.exe\n```\n\n"
+    },
+    {
+      "title": "Update Intel Management Engine firmware",
+      "level": 3,
+      "content": "You can use Windows PE in order to install updates for firmware such as Intel ME if your hardware manufacturer only provides Windows binaries, and you cannot update via Fwupd.\n\nYou will need to download :\n\n- your manufacturer's Intel ME update tool\n- drivers for the Intel Management Engine.\n\nStore both extracted archives in a folder, e.g.\n\n```\n/vendor_files\n  ├── me_driver\n  └── update_tool\n```\n\nProceed with #Creating a bootable Windows PE image but make sure to :\n\n- choose a windows PE version for which your device vendor provides Intel ME drivers, i.e. 32-bit or 64-bit.\n- include the device drivers and update tool with --overlay, e.g. :\n\n```\n$ mkwinpeimg --iso --windows-dir=/media/winimg --overlay=vendor_files winpe.iso\n```\n\nProceed with #Booting Windows PE, then load the drivers with:\n\n```\nX:\\Windows\\Systems32>cd \\\nX:\\>drvload me_driver\\...\\heci.inf\n```\n\nFinally, update the Intel ME firmware by using the update tool.\n\n"
+    },
+    {
+      "title": "Custom Windows PE images",
+      "level": 3,
+      "content": "Tools like Hiren's BootCD and others include Windows PE and are around half the size (~2.8GB) of a full Windows ISO. They are often fuller featured boot environments and can include Internet Explorer, which may be helpful to look up bcdedit or bootrec commands to repair Windows boot manager.\n\nHiren's BootCd is already bootable, it only needs to be extracted to a USB.\n\n```\ndd bs=4M if=./HBCD_PE_x64.iso of=/dev/sdX status=progress && sync\n```\n\nMake sure the USB key uses a GPT partition table as described in #Prepare bootable Windows PE media for UEFI systems.\n\n"
+    },
+    {
+      "title": "System error 58 has occurred. The specified server cannot perform the requested operation",
+      "level": 3,
+      "content": "If you are getting the following error when using the net use command:\n\n```\nSystem error 58 has occurred.\n\nThe specified server cannot perform the requested operation.\n```\n\n1. Make sure you have not accidentally unmounted the /media/winimg directory.\n\n2. Add a map to guest to /etc/samba/smb.conf. Add the following at the top of the file:\n\n```\n/etc/samba/smb.conf\n```\n\n```\n[global]\nmap to guest = Bad User\n...\n```\n\n3. Restart the smbd.service.\n\n4. Specify any username/password in the net use command:\n\n```\nnet use I: \\\\IP.ADDRESS.OF.SAMBA.SERVER\\REMINST /user:user pass\n```\n\nThis is happening because Windows 10 connects to anonymous shares by checking some username and password to see if it is able to log in, and if so it allows an anonymous connection. Apparently whatever part hides this from the user did not make it into the PE build.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Microsoft's documentation for Windows PE\n- Another article about making Windows PE images on Linux\n- Windows 10 PE Unable to map network drive anonymously\n- Wim\n\n"
+    }
+  ]
+}

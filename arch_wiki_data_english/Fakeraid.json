@@ -1,0 +1,71 @@
+{
+  "title": "Fakeraid",
+  "url": "https://wiki.archlinux.org/title/Fakeraid",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Installing with Software RAID or LVM\n- Convert a single drive system to RAID\n- Installation guide\n\nThe purpose of this guide is to enable use of a RAID set created by the on-board BIOS RAID controller and thereby allow dual-booting of Linux and Windows from partitions inside the RAID set using GRUB. When using so-called \"fake RAID\" or \"host RAID\", the disc sets are reached from /dev/mapper/chipsetName_randomName and not /dev/sdX.\n\n"
+    },
+    {
+      "title": "What is \"fake RAID\"",
+      "level": 2,
+      "content": "From Wikipedia:RAID:\n\nSee also FakeRaidHowto @ Community Ubuntu Documentation for more information.\n\nDespite the terminology, \"fake RAID\" via dmraid is a robust software RAID implementation that offers a solid system to mirror or stripe data across multiple disks with negligible overhead for any modern system. dmraid is comparable to mdadm (pure Linux software RAID) with the added benefit of being able to completely rebuild a drive after a failure before the system is ever booted. However, be aware that not all BIOS RAID implementations support drive rebuilding. Instead they rely on non-linux software to perform the rebuild. If your system cannot rebuild a drive in the BIOS RAID setup utility, you are strongly encouraged to use mdraid (pure Linux Software Raid via mdadm - see RAID) instead of dmraid or you will find yourself unable to rebuild an array in case of a drive failure - or unable to retrieve information from your array in case of a motherboard failure without a lot of additional work.\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\n"
+    },
+    {
+      "title": "Preparation",
+      "level": 2,
+      "content": "Note: **Consider yourself warned!** \n\n- Open up any needed guides (Installation guide) on another machine. If you do not have access to another machine, print it out.\n- Download the latest Arch Linux install image.\n- Backup all important files since everything on the target partitions will be destroyed.\n\n"
+    },
+    {
+      "title": "Configure RAID sets",
+      "level": 3,
+      "content": "- Enter your BIOS setup and enable the RAID controller. The BIOS may contain an option to configure SATA drives as \"IDE\", \"AHCI\", or \"RAID\"; ensure \"RAID\" is selected.\n- Save and exit the BIOS setup. During boot, enter the RAID setup utility. The RAID utility is usually either accessible via the boot menu (often F8, F10 or CTRL+I) or whilst the RAID controller is initializing.\n- Use the RAID setup utility to create preferred stripe/mirror sets.\n\n- The BIOS may contain an option to configure SATA drives as \"IDE\", \"AHCI\", or \"RAID\"; ensure \"RAID\" is selected.\n\n- The RAID utility is usually either accessible via the boot menu (often F8, F10 or CTRL+I) or whilst the RAID controller is initializing.\n\n"
+    },
+    {
+      "title": "Boot the installer",
+      "level": 2,
+      "content": "See Installation guide#Pre-installation for details.\n\n"
+    },
+    {
+      "title": "MBR install example using mdadm and Intel FakeRAID",
+      "level": 2,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis is here because I spent hours making this work because there is so much information out there on different ways to do it, plus outdated information. It may need integrated into this page better with more explanation but I am wrapping this up at the moment. This is a basic command line dump that shows a successful RAID setup using the MBR partition structure.\n\nIt looks like once you create the array in the intel util it writes the RAID metadata. So assembling/creating an array does not need to happen. I named my array ZERO in the intel util and you can see it in this example.\n\nI am leaving the entire install example as it shows when to configure things during the install. You are going to have to modify some things to make them work, do not copy and paste!\n\n```\n# ls /dev/md/\n# parted /dev/md/ZERO_0\n# mklabel msdos\n# mkpart primary ext4 1MiB 100MiB\n# set 1 boot on\n# mkpart primary ext4 100MiB 16.5GiB\n# mkpart primary linux-swap 16.5GiB 100%\n```\n\nJust to see changes:\n\n```\n# fdisk -l /dev/md/ZERO_0\n```\n\nCreate filesystem/swap and activate swap:\n\n```\n# mkfs.ext4 /dev/md/ZERO_0p1\n# mkfs.ext4 /dev/md/ZERO_0p2\n# mkswap /dev/md/ZERO_0p3\n# swapon /dev/md/ZERO_0p3\n# mount /dev/md/ZERO_0p2 /mnt\n# mkdir -p /mnt/boot\n# mount /dev/md/ZERO_0p1 /mnt/boot/\n```\n\nEdit /etc/pacman.conf and uncomment multilib on x64 (why not)(do it after chroot too). Then:\n\n```\n# pacstrap -K -i /mnt base base-devel\n# genfstab -U /mnt > /mnt/etc/fstab\n```\n\nEdit /mnt/etc/fstab and replace UUIDs with (this may be optional):\n\n```\n/dev/md/ZERO_0p1\n/dev/md/ZERO_0p2\n/dev/md/ZERO_0p3\n```\n\nThen run:\n\n```\n# mdadm --detail --scan >> /mnt/etc/mdadm.conf\n```\n\nChroot in for config:\n\n```\n# arch-chroot /mnt /bin/bash\n```\n\nEdit /etc/locale.gen and uncomment en_US.UTF-8 UTF-8 and other needed UTF-8 locales. Generate the locales by running:\n\n```\n# locale-gen\n```\n\nCreate the locale.conf(5) file, and set the LANG variable accordingly:\n\n```\n/etc/locale.conf\n```\n\n```\nLANG=en_US.UTF-8\n```\n\nSet the time zone:\n\n```\n# ln -sf /usr/share/zoneinfo/Region/City /etc/localtime\n```\n\nInstall grub. Edit /etc/default/grub and uncomment GRUB_DISABLE_LINUX_UUID=true\n\nAdd mdadm_udev to the HOOKS array in /etc/mkinitcpio.conf:\n\n```\nHOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block mdadm_udev filesystems fsck)\n```\n\nRegenerate the initramfs. Then:\n\n```\n# grub-install --recheck /dev/md/ZERO_0\n# grub-mkconfig -o /boot/grub/grub.cfg\n```\n\nCreate the hostname file:\n\n```\n/etc/hostname\n```\n\n```\nyourhostname\n```\n\nUpdate /etc/hosts file appropriately. Then:\n\n```\n# systemctl enable dhcpcd@enp13s0.service\n# exit\n# umount -R /mnt\n# reboot\n```\n\nRemove the installation medium.\n\n"
+    },
+    {
+      "title": "Load dmraid",
+      "level": 2,
+      "content": "Note: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nLoad device-mapper and find RAID sets:\n\n```\n# modprobe dm_mod\n# dmraid -ay\n# ls -la /dev/mapper/\n```\n\nExample output:\n\n```\n/dev/mapper/control            <- Created by device-mapper; if present, device-mapper is likely functioning\n/dev/mapper/sil_aiageicechah   <- A RAID set on a Silicon Image SATA RAID controller\n/dev/mapper/sil_aiageicechah1  <- First partition on this RAID set\n```\n\nIf there is only one file (/dev/mapper/control), check if your controller chipset module is loaded with lsmod. If it is, then dmraid does not support this controller or there are no RAID sets on the system (check RAID BIOS setup again). If correct, then you may be forced to use software RAID (this means no dual-booted RAID system on this controller).\n\nIf your chipset module is NOT loaded, load it now. For example:\n\n```\n# modprobe sata_sil\n```\n\nSee /lib/modules/`uname -r`/kernel/drivers/ata/ for available drivers.\n\nTo test the RAID sets:\n\n```\n# dmraid -tay\n```\n\n"
+    },
+    {
+      "title": "GRUB2",
+      "level": 3,
+      "content": "See GRUB2 for details on configuring GRUB2. grub-bios works out of the box with dm-raid partitions:\n\n```\n$ grub-install --target=i386-pc --recheck --debug /dev/mapper/sil_aiageicechah\n```\n\n(Optional) Install os-prober if you have other OS like windows.\n\n```\n$ grub-mkconfig -o /boot/grub/grub.cfg\n```\n\nThat's all, grub-mkconfig will generate the configure automatically. You could edit /etc/default/grub to modify the configure (timeout, color, etc) before grub-mkconfig.\n\n"
+    },
+    {
+      "title": "Booting with degraded array",
+      "level": 3,
+      "content": "One drawback of the fake RAID approach on GNU/Linux is that dmraid is currently unable to handle degraded arrays, and will refuse to activate. In this scenario, one must resolve the problem from within another OS (e.g. Windows) or via the BIOS/chipset RAID utility.\n\nAlternatively, if using a mirrored (RAID 1) array, users may temporarily bypass dmraid during the boot process and boot from a single drive:\n\n1. Edit the kernel line from the GRUB menu Remove references to dmraid devices (e.g. change /dev/mapper/raidSet1 to /dev/sda1) Append disablehooks=dmraid to prevent a kernel panic when dmraid discovers the degraded array\n1. Boot the system\n\n1. Remove references to dmraid devices (e.g. change /dev/mapper/raidSet1 to /dev/sda1)\n1. Append disablehooks=dmraid to prevent a kernel panic when dmraid discovers the degraded array\n\n"
+    },
+    {
+      "title": "Error: Unable to determine major/minor number of root device",
+      "level": 3,
+      "content": "If you experience a boot failure after kernel update where the boot process is unable to determine major/minor number of root device, this might just be a timing problem (i.e. dmraid -ay might be called before /dev/sd* is fully set up and detected). This can effect both the normal and LTS kernel images. Booting the 'Fallback' kernel image should work. The error will look something like this:\n\n```\nActivating dmraid arrays...\nno block devices found\nWaiting 10 seconds for device /dev/mapper/nvidia_baaccajap5\nRoot device '/dev/mapper/nvidia_baaccajap5' doesn't exist attempting to create it.\nError: Unable to determine major/minor number of root device '/dev/mapper/nvidia_baaccajap5'\n```\n\nTo work around this problem:\n\n- boot the Fallback kernel\n- insert the sleep hook in the HOOKS array of /etc/mkinitcpio.conf after the udev hook like this:\n\n```\nHOOKS=(base udev sleep autodetect microcode modconf kms keyboard keymap consolefont block dmraid filesystems fsck)\n```\n\n- rebuild the kernel image and reboot\n\n"
+    },
+    {
+      "title": "dmraid mirror fails to activate",
+      "level": 3,
+      "content": "Does everything above work correctly the first time, but then when you reboot dmraid cannot find the array?\n\nThis is because Linux software raid (mdadm) has already attempted to mount the fakeraid array during system init and left it in an umountable state. To prevent mdadm from running, move the udev rule that is responsible out of the way:\n\n```\n# cd /lib/udev/rules.d\n# mkdir disabled\n# mv 64-md-raid.rules disabled/\n# reboot\n```\n\n"
+    },
+    {
+      "title": "No block devices for partitions on existing RAID array",
+      "level": 3,
+      "content": "If your existing array, set up before attempting to install arch, appears in /dev/mapper/raidnamehere, but does not have any partitions (raidnamehere1, etc) re-check the status of your RAID partitions.\n\nArch may not create block devices for partitions that work in another OS if there are certain, even minor, problems.\n\ngparted is useful to diagnose and repair most problems. Unfortunately, you may have to repartition from scratch.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Related forum thread\n\n"
+    }
+  ]
+}

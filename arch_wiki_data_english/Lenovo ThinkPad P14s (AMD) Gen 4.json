@@ -1,0 +1,96 @@
+{
+  "title": "Lenovo ThinkPad P14s (AMD) Gen 4",
+  "url": "https://wiki.archlinux.org/title/Lenovo_ThinkPad_P14s_(AMD)_Gen_4",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nGPU | 1002:15bf | Yes\nWi-Fi | 17cb:1103 | Yes\nBluetooth | 10ab:9309 | Yes\nEthernet | 10ec:8168 | Yes\nAudio | 1022:15e3 | Mic might not work\nTrackPoint |  | Yes\nTouchpad |  | Yes\nTouchscreen |  | Yes\nWebcam | 5986:118c | Yes\nTPM |  | Yes\nFingerprint reader | 27c6:6594 | Yes\nSmartcard reader | 2ce3:9563 | Untested\n\nThis article covers the installation and configuration of Arch Linux on a Lenovo ThinkPad P14s (AMD) Gen 4 laptop. With recent enough kernel the device works almost out of the box.\n\nFor a general overview of laptop-related articles and recommendations, see Laptop.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "This model is fully compatible with fwupd.\n\nfwupdmgr get-devices detects the System Firmware, UEFI BIOS, webcam, fingerprint sensor, CPU/GPU, TPM and the NVMe controller.\n\n"
+    },
+    {
+      "title": "CPU",
+      "level": 2,
+      "content": "Since kernel 6.5, the AMD P-State EPP driver with \"Active\" profile is applied by default, no changes should be needed.\n\nIn case you are getting GPU resets (black screen), check Lenovo ThinkPad T14s (AMD) Gen 3#CPU.\n\n"
+    },
+    {
+      "title": "Touchpad",
+      "level": 2,
+      "content": "To disable sleep wake-up from touchpad see Lenovo ThinkPad T14s (AMD) Gen 3#Disable wakeup from sleep on touchpad activity.\n\n"
+    },
+    {
+      "title": "Touchscreen",
+      "level": 2,
+      "content": "The variation of this model with product code/name 21K50009CK is equipped with InfoVision display with touchscreen capability and it works out of the box.\n\nThe respective touchscreen input can be found as I2C device ELAN901C:00 04F3:2EDE.\n\nSee Touchscreen for other information.\n\n"
+    },
+    {
+      "title": "Speakers",
+      "level": 2,
+      "content": "Speakers work out of the box. However, they will not have the same sound quality as on Windows due to the missing Dolby Atmos Convolver. The quality can be improved by using EasyEffects with a convolver effect (and possibly others) - see here for an example preset for this laptop.\n\n"
+    },
+    {
+      "title": "Wi-Fi",
+      "level": 2,
+      "content": "Note: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nStarting with kernel v6.10, remaining bugs with the ath11k firmware have been fixed.\n\nHowever, this patch was found to cause issues with suspend, and was reverted in 6.10.10 as well as 6.11.\n\nSee Lenovo ThinkPad T14s (AMD) Gen 3#Network / Wi-Fi for a fix that unloads the ath11k_pci module before sleep and loads it again after resume.\n\nPreviously, specific ath11k firmware versions caused suspend during lid close to immediately wake from sleep.\n\n"
+    },
+    {
+      "title": "Smartcard reader",
+      "level": 2,
+      "content": "Seems to work and read cards. Follow instructions from smartcards.\n\n"
+    },
+    {
+      "title": "Fingerprint reader",
+      "level": 2,
+      "content": "Works as expected. Follow fprintd\n\n"
+    },
+    {
+      "title": "S3 sleep / s2idle",
+      "level": 3,
+      "content": "S3 (deep) sleep is not supported by this CPU anymore. However, s2idle works out of the box and causes no problems with sleep / hibernation.\n\nThe sleep power consumption with s2idle (or S0/S0ix/Modern Standby) can vary as it depends on the running OS and how well it can put peripherals into sleep mode.\n\n"
+    },
+    {
+      "title": "Hibernate",
+      "level": 3,
+      "content": "Works fine. If you face Wi-Fi issues after hibernation see #Wi-Fi.\n\n"
+    },
+    {
+      "title": "Battery thresholds",
+      "level": 3,
+      "content": "Battery charge thresholds can be correctly set with TLP or within KDE / GNOME power management.\n\n"
+    },
+    {
+      "title": "AMD P-State EPP",
+      "level": 3,
+      "content": "If you are using power-profiles-daemon, please note that the current stable release of it do not fully support AMD P-State EPP. You can switch to TLP version 1.6 or newer that supports AMP P-State features, or fix this using an udev rule + script to apply different AMD P-State EPP states depending on whether the laptop is running on battery or charger.\n\n```\n/etc/udev/rules.d/99-battery.rules\n```\n\n```\nSUBSYSTEM==\"power_supply\", ATTR{online}==\"0\", RUN+=\"/usr/local/bin/on_battery.sh\"\nSUBSYSTEM==\"power_supply\", ATTR{online}==\"1\", RUN+=\"/usr/local/bin/on_ac.sh\"\n```\n\n```\n/usr/local/bin/on_battery.sh\n```\n\n```\n#!/usr/bin/bash\n\n# Change Dirty Writeback Centisecs according to TLP / Powertop\necho '5000' > '/proc/sys/vm/dirty_writeback_centisecs';\n\n# Change AMD Paste EPP energy preference\n# Available profiles: performance, balance_performance, balance_power, power\necho 'balance_power' | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference;\n\n# If required, change cpu scaling governor\n# Possible options are: conservative ondemand userspace powersave performance schedutil\n#cpupower frequency-set -g powersave;\n\n# Platform Profiles Daemon will do this automatically, based on your settings in KDE / GNOME\n# You can how ever, set this manually as well\n# Possible profile options are: performance, powersave, low-power\n#echo 'powersave' > '/sys/firmware/acpi/platform_profile';\n\n# Radeon AMDGPU DPM switching does not seem to be supported.\n# Possible options should be: battery, balanced, performance, auto\n#echo 'battery' > '/sys/class/drm/card0/device/power_dpm_state'; \n\n# Should always be auto (TLP default = auto)\n# Possible options are: auto, high, low\n#echo 'auto' > '/sys/class/drm/card0/device/power_dpm_force_performance_level';\n\n# Runtime PM for PCI Device to auto\nfind /sys/bus/pci/devices/*/power -name control -exec sh -c 'echo \"auto\" > \"$1\"' _ {} \\;\nfor i in $(find /sys/devices/pci0000\\:00/0* -maxdepth 3 -name control); do\n    echo auto > $i;\ndone\n```\n\n```\n/usr/local/bin/on_ac.sh\n```\n\n```\n#!/usr/bin/bash\n\n# Change Dirty Writeback Centisecs according to TLP / Powertop\necho '500' > '/proc/sys/vm/dirty_writeback_centisecs';\n\n# Change AMD Paste EPP energy preference\n# Available profiles: performance, balance_performance, balance_power, power\necho 'balance_performance' | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference;\n\n# If required, change cpu scaling governor\n# Possible options are: conservative ondemand userspace powersave performance schedutil\n#cpupower frequency-set -g performance;\n\n# Platform Profiles Daemon will do this automatically, based on your settings in KDE / GNOME\n# You can how ever, set this manually as well\n# Possible profile options are: performance, powersave, low-power\n#echo 'performance' > '/sys/firmware/acpi/platform_profile';\n\n# Radeon AMDGPU DPM switching does not seem to be supported.\n# Possible options should be: battery, balanced, performance, auto\n#echo 'performance' > '/sys/class/drm/card0/device/power_dpm_state';\n\n# Should always be auto (TLP default = auto)\n# Possible options are: auto, high, low\n#echo 'auto' > '/sys/class/drm/card0/device/power_dpm_force_performance_level';\n\n# Runtime PM for PCI Device to on\nfind /sys/bus/pci/devices/*/power -name control -exec sh -c 'echo \"on\" > \"$1\"' _ {} \\;\nfor i in $(find /sys/devices/pci0000\\:00/0* -maxdepth 3 -name control); do\n    echo on > $i;\ndone\n```\n\nAdditionally make /usr/local/bin/on_battery.sh and /usr/local/bin/on_ac.sh executable.\n\n"
+    },
+    {
+      "title": "Power Profiles Daemon",
+      "level": 3,
+      "content": "The package power-profiles-daemon is the standard power management service for KDE#Power management and GNOME#Power modes. It conflicts with TLP and the reasons for that are described here: https://gitlab.freedesktop.org/upower/power-profiles-daemon#why-not\n\n1. Install power-profiles-daemon\n1. Start/enable the power-profiles-daemon service.\n\n"
+    },
+    {
+      "title": "Reported as unplugged",
+      "level": 3,
+      "content": "If the internal mic is recognized by ALSA, but the recorded input is silent, please see: https://bbs.archlinux.org/viewtopic.php?pid=2162297#p2162297\n\n"
+    },
+    {
+      "title": "LED",
+      "level": 3,
+      "content": "If the Mic LED seems to stay always on see: Lenovo ThinkPad T14 (AMD) Gen 3#Mute Mic LED always on.\n\n"
+    },
+    {
+      "title": "Function keys",
+      "level": 2,
+      "content": "Table content:\nKey | Visible?1 | Marked?2 | Effect | Note\nFn | Yes | - | XF86WakeUp | Can be swapped with left Ctrl in BIOS\nFn+4 | Yes | No | XF86Sleep | \nFn+Esc | No | Yes | Toggles Fn lock | Has status led\nFn+F1 | Yes | Yes | XF86AudioMute | Has status led\nFn+F2 | Yes | Yes | XF86AudioLowerVolume | \nFn+F3 | Yes | Yes | XF86AudioRaiseVolume | \nFn+F4 | Yes | Yes | XF86AudioMicMute | Has status led\nFn+F5 | Yes | Yes | XF86MonBrightnessDown | \nFn+F6 | Yes | Yes | XF86MonBrightnessUp | \nFn+F7 | Yes | Yes | XF86Display | \nFn+F8 | Yes | Yes | XF86WLAN | Marked with airplane mode\nFn+F9 | Yes | Yes | XF86Messenger | Marked with message box\nFn+F10 | Yes | Yes | XF86Go | Marked with phone answer call\nFn+F11 | Yes | Yes | Cancel | Marked with phone end call\nFn+F12 | Yes | Yes | XF86Favorites | \nFn+Tab | Yes | No | XF86FullScreen | \nFn+Left | Yes | No | Home | \nFn+Right | Yes | No | End | \nFn+P | Yes | No | Pause | \nFn+S | Yes | No | Sys_Req | \nFn+K | Yes | No | Scroll_Lock | \nFn+B | Yes | No | Break | \nFn+PrtSc | Yes | Yes | XF86Launch2 | \nFn+Space | No | Yes | Change keyboard backlight level | \n\n1. The key is visible to xev or wev and similar tools.\n1. The physical key has a symbol on it, which describes its function.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Lenovo ThinkPad T14s (AMD) Gen 3\n- Lenovo ThinkPad T14 (AMD) Gen 3\n\n"
+    }
+  ]
+}

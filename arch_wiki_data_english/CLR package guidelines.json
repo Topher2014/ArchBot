@@ -1,0 +1,31 @@
+{
+  "title": "CLR package guidelines",
+  "url": "https://wiki.archlinux.org/title/CLR_package_guidelines",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document defines the standard for packaging Common Language Runtime (.NET) projects under Arch Linux. Currently only Mono is capable of providing a usable, efficient CLR runtime for multiple systems and this standard will reflect its use. Be aware that a lot of CLR programs were developed with Microsoft .NET in mind and, as such, may or may not run under Mono because of .NET-exclusive factors such as P/Invoke calls and Microsoft digital rights management (DRM) APIs and are thus will not yield a usable package for Arch Linux. However, if combined with Wine as of version 1.5.6 (?), your package may have a chance to run under it. Please see the Wine PKGBUILD Guidelines for more information if such is the case.\n\n"
+    },
+    {
+      "title": "Packaging gotchas",
+      "level": 2,
+      "content": "- Always add mono to depends\n- Always set arch to any. Mono does not yet support compiling (running?) 64-bit assemblies.\n- Always add !strip to options\n- If the package is a library (DLL), consider installing it to Mono's global assembly cache (GAC) if it is to be used as a dependency.\n- If the assembly is precompiled and comes with a program debug database file (Foo.dll.pdb), consider converting it as such: pdb2mdb Foo.dll\n- If the package is meant to be executed (EXE), be sure to install to /usr/bin a shell script to run it, similar to this one:\n\n```\n#!/bin/sh\nexec mono foo.exe \"$@\"\n```\n\n"
+    },
+    {
+      "title": "Signed assemblies",
+      "level": 3,
+      "content": "If the package is to be installed into the GAC, be sure it has a signed key file. If not, you can generate one like this: sn -k 1024 Foo.snk. Following that, the easiest way to embed the key file into the assembly is to disassemble it like this: monodis Foo.dll --output=Foo.il. Afterwards, reassemble it like so: ilasm /dll /key:Foo.snk Foo.il\n\n"
+    },
+    {
+      "title": "Sample PKGBUILDs",
+      "level": 2,
+      "content": "The following examples will try to cover some of the most common conventions and build systems.\n\n"
+    },
+    {
+      "title": "Unsigned DLL",
+      "level": 4,
+      "content": "```\n# Maintainer: yourname <yourmail>\npkgname=foo\npkgver=1.0\npkgrel=1\npkgdesc=\"Fantabulous library for .Net\"\narch=('any')\nurl=\"http://www.foo.bar\"\nlicense=('GPL')\ndepends=('mono')\noptions=('!strip')\nsource=(\"http://www.foo.bar/foobar.tar.gz\")\nmd5sums=('4736ac4f34fd9a41fa0197eac23bbc24')\n\nbuild() {\n  cd foobar\n\n  xbuild Foo.sln\n\n  # if the package is unsigned, do the following:\n  cd /bin/x86/Debug\n  monodis Foo.dll --output=Foo.il\n  sn -k 1024 Foo.snk\n  ilasm /dll /key:Foo.snk Foo.il\n}\n\npackage() {\n  cd foobar/bin/x86/Debug\n\n  install -Dm644 Foo.dll \"$pkgdir/usr/lib/foobar/Foo.dll\"\n  install -Dm644 Foo.dll.mdb \"$pkgdir/usr/lib/foobar/Foo.dll.mdb\"\n  \n  # Register assembly into Mono's GAC\n  gacutil -i Foo.dll -root \"$pkgdir/usr/lib\"\n}\n```\n\n"
+    }
+  ]
+}

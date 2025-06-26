@@ -1,0 +1,41 @@
+{
+  "title": "OpenVAS",
+  "url": "https://wiki.archlinux.org/title/OpenVAS",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nOpenVAS stands for Open Vulnerability Assessment System and is a network security scanner with associated tools like a graphical user front-end. The core component is a server with a set of network vulnerability tests (NVTs) to detect security problems in remote systems and applications.\n\n"
+    },
+    {
+      "title": "PostgreSQL",
+      "level": 3,
+      "content": "Set up PostgreSQL before you continue.\n\n"
+    },
+    {
+      "title": "Redis",
+      "level": 3,
+      "content": "Configure Redis as prescribed by the OpenVAS redis configuration. In summary, amend the following to your /etc/redis/redis.conf:\n\n```\nport 0\nunixsocket /run/redis/redis.sock\nunixsocketperm 770\ntimeout 0\ndatabases 128\n```\n\nFinally restart redis.service.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the following packages to get a full OpenVAS setup, including manager, web frontend, scanner, and so on: openvas-scannerAUR, ospd-openvasAUR, gsaAUR, gvmdAUR. nmap needs to be installed for the scanner to deliver proper results and texlive is needed for PDF report feature to work.\n\n"
+    },
+    {
+      "title": "Initial setup",
+      "level": 2,
+      "content": "Setup the PostgreSQL DB for gvm:\n\n```\n[postgres]$ createuser gvm\n[postgres]$ createdb -O gvm gvmd\n```\n\nGrant this user DBA roles:\n\n```\n[postgres]$ psql gvmd\n# create role dba with superuser noinherit;\n# grant dba to gvm;\n# create extension \"uuid-ossp\";\n# \\q\n```\n\nMake sure to have the following sysctl configurations:\n\n```\n# echo \"net.core.somaxconn = 1024\" >> /etc/sysctl.d/90-openvas.conf\n# echo \"vm.overcommit_memory = 1\" >> /etc/sysctl.d/90-openvas.conf\n# sysctl -p /etc/sysctl.d/90-openvas.conf\n```\n\nBefore doing this check the values of somaxconn (normally this is 4096 for Arch Linux and does not need to be adjusted:\n\n```\n# sysctl -a | grep somaxconn\n```\n\nIf this is the case just skip the first echo line.\n\nGrant the gvm user access to the redis socket:\n\n```\n# usermod -aG redis gvm\n# echo \"db_address = /run/redis/redis.sock\" > /etc/openvas/openvas.conf\n# chown gvm:gvm /etc/openvas/openvas.conf\n```\n\nUpdate NVTs:\n\n```\n# chown -R gvm:gvm /var/lib/openvas\n[gvm]$ greenbone-nvt-sync && openvas --update-vt-info\n```\n\nUpdate feeds:\n\n```\n[gvm]$ greenbone-feed-sync --type GVMD_DATA\n[gvm]$ greenbone-scapdata-sync --rsync\n[gvm]$ greenbone-certdata-sync --rsync\n```\n\nYou can enable the following timers to update these data on a frequently basis: greenbone-nvt-sync.timer, greenbone-feed-sync.timer, greenbone-scapdata-sync.timer, greenbone-certdata-sync.timer.\n\nCreate certificates for the server and clients, default values were used:\n\n```\n[gvm]$ gvm-manage-certs -a\n```\n\nAdd an administrator user account, be sure to copy the password:\n\n```\n[gvm]$ gvmd --create-user=admin --role=Admin\n```\n\nYou can also change the password of the user later on\n\n```\n[gvm]$ gvmd --user=admin --new-password=<password>\n```\n\n"
+    },
+    {
+      "title": "Getting started",
+      "level": 2,
+      "content": "Start ospd-openvas.service, gvmd.service and gsad.service.\n\nCreate the Scanner:\n\n```\n[gvm]$ gvmd --get-scanners\n```\n\nCopy the id of the OpenVAS Default scanner and run:\n\n```\n[gvm]$ gvmd --modify-scanner=id-of-scanner --scanner-host=/run/gvm/ospd.sock\n[gvm]$ gvmd --verify-scanner=id-of-scanner\n```\n\nSet the feed import user:\n\n```\n[gvm]$ gvmd --get-users --verbose\n```\n\nCopy the id of the admin user and run:\n\n```\n[gvm]$ gvmd --modify-setting 78eceaec-3385-11ea-b237-28d24461215b --value id-of-admin\n```\n\nPoint your web browser to http://127.0.0.1 and login with your admin credentials.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Wikipedia:OpenVAS\n- OpenVAS Official OpenVAS website.\n\n"
+    }
+  ]
+}

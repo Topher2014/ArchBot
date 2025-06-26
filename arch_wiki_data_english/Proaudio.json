@@ -1,0 +1,116 @@
+{
+  "title": "Proaudio",
+  "url": "https://wiki.archlinux.org/title/Proaudio",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- /Examples\n- /Development\n- /Hardware\n- Sound system\n- JACK\n- Realtime kernel\n- envy24control\n\nThis article describes how to configure your system for recording, mixing and playing back audio as well as using it to synthesize and generate sounds. Those activities are subsumed under the term professional audio (pro audio) and typically require low latency performance.\n\nMost applications do not need as much high-end hardware, compared to video production or gaming. Almost any computer produced since late 2012 can be optimized for pro audio. Please refer to Ardour manual's page on The Right Computer System for Digital Audio for more information.\n\n"
+    },
+    {
+      "title": "Getting started",
+      "level": 2,
+      "content": "After reading the Sound system article, you might be aware that Advanced Linux Sound Architecture or ALSA is part of the Linux kernel and used for drivers and interface on Arch Linux as the default Sound system. ALSA should work out of the box with a default Arch installation. If this is not the case, you must solve the problem before going any further.\n\nHowever, \"no sound\" is likely a simple unmuting the channels problem in ALSA's mixer configuration. If you are using multiple audio devices (e.g. a USB audio interface and keep in mind integrated soundcards), you would want to set the default sound card.\n\nHave I set up sound properly?\n\n```\n$ speaker-test\n```\n\nA vanilla Arch Linux kernel is sufficient for low latency operation in most use cases. Applying further #System configuration will be necessary only if you are experiencing audio drop-outs (also known as glitches) or if you need (or want) to reach ultra-low latency operations.\n\nTo finish with optimizations, these ultra low latency operations may require you to set up a #Realtime kernel.\n\nAlthough some pro audio software can work with ALSA directly, most of the #Applications mentioned later are JACK Audio Connection Kit or JACK clients. Therefore, you will need to install and setup one of the available sound servers which are outlined soon.\n\n"
+    },
+    {
+      "title": "System configuration",
+      "level": 2,
+      "content": "You may want to consider the following often seen system optimizations:\n\n- Setting the CPU frequency scaling governor to performance.\n- Configuring pam_limits (e.g. by installing realtime-privileges and adding your user to the realtime group).\n- Using the threadirqs kernel parameter (consult [1] for reference) - enforced by default by the realtime kernel patchset.\n- Using the realtime kernel patchset.\n- Add noatime to fstab (see Improving performance#Mount options).\n- Increasing the highest requested RTC interrupt frequency (default is 64 Hz) by running the following at boot:\n\n```\n# echo 2048 > /sys/class/rtc/rtc0/max_user_freq\n# echo 2048 > /proc/sys/dev/hpet/max-user-freq\n```\n\n- Reducing swappiness (aka swap frequency, set to 60 by default) to e.g. 10 will make the system wait much longer before trying to swap to disk (see wikipedia:Paging#Swappiness). This can be done on the fly with sysctl vm.swappiness=10 (see sysctl(8)) or setup permanently, using a configuration file (see sysctl.d(5)) such as:\n\n```\n/etc/sysctl.d/90-swappiness.conf\n```\n\n```\nvm.swappiness = 10\n```\n\n- Increasing the maximum watches on files (defaults to 524288) to e.g. 600000, that inotify keeps track of for your user, can help with applications, that require many file handles (such as DAWs). This again can be done on the fly with sysctl fs.inotify.max_user_watches=600000 or in a dedicated configuration file:\n\n```\n/etc/sysctl.d/90-max_user_watches.conf\n```\n\n```\nfs.inotify.max_user_watches = 600000\n```\n\nYou may also want to maximize the PCI latency timer of the PCI sound card and raise the latency timer of all other PCI peripherals (default is 64).\n\n```\n$ setpci -v -d *:* latency_timer=b0\n# setpci -v -s $SOUND_CARD_PCI_ID latency_timer=ff\n```\n\nE.g. SOUND_CARD_PCI_ID=03:00.0.\n\nThe SOUND_CARD_PCI_ID can be obtained like so:\n\n```\n$ lspci | grep -i audio\n```\n\n```\n03:00.0 Multimedia audio controller: Creative Labs SB Audigy (rev 03)\n03:01.0 Multimedia audio controller: VIA Technologies Inc. VT1720/24 [Envy24PT/HT] PCI Multi-Channel Audio Controller (rev 01)\n```\n\n"
+    },
+    {
+      "title": "Choosing a sound server",
+      "level": 2,
+      "content": "Sound hardware cannot play back sound from more than one application simultaneously. While ALSA can theoretically be configured to mix applications in software this is typically left to a sound server. As ALSA alone cannot achieve low latencies easily and cannot synchronise multiple audio applications to play on time, starting all at the same time, at the same tempo, etc, and as it can not share audio flux between applications simply by connecting all it's clients together, you not only need any sound server, but pro audio class one.\n\nThere are three of them, two meant for pro-audio:\n\n- PulseAudio is one of the standard server for playback and multimedia, such as videos, browser, music and games. It was not conceived for pro-audio and lacks the capability to achieve low latencies and sync applications.\n- JACK has been developed with all the needs of pro audio and has been in use all over the world for many years and is therefore very stable and mature. Pro-Audio applications are written for the JACK API.\n- PipeWire is a replacement of JACK and PulseAudio at the same time for the audio part. It should be considered as a good candidate for a daily use and not \"so professional audio\" use cases. It also handles video routing, which is not described in this article.\n\nThe sound server setup strongly depends on the use case as well as on the workflow and capabilities of some application interaction. The JACK Audio Connection Kit was designed to share audio between applications and access an audio device simultaneously by providing the synchronous execution of clients while maintaining constant low latency. Its PipeWire replacement provides a sufficient server for most of the use cases.\n\nThis layout illustrates a layer model of the sound server setups to be discussed:\n\n```\n#PipeWire-only   #PipeWire-as-JACK-Client   #JACK-only\n\n ┌──────────────┐    ┌──────────────┐    ┌──────────────┐\n │ Applications │    │ Applications │    │ Applications │\n ├──────────────┤    ├──────────────┤    ├──────────────┤\n │   PipeWire   │    │ PipeWire+JACK│    │     JACK     │\n ├──────────────┤    ├──────────────┤    ├──────────────┤\n │     ALSA     │    │     ALSA     │    │     ALSA     │\n └──────────────┘    └──────────────┘    └──────────────┘\n```\n\n"
+    },
+    {
+      "title": "PipeWire-only",
+      "level": 3,
+      "content": "The newer PipeWire framework replaces JACK as well as other sound servers for the sake of simplicity. Thus, it's recommended to first go for a PipeWire-only setup implementing support for JACK clients by installing pipewire-jack and using the vanilla Arch Linux kernel.\n\nFor Pro Audio use, you also have to select the Pro Audio profile installing and using pavucontrol, PulseAudio's mixer. Follow the link and read the PipeWire's page.\n\n"
+    },
+    {
+      "title": "PipeWire-as-JACK-Client",
+      "level": 3,
+      "content": "PipeWire can also be used as a JACK client by installing pipewire-jack-client. This is explained in PipeWire's page.\n\n"
+    },
+    {
+      "title": "JACK-only",
+      "level": 3,
+      "content": "The principle of versatility allows you to employ JACK and the #Realtime kernel with further #System configuration to achieve low latencies for advanced use cases known as JACK-only setup. Using JACK as the only sound server requires any software, that is intended for interaction and audio device access, to run as a JACK client.\n\nUnfortunately, popular desktop applications such as Firefox or most games either dropped JACK support or never implemented it. For that reason this setup should be used for a dedicated pro audio system where non-JACK software can be neglected. If you still need to use software that can't connect to JACK, refer to Professional audio/Examples#Advanced sound server setups after following the setup described here. Before installing and running JACK you should ensure it can access your audio device.\n\nIs PulseAudio or something else grabbing my device?\n\n```\n$ lsof +c 0 /dev/snd/pcm* /dev/dsp*\n```\n\nor\n\n```\n$ fuser -fv /dev/snd/pcm* /dev/dsp*\n```\n\nIf your audio device isn't listed, it may be used by PulseAudio (which was probably installed as dependency of another application). Remove those alongside PulseAudio, if you're not intending to use Professional audio/Examples#PulseAudio+JACK in order to make PulseAudio release your audio device.\n\nAs JACK version 1 is planned to be \"slowly phased out\" [2], doesn't support Symmetric Multiprocessing (SMP), lacks D-Bus and Systemd integration you'd want to use version 2 which is available as jack2 package in the official repositories. If you're going to use a JACK control GUI or a Systemd user service for Starting the audio graph, also install jack2-dbus.\n\nThe article on JACK describes a GUI-based and a shell-based example setup as a point of reference for your own scenario. Parameter values of JACK are discussed in detail in the #JACK parameters section and may depend on other system factors covered by the #System configuration section above.\n\n"
+    },
+    {
+      "title": "JACK parameters",
+      "level": 2,
+      "content": "The aim here is to find the best possible combination of buffer size and periods, given the hardware you have. Frames/Period = 256 is a sane starter. For onboard and USB devices, try Periods/Buffer = 3 before lowering both values. Commonly used values are: 256/3, 256/2, 128/3, 128/2.\n\nAlso, the sample rate must match the hardware sample rate. To check what sample and bit rates your device supports:\n\n```\n$ cat /proc/asound/card0/codec#0\n```\n\nReplace card0 and codec#0 depending on what you have. You will be looking for rates or VRA in Extended ID. A common sample rate across many of today's devices is 48000 Hz. Others common rates include 44100 Hz, 96000 Hz and 192000 Hz.\n\nAlmost always, when recording or sequencing with external gear is concerned, realtime is a must. Also, you may like to set maximum priority (at least 10 lower than system limits defined in /etc/security/limits.d/99-realtime-privileges.conf; the highest is for the device itself).\n\nStart jack with the options you just found out:\n\n```\n$ /usr/bin/jackd -R -P89 -dalsa -dhw:0 -r48000 -p128 -n2\n```\n\nqjackctl, cadenceAUR, patchageAUR and studio-controls-gitAUR can all be used to as GUIs to monitor JACK's status and simplify its configuration.\n\n"
+    },
+    {
+      "title": "Latency verification",
+      "level": 2,
+      "content": "JACK parameters are most significant for controlling the round-trip delay (RTD). In the context of this article that is the overall time it takes for an audio signal to be recorded, processed and played back. The next subsection deals with theoretical background on the sources of latency adding up to the RTD. If you are already familiar with that, you can go to #Measuring latency to verify your RTD or skip this section completely.\n\n"
+    },
+    {
+      "title": "Latency sources",
+      "level": 3,
+      "content": "Consider a typical recording situation of a singer performance. The voice is being captured with a microphone as it propagates trough the air with the speed of sound. An analog-to-digital-conversion enables the electrical signal to be recorded by a computer for digital signal processing. Finally, a digital-to-analog conversion returns the signal to be played back at the singer's headphones for monitoring similar to stage monitor system usage.\n\nIn that voice recording situation there are five significant latency sources constructing the RTD and occuring in the following order:\n\n1. Sound propagation through the air from the mouth of the singer\n1. Analog-to-digital conversion\n1. Digital signal processing\n1. Digital-to-analog conversion\n1. Sound propagation through the air to the ear of the singer\n\nThe first and last latency source is hard to change as a particular distance is technically necessary to create an intended sound during recording or playback, respectively. Additionally, when using closer miking for capturing and headphones for monitoring both sound propagation latencies are typically within the range of a few microseconds which is not noticeable by humans. Thus, an objective for RTD minimization is to reduce the other sources of latency.\n\n"
+    },
+    {
+      "title": "Conversion latency",
+      "level": 3,
+      "content": "In theory JACK maintains a constant low latency by using fixed values (frames, periods, sample rate) for sampling and buffering of audio to be converted analog-to-digital and vice versa. The latency occurring in the capturing process is described by the following equation:\n\nLc: Capture latency in milliseconds (ms), n: Frames or buffer (multiples of 2, starting at 16), f: Sample rate in Hertz (Hz).\n\nThe playback latency is also employing the periods value:\n\nLp: Playback latency in milliseconds (ms), n: Frames or buffer (multiples of 2, starting at 16), p: Periods, f: Sample rate in Hertz (Hz).\n\nAs already stated before the capabilities of the audio interface define working combinations. You have to trial and error to find a setup. Sure, it's a trade-off between xrun prevention and achieving low latency, but recent audio interfaces can be used at high sample rates (up to 192 kHz) to deal with that requirement. The audio flux of JACK clients in the digital domain is about zero and thus, negligible for latency measurements [3].\n\n"
+    },
+    {
+      "title": "Measuring latency",
+      "level": 3,
+      "content": "Once you have set up #JACK parameters you might want to verify the RTD described above. For example, using a frames or buffer size of n = 128, a periods value of p = 2, and a sample rate of f = 48000 results in a capture latency of about Lc = 2,666... ms and a playback latency of about Lp = 5,333... ms summing up to a total round-trip delay of RTD = 8 ms.\n\nThe jack_delay utility by Fons Adriaensen measures RTD by emitting test tones out a playback channel and capturing them again at a capture channel for measuring the phase differences to estimate the round-trip time the signal has taken through the whole chain. Use an appropriate cable to connect an input and output channel of your audio device or put a speaker close to a microphone as described by JACK Latency tests.\n\nFor example, running jack_delay for a JACK-only setup using a cable connection between the ports playback_1 and capture_1 (the description may differ depending on your hardware) to close the loop, as well as the values discussed before yields the following insights:\n\n```\n$ jack_delay -O system:playback_1 -I system:capture_1\n```\n\n```\ncapture latency  = 128\nplayback_latency = 256\nSignal below threshold...\nSignal below threshold...\nSignal below threshold...\n  422.507 frames      8.802 ms total roundtrip latency\n       extra loopback latency: 38 frames\n       use 19 for the backend arguments -I and -O\n  422.507 frames      8.802 ms total roundtrip latency\n       extra loopback latency: 38 frames\n       use 19 for the backend arguments -I and -O\n  422.506 frames      8.802 ms total roundtrip latency\n       extra loopback latency: 38 frames\n       use 19 for the backend arguments -I and -O\n  422.507 frames      8.802 ms total roundtrip latency\n       extra loopback latency: 38 frames\n       use 19 for the backend arguments -I and -O\n<output omitted>\n```\n\nAs the output indicates further optimization of JACK can be done by using the parameters -I 19 and -O 19 to compensate for the reported extra loopback latency in the chain:\n\n```\n$ /usr/bin/jackd -R -P89 -dalsa -dhw:0 -r48000 -p128 -n2 -I19 -O19\n```\n\n"
+    },
+    {
+      "title": "Realtime kernel",
+      "level": 2,
+      "content": "\"Realtime\" in the context of an operating system is defined that the results of a computation are available within a fixed period of time. Only in a broader sense does it mean \"time running simultaneously with reality\", for example, that a sound is produced immediately in response to musical user input. The latter is called \"low latency\" and it's setup is one of the main goals of this articles.\n\nSince a while ago, the stock Linux kernel (with CONFIG_PREEMPT=y, default in Arch Linux vanilla kernel) has proven to be adequate for low latency operation. Latency in an operating system context is the time between the moment an interrupt occurs in hardware, and the moment the corresponding interrupt-thread gets running. Unfortunately, some device drivers can introduce higher latencies. So depending on your hardware, drivers, and requirements, you might want a kernel with hard realtime capabilities.\n\n"
+    },
+    {
+      "title": "Pros and cons",
+      "level": 3,
+      "content": "The RT_PREEMPT patch by Ingo Molnar and Thomas Gleixner is an interesting option for hard and firm realtime applications, reaching from professional audio to industrial control. Most audio-specific Linux distributions ships with this patch applied. A realtime-preemptible kernel will also make it possible to tweak priorities of IRQ handling threads and help ensure smooth audio almost regardless of the load.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 3,
+      "content": "Install either the linux-rt or linux-rt-lts package.\n\n"
+    },
+    {
+      "title": "Compilation",
+      "level": 3,
+      "content": "If you are going to compile your own kernel using the Realtime kernel patchset, remember that removing modules/options does not equate to a \"leaner and meaner\" kernel. It is true that the size of the kernel image is reduced, but in today's systems it is not as much of an issue as it was back in 1995.\n\nIn any way, you should also ensure that:\n\n- Timer Frequency is set to 1000Hz (CONFIG_HZ_1000=y; if you do not do MIDI you can ignore this)\n- APM is DISABLED (CONFIG_APM=n; Troublesome with some hardware - default in x86_64)\n\nIf you truly want a slim system, we suggest you go your own way and deploy one with static /devs. You should, however, set your CPU architecture. Selecting \"Core 2 Duo\" for appropriate hardware will allow for a good deal of optimisation, but not so much as you go down the scale.\n\nGeneral issue(s) with (realtime) kernels:\n\n- Hyperthreading (if you suspect, disable in UEFI settings)\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "- Disable Wi-Fi and close any programs that do not need to be open when recording such as browsers. Many have reported disabling Wi-Fi has led to more reliable JACK performance.\n\n- Some USB audio hardware is known not to work properly when plugged into USB 3 ports so try USB 2/1 ports instead.\n\n- IRQ issues can occur and cause problems. An example is video hardware reserving the bus, causing needless interrupts in the system I/O path. See discussion at FFADO IRQ Priorities How-To. If you have a realtime or a recent kernel, you can use rtirq to adjust priorities of IRQ handling threads.\n\n- Do not use the irqbalance daemon, or do so carefully [4].\n\n- If you need to use multiple audio devices with JACK2, the alsa_in and alsa_out utilities can be used to have extra devices wrapped and show up as outputs in the JACK patchbay.\n\n- Some daemons/processes can unexpectedly cause xruns. If you do not need it - kill it. No questions asked.\n\n```\n$ ls /var/run/daemons\n$ top # or htop, ps aux, whatever you are comfortable with\n$ killall -9 $processname\n# systemctl stop $daemonname\n```\n\n- If you are facing a lot of xruns especially with nvidia, disable your GPU throttling. This can be done via the card's control applet and for NVIDIA it is \"prefer maximum performance\" (thanks to a post in LAU by Frank Kober[5]).\n\n- You may like to read more on ALSA: https://www.volkerschatz.com/noise/alsa.html\n\n"
+    },
+    {
+      "title": "Applications",
+      "level": 2,
+      "content": "Arch Linux provides the package group pro-audio holding all relevant (semi-) professional applications. All applications in the pro-audio package group are JACK clients. Also lv2-plugins, ladspa-plugins, dssi-plugins, vst-plugins and clap-plugins are subgroups of the pro-audio group.\n\nAn overview and brief information on some applications is found in List of applications/Multimedia#Audio. Especially the categories Digital audio workstations, Audio effects and Music trackers, as well as Audio synthesis environments and Sound generators, provide examples of pro audio software for e.g. recording, mixing, mastering, and sound design. Other categories include Scorewriters, Audio editors, Audio converters, and DJ software.\n\nPackages not (yet) in the official repositories can be found in proaudio. Browse the list of packages to find the application you need or request packaging of your desired applications via GitHub.\n\n"
+    },
+    {
+      "title": "Hardware",
+      "level": 2,
+      "content": "The majority of sound cards and audio devices will work with no extra configuration or packages, simply set JACK to use the desired one.\n\nThis is not true for all devices, have a look at the Category:Sound, /Hardware as well as Envy24control#Supported cards for those special cases.\n\n"
+    },
+    {
+      "title": "Mailing lists",
+      "level": 3,
+      "content": "- Arch Linux Pro-audio Discussion about real-time multimedia, including (semi-)pro audio and video.\n- Linux Audio User The Linux pro-audio related mailing list with much traffic and a huge subscriber community of users and developers.\n\n"
+    },
+    {
+      "title": "IRC",
+      "level": 3,
+      "content": "- #archlinux-proaudio - Arch Linux pro-audio channel\n- #lau - General Linux Audio channel for users\n- #jack - Development and support related to JACK audio system\n- #lv2 - Development and support related to the LV2 plugin format\n- #ardour - Discussion and support relating to the Ardour DAW\n- #opensourcemusicians - Large general OSS musician discussion channel\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Professional audio Comprehensive guide for a pro-audio setup based on Arch Linux\n- AUR meta packages: proaudio-metaAUR, soundfonts-aur-metaAUR, lv2-plugins-aur-metaAUR\n- awesome-linuxaudio A list of software and resources for professional audio/video/live events production on the Linux platform\n- Multimedia and Games / Arch Linux Forums\n- Realtime The Linux Foundation wiki on the PREEMPT_RT patches\n\n"
+    }
+  ]
+}

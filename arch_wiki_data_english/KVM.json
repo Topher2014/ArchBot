@@ -1,0 +1,61 @@
+{
+  "title": "KVM",
+  "url": "https://wiki.archlinux.org/title/KVM",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Category:Hypervisors\n- Libvirt\n\nKVM, Kernel-based Virtual Machine, is a hypervisor built into the Linux kernel. It is similar to Xen in purpose but much simpler to get running. Unlike native QEMU, which uses emulation, KVM is a special operating mode of QEMU that uses CPU extensions (HVM) for virtualization via a kernel module.\n\nUsing KVM, one can run multiple virtual machines running unmodified GNU/Linux, Windows, or any other operating system. (See Guest Support Status for more information.) Each virtual machine has private virtualized hardware: a network card, disk, graphics card, etc.\n\nDifferences between KVM and Xen, VMware, or QEMU can be found at the KVM FAQ.\n\nThis article does not cover features common to multiple emulators using KVM as a backend. You should see related articles for such information.\n\n"
+    },
+    {
+      "title": "Hardware support",
+      "level": 3,
+      "content": "KVM requires that the virtual machine host's processor has virtualization support (named VT-x for Intel processors and AMD-V for AMD processors). You can check whether your processor supports hardware virtualization with the following command:\n\n```\n$ LC_ALL=C.UTF-8 lscpu | grep Virtualization\n```\n\nAlternatively:\n\n```\n$ grep -E --color=auto 'vmx|svm|0xc0f' /proc/cpuinfo\n```\n\nIf nothing is displayed after running either command, then your processor does not support hardware virtualization, and you will not be able to use KVM.\n\n"
+    },
+    {
+      "title": "Kernel support",
+      "level": 3,
+      "content": "Arch Linux kernels provide the required kernel modules to support KVM.\n\n- One can check if the necessary modules, kvm and either kvm_amd or kvm_intel, are available in the kernel with the following command:\n\n```\n$ zgrep CONFIG_KVM= /proc/config.gz\n```\n\nThe module is available only if it is set to either y or m.\n\n- Then, ensure that the kernel modules are automatically loaded, with the command:\n\n```\n$ lsmod | grep kvm\n```\n\n```\nkvm_intel             245760  0\nkvmgt                  28672  0\nmdev                   20480  2 kvmgt,vfio_mdev\nvfio                   32768  3 kvmgt,vfio_mdev,vfio_iommu_type1\nkvm                   737280  2 kvmgt,kvm_intel\nirqbypass              16384  1 kvm\n```\n\nIf the command returns nothing, the module needs to be loaded manually; see Kernel modules#Manual module handling.\n\n"
+    },
+    {
+      "title": "Para-virtualization with Virtio",
+      "level": 2,
+      "content": "Para-virtualization provides a fast and efficient means of communication for guests to use devices on the host machine. KVM provides para-virtualized devices to virtual machines using the Virtio API as a layer between the hypervisor and guest.\n\nAll Virtio devices have two parts: the host device and the guest driver.\n\n"
+    },
+    {
+      "title": "Kernel support",
+      "level": 3,
+      "content": "Use the following command inside the virtual machine to check if the VIRTIO modules are available in the kernel:\n\n```\n$ zgrep VIRTIO /proc/config.gz\n```\n\nThen, check if the kernel modules are automatically loaded with the command:\n\n```\n$ lsmod | grep virtio\n```\n\nIn case the above commands return nothing, you need to load the kernel modules manually.\n\n"
+    },
+    {
+      "title": "List of para-virtualized devices",
+      "level": 3,
+      "content": "- network device (virtio-net)\n- block device (virtio-blk)\n- controller device (virtio-scsi)\n- serial device (virtio-serial)\n- balloon device (virtio-balloon)\n\n"
+    },
+    {
+      "title": "How to use KVM",
+      "level": 2,
+      "content": "See the main article: QEMU.\n\n"
+    },
+    {
+      "title": "Nested virtualization",
+      "level": 3,
+      "content": "Nested virtualization enables existing virtual machines to be run on third-party hypervisors and on other clouds without any modifications to the original virtual machines or their networking.\n\nOn host, enable nested feature for kvm_intel:\n\n```\n# modprobe -r kvm_intel\n# modprobe kvm_intel nested=1\n```\n\nTo make it permanent (see Kernel modules#Setting module options):\n\n```\n/etc/modprobe.d/kvm_intel.conf\n```\n\n```\noptions kvm_intel nested=1\n```\n\nVerify that feature is activated:\n\n```\n$ cat /sys/module/kvm_intel/parameters/nested\n```\n\n```\nY\n```\n\nEnable the \"host passthrough\" mode to forward all CPU features to the guest system:\n\n1. If using QEMU, run the guest virtual machine with the following command: qemu-system-x86_64 -enable-kvm -cpu host.\n1. If using virt-manager, change the CPU model to host-passthrough.\n1. If using virsh, use virsh edit vm-name and change the CPU line to <cpu mode='host-passthrough' check='partial'/>\n\nBoot the virtual machine and check if the vmx flag is present:\n\n```\n$ grep -E --color=auto 'vmx|svm' /proc/cpuinfo\n```\n\n"
+    },
+    {
+      "title": "Enabling huge pages",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with QEMU.** This article or section is a candidate for merging with QEMU.\n\nThis article or section is a candidate for merging with QEMU.\n\nYou may also want to enable hugepages to improve the performance of your virtual machine. With an up to date Arch Linux and a running KVM, you probably already have everything you need. Check if you have the directory /dev/hugepages. If not, create it. Now we need the right permissions to use this directory. The default permission is root's uid and gid with 0755, but we want anyone in the kvm group to have access to hugepages.\n\nAdd to your /etc/fstab:\n\n```\n/etc/fstab\n```\n\n```\nhugetlbfs       /dev/hugepages  hugetlbfs       mode=01770,gid=kvm        0 0\n```\n\nInstead of specifying the group name directly, with gid=kvm, you can of course specify the gid as a number, but it must match the kvm group. The mode of 1770 allows anyone in the group to create files but not unlink or rename each other's files. Make sure /dev/hugepages is mounted properly:\n\n```\n# umount /dev/hugepages\n# mount /dev/hugepages\n$ mount | grep huge\n```\n\n```\nhugetlbfs on /dev/hugepages type hugetlbfs (rw,relatime,mode=1770,gid=78)\n```\n\nNow you can calculate how many hugepages you need. Check how large your hugepages are:\n\n```\n$ grep Hugepagesize /proc/meminfo\n```\n\nNormally that should be 2048 kB ≙ 2 MB. Let us say you want to run your virtual machine with 1024 MB. 1024 / 2 = 512. Add a few extra so we can round this up to 550. Now tell your machine how many hugepages you want:\n\n```\n# sysctl -w vm.nr_hugepages=550\n```\n\nIf you had enough free memory, you should see:\n\n```\n$ grep HugePages_Total /proc/meminfo\n```\n\n```\nHugesPages_Total:  550\n```\n\nIf the number is smaller, close some applications or start your virtual machine with less memory (number_of_pages x 2):\n\n```\n$ qemu-system-x86_64 -enable-kvm -m 1024 -mem-path /dev/hugepages -hda <disk_image> [...]\n```\n\nNote the -mem-path parameter. This will make use of the hugepages.\n\nNow you can check, while your virtual machine is running, how many pages are used:\n\n```\n$ grep HugePages /proc/meminfo\n```\n\n```\nHugePages_Total:     550\nHugePages_Free:       48\nHugePages_Rsvd:        6\nHugePages_Surp:        0\n```\n\nNow that everything seems to work, you can enable hugepages by default if you like. Add to your /etc/sysctl.d/40-hugepage.conf:\n\n```\n/etc/sysctl.d/40-hugepage.conf\n```\n\n```\nvm.nr_hugepages = 550\n```\n\nSee also:\n\n- Summary of hugetlbpage support in the Linux kernel\n- Debian Wiki - Hugepages\n\n"
+    },
+    {
+      "title": "Secure Boot",
+      "level": 3,
+      "content": "Note: **This article or section is a candidate for merging with QEMU#Enabling Secure Boot.** This article or section is a candidate for merging with QEMU#Enabling Secure Boot.\n\nThis article or section is a candidate for merging with QEMU#Enabling Secure Boot.\n\nKVM Secure boot has a few requirements before it can be enabled:\n\n1. You must use a UEFI with secure boot support compiled in.\n1. The UEFI must have keys enrolled.\n\nTo enable UEFI with secure boot support, install edk2-ovmf and set your virtual machine to use the secure boot enabled UEFI. If you are using libvirt, you can do this by adding the following to the XML configuration of your virtual machine.\n\n```\n<os firmware=\"efi\">\n  <loader readonly=\"yes\" secure=\"yes\" type=\"pflash\">/usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd</loader>\n</os>\n```\n\nNext you need to enroll some keys. In this example we will enroll Microsoft and Redhat's secure boot keys. Install virt-firmware and run the following. Replace vm_name with the name of your virtual machine.\n\n```\n$ virt-fw-vars --input /var/lib/libvirt/qemu/nvram/vm_name_VARS.fd --output /var/lib/libvirt/qemu/nvram/vm_name_SECURE_VARS.fd --secure-boot --enroll-redhat\n```\n\nThen edit the libvirt XML configuration of your virtual machine to point to the new VARS file.\n\n```\n<os firmware=\"efi\">\n  <loader readonly=\"yes\" secure=\"yes\" type=\"pflash\">/usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd</loader>\n  <nvram template=\"/usr/share/edk2/x64/OVMF_VARS.4m.fd\">/var/lib/libvirt/qemu/nvram/{vm-name}_SECURE_VARS.fd</nvram>\n</os>\n```\n\nAfter this secure boot should automatically be enabled. You can double check by entering the virtual machine's BIOS by pressing F2 when you see the UEFI boot logo.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- KVM Howto\n- KVM FAQ\n\n"
+    }
+  ]
+}

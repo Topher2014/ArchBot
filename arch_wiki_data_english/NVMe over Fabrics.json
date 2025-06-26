@@ -1,0 +1,46 @@
+{
+  "title": "NVMe over Fabrics",
+  "url": "https://wiki.archlinux.org/title/NVMe_over_Fabrics",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "NVMe over Fabrics (NVMe-oF) allows sending NVMe commands over Ethernet or Fibre Channel. This can be used for remote access to block devices similar to iSCSI. An NVMe-oF host can access devices exposed by an NVMe-oF controller. This is not limited to NVMe devices, you can also expose block devices such as ZFS zvols.\n\n"
+    },
+    {
+      "title": "Host configuration",
+      "level": 2,
+      "content": "To access a block device exposed by a remote NVMe-oF controller, install the nvme-cli package.\n\nFirst, make sure the necessary kernel module is loaded:\n\n```\n# modprobe nvme-fabrics\n```\n\nNow you can use the CLI to connect to the device:\n\n```\n# nvme connect --transport=tcp --traddr=192.168.0.5 --trsvcid=4420 --nqn=nqn.2024-08.com.example:my-disk\n```\n\nAfter running this command, the device will be available as a normal NVMe block device, e.g. under /dev/nvme0n1 with partitions under /dev/nvme0n1p1. It is recommended to refer to these devices by UUID, however.\n\n"
+    },
+    {
+      "title": "Controller configuration",
+      "level": 2,
+      "content": "Install the nvmetcli package.\n\nFirst, make sure the necessary kernel module is loaded:\n\n```\n# modprobe nvmet\n```\n\nController configuration happens through a file system located at /sys/kernel/config/nvmet. nvmetcli provides a convenient interface to modify that file system. It also provides a way to load and save the settings. nvmetcli save will save the current state to /etc/nvmet/config.json, and nvmetcli restore will load from that location. You can enable the nvmet.service unit to load the configuration from that file automatically.\n\nInside nvmetcli, you can navigate using cd and show the config tree using ls. There are three top-level directories.\n\n"
+    },
+    {
+      "title": "Adding a device",
+      "level": 3,
+      "content": "First you'll want to create a device to expose:\n\n```\n/> cd subsystems\n/subsystems> create nqn.2024-08.com.example:my-device\n/subsystems> cd nqn.2024-08.com.example:my-device\n/subsystems/n...ple:my-device>\n```\n\nConfigure access for the device:\n\n```\n/subsystems/n...ple:my-device> set attr allow_any_host=1\n```\n\nConfigure a namespace for the device and set the backing block device:\n\n```\n/subsystems/n...ple:my-device> cd namespaces\n/subsystems/n...ce/namespaces> create 1\n/subsystems/n...ce/namespaces> cd 1\n/subsystems/n.../namespaces/1> set device path=/dev/path/to/block/device\n/subsystems/n.../namespaces/1> enable\n```\n\n"
+    },
+    {
+      "title": "Configuring the port",
+      "level": 3,
+      "content": "Next, create a port. Navigate back to the top using cd /.\n\n```\n/> cd ports\n/ports> create 1\n/ports> cd 1\n/ports/1> set addr trtype=tcp traddr=192.168.0.5 trsvcid=4420 adrfam=ipv4\n```\n\nAdd the device you created above to the network port:\n\n```\n/ports/1> cd subsystems\n/ports/1/subsystems> create nqn.2024-08.com.example:my-device\n```\n\nThat's it! Now the device is accessible to the host using the above instructions. To make this permanent, give the saveconfig command and ensure nvmet.service is enabled/started.\n\n"
+    },
+    {
+      "title": "Authentication using DHCHAP",
+      "level": 2,
+      "content": "It is prudent to not allow just any device access to the exposed block device. To authenticate the host, NVMe-oF offers a DHCHAP handshake using a secret shared between host and controller. Unfortunately, as of writing, nvmetcli does not support this out of the box, so you have to modify the config FS manually. The host nvme command does support DHCHAP.\n\nFirst, use nvmetcli to limit access to the device to only a single host, identified by NQN.\n\n```\n/> cd hosts\n/hosts> create nqn.2024-08.com.example.host\n/hosts> cd /subsystems/nqn.2024-08.com.example:my-device\n/subsystems/n...ple:my-device> set attr allow_any_host=0\n/subsystems/n...ple:my-device> cd allowed_hosts\n/subsystems/n...allowed_hosts> create nqn.2024-08.com.example.host\n```\n\nThe NVMe controller now knows that only the host with the NQN nqn.2024-08.com.example.host may access the device. You can test this (without DHCHAP, for now) using nvme connect --hostnqn=nqn.2024-08.com.example.host. With the wrong NQN, the connection should fail, with the right NQN, it should succeed.\n\nThe next step is to configure DHCHAP. First you need to generate a secret like so:\n\n```\n$ nvme gen-dhchap-key --nqn=nqn.2024-08.com.example.host\nDHHC-1:00:znDcb37R200FNlZkIOkv37idpu/notvalid!!si1VQ09KhKv2g:\n```\n\nBecause nvmetcli does not support DHCHAP, you must configure it manually:\n\n```\n# echo 'DHHC-1:00:znDcb37R200FNlZkIOkv37idpu/notvalid!!si1VQ09KhKv2g:' > /sys/kernel/config/nvmet/hosts/nqn.2024-08.com.example.host/dhchap_key\n```\n\nNow, you can connect using the DHCHAP secret:\n\n```\n# nvme connect --transport=tcp --traddr=192.168.0.5 --trsvcid=4420 --nqn=nqn.2024-08.com.example:my-disk --hostnqn=nqn.2024-08.com.example.host --dhchap-secret=\"DHHC-1:00:znDcb37R200FNlZkIOkv37idpu/notvalid!!si1VQ09KhKv2g:\"\n```\n\n"
+    },
+    {
+      "title": "Booting from NVMe-oF",
+      "level": 2,
+      "content": "It is possible to connect to an NVMe-oF device during the boot process inside initramfs and use the device for the root file system. The procedure is very similar to that for iSCSI. Only the NVMe-specific parts are listed here for now.\n\nThe initcpio hook is different for NVMe-oF. The install script adds different modules, and adds the nvme binary instead of iscsistart:\n\n```\n/etc/initcpio/install/nvme-of\n```\n\n```\nbuild () {\n\tmap add_module nvme-fabrics nvme-tcp nvme-keyring\n\tadd_checked_modules \"/drivers/net\"\n\tadd_binary nvme\n\tadd_runscript\n}\nhelp () {\n\tcat <<HELPEOF\n\tThis hook allows you to boot from an NVMe-oF target.\nHELPEOF\n}\n```\n\nThe actual hook uses the CLI to connect to the device:\n\n```\n/etc/initcpio/hooks/nvme-of\n```\n\n```\nrun_hook () {\n\tmsg \"Mounting NVMe-oF target\"\n\tnvme connect --transport=tcp --nqn=nqn.2024-08.com.example:my-device --traddr=192.168.0.5 --trsvcid=4420\n}\n```\n\nModify the mkinitcpio configuration:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(... nvme-fabrics)\nHOOKS=(... net nvme-of block ...)\n```\n\n"
+    },
+    {
+      "title": "Page allocation failure",
+      "level": 3,
+      "content": "If you are seeing this failure on the host:\n\n```\nnvme nvme0: Connect command failed, error wo/DNR bit: 6\nnvme nvme0: failed to connect queue: 3 ret=6\ncould not add new controller: failed to write to nvme-fabrics device\n```\n\nCheck dmesg on the controller for this error:\n\n```\nkworker/5:1H: page allocation failure: order:6, mode:0x40dc0(GFP_KERNEL|__GFP_COMP|__GFP_ZERO), nodemask=(null),cpuset=/,mems_allowed=0\nCPU: 5 PID: ... Comm: kworker/5:1H Tainted: P           OE      ...\nHardware name: ...\nWorkqueue: nvmet_tcp_wq nvmet_tcp_io_work [nvmet_tcp]\nCall Trace:\n <TASK>\n dump_stack_lvl+0x4d/0x70\n warn_alloc+0x165/0x1e0\n ? __alloc_pages_direct_compact+0x163/0x390\n __alloc_pages_slowpath.constprop.0+0xce9/0xde0\n __alloc_pages+0x320/0x340\n ? nvmet_tcp_install_queue+0x50/0x140 [nvmet_tcp ...]\n __kmalloc_large_node+0x71/0x130\n __kmalloc+0xc4/0x130\n nvmet_tcp_install_queue+0x50/0x140 [nvmet_tcp ...]\n nvmet_install_queue+0xa6/0x1f0 [nvmet ...]\n nvmet_execute_io_connect+0xd1/0x1a0 [nvmet ...]\n nvmet_tcp_io_work+0x811/0x880 [nvmet_tcp ...]\n process_one_work+0x180/0x350\n worker_thread+0x315/0x450\n ? __pfx_worker_thread+0x10/0x10\n kthread+0xe8/0x120\n ? __pfx_kthread+0x10/0x10\n ret_from_fork+0x34/0x50\n ? __pfx_kthread+0x10/0x10\n ret_from_fork_asm+0x1b/0x30\n </TASK>\n```\n\nIf the stack traces match, you are running into this bug. To serve a new TCP connection, the NVMe target / controller allocates a relatively large contiguous buffer in kernel space. If kernel memory is full (or fragmented), such a large contiguous region may not be available. This used to cause a kernel crash that was fixed in recent kernels, but as of Feburary 2025 this still prevents new TCP connections to the controller. A patch for that is pending but stuck in review.\n\nTo work around this issue, you can use the following command to free up kernel memory on the controller prior to connection:\n\n```\necho 3 | sudo tee /proc/sys/vm/drop_caches\n```\n\nAnother option that seems to work is to create and delete a large file in tmpfs:\n\n```\ndd if=/dev/urandom of=/tmp/random-buffer bs=1M count=4096 status=progress; rm -f /tmp/random-buffer\n```\n\nIf that does not help, a reboot might be necessary.\n\n"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "title": "Netboot",
+  "url": "https://wiki.archlinux.org/title/Netboot",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Netboot images are small (< 1 MiB) images that can be used to download the latest Arch Linux release on the fly upon system boot. It is unnecessary to update the netboot image, the newest release will be available automatically. Netboot images can be downloaded from the Arch Linux Netboot page.\n\nNote: **It is mostly intended for wired connectivity** \n\n- You need sufficient memory (probably 1.5GiB or even more) to store and run the live system, otherwise you may get a kernel panic on boot.\n- It is mostly intended for wired connectivity: Wi-Fi support is limited and highly firmware-dependent[1].\n\n"
+    },
+    {
+      "title": "BIOS",
+      "level": 2,
+      "content": "To use netboot on a BIOS-based computer, you need either the ipxe.lkrn or ipxe.pxe image.\n\n"
+    },
+    {
+      "title": "Using ipxe.lkrn",
+      "level": 3,
+      "content": "The ipxe.lkrn image can be booted like a Linux kernel. Any Linux boot loader (like GRUB or Syslinux) can be used to load it from your hard drive, a CD or a USB drive. For example, the Syslinux wiki gives instructions to install[2] and configure[3] Syslinux on a bootable medium.\n\nYou can make flash drive that boots ipxe.lkrn with the following steps:\n\n- Find out your device path using lsblk. Let us assume it is /dev/sdc.\n- Create MBR partition table on the device.\n- Create a primary partition with FAT32 file system and flag it as active.\n- Mount partition, create boot/syslinux directory there and copy ipxe.lkrn to the boot directory.\n\n```\n# mount /dev/sdc /mnt\n# mkdir -p /mnt/boot/syslinux\n# cp ipxe.lkrn /mnt/boot\n```\n\n- Create syslinux configuration\n\n```\n/mnt/boot/syslinux/syslinux.cfg\n```\n\n```\nDEFAULT arch_netboot\n   SAY Booting Arch over the network.\nLABEL arch_netboot\n   KERNEL /boot/ipxe.lkrn\n```\n\n- Unmount partition\n\n```\n# umount /mnt\n```\n\n- Install Syslinux MBR and Syslinux itself\n\n```\n# dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/bios/mbr.bin of=/dev/sdc\n# syslinux --directory /boot/syslinux/ --install /dev/sdc1\n```\n\n- Now you should be able to boot your usb stick with ipxe.lkrn.\n\nAlternatively, you can also try the image with QEMU by running the following command:\n\n```\n$ qemu-system-x86_64 -enable-kvm -m 2G -kernel ipxe.lkrn\n```\n\n"
+    },
+    {
+      "title": "Using ipxe.pxe",
+      "level": 3,
+      "content": "The ipxe.pxe image is a PXE image. It can be chainloaded from an existing PXE environment. This allows configuring a DHCP server such that booting from the network will always boot into Arch Linux netboot.\n\nAlternatively, you can also chainload it from existing pxe loader such as pxelinux. This is a menu entry example:\n\n```\nLABEL arch_netboot_chain\n  COM32 pxechn.c32\n  APPEND ipxe.a56af4e6a9a9.pxe\n```\n\nFor this example to work you must have pxechn.c32 copied to the directory where your pxelinux.0 resides.\n\n"
+    },
+    {
+      "title": "UEFI",
+      "level": 2,
+      "content": "The ipxe-arch.efi image can be used to launch Arch Linux netboot in UEFI mode. Only 64-bit UEFI is supported. The image can be added as a boot option via efibootmgr, launched from a boot manager, like systemd-boot or rEFInd, or directly from the UEFI shell. You can also boot it from a standalone USB stick on UEFI systems.\n\n"
+    },
+    {
+      "title": "Installation with efibootmgr",
+      "level": 3,
+      "content": "First install the efibootmgr package. Assuming your EFI system partition (ESP) is /dev/sdd1 and mounted under esp, you should move it as follows—let us also give it a more friendly name:\n\n```\n# mkdir esp/EFI/arch_netboot\n# mv ipxe.*.efi esp/EFI/arch_netboot/arch_netboot.efi\n```\n\nThen you can create a boot entry as follows:\n\n```\n# efibootmgr --create --disk /dev/sdd --part 1 --loader /EFI/arch_netboot/arch_netboot.efi --label \"Arch Linux Netboot\" --unicode\n```\n\n"
+    },
+    {
+      "title": "Boot from a USB flash drive",
+      "level": 3,
+      "content": "If you want to boot the Netboot EFI binary from a USB flash drive, copy it to the default/fallback boot path (/EFI/BOOT/BOOTx64.EFI) on a FAT formatted partition. It does not require creating a EFI system partition on the drive as all UEFI will happily boot any FAT volume from USB flash drives. The most compatible setup would be using the MBR partition table with a single active (bootable) primary partition of type 0c \"W95 FAT32 (LBA)\".[4]\n\nThe image should be then loaded automatically by UEFI systems.\n\n"
+    },
+    {
+      "title": "In GNU/Linux",
+      "level": 4,
+      "content": "For example, assuming /dev/sdX as the flash drive, prepare the USB flash drive as follows:\n\n1. If not done yet, create a partition table on /dev/sdX and a partition (/dev/sdXn) on the device.\n1. If not done yet, format the partition to FAT32: # mkfs.fat -F 32 /dev/sdXn\n1. Mount the file system: # mount /dev/sdXn /mnt\n1. Create a /EFI/BOOT directory on the mounted file system: # mkdir /mnt/EFI /mnt/EFI/BOOT\n1. Copy pxe-arch.efi to the default boot path for x64 UEFI: # cp pxe-arch.efi /mnt/EFI/BOOT/BOOTx64.EFI\n1. Unmount the file system.\n\n```\n# mkfs.fat -F 32 /dev/sdXn\n```\n\n```\n# mount /dev/sdXn /mnt\n```\n\n```\n# mkdir /mnt/EFI /mnt/EFI/BOOT\n```\n\n```\n# cp pxe-arch.efi /mnt/EFI/BOOT/BOOTx64.EFI\n```\n\n"
+    },
+    {
+      "title": "In Windows",
+      "level": 4,
+      "content": "Prepare the USB flash drive as follows:\n\n1. If not done yet, partition the USB flash drive and format it to FAT32.\n1. Navigate to the root of the USB flash drive and create an EFI folder in it and a BOOT folder inside the EFI folder.\n1. Copy pxe-arch.efi to the EFI\\BOOT folder.\n1. Rename the pxe-arch.efi file to BOOTx64.EFI.\n1. Eject the USB flash drive when done.\n\n"
+    },
+    {
+      "title": "Booting EFI binary gives \"device error\"",
+      "level": 3,
+      "content": "If booting the EFI binary results in Failed to execute ... device error, make sure the network stack is enabled in your UEFI settings. It may require initializing the network interface controller's (NIC) option ROM, so additionally look for settings like \"OnBoard LAN Boot ROM\", \"Launch PXE OpROM Policy\" or similar.\n\n"
+    }
+  ]
+}

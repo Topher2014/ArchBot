@@ -1,0 +1,131 @@
+{
+  "title": "Bcachefs",
+  "url": "https://wiki.archlinux.org/title/Bcachefs",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- File systems\n\nBcachefs is a next-generation CoW filesystem that aims to provide features from Btrfs and ZFS with a cleaner codebase, more stability, greater speed and a GPL-compatible license.\n\nIt is built upon Bcache and is mainly developed by Kent Overstreet.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "As of kernel 6.7 (January 2024) Bcachefs has been merged into the upstream Kernel so it is available in the linux and linux-zen package. Other kernel packages may be based on older versions than 6.7 and need special patches for Bcachefs.\n\nThe Bcachefs userspace tools are available from bcachefs-tools.\n\n"
+    },
+    {
+      "title": "Single drive",
+      "level": 3,
+      "content": "```\n# bcachefs format /dev/sdX\n# mount -t bcachefs /dev/sdX /mnt\n```\n\n"
+    },
+    {
+      "title": "Multiple drives",
+      "level": 3,
+      "content": "Bcachefs stripes data by default, similar to RAID0. Redundancy is handled via the replicas option. 2 drives with --replicas=2 is equivalent to RAID1, 4 drives with --replicas=2 is equivalent to RAID10, etc.\n\n```\n# bcachefs format /dev/sdX /dev/sdY --replicas=n\n# mount -t bcachefs /dev/sdX:/dev/sdY /mnt\n```\n\nHeterogeneous drives are supported. If they are different sizes, larger stripes will be used on some, so that they all fill up at the same rate. If they are different speeds, reads for replicated data will be sent to the ones with the lowest IO latency. If some are more reliable than others (a hardware raid device, for example) you can set --durability=2 device to count each copy of data on that device as 2 replicas.\n\n"
+    },
+    {
+      "title": "Encrypted root filesystem",
+      "level": 3,
+      "content": "Bcachefs supports whole filesystem encryption using ChaCha20Poly1305. To format an encrypted filesystem:\n\n```\n# bcachefs format --encrypted /dev/sdX\n```\n\nIn the case of a root filesystem add bcachefs to the HOOKS array in the /etc/mkinitcpio.conf configuration to prompt for filesystem unlock at boot or resuming from hibernate.\n\n"
+    },
+    {
+      "title": "SSD caching",
+      "level": 3,
+      "content": "Bcachefs has 3 storage targets: background, foreground, and promote. Writes to the filesystem prioritize the foreground drives, which are then moved to the background over time. Reads are cached on the promote drives.\n\nA recommended configuration is to use an ssd group for the foreground and promote, and an hdd group for the background (a writeback cache).\n\n```\n# bcachefs format \\\n    --label=ssd.ssd1 /dev/sdA \\\n    --label=ssd.ssd2 /dev/sdB \\\n    --label=hdd.hdd1 /dev/sdC \\\n    --label=hdd.hdd2 /dev/sdD \\\n    --label=hdd.hdd3 /dev/sdE \\\n    --label=hdd.hdd4 /dev/sdF \\\n    --replicas=2 \\\n    --foreground_target=ssd \\\n    --promote_target=ssd \\\n    --background_target=hdd\n# mount -t bcachefs /dev/sdA:/dev/sdB:/dev/sdC:/dev/sdD:/dev/sdE:/dev/sdF /mnt\n```\n\nFor a writethrough cache, do the same as above, but set --durability=0 device on each of the ssd devices. For a writearound cache, foreground target to the hdd group, and promote target to the ssd group.\n\n"
+    },
+    {
+      "title": "Mounting",
+      "level": 3,
+      "content": "The default way of mounting is to specify every device in the mount directive.\n\n```\n# mount -t bcachefs /dev/sdA:/dev/sdB:/dev/sdC:/dev/sdD:/\n```\n\nThe mount.bcachefs command supports mounting a filesystem by UUID, which is displayed by bcachefs format on filesystem creation.\n\n```\n# mount.bcachefs UUID=f66d108f-83d2-4679-b50b-7d5e710f6a2b /mnt/\n```\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nMost options can be set\n\n- during bcachefs format,\n- after format with bcachefs set-fs-option,\n- at mount time with mount -o option=value,\n- or through sysfs, for example, echo X > /sys/fs/bcachefs/UUID/options/option.\n\nMount options override those set by the other methods, which save them to the filesystem's superblock.\n\nExamples of some available options are:\n\nTable content:\nOption | Description\nmetadata_checksum | specifies the checksum algorithm to be used for metadata writes. By default the algorithm is crc32c. You can choose one of none, crc32c, crc64, xxhash.\ndata_checksum | specifies the checksum algorithm to be used for data writes, shares the same defaults and options as metadata_checksum.\ncompression | specifies the algorithm to be used for (foreground) compression. By default this option is none. You can choose one of none, lz4, gzip, zstd.\nbackground_compression | specifies the algorithm to be used for (background) compression, shares the same defaults and options as compression.\nstr_hash | specifies the hashing function to be used for directory entries and xattrs. You can choose one of crc32c, crc64 and siphash.\nnocow | all writes will be done in place when possible. Snapshots and reflinks will still cause writes to be COW, this option implicitly disables data checksumming, compression and encryption.\nencrypted | enables encryption on the filesystem (chacha20/poly1305); passphrase will be prompted for.\n\nMore options can be found in the bcachefs documentation.\n\nThe following can also be set on a per directory or per file basis with bcachefs setattr file --option=value. It will propagate options recursively if you set it on a directory.\n\n- data_replicas\n- data_checksum\n- compression, background_compression\n- foreground_target, background_target, promote_target\n\nTo check what options are active you can do getfattr -d -m 'bcachefs_effective\\.' directory/file\n\n"
+    },
+    {
+      "title": "Changing a device's group",
+      "level": 3,
+      "content": "The group of a device can be changed through the sysfs.\n\n```\n# echo group.drive_name > /sys/fs/bcachefs/filesystem_uuid/dev-X/label\n```\n\n"
+    },
+    {
+      "title": "Adding a device",
+      "level": 3,
+      "content": "```\n# bcachefs device add --label=group.drive_name /mnt /dev/device\n```\n\nIf this is the first drive in a group, you will need to change the target settings to make use of it. This example is for adding a cache drive.\n\n```\n# echo new_group > /sys/fs/bcachefs/filesystem_uuid/options/promote_target\n# echo new_group > /sys/fs/bcachefs/filesystem_uuid/options/foreground_target\n# echo old_group > /sys/fs/bcachefs/filesystem_uuid/options/background_target\n```\n\n"
+    },
+    {
+      "title": "Removing a device",
+      "level": 3,
+      "content": "First make sure there are at least 2 metadata replicas (Evacuate does not appear to work for metadata). If your data and metadata are already replicated, you may skip this step.\n\n```\n# echo 2 > /sys/fs/bcachefs/UUID/options/metadata_replicas\n# bcachefs data rereplicate /mnt\n# bcachefs device set-state ro device\n# bcachefs device evacuate device\n```\n\nSetting state ro meaning read-only.\n\nTo remove the device:\n\n```\n# bcachefs device remove device\n# bcachefs data rereplicate /mnt\n```\n\n"
+    },
+    {
+      "title": "Replication",
+      "level": 3,
+      "content": "Metadata and data replicas can be configured separately depending upon the level of redundancy a user desires. There are five options relating to replicas:\n\n- --replicas=X sets the number of metadata and data replicas at the same time.\n- --metadata_replicas=X sets the number of metadata replicas which will eventually be written.\n- --data_replicas=X sets the number of data replicas which will eventually be written.\n- --metadata_replicas_required=X sets the number of metadata replicas which must be written before the metadata is considered \"written\".\n- --data_replicas_required=X sets the number of data replicas which must be written before the data is considered \"written\".\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nNote: **The factual accuracy of this article or section is disputed.** The factual accuracy of this article or section is disputed.\n\nThe factual accuracy of this article or section is disputed.\n\nThe distinction between --[meta]data_replicas_required and --[meta]data_replicas is important, as the replicas required value sets the floor for the number of replicas that will be written immediately, whereas the replicas value sets the target number of replicas that will eventually be written.\n\n"
+    },
+    {
+      "title": "Compression",
+      "level": 3,
+      "content": "Compression is set with the --compression= option. It is also possible to set the compression level. As an example to set zstd compression level 5, you can use --compression=zstd:5.\n\n"
+    },
+    {
+      "title": "Subvolumes",
+      "level": 3,
+      "content": "Bcachefs supports subvolumes and snapshots with a similar userspace interface as Btrfs. A new subvolume may be created empty, or it may be created as a snapshot of another subvolume. Snapshots are writeable and may be snapshot-ted again, creating a tree of snapshots.\n\nSnapshots are very cheap to create: they’re not based on cloning of COW btrees as with Btrfs, but instead are based on versioning of individual keys in the btrees. Many thousands or millions of snapshots can be created, with the only limitation being disk space.\n\n"
+    },
+    {
+      "title": "Creating a subvolume",
+      "level": 4,
+      "content": "To create a new, empty subvolume:\n\n```\n# bcachefs subvolume create /path/to/subvolume\n```\n\n"
+    },
+    {
+      "title": "Deleting a subvolume",
+      "level": 4,
+      "content": "To delete an existing subvolume or snapshot:\n\n```\n# bcachefs subvolume delete /path/to/subvolume\n```\n\n"
+    },
+    {
+      "title": "Creating a snapshot of an existing subvolume",
+      "level": 4,
+      "content": "To create a snapshot of an existing subvolume:\n\n```\n# bcachefs subvolume snapshot /path/to/source /path/to/dest\n```\n\nA subvolume can also be deleting with a normal rmdir after deleting all the contents, as with rm -rf.\n\nFeatures including recursive snapshot creation and a method for recursively listing subvolume are still to be implemented.\n\n"
+    },
+    {
+      "title": "Tips and tricks",
+      "level": 2,
+      "content": "Note: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nCheck the journal for more useful error messages.\n\n"
+    },
+    {
+      "title": "Flag Ordering",
+      "level": 3,
+      "content": "Some bcachefs format flags are set based upon their argument order and only affect drives that come after the flag is toggled. For example, if you want SSDs to have --durability=0 and enable --discard while HDDs use defaults, make sure arguments are passed in the following order:\n\n```\n# bcachefs format \\\n    --label=hdd.hdd1 /dev/sdC \\\n    --label=hdd.hdd2 /dev/sdD \\\n    --label=hdd.hdd3 /dev/sdE \\\n    --label=hdd.hdd4 /dev/sdF \\\n    --durability=0 --discard \\\n    --label=ssd.ssd1 /dev/sdA \\\n    --label=ssd.ssd2 /dev/sdB \\\n    --replicas=2 \\\n    --foreground_target=ssd \\\n    --promote_target=ssd \\\n    --background_target=hdd\n```\n\n"
+    },
+    {
+      "title": "Setting replicas after format",
+      "level": 3,
+      "content": "It is possible to set replica count after format using set-fs-option.\n\n```\n# bcachefs set-fs-option --metadata_replicas=2 --data_replicas=2 /dev/sdX\n```\n\nAfterwards you'll need to tell bcachefs to ensure that all files have a replica with:\n\n```\n# bcachefs data rereplicate /mnt\n```\n\n"
+    },
+    {
+      "title": "32-bit programs cannot see directory contents",
+      "level": 3,
+      "content": "Some 32-bit programs may fail to retrieve contents of directories in Bcachefs, due to incompatibility of data returned by the filesystem when a readdir(3) syscall is performed. [3]\n\nThis can be worked around by temporarily using a different filesystem, such as tmpfs, for such a program to read and write from.\n\n"
+    },
+    {
+      "title": "swapfile contains holes or other unsupported extents.",
+      "level": 3,
+      "content": "Bcachefs does not currently support swapfiles.\n\n"
+    },
+    {
+      "title": "Multi-device fstab",
+      "level": 3,
+      "content": "There is currently a bug in systemd that does not make it possible for it to mount a multi-device bcachefs filesystem at boot using devices separated by colons in fstab. It will work when doing mount -a, but will not mount at boot. However since bcachefs-tools version 1.7.0 it is possible to mount a multi-device array using one device node; this allows the use of the normal UUID specifier.\n\n```\n# UUID=10176fc9-c4fa-4a30-9fd0-a756d861c4cd     /mnt   bcachefs defaults,nofail 0 0\n```\n\nThe filesystem UUID / External UUID can be found by either using:\n\n```\n# bcachefs fs usage /mnt\n# bcachefs show-super /dev/sdXY\n```\n\n"
+    },
+    {
+      "title": "Mounting an encrypted device errors",
+      "level": 3,
+      "content": "When the mounting of a device created with the --encrypted option fails after bcachefs unlock /dev/sdXY with\n\n```\nERROR - bcachefs::commands::cmd_mount: Fatal error: Required key not available\n```\n\nIt can be worked-around by manually linking the keys to the session[4]:\n\n```\n# keyctl link @u @s\n# mount /dev/sdXY /mnt\nEnter passphrase:\n```\n\nThe renewed entry of the passphrase queried by mount is not necessary (pressing Enter suffices).\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official Manual\n- Kent Overstreet's Patreon page\n- Wikipedia:Bcachefs\n- bcachefs on ReadTheDocs\n\n"
+    }
+  ]
+}

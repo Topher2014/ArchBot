@@ -1,0 +1,91 @@
+{
+  "title": "Dell G5 SE 5505",
+  "url": "https://wiki.archlinux.org/title/Dell_G5_SE_5505",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Table content:\nHardware | PCI/USB ID | Working?\nGPU | 1002:731f | Yes\nWireless | 8086:2723 | Yes\nBluetooth | 8087:0029 | Yes\nAudio | 1022:15e3 | Yes\nTouchpad | 04F3:30CB | Yes\nWebcam | 0c45:671f | Yes\nEthernet | 10ec:8168 | Yes\n\nThis page describes the Dell G5 SE 5505 laptop in thorough detail.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Before booting into the installation media, disable Secure Boot in your BIOS. The BIOS is accessed by pressing the F2 or DEL key during the POST screen. To access the boot menu directly, press F8 during the POST screen. Install Arch Linux as usual with the UEFI installation method. It may be required to use the amdgpu.runpm=0 kernel parameters if GPU crashes are experienced. If there is an active Windows partition present, disable fast startup to prevent complications while installing Arch.\n\n"
+    },
+    {
+      "title": "Accessibility",
+      "level": 2,
+      "content": "If you are an individual with accessibility needs, this will unfortunately not be a great device for you. The FN shortcuts, BIOS UI, thermal management quirks, basic display, and lack of error code beeps are not accommodating for those with accessibility needs. This device contains no diagnostic LEDs aside from the ambiguous status indicator LED near the charge port.\n\n"
+    },
+    {
+      "title": "Firmware",
+      "level": 2,
+      "content": "There are a few ways to update the firmware on this device. Using Windows and the Dell provided tools on the support page for this laptop is certainly one of them, but that method often causes many issues.\n\nBefore we begin, make sure UEFI Capsule Updates is enabled in the UEFI settings. Passing firmware updates (especially UEFI or similar I/O updates) from an OS to the NVRAM (where firmware data is \"physically stored\" on the motherboard) is impossible to achieve otherwise.\n\nSince we are downloading files to a storage medium with very limited storage capacity, it is important to make sure there is sufficient available space in the NVRAM partition. Often times the above referenced Dell support tools used to install capsule updates from Windows fills the NVRAM with dump logs.\n\nNavigate to the /sys/firmware/efi/efivars/ and make sure to remove all dump-* files within this directory, if any.\n\nNow there are no dump files, we can update the system firmware by running fwupd. When running fwupdmgr update your device may restart: do not touch anything, especially the power button/AC adapter and let the updates run their course.\n\n"
+    },
+    {
+      "title": "Drivers",
+      "level": 3,
+      "content": "By default, there is very basic graphical functionality and performance. install mesa to run general 3D programs. See AMDGPU and Vulkan for full graphics installation information and instruction.\n\n"
+    },
+    {
+      "title": "Screen tearing",
+      "level": 3,
+      "content": "There is no screen tearing out of the box for Wayland sessions, but for gaming (at the time of writing) Wayland has considerable render and input latency unless the game is running in exclusive full-screen mode.\n\nTo eliminate screen tearing on X11 environments, see AMDGPU#Tear free rendering. This will also increase input and render latency unless pertinent display environment variables are explicitly configured.\n\n"
+    },
+    {
+      "title": "Dedicated GPU override",
+      "level": 3,
+      "content": "Many programs will default usage to the integrated GPU. To force (almost) any program to take advantage of the dedicated GPU, run DRI_PRIME=1 command, where command is the desired process you want to launch with your dGPU. For steam titles, adding DRI_PRIME=1 %command% to the launch options will make that specific title launch with the dGPU. For further clarification, read PRIME#For open source drivers - PRIME.\n\n"
+    },
+    {
+      "title": "Resizable BAR support",
+      "level": 3,
+      "content": "AMD's Smart Access Memory (\"Resizable BAR\") has been officially supported since kernel ≥ 5.11.4, but it will not function on this device until after it is manually enabled. The default BIOS configuration does not have SAM enabled, nor does it have an option available to enable it. Use of a BIOS editing tool, such as Smokeless Runtime Efi Patcher (SREP) is required to enable SAM/Resizable BAR.\n\n"
+    },
+    {
+      "title": "Fan control",
+      "level": 3,
+      "content": "An easy way to manually control fans, or to manually create custom fan curves i to use a this python script which can more accurately push the fans according to CPU and GPU temperatures. This script also restores the defunct Fn+F7 \"boost\" functionality by providing a command that manually activates the boost profile as defined by UEFI data.\n\n"
+    },
+    {
+      "title": "Monitoring sensor data",
+      "level": 3,
+      "content": "By default, the kernel loads the k10temp module to check CPU thermals. To monitor GPU temperature and see fan speeds, you will have to force load the dell-smm-hwmon kernel module (see [1] for its documentation), which is not loaded by default on this laptop.\n\n```\n# modprobe dell-smm-hwmon restricted=0 ignore_dmi=1\n```\n\nTo make this setting permanent, create:\n\n```\n/etc/modules-load.d/dell-smm-hwmon.conf\n```\n\n```\ndell-smm-hwmon\n```\n\nand\n\n```\n/etc/modprobe.d/dell-smm-hwmon.conf\n```\n\n```\noptions dell-smm-hwmon restricted=0 ignore_dmi=1\n```\n\nYou should now see a dell result in the result of sensors.\n\n"
+    },
+    {
+      "title": "CPU",
+      "level": 3,
+      "content": "The packages ryzenadj-gitAUR and ryzen-controller-binAUR (optional GUI for ryzenadj) should work out of the box to control maximum temperature and TDP of your CPU. For example, the following command will restrict your CPU TDP to 40 Watts and maximum temperature to 70°C (perfectly safe on this laptop).\n\n```\n# ryzenadj -a 40000 -b 40000 -c 40000 -f 70\n```\n\nsee [2] and [3] for detailed instructions on how to use these tools.\n\n"
+    },
+    {
+      "title": "Frequency",
+      "level": 4,
+      "content": "Undervolting and overclocking are not conventionally possible on this laptop. zenstates-gitAUR does not seem to have any effect on zen2 processors.[4]\n\nacpi-cpufreq is working down to 1.40 GHz. amd_pstate fails to load with BIOS Version 1.14.0:\n\n```\nkernel: amd_pstate: the _CPC object is not present in SBIOS or ACPI disabled.\n```\n\nThis more than likely ties into the strange no sleep/hibernation issue.\n\n"
+    },
+    {
+      "title": "GPU",
+      "level": 3,
+      "content": "It may be possible to use corectrl. Also see AMDGPU#Overclocking. Unknown compaitibility (2024-06-04)\n\nWhile it increases performance, the battery lasts under two hours when amdgpu.runpm=0 is used and the dedicated GPU never turns off.\n\nSince Kernel Version 6.0.x and BIOS Version: 1.13.0 amdgpu power management sees fewer GPU crashes.\n\nShow power management profiles:\n\n```\n# cat /sys/class/drm/card?/device/pp_power_profile_mode\n```\n\nEnable power saving mode (as root):\n\n```\n# echo manual > /sys/class/drm/card0/device/power_dpm_force_performance_level\n# echo \"2\" > /sys/class/drm/card0/device/pp_power_profile_mode\n```\n\nSee amdgpu kernel documentation\n\n"
+    },
+    {
+      "title": "System power states",
+      "level": 3,
+      "content": "Suspension and hibernation features simply do not work. You can try to enabling its support via BIOS injection, see [5]\n\n"
+    },
+    {
+      "title": "Keyboard",
+      "level": 2,
+      "content": "The keyboard for this device features a four section LED backlight with 18.7mm x 18.05mm keys. The keyboard by defauly features a QWERTY layout. The North American model contains 81 keys, the UK mod contains 82 keys, and the model released in Japan contains 85 keys.\n\n"
+    },
+    {
+      "title": "Function key",
+      "level": 2,
+      "content": "Note: **This article or section does not follow the Laptop page guidelines.** This article or section does not follow the Laptop page guidelines.\n\nThis article or section does not follow the Laptop page guidelines.\n\nTable content:\nInput Key | Visible?1 | Marked?2 | Effect\nFn+Esc | Yes | Yes | Toggle Fn lock\nFn+F1 | Yes | Yes | Mute audio\nFn+F2 | Yes | Yes | Lower Volume\nFn+F3 | Yes | Yes | Raise Volume\nFn+F4 | Yes | Yes | Play previous track/chapter\nFn+F5 | Yes | Yes | Play/Pause\nFn+F6 | Yes | Yes | PLay next track/chapter\nFn+F7 | Yes | Yes | Enables Game Shift Mode. OS dependent unless a compatibility script is installed.\nFn+F8 | Yes | Yes | Switch to external display\nFn+F10 | Yes | Yes | Toggle keyboard backlight\nFn+F11 | Yes | Yes | Decrease brightness\nFn+F12 | Yes | Yes | Increase brightness\nFn+PrtSc | Yes | Yes | Toggle wireless\nFn+ctrl | Yes | Yes | Open Application Menu\nFn+B | Yes | No | Pause/Break\nFn+insert | Yes | No | Sleep\nFn+S | Yes | No | Toggle Scroll Lock\nFn+H | Yes | No | Toggle between power and battery-status light\nFn+R | Yes | No | System Request\nFn+pg up | Yes | No | Page Up\nFn+pg dn | Yes | No | Page Down\nFn+home | Yes | No | Home\nFn+end | Yes | No | End\nFn+F9 | No | No | Search\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The official DELL product specifications page\n- The Dell G series Wikipedia page\n- The Dell G5 SE Reddit board\n\n"
+    }
+  ]
+}

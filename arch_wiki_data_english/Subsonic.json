@@ -1,0 +1,96 @@
+{
+  "title": "Subsonic",
+  "url": "https://wiki.archlinux.org/title/Subsonic",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Subsonic was a music server that let you store your music on one machine and play it from other machines, cell phones, via a web interface, or various other applications. It is no longer maintained. However, a maintained fork (airsonic-advanced-gitAUR) exists.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "The old, unmaintained version of subsonicAUR is still available. In addition, as of version 6, the software was not open source. Hence it is recommended for users to instead install the open-source fork airsonic-advanced-gitAUR.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "After performing any configuration, remember to restart subsonic.service.\n\n"
+    },
+    {
+      "title": "Install transcoders",
+      "level": 3,
+      "content": "By default, Subsonic uses FFmpeg to transcode videos and songs to an appropriate format and bitrate on-the-fly. After installation, you can change these defaults so that, for example, Subsonic will transcode FLAC files using FLAC and LAME instead of FFmpeg. You should therefore install the ffmpeg, and you may also want to install flac and lame.\n\nFor security reasons, Subsonic will not search the system for any transcoders. Instead, the user must create symlinks to the transcoders in the /var/lib/subsonic/transcode folder. Create the symlinks like so:\n\n```\n$ cd /var/lib/subsonic/transcode\n# for transcoder in ffmpeg flac lame; do ln -s \"$(which $transcoder)\"; done\n```\n\n"
+    },
+    {
+      "title": "With Subsonic",
+      "level": 4,
+      "content": "To enable HTTPS browsing and streaming, edit /var/lib/subsonic/subsonic.sh and change the port from 0 to 8443:\n\n```\n/var/lib/subsonic/subsonic.sh\n```\n\n```\nSUBSONIC_HTTPS_PORT=8443\n```\n\n"
+    },
+    {
+      "title": "With nginx",
+      "level": 4,
+      "content": "If you already have multiple web services running, it might be easier to use a single SSL configuration everywhere. The following nginx configuration runs Subsonic under https://example.com/subsonic:\n\n```\nserver {\n    listen              443 default ssl;\n    server_name         example.com;\n    ssl_certificate     cert.pem\n    ssl_certificate_key key.pem\n\n    location /subsonic {\n      proxy_set_header X-Real-IP         $remote_addr;\n      proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;\n      proxy_set_header X-Forwarded-Proto https;\n      proxy_set_header Host              $http_host;\n      proxy_max_temp_file_size           0;\n      proxy_pass                         http://127.0.0.1:4040;\n      proxy_redirect                     http:// https://;\n    }\n}\n```\n\nTo run Subsonic under a different path, you have to set the following options:\n\n```\n/var/lib/subsonic/subsonic.sh\n```\n\n```\nSUBSONIC_CONTEXT_PATH=/subsonic\nSUBSONIC_HOST=127.0.0.1\nSUBSONIC_PORT=4040\nSUBSONIC_HTTPS_PORT=0\n```\n\n"
+    },
+    {
+      "title": "With lighttpd",
+      "level": 4,
+      "content": "The following configuration makes lighttpd accept HTTPS connections and proxies them to localhost. An advantage of this approach is that Subsonic does not need to be aware of SSL settings, and it can be left with default settings. This configuration is also designed to play well with the case where lighttpd is hosting multiple sites at a single IP address.\n\n```\n/etc/lighttpd.conf\n```\n\n```\n# Documentation at: https://redmine.lighttpd.net/projects/lighttpd/wiki/Docs\n# Check for errors: lighttpd -t -f /path/to/config\nserver.modules += (\"mod_proxy\", \"mod_redirect\")\nserver.username       =  \"http\"\nserver.groupname      =  \"http\"\nserver.pid-file       =  \"/var/run/lighttpd.pid\"\nserver.errorlog       =  \"/var/log/lighttpd/error.log\"\nserver.document-root  = \"/srv/http/\"\nindex-file.names = (\"index.html\")\nmimetype.assign = (\n    \".avi\"       =>  \"video/x-msvideo\",\n    \".css\"       =>  \"text/css\",\n    \".html\"      =>  \"text/html\",\n    \".jpg\"       =>  \"image/jpeg\",\n    \".log\"        =>  \"text/plain\",\n    \".markdown\"  =>  \"text/plain\",\n    \".md\"        =>  \"text/plain\",  # markdown\n    \".mkv\"       =>  \"video/x-matroska\",\n    \".mp4\"       =>  \"video/mp4\",\n    \".nfo\"        =>  \"text/plain\",\n    \".png\"       =>  \"image/png\",\n    \".rc\"        =>  \"text/plain\",\n    \".rst\"       =>  \"text/plain\",  # reStructuredText\n    \".svg\"       =>  \"image/svg+xml\",\n    \".txt\"       =>  \"text/plain\",\n    \".xml\"       =>  \"application/xml\",\n    \"\"           =>  \"application/octet-stream\"\n)\n\n$SERVER[\"socket\"] == \":80\" {\n    $HTTP[\"host\"] == \"subsonic.example.com\" {\n        url.redirect = (\"^/(.*)\" => \"https://subsonic.example.com/$1\")\n    }\n}\n\n$SERVER[\"socket\"] == \":443\" {\n    # A default ssl.pemfile is required. It can be overridden in specific host\n    # blocks. It *may* also be possible to override ssl.ca-file, but this has\n    # not been tested.\n    ssl.engine  = \"enable\"\n    ssl.use-sslv3 = \"disable\"\n    ssl.ca-file = \"/etc/lighttpd/ssl/GandiStandardSSLCA2.pem\"\n    ssl.pemfile = \"/etc/lighttpd/ssl/subsonic.example.com.pem\"\n\n    $HTTP[\"host\"] == \"subsonic.example.com\" {\n        ssl.pemfile = \"/etc/lighttpd/ssl/subsonic.example.com.pem\"\n        proxy.server = (\n            # This proxying is completely transparent to clients. We load\n            # balance requests for this path or extension...\n            \"\" => (\n                # ... among the following servers. The string naming each server\n                # is just a label, and it has little functional impact. (It\n                # might affect log file output?)\n                (\"host\" => \"127.0.0.1\", \"port\" => 4040)\n            )\n        )\n    }\n}\n```\n\n"
+    },
+    {
+      "title": "FLAC playback",
+      "level": 3,
+      "content": "The FFmpeg transcoder does not handle FLAC files well, and clients will often fail to play the resultant streams. Using FLAC and LAME instead of FFmpeg may solve this issue. This workaround requires that the FLAC and LAME transcoders have been installed, as explained in #Install transcoders.\n\nStart Subsonic and go to settings > transcoding. Ensure that the default FFmpeg transcoder does not get used on .flac files, then add a new entry. You will end up with something like this:\n\nTable content:\nName | Convert from | Convert to | Step 1 | Step 2\nmp3 default | ... NOT flac ... | mp3 | ffmpeg ... | \nmp3 flac | flac | mp3 | flac --silent --decode --stdout %s | lame --silent -h -b %b -\n\n"
+    },
+    {
+      "title": "Accessing the database",
+      "level": 3,
+      "content": "Subsonic stores all its data inside a HyperSQL database in /var/lib/subsonic/db. You can access it with a simple web interface by going to http://localhost:4040/db.view (replace with your Subsonic URL).\n\nYou can also use the SQLTool command-line tool from the HyperSQL distribution, found in hsqldb2-javaAUR.\n\nThis command can be run interactively without other arguments :\n\n```\n$ java -jar /usr/share/java/sqltool.jar --inlineRc=url=jdbc:hsqldb:file:db.copy/libresonic,user=sa,password=\nSqlTool v. 5337.\nJDBC Connection established to a HSQL Database Engine v. 2.3.3 database\n...\nsql>\n```\n\nIt can also run commands non-interactively. This command exports all the contents in the MEDIA_FILE table :\n\n```\n$ java -jar /usr/share/java/sqltool.jar --inlineRc=url=jdbc:hsqldb:file:db.copy/libresonic,user=sa,password= - <<< '\\xq MEDIA_FILE'\n8074 row(s) fetched from database.\nWrote 3252295 characters to file 'MEDIA_FILE.csv'.\n```\n\nThis command exports the whole database as a SQL file :\n\n```\n$ java -jar /usr/share/java/sqltool.jar --inlineRc=url=jdbc:hsqldb:file:db.copy/libresonic,user=sa,password= - <<< \"backup database to 'backup.tar' script not compressed;\"\n1 / 1 subsonic.script...\n```\n\n"
+    },
+    {
+      "title": "Libresonic/Airsonic",
+      "level": 3,
+      "content": "Subsonic was subsequently forked as Libresonic. This was also open-source, but had removed the paid-licence checks, hence was also free as in free beer. However neither Subsonic nor Libresonic are maintained. The current fork continues with the name Airsonic-Advanced.\n\n"
+    },
+    {
+      "title": "Madsonic",
+      "level": 3,
+      "content": "madsonicAUR is a (non-free) fork of Subsonic with extra features.\n\nOnce you start the server, pay close attention to the Transcoding options, as you will probably have to change the command from \"Audioffmpeg\" to \"ffmpeg\".\n\n"
+    },
+    {
+      "title": "Gonic",
+      "level": 3,
+      "content": "gonicAUR is a lightweight music streaming server which implements the Subsonic API\n\n"
+    },
+    {
+      "title": "Navidrome",
+      "level": 3,
+      "content": "navidrome is also a modern and good alternative music server which implements the Subsonic API. It is written in Go and it works on a variety of platforms including Raspberry PIs [1].\n\n"
+    },
+    {
+      "title": "Feishin",
+      "level": 3,
+      "content": "feishinAUR (previously maintained as sonixdAUR) is a cross platform, desktop Subsonic API client player\n\n"
+    },
+    {
+      "title": "Strawberry Music Player",
+      "level": 3,
+      "content": "strawberry has the ability to playback music from Subsonic API servers\n\n"
+    },
+    {
+      "title": "Sublime Music",
+      "level": 3,
+      "content": "sublime-musicAUR is a native, graphical Subsonic client.\n\n"
+    },
+    {
+      "title": "stmps",
+      "level": 3,
+      "content": "stmps-gitAUR is a Subsonic client for the terminal.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Official web site\n\n"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "title": "Bluetooth mouse",
+  "url": "https://wiki.archlinux.org/title/Bluetooth_mouse",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Bluetooth\n- Mouse polling rate\n\nThis article describes configuration & troubleshooting steps specific to Bluetooth mice. The information here builds on the main Bluetooth article, and assumes the user has already followed any installation, configuration, or troubleshooting from that article.\n\n"
+    },
+    {
+      "title": "Apple Magic Mouse scroll speed",
+      "level": 3,
+      "content": "If the scroll speed is too slow, you can try\n\n```\n# modprobe -r hid_magicmouse\n# modprobe hid_magicmouse scroll_acceleration=1 scroll_speed=55\n```\n\nScroll speed can be set from 0 to 63.\n\nIf the speed suits you, you can make the change permanent in /etc/modprobe.d/\n\n```\n/etc/modprobe.d/hid_magicmouse.conf\n```\n\n```\noptions hid_magicmouse scroll_acceleration=1 scroll_speed=55\n```\n\n"
+    },
+    {
+      "title": "Apple Magic Mouse middle click",
+      "level": 3,
+      "content": "If you find the middle click to be too finicky, you can disable it\n\n```\n# modprobe -r hid_magicmouse\n# modprobe hid_magicmouse emulate_3button=0\n```\n\nIf this setting suits you, you can make the change permanent in /etc/modprobe.d/\n\n```\n/etc/modprobe.d/hid_magicmouse.conf\n```\n\n```\noptions hid_magicmouse emulate_3button=0\n```\n\n"
+    },
+    {
+      "title": "Mouse pairing and dual boot",
+      "level": 3,
+      "content": "When dual booting Windows and Linux, you may find yourself having to re-pair your Bluetooth mouse again and again. This will happen every time you switch OS, because when you pair your device, your Bluetooth service generates a unique set of pairing keys. And the core reason is that the set of pairing keys cannot be shared between the two OS.\n\nFirst, your computer stores the Bluetooth device's mac address and pairing key. Second, your Bluetooth device stores your computer's mac address and the matching key. This usually works fine, but the mac address for your Bluetooth port will be the same on both Linux and Windows (it is set on the hardware level). However, when you re-pair the device in Windows or Linux, it generates a new key. That key overwrites the previously stored key on the Bluetooth device. Windows overwrites the Linux key and vice versa.\n\nTo fix the problem, see Bluetooth#Dual boot pairing.\n\nif using a Bluetooth LE device use this python script, slightly edited to adapt for arch, originally discussed on [1].\n\n"
+    },
+    {
+      "title": "Mouse lag",
+      "level": 3,
+      "content": "If you experience mouse lag you can try to increase the polling rate. See Mouse polling rate for more information.\n\nYou can try to set the minimum/maximum latency for the mouse in BlueZ [2]:\n\nAdd or modify the following section in /var/lib/bluetooth/mac-of-your-adapter/mac-of-your-mouse/info (adapt the path accordingly):\n\n```\n[ConnectionParameters]\nMinInterval=6\nMaxInterval=9\nLatency=44\nTimeout=216\n```\n\nAlso, you can use hcitool (in bluez-deprecated-tools) to change latency parameters of the device:\n\n```\n# HANDLE=\"$(hcitool con | grep '<Bluetooth Mouse mac address>' | awk '{print $5}')\"  # get the device handle\n# hcitool lecup --handle $HANDLE --latency 0 --min 6 --max 8\n```\n\nNote that this method is only effective for the current connection. If the mouse gets disconnected, you will need to execute again.\n\nAlternatively, you can change the default latency settings via debugfs. See /sys/kernel/debug/bluetooth/hci0/conn_{latency,{min,max}_interval} .\n\nThis example will solve the lag problems, but you must un pair and pair the mouse:\n\n```\n# echo 0 > /sys/kernel/debug/bluetooth/hci0/conn_latency\n# echo 6 > /sys/kernel/debug/bluetooth/hci0/conn_min_interval\n# echo 7 > /sys/kernel/debug/bluetooth/hci0/conn_max_interval\n```\n\n"
+    },
+    {
+      "title": "Problems with the USB dongle",
+      "level": 3,
+      "content": "If you have trouble with your USB dongle, you may also want to try:\n\n```\n# modprobe -v rfcomm\n```\n\nAt this point, you should get an hci0 device with:\n\n```\n# hcitool dev\n```\n\nSometimes the device is not active right away. Try starting the interface with:\n\n```\n# hciconfig hci0 up\n```\n\nand searching for devices as shown above.\n\n"
+    },
+    {
+      "title": "Mouse always disconnects",
+      "level": 3,
+      "content": "If the mouse stops working but works again after restarting bluetooth, or the mouse seemingly keeps \"falling asleep\" after a couple of seconds of inactivity (which is the case for at least some models of Dell XPS 13 [3]), you may need to disable USB autosuspend for the selected device.\n\nThe issue may also lie in the device timeout and HID settings. See #Thinkpad Bluetooth Laser Mouse problems.\n\nIf you are using a Logitech device, this issue may be resolved by following the procedure in #Problems with the Logitech BLE mouse (M557, M590, M720, anywhere mouse 2, etc).\n\n"
+    },
+    {
+      "title": "Thinkpad Bluetooth Laser Mouse problems",
+      "level": 3,
+      "content": "If you are experiencing that your Thinkpad Bluetooth Laser Mouse rapidly connects and then (after a few milliseconds) disconnects again every few seconds (when you move the mouse or press a button), try pairing it with the code 0000 instead pairing without a code.\n\nIf the above is unhelpful, the issue may be in the device timeout settings. Edit/create the file /etc/bluetooth/input.conf and apply the following changes:\n\n```\n# Configuration file for the input service\n```\n\n```\n# This section contains options which are not specific to any\n# particular interface\n[General]\n\n# Set idle timeout (in seconds) before the connection will be disconnect and\n# the input device is removed.\n# Defaults: 0 (disabled)\nIdleTimeout=0\n\n# Enable HID protocol handling in userspace input profile\n# Defaults to true (Use UHID instead of kernel HIDP)\nUserspaceHID=true\n```\n\nThese changes will prevent device timeout in order to remain connected. The second setting enables userspace HID handling for Bluetooth devices. However, both should be set this way by default. Restart bluetooth.service to test changes. You also may need a reboot and to re-pair the device.\n\n"
+    },
+    {
+      "title": "Kensington Expert Wireless Trackball problems",
+      "level": 3,
+      "content": "The Kensington Expert Wireless Trackball has default polling rates in the 200ms range, which make it laggy. To fix that, add or modify the [ConnectionParameters] section in /var/lib/bluetooth/mac-of-your-adapter/mac-of-your-mouse/info (adapt the path according to your mouse bluetooth address) as shown above, especially lower the latency to a small number or even 0.\n\n"
+    },
+    {
+      "title": "Problems with the Logitech BLE mouse (M557, M590, M720, anywhere mouse 2, etc)",
+      "level": 3,
+      "content": "In some case, the mouse is paired but not moving when used. The device add to be trusted and unblocked. First of all open a terminal and run bluetoothctl\n\n1. Power off the bluetooth: [bluetooth] # power off\n1. Power on the bluetooth, then enable the pairing method on the mouse if needed: [bluetooth] # power on\n1. List the available bluetooth devices, you have to copy the mouse device ID XX:XX:XX:XX:XX:XX: [bluetooth] # scan on\n1. Unpair the device if already paired: [bluetooth] # remove XX:XX:XX:XX:XX:XX\n1. Put device in pairing mode (typically by long pressing a button). It will be detected by scan and displayed. Mind that the device ID may have changed (slightly), so copy the device ID shown by the scan.\n1. Trust the device: [bluetooth] # trust XX:XX:XX:XX:XX:XX\n1. Pair the mouse with the computer: [bluetooth] # pair XX:XX:XX:XX:XX:XX\n1. Connect the computer with the mouse: [bluetooth] # connect XX:XX:XX:XX:XX:XX\n1. Unblock the device control: [M585/M590] # unblock\n1. Power the bluetooth off and on.\n\n```\n[bluetooth] # power off\n```\n\n```\n[bluetooth] # power on\n```\n\n```\n[bluetooth] # scan on\n```\n\n```\n[bluetooth] # remove XX:XX:XX:XX:XX:XX\n```\n\n```\n[bluetooth] # trust XX:XX:XX:XX:XX:XX\n```\n\n```\n[bluetooth] # pair XX:XX:XX:XX:XX:XX\n```\n\n```\n[bluetooth] # connect XX:XX:XX:XX:XX:XX\n```\n\n```\n[M585/M590] # unblock\n```\n\nIf the mouse does not work directly, just power off and power on the mouse.\n\nIn some cases, it may also be necessary to load the uhid kernel module.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- BlueZ settings storage\n\n"
+    }
+  ]
+}

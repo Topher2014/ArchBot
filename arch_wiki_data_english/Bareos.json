@@ -1,0 +1,36 @@
+{
+  "title": "Bareos",
+  "url": "https://wiki.archlinux.org/title/Bareos",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Bareos (Backup Archiving Recovery Open Sourced) is a backup software, originally forked from the Bacula project. It is network-based, multi-client and very flexible with an architecture oriented towards scalability. Thus the learning curve might be considered somewhat steep. The project is backed by the commercial company Bareos GmbH & Co. KG, based in Germany.\n\nThe open-source project site is located at https://www.bareos.com/, the source code is hosted on Github https://github.com/bareos/\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "There is a group of packages in AUR that will install the software, but there is some minor manual labour necessary to make it run. It is recommended to use Bareos with PostgreSQL, since use with MariaDB/MySQL was deprecated with version 19.0.\n\nInstall the requirements first:\n\n- apache Apache Webserver\n- php-apache Apache PHP module\n- postgresql PostgreSQL Database\n- php-pgsql PostgreSQL module for PHP\n\n"
+    },
+    {
+      "title": "Pre-Configuration",
+      "level": 3,
+      "content": "Minimal configuration for Apache HTTP Server and PHP:\n\n- Follow the steps described in Apache HTTP Server#Using libphp\n- You will also need to enable the rewrite module, to do this, modify /etc/httpd/conf/httpd.conf and uncomment:\n\n```\nLoadModule rewrite_module modules/mod_rewrite.so\n```\n\nIf you are using a standard configuration file, change the following lines to the following:\n\n```\n#LoadModule mpm_event_module modules/mod_mpm_event.so \nLoadModule mpm_prefork_module modules/mod_mpm_prefork.so\n```\n\n```\n# bareos-webui\nInclude conf/extra/bareos-webui.conf\n```\n\n```\nLoadModule php_module modules/libphp.so\nInclude conf/extra/php_module.conf\n```\n\nTo use PHP7 you need to make the following fixes:\n\n```\nLoadModule php7_module modules/libphp7.so\nInclude conf/extra/php7_module.conf\n```\n\n- Then enable the postgresql extension in PHP as listed in PHP#PostgreSQL\n- And enable the gettext extension in PHP\n\nFixes in /etc/php7/php.ini or /etc/php7/php.ini:\n\n```\nopen_basedir = /tmp/:/usr/share/bareos-webui/:/etc/bareos-webui: \nextension=gettext\nextension=pgsql\n```\n\nMinimal configuration for PostgreSQL\n\n- Initialize the database by following PostgreSQL#Initial configuration\n\nStart/enable httpd.service and postgresql.service.\n\n"
+    },
+    {
+      "title": "Initial setup",
+      "level": 3,
+      "content": "These steps mostly follow the Instructions from docs.bareos.org, and include some Arch-specifics.\n\n- Setup the Bareos database\n\n```\n$ /usr/lib/bareos/scripts/create_bareos_database \n$ /usr/lib/bareos/scripts/make_bareos_tables\n$ /usr/lib/bareos/scripts/grant_bareos_privileges\n```\n\n- Copy default configuration files to the /etc/bareos/ directory\n\n```\n# cp -r /usr/share/bareos/config/* /etc/bareos/\n# chown -R bareos:bareos /etc/bareos\n```\n\n- Set the correct DB driver in the catalog configuration file\n\n```\n/etc/bareos/bareos-dir.d/catalog/MyCatalog.conf\n```\n\n```\ndbdriver = \"postgresql\"\n```\n\n- Now enable/start bareos-dir.service, bareos-sd.service and bareos-fd.service\n\n"
+    },
+    {
+      "title": "Add a user for the webui",
+      "level": 4,
+      "content": "- to start the interactive management shell, run:\n\n```\n$ bconsole\n```\n\n- inside the shell, you get a * as prompt, where you can enter the following commands:\n\n```\n*reload\n*configure add console name=admin password=password profile=webui-admin tlsenable=false\n*quit\n```\n\n"
+    },
+    {
+      "title": "Setup Apache",
+      "level": 4,
+      "content": "- we need to fix a path in two lines:\n\n```\n/etc/httpd/conf.d/extra/bareos-webui.conf\n```\n\n```\nAlias /bareos-webui  /usr/share/webapps/bareos-webui/public\n# ...\n<Directory /usr/share/webapps/bareos-webui/public>\n```\n\n- in the file /etc/httpd/conf/httpd.conf add the line:\n\n```\nInclude conf.d/extra/bareos-webui.conf\n```\n\n- restart Apache httpd.service\n\nNow you can now login to Bareos Webui at http://localhost/bareos-webui/ and login using the account you just created with bconsole.\n\n"
+    }
+  ]
+}

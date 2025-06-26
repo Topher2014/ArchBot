@@ -1,0 +1,76 @@
+{
+  "title": "Timer de systemd",
+  "url": "https://wiki.archlinux.org/title/Timer_de_systemd",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- systemd\n- systemd/User\n- systemd FAQ\n- cron\n\nTimers são arquivos de unit do systemd cujo nome termina em .timer que controla arquivos .service ou seus eventos. Timers podem ser usados como uma alternativa ao cron (leia #Como um substituto do cron). Os timers têm suporte interno para eventos de tempo do calendário, eventos de tempo monotônicos e podem ser executados de forma assíncrona.\n\n"
+    },
+    {
+      "title": "Units de timer",
+      "level": 2,
+      "content": "Timers são arquivos unit do systemd com um sufixo de .timer. Timers são como outros arquivos de configuração units e são carregados dos mesmos caminhos, mas incluem uma seção [Timer] que define quando e como o timer é ativado. Timers são definidos como um dos dois tipos:\n\n- Timers de tempo real (ou wallclock timers, relógios de parede) são ativados em um evento de calendário, da mesma forma que os cronjobs. A opção OnCalendar= é usada para defini-los.\n- Timers monotônicos são ativados após um período de tempo relativo a um ponto inicial variável. Eles param se o computador é temporariamente suspenso ou desligado. Há vários timers monotônicos diferentes, mas todos têm a forma: OnTipoSec=. Timers monotônicos comuns incluem OnBootSec e OnActiveSec.\n\nPara uma explicação completa das opções de timers, veja systemd.timer(5). A sintaxe de argumentos para eventos de calendário e períodos de tempo está definida em systemd.time(7).\n\n"
+    },
+    {
+      "title": "Unit de serviço",
+      "level": 2,
+      "content": "Para cada arquivo .timer, um arquivo .service correspondente existe (p.ex., foo.timer e foo.service). O arquivo .timer ativa e controla o arquivo .service. O .service não exige uma seção [Install], pois os units timer que são habilitados. Se necessário, é possível controlar uma unit com nome diferente usando a opção Unit= na seção [Timer] do timer.\n\n"
+    },
+    {
+      "title": "Gerenciamento",
+      "level": 2,
+      "content": "Para usar uma unit de timer, habilite e inicie-a como qualquer outra unit unit (lembre-se de adicionar o sufixo .timer). Para ver todos os timers iniciados, execute:\n\n```\n$ systemctl list-timers\n```\n\n```\nNEXT                          LEFT        LAST                          PASSED     UNIT                         ACTIVATES\nThu 2014-07-10 19:37:03 CEST  11h left    Wed 2014-07-09 19:37:03 CEST  12h ago    systemd-tmpfiles-clean.timer systemd-tmpfiles-clean.service\nFri 2014-07-11 00:00:00 CEST  15h left    Thu 2014-07-10 00:00:13 CEST  8h ago     logrotate.timer              logrotate.service\n```\n\n- Para listar todos os timers (incluindo inativos), use systemctl list-timers --all.\n- O status de um serviço iniciado por um timer provavelmente ficará inativo, a menos que esteja sendo acionado no momento.\n- Se um timer ficar fora de sincronia, pode ajudar a excluir seu arquivo stamp-* em /var/lib/systemd/timers (ou ~/.local/share/systemd/ no caso de timers do usuário). Estes são arquivos de comprimento zero que marcam a última vez que cada timer foi executado. Se excluídos, eles serão reconstruídos no próximo início do temporizador.\n\n"
+    },
+    {
+      "title": "Exemplos",
+      "level": 2,
+      "content": "Um arquivo unit de serviço pode ser agendado com um temporizador pronto para uso. Os exemplos a seguir agendam o foo.service para ser executado com um timer correspondente chamado foo.timer.\n\n"
+    },
+    {
+      "title": "Timer monotônico",
+      "level": 3,
+      "content": "Um timer que será iniciado 15 minutos após a inicialização e novamente toda semana enquanto o sistema estiver em execução.\n\n```\n/etc/systemd/system/foo.timer\n```\n\n```\n[Unit]\nDescription=Executa foo semanalmente e na inicialização\n\n[Timer]\nOnBootSec=15min\nOnUnitActiveSec=1w \n\n[Install]\nWantedBy=timers.target\n```\n\n"
+    },
+    {
+      "title": "Timer de tempo real",
+      "level": 3,
+      "content": "Um timer que começa uma vez por semana (às 00:00 da segunda-feira). Quando ativado, aciona o serviço imediatamente se perdeu a última hora de início (opção Persistent=true), por exemplo, devido ao sistema estar desligado:\n\n```\n/etc/systemd/system/foo.timer\n```\n\n```\n[Unit]\nDescription=Executa foo semanalmente\n\n[Timer]\nOnCalendar=weekly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n```\n\nQuando datas e horas mais específicas são necessárias, os eventos de OnCalendar usam o seguinte formato:\n\n```\nDiaDaSemana Ano-Mês-Dia Hora:Minuto:Segundo\n```\n\nUm asterisco pode ser usado para especificar qualquer valor e vírgulas podem ser usadas para listar possíveis valores. Dois valores separados por .. indicam um intervalo contíguo.\n\nNo exemplo abaixo, o serviço é executado nos primeiros quatro dias de cada mês às 12:00, mas somente se esse dia for uma segunda-feira ou uma terça-feira.\n\n```\nOnCalendar=Mon,Tue *-*-01..04 12:00:00\n```\n\nPara executar um serviço no primeiro sábado de cada mês, use:\n\n```\nOnCalendar=Sat *-*-1..7 18:00:00\n```\n\nAo usar a parte DiaDaSemana, pelo menos um dia da semana deve ser especificado. Se você quer que algo seja executado todos os dias às 4h da manhã, use:\n\n```\nOnCalendar=*-*-* 4:00:00\n```\n\nPara executar um serviço em momentos diferentes, OnCalendar pode ser especificado mais de uma vez. No exemplo abaixo, o serviço funciona às 22:30 durante a semana e às 20:00 nos finais de semana.\n\n```\nOnCalendar=Mon..Fri 22:30\n OnCalendar=Sat,Sun 20:00\n```\n\nMais informações estão disponíveis em systemd.time(7).\n\n- Especificações de tempo no OnCalendar pode ser testado para verificar sua validade e calcular a próxima vez que a condição decorrerá quando usada em um arquivo unit de timer com a opção calendar do utilitário systemd-analyse. Por exemplo, pode-se usar o systemd-analyze calendar weekly ou o systemd-analyze calendar \"Mon,Tue *-*-01..04 12:00:00\".\n- Expressões de eventos especiais como daily e weekly referem-se a horários de início específicos e, assim, todos os timers que compartilham esses eventos de calendário serão iniciados simultaneamente. Os timers que compartilham eventos iniciais podem causar um desempenho ruim do sistema se os serviços dos timers competirem pelos recursos do sistema. A opção RandomizedDelaySec na seção [Timer] evita esse problema, escalonando aleatoriamente a hora de início de cada timer. Veja systemd.timer(5).\n- Adicione a opção AccuracySec=1us à seção [Timer], para evitar a imprecisão do valor padrão 1m de AccuracySec. Consulte também systemd.timer(5).\n\n"
+    },
+    {
+      "title": "Units .timer transientes",
+      "level": 2,
+      "content": "Pode-se usar systemd-run para criar unidades .timer transitórias. Ou seja, é possível definir um comando para ser executado em um horário especificado sem ter um arquivo de serviço. Por exemplo, o seguinte comando toca um arquivo após 30 segundos:\n\n```\n# systemd-run --on-active=30 /bin/touch /tmp/foo\n```\n\nTambém é possível especificar um arquivo de serviço pré-existente que não tenha um arquivo de cronômetro. Por exemplo, o seguinte inicia a unit systemd denominada algumaunit.service após 12,5 horas:\n\n```\n# systemd-run --on-active=\"12h 30m\" --unit algumaunit.service\n```\n\nVeja systemd-run(1) para mais informações e exemplos.\n\n"
+    },
+    {
+      "title": "Como um substituto do cron",
+      "level": 2,
+      "content": "Embora o cron seja indiscutivelmente o agendador de tarefas mais conhecido, os temporizadores systemd podem ser uma alternativa.\n\n"
+    },
+    {
+      "title": "Benefícios",
+      "level": 3,
+      "content": "Os principais benefícios do uso de timers vêm de cada job ter seu próprio serviço systemd. Alguns desses benefícios são:\n\n- Os trabalhos podem ser facilmente iniciados independentemente de seus timers. Isso simplifica a depuração.\n- Cada trabalho pode ser configurado para ser executado em um ambiente específico (consulte systemd.exec(5)).\n- Os trabalhos podem ser anexados a cgroups.\n- Os trabalhos podem ser configurados para depender de outras units systemd.\n- Os trabalhos são registrados no diário systemd para facilitar a depuração.\n\n"
+    },
+    {
+      "title": "Ressalvas",
+      "level": 3,
+      "content": "Algumas coisas que são fáceis de fazer com o cron são difíceis de fazer apenas com units de timers:\n\n- Criação: para configurar um trabalho com timer com systemd, você precisa criar dois arquivos e executar comandos systemctl, em comparação com a adição de uma única linha a um crontab.\n- E-mails: não há um equivalente interno ao MAILTO do cron para enviar e-mails em caso de falha no trabalho. Veja a próxima seção para um exemplo de configuração de uma funcionalidade similar usando OnFailure=.\n\n"
+    },
+    {
+      "title": "MAILTO",
+      "level": 3,
+      "content": "Você pode configurar o systemd para enviar um e-mail quando uma unit falhar. Cron envia um e-mail para MAILTO se o trabalho é gerado para stdout ou stderr, mas muitos trabalhos são configurados para serem emitidos somente com erro. Primeiro você precisa de dois arquivos: um executável para enviar o e-mail e um .service para iniciar o executável. Para este exemplo, o executável é apenas um script de shell usando sendmail, que está em pacotes que fornecem smtp-forwarder.\n\n```\n/usr/local/bin/systemd-email\n```\n\n```\n#!/bin/sh\n\n/usr/bin/sendmail -t <<ERRMAIL\nTo: $1\nFrom: systemd <root@$HOSTNAME>\nSubject: $2\nContent-Transfer-Encoding: 8bit\nContent-Type: text/plain; charset=UTF-8\n\n$(systemctl status --full \"$2\")\nERRMAIL\n```\n\nSeja qual for o executável que você usa, ele provavelmente deve ter pelo menos dois argumentos, como o script de shell: o endereço para enviar e o arquivo de unit para obter o status. O .service que criamos passará esses argumentos:\n\n```\n/etc/systemd/system/status-email-usuário@.service\n```\n\n```\n[Unit]\nDescription=e-mail de estado de %i para usuário\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/systemd-email endereço %i\nUser=nobody\nGroup=systemd-journal\n```\n\nsendo usuário o usuário que está sendo enviado por e-mail e o endereço o endereço de e-mail desse usuário. Embora o destinatário esteja embutido em código, o arquivo unit a ser relatado é passado como um parâmetro de instância, portanto, esse serviço pode enviar emails para muitas outras units. Neste ponto, você pode iniciar status-email-usuário@dbus.service para verificar se você pode receber os e-mails.\n\nEm seguida, basta editar o serviço para o qual você deseja receber e-mails OnFailure=status-email-usuário@%n.service para o [Unit] seção. %n passa o nome da unit para o modelo.\n\n- Se você configurar a segurança do sSMTP de acordo com sSMTP#Security, o usuário nobody não terá acesso a /etc/ssmtp/ssmtp.conf e o comando systemctl start status-email-usuário@dbus.service falhará. Uma solução é usar root como o usuário da unit status-email-usuário@.service.\n- Se você tentar usar o mail -s algunslogs endereço no seu script de e-mail, mail fará um fork e o systemd eliminará o processo de e-mail quando vir sua saída de script. Certifique-se que o e-mail não faça um \"fork\" fazendo mail -Ssendwait -s algunslogs endereços.\n\n"
+    },
+    {
+      "title": "Usando um crontab",
+      "level": 3,
+      "content": "Várias das ressalvas podem ser contornadas instalando um pacote que analisa um crontab tradicional para configurar os timers. systemd-cron-nextAUR[link quebrado: package not found] e systemd-cronAUR são dois desses pacotes. Eles podem fornecer o recurso MAILTO ausente.\n\nAlém disso, assim como no crontabs, uma visão unificada de todos os trabalhos agendados pode ser obtida com systemctl. Veja #Gerenciamento.\n\n"
+    },
+    {
+      "title": "Veja também",
+      "level": 2,
+      "content": "- systemd.timer(5)\n- Página wiki do Projeto Fedora sobre timers de calendário do systemd\n- Seção no wiki do Gentoo sobre serviços de timer do systemd\n- systemd-cron-next — Ferramenta para gerar timers/serviços a partir de arquivos crontab e anacrontab\n\n- systemd-cron — Fornece units de systemd para executar scripts do cron; usando systemd-crontab-generator para converter crontabs\n\n"
+    }
+  ]
+}

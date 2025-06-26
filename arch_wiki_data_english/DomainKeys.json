@@ -1,0 +1,41 @@
+{
+  "title": "DomainKeys",
+  "url": "https://wiki.archlinux.org/title/DomainKeys",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Dkfilter is a DomainKeys filter for Postfix.\n\n"
+    },
+    {
+      "title": "What is it?",
+      "level": 2,
+      "content": "It is digital email signing/verification technology, which included into RFCs and already supported by many mail servers. (For example yahoo, google, etc).\n\n"
+    },
+    {
+      "title": "How it works?",
+      "level": 3,
+      "content": "Sender signs email with private key.\n\nReceiver gets signed email, request public key from DNS and verify it.\n\nSo you can check who actualy sent this email.\n\nSee RFC 4870 for more information.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the dkfilter package.\n\nBy default, you should add dkfilter user and group. If you do not want to do this, edit /etc/conf.d/dkfilter and change DKFILTER_USER and DKFILTER_GROUP.\n\n"
+    },
+    {
+      "title": "Generic configuration",
+      "level": 2,
+      "content": "- Generate key:\n\n```\n$ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.key\n$ openssl rsa -in private.key -pubout -out public.key\n```\n\n- Adjust /etc/conf.d/dkfilter.\n- Add DNS record with your selector (see DKFILTER_SELECTOR in /etc/conf.d/dkfilter, you may choose random name) and key:\n\n```\nserver1._domainkey IN TXT \"k=rsa; p=MHwwDQYJK ... OprwIDAQAB; t=y\"\n```\n\n- Start/enable dkfilter-in.service and dkfilter-out.service.\n\n"
+    },
+    {
+      "title": "Inbound filter",
+      "level": 3,
+      "content": "Inbound filter gets connection from port 10025 and output filtered data to port 10026. (Inbound filter does not remove any data, it just adds verification result into mail)\n\nAdd following into /etc/postfix/master.cf:\n\n```\n#\n# Before-filter SMTP server. Receive mail from the network and\n# pass it to the content filter on localhost port 10025.\n#\nsmtp      inet  n       -       n       -       -       smtpd\n    -o smtpd_proxy_filter=127.0.0.1:10025\n    -o smtpd_client_connection_count_limit=10\n#\n# After-filter SMTP server. Receive mail from the content filter on\n# localhost port 10026.\n#\n127.0.0.1:10026 inet n  -       n       -        -      smtpd\n    -o smtpd_authorized_xforward_hosts=127.0.0.0/8\n    -o smtpd_client_restrictions=\n    -o smtpd_helo_restrictions=\n    -o smtpd_sender_restrictions=\n    -o smtpd_recipient_restrictions=permit_mynetworks,reject\n    -o smtpd_data_restrictions=\n    -o mynetworks=127.0.0.0/8\n    -o receive_override_options=no_unknown_recipient_checks\n```\n\n"
+    },
+    {
+      "title": "Outbound filter",
+      "level": 3,
+      "content": "Outbound filter gets connection from port 10027 and output signed data to port 10028.\n\nAdd following into /etc/postfix/master.cf:\n\n```\n#\n# modify the default submission service to specify a content filter\n# and restrict it to local clients and SASL authenticated clients only\n#\nsubmission  inet  n     -       n       -       -       smtpd\n    -o smtpd_etrn_restrictions=reject\n    -o smtpd_sasl_auth_enable=yes\n    -o content_filter=dksign:[127.0.0.1]:10027\n    -o receive_override_options=no_address_mappings\n    -o smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject\n\n#\n# specify the location of the DomainKeys signing filter\n#\ndksign    unix  -       -       n       -       10      smtp\n    -o smtp_send_xforward_command=yes\n    -o smtp_discard_ehlo_keywords=8bitmime\n\n#\n# service for accepting messages FROM the DomainKeys signing filter\n#\n127.0.0.1:10028 inet  n  -      n       -       10      smtpd\n    -o content_filter=\n    -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks\n    -o smtpd_helo_restrictions=\n    -o smtpd_client_restrictions=\n    -o smtpd_sender_restrictions=\n    -o smtpd_recipient_restrictions=permit_mynetworks,reject\n    -o mynetworks=127.0.0.0/8\n    -o smtpd_authorized_xforward_hosts=127.0.0.0/8\n```\n\n"
+    }
+  ]
+}

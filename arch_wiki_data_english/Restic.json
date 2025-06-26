@@ -1,0 +1,76 @@
+{
+  "title": "Restic",
+  "url": "https://wiki.archlinux.org/title/Restic",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- System backup\n- Disk cloning\n- System maintenance#Backup\n- File recovery\n\nThis page discusses the restic backup tool, provides a 'quick start' guide, and suggests best practices in the context of Arch Linux.\n\nRestic's main features and benefits are:\n\n- encrypted backups\n- remote backups\n- built-in support for compression\n- efficient storage (chunk-based increments, data is not duplicated)\n- gives flexibility to use a custom scheduler like cron or systemd\n- written in Go, providing stand-alone binaries\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install restic, then initialise a repository in an empty directory (for local backups) with:\n\n```\n$ restic init --repo /path/to/backup/directory/\n```\n\nSee the official tutorial.\n\n"
+    },
+    {
+      "title": "Security",
+      "level": 2,
+      "content": "Restic stipulates threat-model assumptions for usage.\n\nIt uses symmetric encryption for repositories. This introduces some issues with scheduled backups[1][2], as the key would generally have to be stored in plain text for an automated process to be able to create the backup. Ideally there would be asymmetric encryption that allows to create snapshots with a public key (used in an automated script by restic) yet only decrypt the snapshot with a private key, but this is not supported.\n\nAs an advantage of restic's symmetric encryption, it features restic-key(1) commands to manage multiple keys for a repository. Hence, it is possible to add a primary key and secondary keys. Further, the --password-command option can be used to fetch a key from a vault. In combination it is possible to safeguard a primary key and use a secondary key:\n\n- for an append-only backup repository,\n- securing it via a vault like systemd-creds, or with a second-factor token.\n\nThe above methods can be configured both for a system (root) and a regular user, limiting the risk associated with plaintext password credentials for the backup repository.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nMention TLS features\n\n"
+    },
+    {
+      "title": "Systemd timers",
+      "level": 3,
+      "content": "Unlike other tools like timeshift[3], restic does not include a scheduling capability. You are expected to either use cron or systemd timers.\n\nYou can use a ready project like restic-automatic-backup-scheduler or follow this example that creates local (full) system backups and should be run as the root user.\n\nThe example assumes there is an existing directory where an existing restic repository has been initialised (see #Installation).\n\n"
+    },
+    {
+      "title": "Create separate volume",
+      "level": 4,
+      "content": "This step is optional, but it is a good idea to mount a separate volume there to prevent the automated backup process from potentially consuming all space available to the OS.\n\nThe first restic backup will have to clone the entire OS, so the minimum amount of space required is equal to the space taken up by the OS (subject to path exclusions described below) or any other directory that you decide to backup.\n\nOf course, you need space for any additional incremental changes in the future so it is a good idea to create a volume with 2 or even 3 times the size of the data being backed up. E.g. if / takes up 55G then you can create /mnt/restic with 110G.\n\n"
+    },
+    {
+      "title": "Systemd service",
+      "level": 4,
+      "content": "You will need a service unit. Create one:\n\n```\n/etc/systemd/system/restic-backup.service\n```\n\n```\n[Unit]\nDescription=Backup system\n\n[Service]\nExecStart=systemd-inhibit /usr/local/bin/restic-backup\n```\n\nUsing systemd gives you the option to put resource constraints on the backup process. E.g. you can limit the amount of memory and / or CPU. This is something you would configure in the systemd service unit. See systemd.resource-control(5).\n\nAnother way to constrain the resources used by restic is to use the GOMAXPROCS environment variable as described in the official documentation.\n\n"
+    },
+    {
+      "title": "Systemd timer",
+      "level": 4,
+      "content": "You will also need a timer unit (this one runs every 15 min):\n\n```\n/etc/systemd/system/restic-backup.timer\n```\n\n```\n[Unit]\nDescription=Timer for full system backups\n\n[Timer]\nOnBootSec=5min\nOnUnitActiveSec=15min\nUnit=restic-backup.service\n\n[Install]\nWantedBy=timers.target\n```\n\n"
+    },
+    {
+      "title": "Backup script",
+      "level": 4,
+      "content": "You will also want to create a small shell script to pass in all the required options, for example:\n\n```\n/usr/local/bin/restic-backup\n```\n\n```\n#!/bin/bash\n\nif pgrep -f 'restic backup' > /dev/null; then\n  echo 'restic is already running...' 1>&2\n  exit 0\nfi\n\nset -e\nset -v\n\nexport RESTIC_REPOSITORY='/mnt/restic'\nexport RESTIC_PASSWORD_COMMAND='/usr/local/bin/get-restic-password'\nexport RESTIC_COMPRESSION='off'\nexport RESTIC_CACHE_DIR=~/.cache/restic\n\nmkdir -p \"${RESTIC_CACHE_DIR}\"\n\nrestic unlock \nrestic backup / --exclude-file=/etc/restic/excludes.txt --tag scheduled \nrestic check --with-cache --read-data-subset=5G\nrestic forget --prune --keep-hourly 24 --keep-daily 30 --keep-monthly 6 --keep-weekly 4 --keep-yearly 3\n```\n\n```\n/usr/local/bin/get-restic-password\n```\n\n```\n#!/bin/bash\necho VerySecurePassword123\n```\n\n```\n# chmod 744 /usr/local/bin/restic-backup\n# chmod 700 /usr/local/bin/get-restic-password\n```\n\nYou might want to consider enabling compression in restic to save space if you are backing up data that is not already compressed (like large text files).\n\nAdjust the restic forget --prune --keep-hourly 24 --keep-daily 30 --keep-monthly 6 --keep-weekly 4 --keep-yearly 3 values in the script above if wanted.\n\nYou may also wish to tweak niceness of the backup process. If you are running backups often you will likely want to reduce the resource usage to prevent it from affecting interactive use. However, you should check how long the backups are taking and make sure they are not overlapping (i.e. a new backup being started when the previous one has not finished).\n\nYou can do that with nice(1). You may want to adjust the backup script by adding nice to the beginning of the resource intensive commands e.g.:\n\n```\n# nice -n 19 restic backup ...\n# nice -n 19 restic check ...\n```\n\nAlternatively if you are using ananicy-cpp you may want to ensure that the niceness is configured in its configuration file(s) under /etc/ananicy.d/.\n\n```\n/etc/ananicy.d/00-types.types\n```\n\n```\n{\"type\":\"file-sync\",\"nice\":19,\"ionice\":7}\n```\n\n```\n/etc/ananicy.d/99-custom/file-sync/restic.rules\n```\n\n```\n{\"name\": \"restic\", \"type\": \"file-sync\"}\n```\n\nRefer to the restic FAQ for more information.\n\nAdd the excludes file under /etc/restic e.g.:\n\n```\n/etc/restic/excludes.txt\n```\n\n```\n/data/**\n/dev/**\n/home/*/**/*.pyc\n/home/*/**/__pycache__/**\n/home/*/**/node_modules/**\n/home/*/.cache/**\n/home/*/.local/lib/python*/site-packages/**\n/home/*/.mozilla/firefox/*/Cache/**\n/lost+found/**\n/media/**\n/mnt/**\n/proc/**\n/root/**\n/run/**\n/swapfile\n/sys/**\n/tmp/**\n/var/cache/**\n/var/cache/pacman/pkg/**\n/var/lib/docker/**\n/var/lib/libvirt/**\n/var/lock/**\n/var/log/**\n/var/run/**\n```\n\nDo not forget to enable the restic-backup.timer.\n\n"
+    },
+    {
+      "title": "Remote append-only backup repository",
+      "level": 3,
+      "content": "As with most backup solutions, restic backups can usually be modified by the user that executes the backup. This makes the backup data vulnerable to manipulation and threats like ransomware. While the above example runs the backup as root and thereby prevents trivial modification by local unprivileged users, a compromise of the system will allow malware to delete/overwrite the backup data as well, even if that data is in a remote repository (since the local user authenticates to the remote repository). In order to setup a secure backup solution that cannot be modified, restic can be used in combination with rclone to make use of its append-only feature run on a restricted remote system.\n\n"
+    },
+    {
+      "title": "Setup restricted 'rclone serve' over ssh",
+      "level": 4,
+      "content": "The following will restrict the user to the specified command, effectively allowing only the addition of new data to the path /home/myuser/backup while preventing the modification of existing files.\n\n```\n/etc/ssh/sshd_config\n```\n\n```\n/etc/ssh/sshd_config\nMatch user myuser\n  ForceCommand rclone serve restic --stdio --append-only ./backup\n```\n\n"
+    },
+    {
+      "title": "Run restic through rclone",
+      "level": 4,
+      "content": "Initialize the backup repository on the remote ssh server:\n\n```\nrestic -o rclone.program='ssh myuser@backup.tld' -r rclone: init\n```\n\nExecute restic backup with rclone as transport:\n\n```\nrestic -o rclone.program='ssh myuser@backup.tld' -r rclone: backup /home/myuser/importantData\n```\n\n"
+    },
+    {
+      "title": "Append-only script",
+      "level": 4,
+      "content": "Note that it is no longer possible to use the prune option in order to delete old backups since no data on the remote repository can be modified now. The user can only write-append new files and read existing backup data to restore.\n\n```\n/usr/local/bin/restic-backup\n```\n\n```\n#!/bin/bash\n\nif pgrep -f 'restic backup' > /dev/null; then\n  echo 'restic is already running...' 1>&2\n  exit 0\nfi\n\nset -e\nset -v\n\nexport RESTIC_REPOSITORY=\"rclone:\"\nexport RESTIC_PASSWORD_COMMAND='/usr/local/bin/get-restic-password'\nexport RESTIC_COMPRESSION='off'\nexport RESTIC_CACHE_DIR=~/.cache/restic\n\nRCLONE_EXEC=\"rclone.program=ssh myuser@backup.tld forced-command\"\nDATA_PATH=\"/home/myuser/importantData\"\n\nmkdir -p \"${RESTIC_CACHE_DIR}\"\n\nrestic -o \"${RCLONE_EXEC}\" unlock\nrestic -o \"${RCLONE_EXEC}\" backup ${DATA_PATH} --exclude-file=\"$HOME/.local/scripts/excludes\" --tag scheduled\nrestic -o \"${RCLONE_EXEC}\" check --with-cache --read-data-subset=5G\n```\n\n"
+    },
+    {
+      "title": "Restoring backup data",
+      "level": 4,
+      "content": "```\nrestic -o rclone.program='ssh myuser@backup.tld forced-command' -r rclone: restore latest --target /tmp/restoredData\n```\n\n"
+    },
+    {
+      "title": "Password with token as second factor",
+      "level": 3,
+      "content": "The following employs a Universal 2nd Factor token, a YubiKey in this example, to derive a password used to unlock a restic repository with its --password-command option. A prerequisite is an already set up challenge-response slot, since it can be used for multiple purposes.\n\nFirst, a random user key is generated and fed into the token's challenge-response function to obtain its token-unique hash:\n\n```\n$ dd if=/dev/urandom of=/home/username/resticblob bs=512 count=1\n$ chmod 400 /home/username/resticblob\n$ ykchalresp -2 -i/home/username/resticblob\n71832e30cf9d5adb8672154d7a83fa1684f544d3\n```\n\nSecond, the hash is copy-pasted to be added as a user access key to the restic repository.\n\nNote: **must not** \n\n```\n$ restic -r /home/username/restic/ key add\nenter password for repository: \nrepository 045a06ef opened (version 2, compression level auto)\nenter new password: \nenter password again: \nsaved new key with ID 1991e876106f203c245e45a401b59dedec4aae6656f89152b66eca180385c1b\n```\n\nNow, the token can be used to access the repository transparently:\n\n```\n$ restic -r /home/username/restic unlock --password-command \"ykchalresp -2 -i/home/username/resticblob\"\nrepository 045a06ef opened (version 2, compression level auto)\n```\n\nNote for the non-interactive use this method requires a token configuration without user-presence (touch) verification for the challenge-response method and some tokens do not allow to configure the feature. The same restriction applies for other methods, unless the --password-command option is used to execute a shell script to prepare its output accordingly. Also possible is to use the --password-file option, see for example.\n\n"
+    }
+  ]
+}

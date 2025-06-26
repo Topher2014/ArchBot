@@ -1,0 +1,71 @@
+{
+  "title": "Python PKGBUILD",
+  "url": "https://wiki.archlinux.org/title/Python_PKGBUILD",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "32-bit – CLR – CMake – Cross – DKMS – Eclipse – Electron – Font – Free Pascal – GNOME – Go – Haskell – Java – KDE – Kernel modules – Lisp – Meson – MinGW – Node.js – Nonfree – OCaml – Perl – PHP – Python – R – Ruby – Rust - Security – Shell – VCS – Web – Wine\n\nThis document covers standards and guidelines on writing PKGBUILDs for Python software.\n\n"
+    },
+    {
+      "title": "Package naming",
+      "level": 2,
+      "content": "For Python 3 library modules, use python-modulename. Also use the prefix if the package provides a program that is strongly coupled to the Python ecosystem (e.g. pip or tox). For other applications, use only the program name.\n\n"
+    },
+    {
+      "title": "Architecture",
+      "level": 2,
+      "content": "See PKGBUILD#arch.\n\nA Python package that contains C extensions is architecture-dependent. Otherwise it is most likely architecture-independent.\n\nPackages built using setuptools define their C extensions using the ext_modules keyword in setup.py.\n\n"
+    },
+    {
+      "title": "Source",
+      "level": 2,
+      "content": "Download URLs linked from the PyPI website include an unpredictable hash that needs to be fetched from the PyPI website each time a package must be updated. This makes them unsuitable for use in a PKGBUILD. PyPI provides an alternative stable scheme: PKGBUILD#source source=() array should use the following URL templates:\n\nNote that a custom _name variable is used instead of pkgname since Python packages are generally prefixed with python-. This variable can generically be defined as follows:\n\n```\n_name=${pkgname#python-}\n```\n\n"
+    },
+    {
+      "title": "Installation methods",
+      "level": 2,
+      "content": "Python packages are generally installed using language-specific package manager such as pip, which fetches packages from an online repository (usually PyPI, the Python Package Index) and tracks the relevant files.\n\nHowever, for managing Python packages from within PKGBUILDs, one needs to \"install\" the Python package to the temporary location $pkgdir/usr/lib/python<Python version>/site-packages/$pkgname.\n\nFor Python packages using standard metadata to specify their build backend in pyproject.toml, this can most easily achieved using python-build and python-installer. Old packages might fail to specify that they use setuptools, and only offer a setup.py that has to be invoked manually.\n\n"
+    },
+    {
+      "title": "Standards based (PEP 517)",
+      "level": 3,
+      "content": "- python-flit-core, python-hatch-vcs and python-setuptools-scm: SETUPTOOLS_SCM_PRETEND_VERSION\n- python-pbr: PBR_VERSION\n- python-pdm-backend: PDM_BUILD_SCM_VERSION\n\nA standards based workflow is straightforward: Build a wheel using python-build and install it to $pkgdir using python-installer:\n\n```\nmakedepends=(python-build python-installer python-wheel)\n\nbuild() {\n    cd $_name-$pkgver\n    python -m build --wheel --no-isolation\n}\n\npackage() {\n    cd $_name-$pkgver\n    python -m installer --destdir=\"$pkgdir\" dist/*.whl\n}\n```\n\nwhere:\n\n- --wheel results in only a wheel file to be built, no source distribution.\n- --no-isolation means that the package is built using what is installed on your system (which includes packages you specified in depends), by default the tool creates an isolated virtual environment and performs the build there.\n- --destdir=\"$pkgdir\" prevents trying to directly install in the host system instead of inside the package file, which would result in a permission error\n- --compile-bytecode=... or --no-compile-bytecode can be passed to installer, but the default is sensibly picked, so this should not be necessary.\n\nNote: **only** \n\n"
+    },
+    {
+      "title": "setuptools or distutils",
+      "level": 3,
+      "content": "If no pyproject.toml can be found or it fails to contain a [build-system] table, it means the project is using the old legacy format, where the project provides a setup.py file, which invokes the setup function from setuptools or distutils.core.\n\nSuch packages usually can also be built and installed using the method described above using python-build and python-installer, and this is the preferred method. But they will also additionally need python-setuptools in makedepends.\n\nYou can still build and install these packages using the old, deprecated way of running setup.py directly, which is shown below and it is described here for those cases, where the pep-517 compliant way does not work for some reason.\n\nBut note that you will get the following warning in the output of the package step, when building a package using this method:\n\n```\nSetuptoolsDeprecationWarning: setup.py install is deprecated.\n```\n\nAlso note that Python versions from 3.12 onwards do not include distutils in the standard library any more, which means that packages for projects still using setup.py generally need to have python-setuptools in makedepends, since that provides its own version of distutils.\n\n```\nmakedepends=('python-setuptools')\n\nbuild() {\n    cd $_name-$pkgver\n    python setup.py build\n}\n\npackage() {\n    cd $_name-$pkgver\n    python setup.py install --root=\"$pkgdir\" --optimize=1\n}\n```\n\nwhere:\n\n- --root=\"$pkgdir\" works like --destdir above\n- --optimize=1 compiles optimized bytecode files (.opt-1.pyc) so they can be tracked by pacman instead of being created on the host system on demand.\n- Adding --skip-build optimizes away the unnecessary attempt to re-run the build steps already run in the build() function, if that is the case.\n\nIf a package uses python-setuptools-scm, the package most likely will not build with an error such as:\n\n```\nLookupError: setuptools-scm was unable to detect version for /build/python-jsonschema/src/jsonschema-3.2.0.\n\nMake sure you're either building from a fully intact git repository or PyPI tarballs. Most other sources (such as GitHub's tarballs, a git checkout without the .git folder) don't contain the necessary metadata and will not work.\n```\n\nTo get it building SETUPTOOLS_SCM_PRETEND_VERSION has to be exported as an environment variable with $pkgver as the value:\n\n```\nexport SETUPTOOLS_SCM_PRETEND_VERSION=$pkgver\n```\n\n"
+    },
+    {
+      "title": "Check",
+      "level": 2,
+      "content": "Note: **not** \n\n- Avoid using tox to run testsuites as it is explicitly designed to test repeatable configurations downloaded from PyPI while tox is running, and does not test the version that will be installed by the package. This defeats the purpose of having a check function at all.\n- Avoid adding pytest plugins for linting, coverage or type checking to checkdepends (see the #Disable pytest options section for details). This makes bootstrapping harder and these tests are not required for distribution packaging as they do not test functionality.\n\nMost Python projects providing a testsuite use the unittest runner or nosetests or pytest (provided by python and python-nose and python-pytest, respectively) to run tests with test in the name of the file or directory containing the testsuite. In general, simply running nosetests or pytest is enough to run the testsuite.\n\n```\ncheck(){\n    cd $_name-$pkgver\n    \n    # Builtin unittest\n    python -m unittest discover -v\n\n    # For nosetests\n    nosetests\n\n    # For pytest\n    pytest\n}\n```\n\nIf there is a compiled C extension, the tests need to be run using a $PYTHONPATH, that reflects the current major and minor version of Python in order to find and load it.\n\n```\ncheck(){\n    cd $_name-$pkgver\n    local python_version=$(python -c 'import sys; print(\"\".join(map(str, sys.version_info[:2])))')\n    \n    # Builtin unittest\n    PYTHONPATH=\"$PWD/build/lib.linux-$CARCH-cpython-$python_version\" python -m unittest discover -vs .\n    \n    # For nosetests\n    PYTHONPATH=\"$PWD/build/lib.linux-$CARCH-cpython-$python_version\" nosetests\n\n    # For pytest\n    PYTHONPATH=\"$PWD/build/lib.linux-$CARCH-cpython-$python_version\" pytest\n}\n```\n\n"
+    },
+    {
+      "title": "Using Python version",
+      "level": 3,
+      "content": "Sometimes during preparing, building, testing or installation it is required to refer to the system's major and minor Python version (e.g. 3.9 or 3.10). Do not hardcode this and instead use a call to the Python interpreter to retrieve the information and store it in a local variable:\n\n```\ncheck(){\n  local python_version=$(python -c 'import sys; print(\".\".join(map(str, sys.version_info[:2])))')\n  ...\n}\n```\n\n"
+    },
+    {
+      "title": "Using site-packages",
+      "level": 3,
+      "content": "Sometimes during building, testing or installation it is required to refer to the system's site-packages directory. Do not hardcode this directory and use a call to the Python interpreter instead to retrieve the path and store it in a local variable:\n\n```\ncheck(){\n  local site_packages=$(python -c \"import site; print(site.getsitepackages()[0])\")\n  ...\n}\n```\n\n"
+    },
+    {
+      "title": "Test directory in site-package",
+      "level": 3,
+      "content": "Make sure to not install a directory named just tests/ directly under site-packages/ (i.e. /usr/lib/pythonX.Y/site-packages/tests/). Doing so could lead to conflicts between packages. Python package projects using setuptools are sometimes misconfigured to include the directory containing its tests as a top level Python package. If you encounter this, you can help by filing an issue with the package project and ask them to fix this, e.g. like this.\n\n"
+    },
+    {
+      "title": "Disable pytest options",
+      "level": 3,
+      "content": "When running pytest, it is mostly desirable to not run with additional plugins. Especially plugins for linting and coverage are counterproductive in packaging, as changes in behavior may have tests fail. To disable pytest options such as addopts it is preferred to use an option override on the command line over patching any configuration files used by pytest due to the maintenance overhead.\n\nTo unset all additional options use\n\n```\npytest -o addopts=\"\"\n```\n\n"
+    },
+    {
+      "title": "Fix reproducibility issue with meson-python",
+      "level": 3,
+      "content": "When using meson-python as a PEP 517 build backend it uses randomized folder paths that create reproducibility issues. This can be circumvented by hardcoding the used folder with the -Cbuild-dir flag:\n\n```\npython -m build --wheel --no-isolation -Cbuild-dir=build\n```\n\n"
+    }
+  ]
+}

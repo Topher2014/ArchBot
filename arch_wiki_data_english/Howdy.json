@@ -1,0 +1,56 @@
+{
+  "title": "Howdy",
+  "url": "https://wiki.archlinux.org/title/Howdy",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Howdy is a program that imitates Windows Hello on Linux. It uses a computer's IR sensors and camera to verify a user's face.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the howdyAUR package.\n\n"
+    },
+    {
+      "title": "Setup Howdy to start when needed",
+      "level": 3,
+      "content": "In order for Howdy to authenticate a user, a small change must be added to any PAM configuration file where Howdy might want to be used. The following line must be added to any configuration file:\n\n```\nauth sufficient pam_python.so /lib/security/howdy/pam.py\n```\n\nNote: When using Howdy 3.0.0 BETA and above (howdy-beta-gitAUR), the line should be:\n\n```\nauth sufficient /lib/security/pam_howdy.so\n```\n\nAdding howdy/pam.py (or pam_howdy.so) as sufficient to any configuration file in /etc/pam.d/ will only prompt for face authentication. This prevents the use of a password if you cannot Ctrl+c face authentication (due to the lack of a shell). In order to use either a password or a face in a graphical interface, add the following line to the top of any files required:\n\n```\nauth sufficient pam_unix.so try_first_pass likeauth nullok\n```\n\n"
+    },
+    {
+      "title": "Add correct IR sensor",
+      "level": 3,
+      "content": "Determine the correct /dev/videoX file connected to the IR sensor. This can be done through various programs such as cheese, fswebcamAUR or v4l-utils.\n\nAn example of doing this with a tool included in the v4l-utils package:\n\n```\n$ v4l2-ctl --list-devices\nIntegrated_Webcam_HD: Integrate (usb-0000:00:14.0-11):\n        /dev/video0\n        /dev/video1\n\nEyeChip: Tobii Video (usb-0000:00:14.0-3.4.3):\n        /dev/video4\n        /dev/video5\n\nHD Webcam C525 (usb-0000:00:14.0-3.4.4):\n        /dev/video2\n        /dev/video3\n```\n\nAs seen in the example above, the command may show more than one webcam device, and for each device it may show multiple /dev/videoX paths. Generally picking the first of the two paths will work fine.\n\nIf you have more than one webcam and/or IR sensor using a /dev/videoX may be somewhat unstable overtime, as it may be prone to change paths if certain devices are unplugged and replugged back in. In this can consider using a more consistent path name supplied by Video4Linux in the /dev/v4l/by-id/ path.\n\n```\n$ ls -l /dev/v4l/by-id\ntotal 0\nlrwxrwxrwx 1 root root 12 Dec  3 15:01 usb-046d_HD_Webcam_C525_BE4703F0-video-index0 -> ../../video2\nlrwxrwxrwx 1 root root 12 Dec  3 15:01 usb-046d_HD_Webcam_C525_BE4703F0-video-index1 -> ../../video3\nlrwxrwxrwx 1 root root 12 Dec  3 14:47 usb-CNFGH19N306021000582_Integrated_Webcam_HD-video-index0 -> ../../video0\nlrwxrwxrwx 1 root root 12 Dec  3 14:47 usb-CNFGH19N306021000582_Integrated_Webcam_HD-video-index1 -> ../../video1\nlrwxrwxrwx 1 root root 12 Dec  3 14:47 usb-Tobii_Technology_AB_EyeChip_IS404-100109244721-video-index0 -> ../../video4\nlrwxrwxrwx 1 root root 12 Dec  3 14:47 usb-Tobii_Technology_AB_EyeChip_IS404-100109244721-video-index1 -> ../../video5\n```\n\nYou can validate that these v4l paths do not change by unplugging and replugging your devices and then re-listing the directory.\n\nOnce the correct filename is found, edit /lib/security/howdy/config.ini using either your preferred editor or with howdy config (run as the root user). Change device_path = null to device_path = path_to_device:\n\n```\n/lib/security/howdy/config.ini\n```\n\n```\n# The path of the device to capture frames from\n# Should be set automatically by an installer if your distro has one\ndevice_path = path_to_device\n```\n\nTo customize which editor howdy config uses, set the EDITOR variable:\n\n```\n# EDITOR=editor howdy config\n```\n\n"
+    },
+    {
+      "title": "Add face to Howdy",
+      "level": 3,
+      "content": "In order to add a face model to Howdy, run howdy add as the root user.\n\n"
+    },
+    {
+      "title": "Secure the installation",
+      "level": 3,
+      "content": "Some versions of Howdy take webcam snapshots when authenticating a user, and save them in /lib/security/howdy/snapshots. This can be considered a security hole. An attacker who has access could trivially find a snapshot corresponding to a successful login of the target user, print it, and use the printed photo to impersonate the target user, who presumably has more rights. Well, the attacker could also use any other photo of the target user, but Howdy simplifies the process too much.\n\nTo avoid this attack and also surprises about the disk space, disable taking snapshots in /lib/security/howdy/config.ini:\n\n```\n[snapshots]\ncapture_failed = false\ncapture_successful = false\n```\n\n"
+    },
+    {
+      "title": "IR emitter does not work",
+      "level": 3,
+      "content": "If the IR camera is on and the IR emitter does not work, one possible situation is that you chose the wrong file. For example, /dev/video0 and /dev/video2 both work fine to recognize your face, but only /dev/video2 will turn on the IR emitter. So make sure you have checked all /dev/videoX.\n\nOtherwise you should follow the instructions from linux-enable-ir-emitter to enable the IR emitter. Install the linux-enable-ir-emitterAUR package.\n\n"
+    },
+    {
+      "title": "Testing your IR camera",
+      "level": 3,
+      "content": "It can be useful to first make verify that your IR camera functions correctly. A set of 10 jpg photos can be taken to test your device using the gstreamer package with the following command:\n\n```\ngst-launch-1.0 v4l2src device=path_to_device num-buffers=10 ! image/jpeg ! multifilesink location=\"frame-%02d.jpg\"\n```\n\n"
+    },
+    {
+      "title": "Howdy does not seem to work",
+      "level": 3,
+      "content": "Verify that Howdy is properly working by running howdy test as root. If that seems to work, check any PAM configuration files and verify they are working. Some programs, such as SDDM [1], do not work properly with PAM, which may result in unexpected results.\n\n"
+    },
+    {
+      "title": "Errors recognizing an input device",
+      "level": 3,
+      "content": "Some IR sensors (for example of the Thinkpad T480) need to have the frame width and height defined in the configuration file:\n\n```\nframe_width = 400\nframe_height = 400\n```\n\nThe width and height of your sensor output: v4l2-ctl --list-devices --all.\n\n"
+    }
+  ]
+}

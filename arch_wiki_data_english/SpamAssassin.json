@@ -1,0 +1,56 @@
+{
+  "title": "SpamAssassin",
+  "url": "https://wiki.archlinux.org/title/SpamAssassin",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- Postfix#SpamAssassin\n\nSpamAssassin is a mail filter to identify spam.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the spamassassin package.\n\nCreate a sa-update-keys directory in /etc/mail/spamassassin and change the owner and group:\n\n```\n# mkdir -p /etc/mail/spamassassin/sa-update-keys /etc/mail/sa-update-keys\n# chown -R spamd:spamd /etc/mail/spamassassin /etc/mail/sa-update-keys\n# chmod 755 /etc/mail/spamassassin\n# chmod 700 /etc/mail/spamassassin/sa-update-keys\n```\n\nNext start/enable spamassassin.service.\n\n"
+    },
+    {
+      "title": "Usage",
+      "level": 2,
+      "content": "Go over /etc/mail/spamassassin/local.cf and configure it to your needs.\n\n"
+    },
+    {
+      "title": "Updating rules",
+      "level": 3,
+      "content": "Update the SpamAssassin matching patterns and compile them:\n\n```\n[spamd]$ /usr/bin/vendor_perl/sa-update && /usr/bin/vendor_perl/sa-compile\n```\n\nYou will want to run this periodically, the best way to do so is by setting up a systemd timer.\n\nCreate the following service, which will run these commands:\n\n```\n/etc/systemd/system/spamassassin-update.service\n```\n\n```\n[Unit]\nDescription=spamassassin housekeeping stuff\nAfter=network.target\n\n[Service]\nUser=spamd\nGroup=spamd\nType=oneshot\n\nExecStart=/usr/bin/vendor_perl/sa-update\nSuccessExitStatus=1\nExecStart=/usr/bin/vendor_perl/sa-compile\nExecStart=!/usr/bin/systemctl -q --no-block try-restart spamassassin.service\n\n# uncomment the following ExecStart line to train SA's bayes filter\n# and specify the path to the mailbox that contains spam email(s)\n#ExecStart=/usr/bin/vendor_perl/sa-learn --spam <path_to_your_spam_mailbox>\n```\n\nThen create the timer, which will execute the previous service daily:\n\n```\n/etc/systemd/system/spamassassin-update.timer\n```\n\n```\n[Unit]\nDescription=spamassassin house keeping\n\n[Timer]\nOnCalendar=daily\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n```\n\nNow you can start and enable spamassassin-update.timer.\n\n"
+    },
+    {
+      "title": "Set maximum size for scanning",
+      "level": 2,
+      "content": "The default maximum size for scanning is 500 KB (see spamc(1p)). You can modify it: create the spamc configuration file. For example :\n\n```\n/etc/mail/spamassassin/spamc.conf\n```\n\n```\n# spamc global configuration file\n\n# max message size for scanning = 1Mo\n-s 1000000\n```\n\n"
+    },
+    {
+      "title": "Using a SQL database",
+      "level": 2,
+      "content": "SpamAssassin can load user preferences, Bayesian filter data and auto-whitelist from a SQL database. This is specially helpful for a virtual user mail setup, where users do not have a $HOME/.spamassassin directory with their SpamAssassin data.\n\n"
+    },
+    {
+      "title": "MySQL",
+      "level": 3,
+      "content": "Install perl-dbd-mysql. Then, create the database:\n\n```\n$ mysql -u root -p\n```\n\n```\nCREATE DATABASE <db_name>;\nGRANT ALL ON <db_name>.* TO '<db_user>'@'localhost' IDENTIFIED BY '<password>';\n```\n\nGit-clone SpamAssassin's source. Under the sql/ directory you will find the required files to create the database tables. Note that TYPE has been replaced by ENGINE in recent MySQL versions, so replace it accordingly in the used .sql files if needed.\n\nCreate the tables for user preferences, Bayesian filter data and TxRep, respectively:\n\n```\n$ mysql -u root -p <db_name> < userpref_mysql.sql\n$ mysql -u root -p <db_name> < bayes_mysql.sql\n$ mysql -u root -p <db_name> < txrep_mysql.sql\n```\n\nTxRep is optional, so skip it if you're not using it. In case you want to use it but haven't configured it yet, please refer to Mail::SpamAssassin::Plugin::TxRep(3)\n\nMake sure to have the following your configuration file:\n\n```\n/etc/mail/spamassassin/local.cf\n```\n\n```\n## MySQL database setup\n# User scores\nuser_scores_dsn             DBI:mysql:<db_name>:localhost\nuser_scores_sql_username    <db_user>\nuser_scores_sql_password    <password>\n\n# Bayesian filter\nbayes_store_module          Mail::SpamAssassin::BayesStore::MySQL\nbayes_sql_dsn               DBI:mysql:<db_name>:localhost\nbayes_sql_username          <db_user>\nbayes_sql_password          <password>\n\n# TxRep plugin\ntxrep_factory               Mail::SpamAssassin::SQLBasedAddrList\nuser_awl_dsn                DBI:mysql:<db_name>:localhost\nuser_awl_sql_username       <db_user>\nuser_awl_sql_password       <password>\n```\n\nFinally, restart spamassassin.service.\n\n"
+    },
+    {
+      "title": "ClamAV",
+      "level": 3,
+      "content": "Install and setup clamd as described in ClamAV.\n\nFollow one of the above instructions to call SpamAssassin from within your mail system.\n\nInstall the perl-cpanplus-dist-archAUR package. Then install the ClamAV perl library as follows:\n\n```\n# /usr/bin/vendor_perl/cpanp -i File::Scan::ClamAV\n```\n\nAdd the 2 files from https://wiki.apache.org/spamassassin/ClamAVPlugin into /etc/mail/spamassassin/. Edit /etc/mail/spamassassin/clamav.pm and update $CLAMD_SOCK to point to your Clamd socket location (default is /run/clamav/clamd.ctl).\n\nFinally, restart spamassassin.service.\n\n"
+    },
+    {
+      "title": "Razor",
+      "level": 3,
+      "content": "Vipul's Razor is a distributed, collaborative, spam detection and filtering network.\n\nMake sure you have installed SpamAssassin first, then:\n\nInstall the razor package.\n\nRegister with Razor.\n\n```\n# mkdir /etc/mail/spamassassin/razor\n# chown spamd:spamd /etc/mail/spamassassin/razor\n[spamd]$ cd /etc/mail/spamassassin/razor\n[spamd]$ /usr/bin/vendor_perl/razor-admin -home=/etc/mail/spamassassin/razor -register\n[spamd]$ /usr/bin/vendor_perl/razor-admin -home=/etc/mail/spamassassin/razor -create\n[spamd]$ /usr/bin/vendor_perl/razor-admin -home=/etc/mail/spamassassin/razor -discover\n```\n\nTo tell SpamAssassin about Razor, add the following line to /etc/mail/spamassassin/local.cf:\n\n```\nrazor_config /etc/mail/spamassassin/razor/razor-agent.conf\n```\n\nTo tell Razor about itself, add the following line to /etc/mail/spamassassin/razor/razor-agent.conf:\n\n```\nrazorhome = /etc/mail/spamassassin/razor/\n```\n\nFinally, restart spamassassin.service.\n\n"
+    },
+    {
+      "title": "Maintaining TxRep SQL table",
+      "level": 3,
+      "content": "It is recommended to keep TxRep SQL table clear of stale data, for performance and storage reasons. Here is a sample query that can be run on a regular schedule:\n\n```\nDELETE FROM txrep WHERE last_hit <= (now() - INTERVAL 120 day);\n```\n\n"
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "title": "Xkbmap",
+  "url": "https://wiki.archlinux.org/title/Xkbmap",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "The X keyboard extension, or XKB, defines the way keyboards codes are handled in X, and provides access to internal translation tables. It is the basic mechanism that allows using multiple keyboard layouts in X.\n\nThis article describes how to modify and create keyboard layouts. If you are looking for how to configure your keyboard, see Xorg/Keyboard configuration.\n\n"
+    },
+    {
+      "title": "Precautions and preparations",
+      "level": 2,
+      "content": "To prepare for the possibility of your X server crashing or your keyboard being put into an unusable state:\n\n1. Make sure you have some way to terminate the session without using your keyboard. (Aside from a power button, having some way to killall X or reboot the host remotely may be a good idea.)\n1. Make sure you have saved all your work to prevent data loss.\n1. If you use GNOME, you can install gnome-tweaks to recover settings with the mouse. For example, when the keyboard becomes unusable, navigate to Keyboard & Mouse > Additional Layout Options with the mouse, and then check and uncheck all settings, which will reset the keyboard to the system behaviour.\n\n"
+    },
+    {
+      "title": "Using rules",
+      "level": 3,
+      "content": "Look inside /usr/share/X11/xkb/rules/ for *.lst files or the XKB Homepage to get ideas on how to configure rules. Your own configurations can go in /etc/X11/xorg.conf.d/.\n\nFor example one may want to remap their Caps Lock key to Escape:\n\n```\n90-custom-kbd.conf\n```\n\n```\nSection \"InputClass\"\n    Identifier \"keyboard defaults\"\n    MatchIsKeyboard \"on\"\n\n    Option \"XKbOptions\" \"caps:escape\"\nEndSection\n```\n\n"
+    },
+    {
+      "title": "Using keymap",
+      "level": 3,
+      "content": "Use xkbcomp(1) (package xorg-xkbcomp) to manipulate XKB data. To get current configuration, run\n\n```\n$ xkbcomp $DISPLAY output.xkb\n```\n\nTo upload the data back to the server, run\n\n```\n$ xkbcomp input.xkb $DISPLAY\n```\n\nNote that without $DISPLAY argument xkbcomp(1) will try to compile .xkb file into (mostly useless) .xkm file, without uploading anything to the server. It will, however, check the syntax and report errors.\n\nOnce the layout is ready, save it as ~/.Xkeymap and make ~/.xinitrc load it on startup:\n\n```\n~/.xinitrc\n```\n\n```\n...\n\ntest -f ~/.Xkeymap && xkbcomp ~/.Xkeymap $DISPLAY\n```\n\nThe actual file name is irrelevant. Note that unlike standard system-wide configuration via xorg.conf(5), this is a per-user keymap. Also, there is no problem changing XKB configuration while X is running.\n\n"
+    },
+    {
+      "title": "Basic information on XKB",
+      "level": 2,
+      "content": "The core XKB functionality is quite simple, and it is necessary to have an idea on how it works before working on the keymaps.\n\n"
+    },
+    {
+      "title": "Tools and values",
+      "level": 3,
+      "content": "Use xev (package xorg-xev) to get keycodes and to check how your keymap works.\n\n```\n$ xev -event keyboard\n```\n\n```\nKeyPress event, serial 45, synthetic NO, window 0x2200001,\n       root 0xad, subw 0x0, time 183176240, (796,109), root:(867,413),\n       state 0x1, keycode 21 (keysym 0x2b, plus), same_screen YES,\n       XLookupString gives 1 bytes: (2b) \"+\"\n       XmbLookupString gives 1 bytes: (2b) \"+\"\n       XFilterEvent returns: False\n```\n\nNote keycode 21, state 0x1 and keysym 0x2b aka plus. Keycode 21 is what input device supplied to X, typically a physical key index of some sort. The state represents modifier keys, 0x01 is Shift. Keycode together with the state value is what X sends to the application in XKeyEvent(3) structure. Keysym and corresponding string is what the client obtained using XLookupString(3) and friends.\n\nThe bits in the state field have pre-defined names: Shift, Lock, Control, Mod1, Mod2, Mod3, Mod4 and Mod5, lowest to highest. Thus, Ctrl+Shift is 0x05, and so on. Client applications typically only check the bits they need, so an application with normal keyboard input and Ctrl+key shortcuts usually makes no distinction between Control and Control+Mod3 states.\n\nKeysyms are numeric, too. A lot of them have names, declared in /usr/include/X11/keysymdef.h with KP_ prefix. However, the number is what clients actually receive. Keysyms are only important when an application expects some particular values; typically that is keys like arrows, Enter, Backspace, F-keys, and various shortcuts. For the rest, the string is used.\n\n"
+    },
+    {
+      "title": "Keycode translation",
+      "level": 3,
+      "content": "XKB works mostly at the XLookupString stage, transforming incoming keycode into keysym according to its own internal state, which is group and state values:\n\n```\n(keycode, group, state) → keysym\n```\n\nGroup typically represents a \"layout\", as in US-English, French-AZERTY, Russian, Greek etc. There can be at most 4 groups.\n\nInternally, the translation involves additional steps:\n\n```\n(keycode [, group]) → type\n   (state, type) → level\n   (keycode, group, level) → S[keycode][group][level]\n```\n\nwith S being the translation table (actually called xkb_symbols, see below).\n\nTypes are used to tell which modifiers affect which keys; essentially it is a way to reduce the third dimension of S. For example, a typical alphanumeric key is only affected by Shift, so its type is set to TWO_LEVEL, and\n\n```\n(state, TWO_LEVEL) → level = ((state >> 0) & 0x01) = state & 0x01\n```\n\nis either 0 or 1. Thus it is S[keycode][0..4][0..1] instead of S[keycode][0..4][0..256].\n\n"
+    },
+    {
+      "title": "Keysyms and states",
+      "level": 3,
+      "content": "In X terms, a and Ctrl+a means same keysym and different states, but a and A are different keysyms.\n\nGenerally it is XKB task to provide different keysyms, but states are handled later by individual applications.\n\nAlso, states in XKB have somewhat delayed effect, that is, you must have the state set prior to pressing a key.\n\nExample: Ctrl+h can be configured to act as backspace in rxvt (application setting). This way rxvt will receive h keysym with Control bit set in the state value, and it will be clearly different from Backspace keysym. Alternatively, XKB can be used to make Ctrl+h combination generate Backspace keysym with Control bit set; in this case, rxvt will not see any difference between physical Backspace key and h key as long as Ctrl key is pressed. Making Ctrl+h combination generate Backspace keysym with no Control bit set is an XKB task, too, but it is much more difficult to implement than Control+Backspace.\n\n"
+    },
+    {
+      "title": "Actions",
+      "level": 3,
+      "content": "Keysym obtained from the table above can also trigger some action:\n\n```\n(keysym, state) → action\n```\n\nFor XKB, setting or locking a modifier bit is an action, and so is any X server interaction like switching consoles, terminating the server, moving pointer etc. Actions do not generally affect keysyms, and generating a keysym is not an action.\n\nThere is only one possible action for each (keysym, state) pair.\n\n"
+    },
+    {
+      "title": "Editing the layout",
+      "level": 2,
+      "content": "Start with whatever default configuration your server has. Whenever possible, make the changes gradually and test them.\n\nThe .xkb file produced by xkbcomp(1) is a simple text file. C++ style comments, // till the end of line, are allowed. Section names, as in xkb_keycodes \"name-here\", are irrelevant at this point and can be omitted.\n\n"
+    },
+    {
+      "title": "xkb_keycodes",
+      "level": 3,
+      "content": "Keycode definition. The rest of the file does not use numeric keycodes, only symbolic keylabels defined in this section.\n\nIt is a good idea to leave only those keys the keyboard in question actually has here.\n\nThe labels themselves are arbitrary. They are only used in xkb_symbols section later.\n\n"
+    },
+    {
+      "title": "xkb_types",
+      "level": 3,
+      "content": "This section comes before xkb_symbols, so take a look, but try not to make changes yet. Standard types depend a lot on virtual modifiers, which will be explained later. For now, just find the types you need. Start with the following: ONE_LEVEL, TWO_LEVEL, ALPHABETIC.\n\nONE_LEVEL keys are not affected by modifiers; typically it is Enter, Space, Escape, F keys, Shift/Alt/Ctrl keys and so on. TWO_LEVEL and ALPHABETIC keys produce different keysyms depending on Shift state. All alphanumeric keys are of these types. ALPHABETIC additionally respects CapsLock.\n\nType description themselves are quite simple. The line\n\n```\nmodifiers= Shift+NumLock+LevelThree;\n```\n\nmeans keys of this type are affected by Shift, NumLock and LevelThree bits only. Map lines like\n\n```\nmap[Shift+LevelThree]= Level4;\n```\n\ndefine which combination corresponds to which level value. xkbcomp(1) uses \"LevelN\" when dumping the data, but short and much more convenient \"N\" can be used as well.\n\nlevel_name lines are irrelevant and can be ignored.\n\n"
+    },
+    {
+      "title": "xkb_compatibility",
+      "level": 3,
+      "content": "Action definitions (interpret) and keyboard LEDs (indicator) among other things. You can remove stuff you do not have or do not use, like keypad actions, mouse control or extra modifiers.\n\nNote that key+AnyOfOrNone(all) is equivalent to just key, but key is much easier to read.\n\nCheck groups switching if you need it. LockGroup(group=N) can be useful if you have four groups, otherwise ISO_Next_Group/ISO_Prev_Group are enough. LatchGroup can be useful for unusual setups.\n\n"
+    },
+    {
+      "title": "xkb_symbols",
+      "level": 3,
+      "content": "The main section that defines what each key does. Syntax:\n\n```\nkey <LABL> { [ G1L1, G1L2, G1L3, ... ], [ G2L1, G2L2, G2L3, ... ], ... }\n```\n\n<LABL> is keylabel from xkb_keycodes section, GiLj is keysym for group i level j. The number of keysyms in each group must match the number of levels defined for this type (xkbcomp(1) will warn you if it does not).\n\nCheck /usr/include/X11/keysymdef.h for the list of possible keysyms. Aside from those listed, you can also use Unnnn for Unicode symbol with hex code nnnn, e.g. U0301 for combining acute accent. Note that a and U0061 are treated differently (for instance, most applications expect Ctrl+a, not Ctrl+U0061 because their numeric values are different.\n\nKey types are also specified here, either as\n\n```\nkey.type = \"T1\";\n   key <...> { ... };\n   key <...> { ... };\n   key <...> { ... };\n   key.type = \"T2\";\n   key <...> { ... };\n   key <...> { ... };\n```\n\nor individually for each key:\n\n```\nkey <...> { type = \"T\", [ .... ], [ .... ] };\n```\n\nKey type may be different in different groups. This is somewhat counter-intuitive, but actually has some useful applications. To set types for each group, use this:\n\n```\nkey <...> { type[1] = \"T1\", type[2] = \"T2\", [ ... ], [ ... ] };\n```\n\nYou can set labels for the groups using\n\n```\nname[1] = \"EN\";     // group 1\n   name[2] = \"RU\";     // group 2\n   name[3] = \"UA\";     // group 3\n```\n\nThis is what xxkb(1) will show if labels are enabled there.\n\nThe section also contains modifier_map lines. Leave them alone for now, or check Virtual Modifiers below.\n\n"
+    },
+    {
+      "title": "xkb_geometry",
+      "level": 3,
+      "content": "A completely irrelevant section describing physical keyboard layout. Can be deleted without any consequences.\n\n"
+    },
+    {
+      "title": "Basic examples",
+      "level": 2,
+      "content": "Check your existing layout first, as it likely contains standard definition for many common keys.\n\nThroughout the text, \"xkb_keycodes { text }\" means \"text\" should be added to xkb_keycodes section. Whenever it is clear from context, section names are omitted.\n\n"
+    },
+    {
+      "title": "Simple key assignment",
+      "level": 3,
+      "content": "Enabling additional (aka multimedia) keys:\n\n```\nxkb_keycodes {\n       <VOL-> = 122;       // check with xev\n       <VOL+> = 123;\n   }\n   \n   xkb_symbols {\n       key.type = \"ONE_LEVEL\";\n       key <VOL-> { [ XF86AudioLowerVolume ] };\n       key <VOL+> { [ XF86AudioRaiseVolume ] };\n   }\n```\n\nEscape on CapsLock, for Vim users mostly:\n\n```\nkey.type = \"ONE_LEVEL\";\n   key <CAPS> { [ Escape ] };\n```\n\nExchanging Ins and PrintScreen (in case they are reversed — happens on Dell laptop keyboards):\n\n```\nkey.type = \"ONE_LEVEL\";\n   key <IN?>  { [    Print ] };\n   key <PRSC> { [   Insert ] };\n```\n\nOn some HP laptop keyboards, the above does not work. Instead, the keycodes themselves must be redefined:\n\n```\npartial xkb_keycodes \"insert\" {\n       alias <I118> = <IN?>;\n       <INS>  = 218;\n       <I218> = 118;\n   };\n```\n\nChanging shift to a sticky key version:\n\nreplace\n\n```\nkey <LFSH> {         [         Shift_L ] };\n```\n\nwith\n\n```\nkey <LFSH> {         [         ISO_Level2_Latch ] };\n```\n\nYou might also need to add the following to /usr/share/X11/xkb/compat/basic\n\n```\ninterpret ISO_Level2_Latch+AnyOf(all) {\n       useModMapMods=level1;\n       action= LatchMods(modifiers=Shift,clearLocks,latchToLock);\n   };\n   interpret ISO_Level2_Latch+AnyOfOrNone(all) {\n       action= LatchMods(modifiers=Shift,clearLocks,latchToLock);\n   };\n```\n\n"
+    },
+    {
+      "title": "Multiple layouts",
+      "level": 3,
+      "content": "For regular alphanumeric keys, just add a second/third/fourth [ ] section to the key definition:\n\n```\nkey.type = \"ALPHABETIC\";\n   key <AD01> { [ q, Q ], [ a, A ] };      // QWERTY-AZERTY\n```\n\n```\nkey <AC02> { [        s,        S ],        // two cyrillic layouts\n                [    U044B,    U042B ],\n                [    U0456,    U0406 ] };\n```\n\nLayout switching is done by triggering action LockGroup:\n\n```\ninterpret ISO_Next_Group { action = LockGroup(group=+1); };\n   interpret ISO_Prev_Group { action = LockGroup(group=-1); };\n```\n\nTypically this means placing ISO_Next_Group and ISO_Prev_Group keysyms in correct group/level positions. Note that groups wrap, so if you have two groups and hit ISO_Next_Group twice, you will return to the group you started with.\n\nCyclic switching between two or more layouts with a dedicated key:\n\n```\nkey.type = \"ONE_LEVEL\";\n   key <RWIN> { [ ISO_Next_Group ] }\n```\n\nIf you have more than two layouts and some keys to spare, it may be a better idea to have a dedicated key for each layout. Example for three layouts:\n\n```\nkey.type = \"ONE_LEVEL\";\n   key <RCTL> { [ ISO_Next_Group ],    // g1: switch to g2\n                [ ISO_Prev_Group ],    // g2: switch back to g1\n                [ ISO_Prev_Group ] };  // g3: switch to g2\n```\n\n```\nkey <MENU> { [ ISO_Prev_Group ],    // g1: switch to g3\n                [ ISO_Next_Group ],    // g2: switch to g3\n                [ ISO_Next_Group ] };  // g3: switch back to g1\n```\n\nWith four layouts, you will likely have to use ISO_First_Group and ISO_Last_Group.\n\nThe same idea can be implemented with only one key by utilizing TWO_LEVEL type:\n\n```\nkey.type = \"TWO_LEVEL\";\n   key <MENU> { [ ISO_Next_Group, ISO_Prev_Group ],   \n                [ ISO_Prev_Group, ISO_Next_Group ],   \n                [ ISO_Prev_Group, ISO_Next_Group ] };\n```\n\nThis way it is Menu for group 2 and Shift-Menu for group 3. To use Ctrl or Alt instead of Shift, replace TWO_LEVEL with PC_CONTROL_LEVEL2 or PC_ALT_LEVEL2 types respectively.\n\nSwitching using two modifier keys (Shift+Shift, Ctrl+Shift etc) can be done by using something other than ONE_LEVEL for these keys. Shift+Shift example:\n\n```\nkey.type = \"TWO_LEVEL\";\n   key <LFSH> { [ Shift_L, ISO_Prev_Group ] };\n   key <RTSH> { [ Shift_R, ISO_Next_Group ] };\n```\n\nTo latch a group (aka toggle; set for the time you hold the key only), use LatchGroup action typically bound to ISO_Group_Latch keysym:\n\n```\nkey <RCTL> { [ ISO_Group_Latch ] }\n```\n\nAdjust ISO_Group_Latch definition in xkb_compatibility section to use the right group:\n\n```\ninterpret ISO_Group_Latch { action = LatchGroup(group=3); };\n```\n\nCheck /usr/share/X11/xkb/symbols/group for more standard examples.\n\n"
+    },
+    {
+      "title": "Caps hjkl as vimlike arrow keys",
+      "level": 3,
+      "content": "Note: **This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.** This article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nThis article or section needs language, wiki syntax or style improvements. See Help:Style for reference.\n\nCreating keymappings that clear modifiers from the keypress is necessary if the target key is to be used in keyboard shortcuts. For instance, highlighting text from the main keyboard (Shift+Left), or changing chats in most messengers (Alt+Down) will not work if there is an additional Caps modifier sent. However, an additional modifier must be sent if a user rebinds a letter key by simply putting the keysym in the symbols section. Rebinding as follows permits functionality like AHK's blind command.\n\nThe types section (which defines layer mapping) must contain an entry such that:\n\n- When no modifiers are pressed, the first level of keysyms is used (lowercase letters).\n- When Shift only is pressed, the second level of keysyms is used (capital letters).\n- When Lock only is pressed, the third level of keysyms is used (the arrow keys)\n- When Shift and Lock are pressed, the third level of keysyms is also used (shift+arrow keys).\n\nAdd this to the bottom of your types section:\n\n```\nxkb_types \"complete\" {\n   ...\n   type \"CUST_CAPSLOCK\" {\n       modifiers= Shift+Lock; \n       map[Shift] = Level2;            //maps shift and no Lock. Shift+Alt goes here, too, because Alt isn't in modifiers.\n       map[Lock] = Level3;\n       map[Shift+Lock] = Level3;       //maps shift and Lock. Shift+Lock+Alt goes here, too.\n       level_name[Level1]= \"Base\";\n       level_name[Level2]= \"Shift\";\n       level_name[Level3]= \"Lock\";\n   };\n };\n```\n\nNow change caps from a lock (toggle) to a set (press) by modifying the already existing definition in compatability from LockMods to SetMods:\n\n(Note that this means you cannot use capslock like normal)\n\n```\nxkb_compatibility \"complete\" {\n   ...\n   interpret Caps_Lock+AnyOfOrNone(all) {\n       action= SetMods(modifiers=Lock);\n   };\n   ...\n };\n```\n\nFinally, modify your symbols file as follows.\n\n```\nxkb_symbols \"pc_us_inet(evdev)\" {\n   ...\n   key <AC06> {\n       type= \"CUST_CAPSLOCK\",\n       symbols[Group1]= [               h,               H,               Left],\n       actions[Group1]= [      NoAction(),      NoAction(),   RedirectKey(keycode=<LEFT>, clearmods=Lock) ]\n  };\n```\n\n"
+    },
+    {
+      "title": "Additional symbols",
+      "level": 3,
+      "content": "Typing more with the same keys.\n\n"
+    },
+    {
+      "title": "Compose key",
+      "level": 4,
+      "content": "Easy to set up and extremely useful for entering common Unicode characters.\n\n```\nkey <RALT> { [ Multi_key ] };\n```\n\n"
+    },
+    {
+      "title": "Level3",
+      "level": 4,
+      "content": "The idea is similar to Alt or AltGr in their original meaning: alphanumeric keys get additional characters, activated by holding down some modifier key.\n\nFirst of all, setting up the modifier.\n\n```\nxkb_symbols { \n       key <LWIN> { [ISO_Level3_Shift ] };\n       modifier_map Mod5 { ISO_Level3_Shift };\n   }\n```\n\nAlso, the following should already be defined in the relevant sections, but in case it is not:\n\n```\nxkb_compatibility {\n       interpret ISO_Level3_Shift { action= SetMods(modifiers=Mod5); };\n   }\n   \n   xkb_types {\n       type \"THREE_LEVEL\" {\n           modifiers= Shift+Mod5;\n           map[Shift]= Level2;\n           map[Mod5]= Level3;\n           map[Shift+Mod5]= Level3;\n           level_name[Level1]= \"Base\";\n           level_name[Level2]= \"Shift\";\n           level_name[Level3]= \"Level3\";\n       };\n       type \"FOUR_LEVEL\" {\n           modifiers= Shift+LevelThree;\n           map[Shift]= Level2;\n           map[LevelThree]= Level3;\n           map[Shift+LevelThree]= Level4;\n           level_name[Level1]= \"Base\";\n           level_name[Level2]= \"Shift\";\n           level_name[Level3]= \"Alt Base\";\n           level_name[Level4]= \"Shift Alt\";\n       };\n   }\n```\n\nNote standard definitions have LevelThree instead of Mod5 in xkb_compatibility and xkb_types. As long as modifier_map above uses Mod5, there is no practical difference, you will end up using Mod5 bit anyway.\n\nNow, the keys themselves, vi-style cursors in this case:\n\n```\nkey.type = \"THREE_LEVEL\";\n   key <AC06> { [ h, H,  Left ] };\n   key <AC07> { [ j, J,  Down ] };\n   key <AC08> { [ k, K,    Up ] };\n   key <AC09> { [ l, L, Right ] };\n```\n\nAs you may find out using xev(1), this produces Mod5+Left instead of just Left. But that is ok as most applications ignore state bits they do not use. For an alternative solution, check Overlays below.\n\n"
+    },
+    {
+      "title": "Real modifiers",
+      "level": 4,
+      "content": "Some applications (notably Emacs) allow meaningful use of higher state bits. It is usually assumed there are modifier keys called Meta, Super and Hyper on the keyboard beside standard Shift, Ctrl and Alt, which control these bits.\n\nFrom XKB point of view this means setting Mod2, Mod3, Mod4 and Mod5 modifier bits. Because all you need is the bits themselves, there is no need to edit types like in the Level3 example above.\n\n```\nxkb_compatibility {\n       interpret Super_L { action = SetMods(modifiers=Mod3); };\n   }\n```\n\n```\nxkb_symbols {\n       key <LWIN> { [ Super_L ] };\n       modifier_map Mod3 { Super_L };\n   }\n```\n\nStandard definitions use Super modifier instead of Mod3 in xkb_compatibility. You can keep that, just make sure modifier_map line is in place.\n\nKeep in mind there is no strict correspondence between ModN and named modifiers like Super, Hyper or even Alt. Mod1 is the only one that is widely used; some applications call it Meta, some Alt. For the others, check how particular application treats state bits, and/or check Virtual modifiers below.\n\n"
+    },
+    {
+      "title": "Keysym tracking",
+      "level": 4,
+      "content": "At least one application (openbox) is known to track KeyPress/KeyRelease events for Meta_[LR], Super_[LR] and Hyper_[LR] keysyms instead of relying on the state bits. In such case\n\n```\nxkb_symbols {\n       key <LWIN> { [ Super_L ] };\n   }\n```\n\nis enough and you can omit interpret and modifier_map lines.\n\nSpeaking of Openbox, note it actually allows both methods: \"S-h\" tracks Super_[LR] events while \"Mod3-h\" checks relevant state bit.\n\n"
+    },
+    {
+      "title": "Preset configuration",
+      "level": 2,
+      "content": "XKB is often configured by specifying XkbTypes/XkbCompat/XkbSymbols, or XkbModel/XkbLayout (+XkbVariant/XkbOptions), or XkbKeymap, typically in /etc/X11/xorg.conf or /etc/X11/xorg.conf.d/*.conf, like this:\n\n```\nOption  \"XkbModel\"    \"thinkpad60\"                                                                                                  \n   Option  \"XkbLayout\"   \"us,sk,de\"                                                                                                    \n   Option  \"XkbVariant\"  \"altgr-intl,qwerty,\"                                                                                          \n   Option  \"XkbOptions\"  \"grp:menu_toggle,grp_led:caps\"\n```\n\nThese values define full XKB map (the one that can be dumped by xkbcomp(1)) by combining several files from /usr/share/X11/xkb. In fact, equivalent .xkb file for xkbcomp(1) can be obtained using setxkbmap -print:\n\n```\n$ setxkbmap -model thinkpad60 -layout us,sk,de -variant altgr-intl,qwerty \\\n       -option -option grp:menu_toggle -option grp_led:caps -print\n```\n\nNote include statements in the output. The files for each section are fetched from relevant subdirectories under /usr/share/X11/xkb, i.e.\n\n```\nxkb_types { include \"complete\" };\n```\n\nmeans xkbcomp(1) will look for /usr/share/X11/xkb/types/complete. Plus signs mean concatenation, so\n\n```\nxkb_keycodes { include \"evdev+aliases(qwerty)\" };\n```\n\nmeans\n\n```\nxkb_keycodes {\n       include \"evdev\";\n       include \"aliases(qwerty)\";\n   };\n```\n\nParenthesis select named section from the file. Check /usr/share/X11/xkb/keycodes/aliases and note\n\n```\nxkb_keycodes \"qwerty\" { ... };\n```\n\nthis is the part aliases(qwerty) refers to. Finally, colons allow shifting parts of layout to another group.\n\nUnlike XkbTypes/XkbCompat/XkbSymbols/XkbGeometry values, which define relevant .xkb file sections directly, XkbModel, XkbLayout and XkbRules refer to additional non-xkb files found under /usr/share/X11/xkb/rules/ that match model and layout values to specific symbols and geometry. XkbKeymap refers to complete keymaps. Check Ivan Pascal page for detailed description.\n\nJust like with xkbcomp(1) approach, this kind of configuration can be done on the fly: use setxkbmap(1) without -print option.\n\nThe files from /usr/share/X11/xkb are a good source of examples, especially when it comes to standard keyboard features with nontrivial XKB implementation (e.g. keypad/NumLock handling). Also, these are the files you have to edit to push your changes upstream. Check X Keyboard Config Rules before doing it though.\n\n"
+    },
+    {
+      "title": "xmodmap",
+      "level": 3,
+      "content": "xmodmap is not directly related to XKB; it uses different (pre-XKB) ideas on how keycodes are processed within X. In particular, it lacks the notion of groups and types, so trying to set more than one keysym per key is not likely to work. In general, except for the simplest modifications of keymaps or pointer button mappings, xkbcomp(1) should be used instead.\n\n"
+    },
+    {
+      "title": "Indicators",
+      "level": 2,
+      "content": "As in \"keyboard LEDs\". Indicator names are used to match the to the physical LEDs in xkb_keycodes section. Otherwise, they are irrelevant. Indicators not matched to any LED are called \"virtual\"; xkbvleds(1) (package xorg-xkbutils) can be used to check their state. Example:\n\n```\nxkb_keycodes {\n       indicator 1 = \"LED1\";       // first physical LED\n   }\n```\n\nIndicators always reflect specified part of XKB internal state. Two common modes is showing modifier state:\n\n```\nxkb_compatibility {\n       indicator \"LED1\" { modifiers = Lock; }; // CapsLock indicator\n   }\n```\n\nor current group:\n\n```\nxkb_compatibility {\n       indicator \"LED1\" { groups = 0x06; };    // \"group 2 or group 3 is active\"\n   }\n```\n\nThe values are bitmasks. For groups, bit 1 is group 1, bit 2 is group 2 and so on.\n\n"
+    },
+    {
+      "title": "Modifiers and types",
+      "level": 2,
+      "content": "At some point it may become necessary to clean up types section, and/or to introduce unusual types.\n\nTypes and modifiers are tightly connected, so it makes a lot of sense to start with the modifier bits first, before doing anything with the type descriptions.\n\nDecide which bits you will use. There are only eight of them, and of those, Shift, Control and Mod1 are widely used in applications, and Lock (aka CapsLock) has pre-defined meaning which also may be hard to override. The remaining four, however, are fair play.\n\nWarning: four standard types, ONE_LEVEL, TWO_LEVEL, ALPHABETIC and KEYPAD, receive special treatment in xkbcomp(1). They may work differently just because they are named this way. Avoid deleting them. If some changes do not work as expected, try adding a new type instead.\n\n"
+    },
+    {
+      "title": "Using real modifiers in standard types",
+      "level": 3,
+      "content": "Depending of your base configuration, there may be a lot of unused standard types like EIGHT_LEVEL or PC_RCONTROL_LEVEL2. Remove them to avoid doing unnecessary work.\n\nNow, some standard types use virtual modifiers. If you decide to use them, check Virtual modifiers below and skip this section. Otherwise, it is a good idea to get rid of them completely. Check the types you need, and either replace them with corresponding real ones, or remove relevant definitions. Example:\n\n```\ntype \"KEYPAD\" {\n       modifiers= Shift+NumLock;\n       map[Shift]= Level2;\n       map[NumLock]= Level2;\n       level_name[Level1]= \"Base\";\n       level_name[Level2]= \"Number\";\n   };\n```\n\nif you use Mod2 for NumLock, change the type to\n\n```\ntype \"KEYPAD\" {\n       modifiers= Shift+Mod2;\n       map[Shift]= Level2;\n       map[Mod2]= Level2;\n       level_name[Level1]= \"Base\";\n       level_name[Level2]= \"Number\";\n   };\n```\n\nif you are not going to have NumLock modifier, change it to\n\n```\ntype \"KEYPAD\" {\n       modifiers= Shift;\n       map[Shift]= Level2;\n       level_name[Level1]= \"Base\";\n       level_name[Level2]= \"Number\";\n   };\n```\n\nDo the same in xkb_compatibility section too. Once it is done, you should be able to remove all \"virtual_modifiers\" lines in the file.\n\n"
+    },
+    {
+      "title": "Switching a single modifier bit",
+      "level": 3,
+      "content": "Basically all you need is a keysym with a relevant interpretation entry. Example for Mod5 switching with LWIN key, with ISO_Level3_Shift for keysym:\n\n```\nxkb_compatibility {\n       interpret ISO_Level3_Shift { action = SetMods(modifiers=Mod5); };\n   }\n   \n   xkb_symbols {\n       key <LWIN> { [ISO_Level3_Shift ] };\n   }\n```\n\nAside from SetMods, you can also use LockMods or LatchMods. SetMods makes a regular \"on while pressed\" modifier key. LockMods makes an \"on/off\" switch like CapsLock or NumLock. LatchMods means \"on until next keypress\" aka sticky modifier\n\n"
+    },
+    {
+      "title": "modifier_map",
+      "level": 3,
+      "content": "Modifier map is a table that maps each of eight modifier bits to at most 4 keys:\n\n```\nmodifier_map Mod1 { Alt_L, Alt_R };\n```\n\nIn the core protocol, without XKB, it means more or less the same thing as\n\n```\ninterpret Alt_L { action = SetMods(modifiers=Mod1); };\n   interpret Alt_R { action = SetMods(modifiers=Mod1); };\n```\n\nXKB does not use modifier map in its original meaning. Within XKB, its only function is to map virtual modifiers (see below).\n\nHowever, the table is easily accessible by clients, and there is one counter-intuitive (but well-known) trick involving it: modifier map is used to tell which of ModX bits is Alt. Because of this, it is a good idea to have one modifier mapped to Alt_L or Alt_R as shown above. Unless you have very good reasons to do otherwise, it should be Mod1.\n\n"
+    },
+    {
+      "title": "Multiple keyboards",
+      "level": 2,
+      "content": "XKB allows setting keymap for a single connected physical keyboard only. This feature can be extremely useful for multi-keyboard setups when keyboards in question are different; consider a laptop with a full-size USB keyboard attached.\n\nFirst of all, use xinput (package xorg-xinput) to get device IDs:\n\n```\nAT Translated Set 2 keyboard                id=11   [slave  keyboard (3)]\n```\n\nNow,\n\n```\n$ xkbcomp -i 11 file.xkb $DISPLAY\n```\n\nor\n\n```\n$ setxkbmap -device 11 ...\n```\n\nwill set keymap for specified keyboard only. Dumping XKB configuration works too:\n\n```\n$ xkbcomp -i 11 $DISPLAY file.xkb\n```\n\nNote xkbcomp -i11 will not work and will not give a clear error message either. Make sure you have space after -i.\n\n"
+    },
+    {
+      "title": "Debugging XKB",
+      "level": 2,
+      "content": "When keys do not work as expected, the first thing to check is XKB internal state: modifiers, effective group and control bits. All three can be used to drive LEDs; use xkbvleds(1) to check them\n\n```\nindicator \"LED1\" { modifiers = Lock; };\n   indicator \"LED2\" { groups = 2; };\n   indicator \"LED3\" { controls = audiblebell; };\n```\n\nAdditionally, xkbwatch(1) shows all (real) modifiers together with their lock/latch status. Modifiers are also reported by xev(1). xxkb(1) can be used to monitor effective group, but make sure two_state mode is off.\n\nIn case interpretations section does not work well, make sure to check for duplicated \"interpret\" blocks. Better yet, try commenting out anything related to specific keysym. See section 9.2 for explanation.\n\nIt also makes sense to check what exactly the server got by downloading the keymap back with\n\n```\n$ xkbcomp $DISPLAY out.xkb\n```\n\nThe results tend to be different from the input file. There is no known work-around for this.\n\n"
+    },
+    {
+      "title": "Virtual Modifiers",
+      "level": 2,
+      "content": "One of the most troublesome parts of XKB, virtual modifiers appear prominently in all standard keymaps, despite being a relatively minor and mostly useless feature. The term itself is grossly misleading, and most of the docs do not help much either.\n\nSo, first of all: virtual modifiers are not modifiers in the same way real modifiers are. If anything, it is a way to name some of the real modifiers. They are not 16 more bits that can be used in level definitions. They are 16 possible names, each referring to one (or some, or none) of the 8 modifier bits.\n\nReal modifier bits are called Shift, Lock, Control and Mod1-Mod5. There are no Alt among them. Virtual modifiers were introduced to allow saying something like\n\n```\n#define Alt Mod1\n```\n\nto applications willing to use this information.\n\nIt is possible to make a usable layout without defining virtual modifiers at all. Among standard modifiers, only Alt/Meta actually need such treatment, because Shift and Control are real modifiers anyway and NumLock is not normally used as a modifier.\n\nAlso, unlike most of the keymap-related things that affect any application using basic Xlib functions, virtual modifiers must be queried explicitly using XKBlib calls. Not all applications actually do that.\n\n"
+    },
+    {
+      "title": "Defining virtual modifiers",
+      "level": 3,
+      "content": "The mapping between virtual and real modifiers is defined in a rather weird way using keysyms as a medium. Refer to XKBproto for some reasons behind this. Real modifiers M are assigned to a key using\n\n```\nmodifier_map M { <keysym> };\n```\n\nVirtual modifiers V can be assigned to a key using\n\n```\ninterpret <keysym> { virtualMod = V; };\n```\n\nIf a virtual modifier V shares at least one keysym with a real modifier M, it is bound to M.\n\nNote that virtual modifier names are not pre-defined and must be declared in xkb_compatibility and xkb_types sections before using them:\n\n```\nxkb_compatibility \"complete\" {\n       virtual_modifiers LevelThree,NumLock,Alt;\n   }\n```\n\n"
+    },
+    {
+      "title": "Keysym interpretation",
+      "level": 3,
+      "content": "Virtual modifiers can be used in interpret <keysym> blocks as if they were defined to the respective real modifiers. For a virtual modifier V not bound to any real modifier, this means\n\n```\n#define V\n```\n\ntype declaration, and\n\n```\ninterpret <key> { }\n   interpret <key>+V { }\n```\n\nblocks will be treated as duplicates. Only one of them, the last one in the file, will work. xkbcomp(1) usually gives a warning in cases like this.\n\n"
+    },
+    {
+      "title": "Client side notes",
+      "level": 3,
+      "content": "Handling XKB virtual modifiers on the client side requires some non-trivial server interaction. Most applications just do not bother, sticking with 8 real modifiers supplied in XKeyEvent.state.\n\nHowever, it is possible for an application to obtain virtual modifiers associated with a key press. Gtk, for instance, has [3] which may or may not be used in particular application.\n\nSome others may implement something that looks like virtual modifier support, but actually is not. Check Openbox example in section 5.3.3.2. Regarding Alt handling, check section 8.3.\n\n"
+    },
+    {
+      "title": "XKB control bits",
+      "level": 2,
+      "content": "A bunch of bit flags affecting various aspects of XKB functionality. To control them, use {Set,Latch,Lock}Controls actions.\n\n"
+    },
+    {
+      "title": "Mouse control",
+      "level": 3,
+      "content": "XKB allows controlling mouse pointer from keyboard. When set up properly, it can be extremely useful. However, its usability depends a lot on particular physical keyboard layout and on user's individual preferences.\n\nFrom XKB point of view it is relatively simple to implement, one should just trigger relevant actions. Fairly complete implementation can be found in /usr/share/X11/xkb/compat/mousekeys.\n\nNote that the actions will not work unless MouseKeys control bit is set:\n\n```\ninterpret Pointer_EnableKeys { action= LockControls(controls=MouseKeys); };\n```\n\nBecause most keyboards do not have dedicated mouse control keys, combining MouseKeys and one of the Overlay flags may be a good idea:\n\n```\ninterpret Pointer_EnableKeys { action= LockControls(controls=MouseKeys+Overlay1); };\n```\n\nThis allows moving pointer control keys to appropriate overlay block:\n\n```\nxkb_keycodes {\n       <MUP> = 218;\n       <MDWN> = 212;\n       <MLFT> = 214;\n       <MRHT> = 216;\n   }\n\n   xkb_symbols {\n       key   <UP> { [    Up ], overlay1 = <MUP> };\n       key <LEFT> { [  Left ], overlay1 = <MLFT> };\n       key <RGHT> { [ Right ], overlay1 = <MRHT> };\n       key <DOWN> { [  Down ], overlay1 = <MDWN> };\n\n       key <MUP>  { [ Pointer_Up ] };\n       key <MDWN> { [ Pointer_Down ] };\n       key <MLFT> { [ Pointer_Left ] };\n       key <MRHT> { [ Pointer_Right ] };\n   }\n```\n\nThis way it is possible to assign non-mouse actions to the keys used to control mouse, and thus, for example, use modifier keys to generate mouse buttons events.\n\n"
+    },
+    {
+      "title": "Local XKB folder",
+      "level": 2,
+      "content": "You can set an X keymap from a local file using the following command:\n\n```\n$ xkbcomp keymap.xkb $DISPLAY\n```\n\nwhere keymap.xkb must have a structure like\n\n```\nkeymap.xkb\n```\n\n```\nxkb_keymap {\n    xkb_keycodes  { ... };\n    xkb_types     { ... };\n    xkb_compat    { ... };\n    xkb_symbols   { ... };\n\n    // Geometry is completely optional.\n    // xkb_geometry  { include \"pc(pc104)\" };\n};\n```\n\nYou can use includes from this file, where the inclusion refer to a local folder instead of /usr/share/X11/xkb. You need to use the -I/path/ parameter of xkbcomp(1) for that. Full example:\n\n```\n$ xkbcomp -I$HOME/.xkb $HOME/.keymap.xkb $DISPLAY\n```\n\n```\n$HOME/.keymap.xkb\n```\n\n```\nxkb_keymap {\n    xkb_keycodes  { include \"evdev+aliases(qwerty)\" };\n    xkb_types     { include \"complete\" };\n    xkb_compat    { include \"complete\" };\n    xkb_symbols   { include \"pc+custom+inet(evdev)\" };\n};\n```\n\nThe symbol file must have the same name as specified in the xkb_symbols right above.\n\n```\n$HOME/.xkb/symbols/custom\n```\n\n```\npartial alphanumeric_keys xkb_symbols \"custom\" { ... };\n```\n\n"
+    },
+    {
+      "title": "Configuration tools",
+      "level": 2,
+      "content": "Most desktop environments allow for changing XKB options via their settings managers. Other relevant tools include:\n\n- input-remapper-gitAUR - a GUI tool for key remapping.\n- klfcAUR - Keyboard Layout Files Creator is a CLI utility for generating layouts from a JSON specifiation into various formats.\n\n"
+    },
+    {
+      "title": "Setting layout via xorg.conf or .xinitrc doesn't work",
+      "level": 3,
+      "content": "If you are able to sucessfully set an XKB layout after starting Xorg, via setxkbmap(1), but not at startup using an Xorg configuration file or ~/.xinitrc (either with xkbcomp(1) using a precompiled XKB map or setxkbmap(1)), then you might have an input method enabled which is overriding XKB. This behavior exists and can be disabled for Fcitx and Fcitx5.\n\n"
+    },
+    {
+      "title": "I have an USB keyboard and the settings get lost upon unplugging it",
+      "level": 3,
+      "content": "Using rules instead of static keymap configuration will give you a more flexible and permanent key mapping that does not need to be reloaded manually (or by a script).\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- The XKB Configuration Guide\n- https://www.x.org/wiki/XKB\n- An Unreliable Guide To XKB Configuration.\n- Ivan Pascal XKB docs. One of the oldest and most well-known guides. Focuses a lot on details, and explains some of exotic XKB features.\n- XKB protocol specification. Comprehensive description of all XKB features. Extremely useful for understating how XKB works, includes a good description of virtual modifiers among other things. Some practice with xkbcomp(1) is strongly recommended though, because the features are described on protocol level.\n\n"
+    }
+  ]
+}

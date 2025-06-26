@@ -1,0 +1,61 @@
+{
+  "title": "Backup do sistema",
+  "url": "https://wiki.archlinux.org/title/Backup_do_sistema",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Artigos relacionados\n\n- Programas de sincronização e backup\n- Manutenção do sistema#Backup\n- Criptografia de dados em repouso#Backup para cenários de criptografia de disco\n- Clonagem de disco\n- Migrar instalação para novo hardware\n- Recuperação de arquivos\n\nUm backup do sistema é o processo de backup do sistema operacional, arquivos e dados úteis/essenciais específicos do sistema. [Ele] garante principalmente que não apenas os dados do usuário em um sistema sejam salvos, mas também o estado do sistema ou a condição operacional. Isso ajuda a restaurar o sistema para o último estado salvo junto com todos os dados de backup selecionados.[1]\n\n"
+    },
+    {
+      "title": "Usando snapshots de Btrfs",
+      "level": 2,
+      "content": "Veja Btrfs (Português)#Snapshots, #Snapshots e partição /boot e Snapper.\n\n"
+    },
+    {
+      "title": "Usando snapshots de LVM",
+      "level": 2,
+      "content": "Veja LVM#Snapshots, Criar snapshots do sistema de arquivos raiz com LVM e #Snapshots e partição /boot.\n\n"
+    },
+    {
+      "title": "Usando rsync",
+      "level": 2,
+      "content": "Veja rsync#As a backup utility.\n\n"
+    },
+    {
+      "title": "Usando tar",
+      "level": 2,
+      "content": "Veja Backup completo do sistema com tar.\n\n"
+    },
+    {
+      "title": "Usando SquashFS",
+      "level": 2,
+      "content": "Veja Backup completo do sistema com SquashFS.\n\n"
+    },
+    {
+      "title": "Backup inicializável",
+      "level": 2,
+      "content": "Ter um backup inicializável pode ser útil caso o sistema de arquivos seja corrompido ou se uma atualização quebrar o sistema. O backup também pode ser usado como uma base de teste para atualizações, com o repositório testing habilitado, etc. Se você transferiu o sistema para uma partição ou unidade diferente e deseja inicializá-lo, o processo é tão simples quanto atualizar o backup do /etc/fstab e o arquivo de configuração do seu gerenciador de boot.\n\nEsta seção pressupõe que você fez o backup do sistema em outra unidade ou partição, que seu carregador de inicialização atual está funcionando bem e que você deseja inicializar a partir do backup também.\n\n"
+    },
+    {
+      "title": "Atualizar o fstab",
+      "level": 3,
+      "content": "Sem reinicializar, edite o fstab do backup comentando ou removendo todas as entradas existentes. Adicione uma entrada para a partição que contém o backup, como o exemplo aqui:\n\n```\n/dev/sdaX    /             ext4      defaults                 0   1\n```\n\nLembre-se de usar o nome do dispositivo e o tipo de sistema de arquivos adequados.\n\n"
+    },
+    {
+      "title": "Atualizar o arquivo de configuração do gerenciador de boot",
+      "level": 3,
+      "content": "Para Syslinux, tudo o que você precisa fazer é duplicar a entrada atual, exceto apontar para uma unidade ou partição diferente.\n\nPara o GRUB, é recomendado que você gere novamente o arquivo de configuração principal automaticamente. Se você quiser instalar recentemente todos os arquivos do GRUB em algum lugar diferente de /boot, como /mnt/newroot/boot, use a opção --boot-directory.\n\nAlém disso, verifique a nova entrada no menu /boot/grub/grub.cfg. Certifique-se de que o UUID esteja correspondendo à nova partição, caso contrário, ele ainda pode inicializar o sistema antigo. Encontre o UUID de uma partição com lsblk:\n\n```\n$ lsblk -no NAME,UUID /dev/sdXY\n```\n\nsendo que /dev/sdXY é a partição desejada (p.ex., /dev/sdb3). Para listar os UUIDs das partições que o GRUB acha que pode inicializar, use o grep:\n\n```\n# grep UUID= /boot/grub/grub.cfg\n```\n\n"
+    },
+    {
+      "title": "Primeira inicialização",
+      "level": 3,
+      "content": "Reinicialize o computador e selecione a entrada correta no gerenciador de boot. Isso carregará o sistema pela primeira vez. Todos os periféricos devem ser detectados e as pastas vazias em / serão preenchidas.\n\nAgora, você pode editar novamente o /etc/fstab para adicionar as partições e os pontos de montagem removidos anteriormente.\n\n"
+    },
+    {
+      "title": "Snapshots e partição /boot",
+      "level": 2,
+      "content": "Se o seu sistema de arquivos suportar snapshots (por exemplo, LVM ou Btrfs), eles provavelmente não incluirão a partição /boot ou ESP.\n\nVocê pode copiar a partição de inicialização automaticamente em uma atualização do kernel para sua partição root com um hook do pacman (certifique-se de que o arquivo hook seja de propriedade do root):\n\n```\n/etc/pacman.d/hooks/95-bootbackup.hook\n```\n\n```\n[Trigger]\nOperation = Upgrade\nOperation = Install\nOperation = Remove\nType = Path\nTarget = usr/lib/modules/*/vmlinuz\n\n[Action]\nDepends = rsync\nDescription = Backing up /boot...\nWhen = PostTransaction\nExec = /usr/bin/rsync -a --delete /boot /.bootbackup\n```\n\n"
+    }
+  ]
+}

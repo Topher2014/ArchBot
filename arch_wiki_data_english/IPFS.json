@@ -1,0 +1,51 @@
+{
+  "title": "IPFS",
+  "url": "https://wiki.archlinux.org/title/IPFS",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "The InterPlanetary File System (IPFS) is a distributed hypermedia protocol, addressed by content and identities. IPFS enables the creation of completely distributed applications, datastores as well as websites and aims to make the web faster, safer, and more open.\n\nIt seeks to connect all computers which do peer-to-peer exchanges of the requested file transfers. In some ways this is similar to the original goals of the Web, but instead of using a client and server role model and location-based addressing, all computers in the network share the information about where which files are stored in a distributed fashion. This way a user does not need to know which server contains which files, but instead only needs to know which id the content has to receive it. The network locates the corresponding nodes and requests the data in a tamper-proof way. Files are stored in objects similar to the way git works, and the metadata storage and the file transfers have similarities to BitTorrent.\n\nFiles added to an IPFS node get chunked and hashed. The individual chunks are added to a MerkleDAG - a tree object - which gets stored alongside the chunks. The hash of the tree object is the tamper-proof content-id (CID). The node then publishes all hashes in the distributed hash-table of the network with its node-id. This way the content can be located by the CID to specific nodes which can provide the data on requests.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the kubo or the kubo-gitAUR package.\n\nTo start using IPFS you must first issue\n\n```\n$ ipfs init\n```\n\nas a user. This creates a ~/.ipfs directory with all the necessary files in it.\n\nNow you can start the IPFS daemon:\n\n```\n$ ipfs daemon\n```\n\nThis starts your node, available via the ipfs cli, or the web interface on localhost:5001/webui. Additionally, a local gateway goes up on localhost:8080 (the default port can be changed in ~/.ipfs/config).\n\n"
+    },
+    {
+      "title": "Using a service to start the daemon",
+      "level": 2,
+      "content": "For convenience, you can automate the startup of the IPFS daemon using the Systemd/User service included in kubo. This ensures that the daemon starts when you log in and that it is restarted if it crashes.\n\nYou can start/enable ipfs.service as a user unit.\n\nIf you want the service to always run regardless of the user session status, enable the system-wide service instead by starting/enabling ipfs@username.service.\n\n"
+    },
+    {
+      "title": "Starting the service with a different command line",
+      "level": 3,
+      "content": "You may also want to limit the bandwidth IPFS uses by using trickleAUR (c.f. ipfs/go-ipfs#3429). You can edit this Systemd/User service file to $HOME/.config/systemd/user/go-ipfs.service:\n\n```\n[Unit]\nDescription=InterPlanetary File System (IPFS) daemon (rate-limited via Trickle)\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nExecStart=/usr/bin/trickle -s -u 56 /usr/bin/ipfs daemon --routing=dhtclient\nRestart=on-failure\n\n[Install]\nWantedBy=default.target\n```\n\nThis will both start IPFS with trickle and pass the argument --routing=dhtclient. You may of course modify it as needed, or base your version on the package's /usr/lib/systemd/user/ipfs.service. Start/enable go-ipfs.service as a user unit.\n\n"
+    },
+    {
+      "title": "Firewall",
+      "level": 2,
+      "content": "IPFS requires port 4001 TCP and UDP. It attempts to configure port forwarding on the router using UPnP/IGD. Routers without UPnP/IGD support will need to do a manual port forward.\n\n"
+    },
+    {
+      "title": "File sharing",
+      "level": 2,
+      "content": "To share a file using IPFS you need the daemon to be running.\n\n```\n$ ipfs add file\n```\n\nreturns a hash. If someone shared this file via IPFS before, the hash would match that previous upload, making you the second source of the file.\n\nTo retrieve a file via the IPFS hash, use ipfs cat:\n\n```\n$ ipfs cat /ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG/readme\n```\n\nYou can pipe this into any other application, for example, to watch a video with mpv:\n\n```\n$ ipfs cat QmWenbjgZnA6UguLtmUYayS6e7UQM7woB15zuEymSRRMoi | mpv -\n```\n\nOr you can download the file:\n\n```\n$ ipfs get QmWenbjgZnA6UguLtmUYayS6e7UQM7woB15zuEymSRRMoi\n```\n\nThere is also an ipgetAUR utility, which acts like wget for IPFS. In addition, it includes a bootstrap node, so you will not have to have ipfs daemon running or installed to use it. To download a file:\n\n```\n$ ipget QmWenbjgZnA6UguLtmUYayS6e7UQM7woB15zuEymSRRMoi\n```\n\nYou can share both files and folders. Folders should be shared recursively:\n\n```\n$ ipfs add -r folder\n```\n\nTo view all the files and caches in a folder (if the hash is a folder):\n\n```\n$ ipfs ls QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG\n```\n\nEvery file shared with network is accessible via the IPFS gateway on localhost:8080 like this:\n\n```\nhttp://localhost:8080/ipfs/QmWenbjgZnA6UguLtmUYayS6e7UQM7woB15zuEymSRRMoi\n```\n\nThere are public gateways, allowing users with no IPFS node running to access files on the network. For example, the official website:\n\n```\nhttps://ipfs.io/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG\n```\n\n"
+    },
+    {
+      "title": "Simple hosting with name resolution",
+      "level": 2,
+      "content": "In IPFS, files shared are never deleted, and with any change of a file its hash changes as well. This makes tasks such as website hosting difficult, as any changes to a webpage, for example to an index.html, would result in it having a different hash, and the old webpage would be still accessible from the old hash. It is one of a network's goals to store all the content persistently with full history. IPFS offers a name service you can use to generate persistent caches - IPNS. IPNS allows you to bind any hash to your node's unique ID, generated at initialization. You can view your ID like this:\n\n```\n$ ipfs id\n```\n\nAnd to bind any hash to it:\n\n```\n$ ipfs name publish HASH\n```\n\nThis assigns the new hash generated by ipfs add after the file change to your node ID and hence makes the updated version of a folder/file accessible at the same address.\n\nNote that when using IPNS the address has an ipns prefix instead of ipfs:\n\n```\nhttp://localhost:8080/ipns/QmPtMQErTfQMbZTMMpQh65cpk5y7D94WdYJurCeRqvXKmD/\n```\n\n"
+    },
+    {
+      "title": "Usage as makepkg DLAGENT",
+      "level": 2,
+      "content": "PKGBUILDs containing URIs pointing to IPFS resources need the ipfs-dlagentAUR download agent installed and configured to be correctly built.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- IPFS homepage\n- IPFS examples\n- Awesome IPFS\n- IPFS and pacman\n- Arch Linux repository on IPFS\n\n"
+    }
+  ]
+}

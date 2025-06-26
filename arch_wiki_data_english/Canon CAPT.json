@@ -1,0 +1,51 @@
+{
+  "title": "Canon CAPT",
+  "url": "https://wiki.archlinux.org/title/Canon_CAPT",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- CUPS\n- CUPS/Printer-specific problems\n\nCAPT (Canon Advanced Printing Technology) is Canon's proprietary driver, supporting the Canon i-Sensys series of laser printers. For more information, see Setting up CAPT printers on Ubuntu.\n\n"
+    },
+    {
+      "title": "Installation",
+      "level": 2,
+      "content": "Install the capt-srcAUR package. It depends on 32-bit library packages and requires enabling multilib.\n\nThere is also an open source CAPT driver in early alpha stage not described here, available as captdriver-gitAUR.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "Canon's driver uses a local daemon to communicate with the printer, and wraps that using a CUPS driver.\n\nTo configure the printer, follow the CUPS article, adding a CAPT printer and using a Printer URI of ccp://localhost:59787. Find the right model using lpinfo -m, or check the table provided on the Ubuntu help page, which matches each supported printer with its corresponding PPD.\n\nNote: **6** \n\n- Installing CAPT printers via the CUPS web interface may not work [1]. Instead, use the CLI tools.\n- If port 59787 does not work, try port 59687.\n- Some models have multiple PPDs, where the last letter indicates the regional model (J = Japan, K = United Kingdom, S = United States)\n\nNext, register the printer with the CAPT driver itself via ccpdadmin. Replace queue_name with the queue descriptive name and printer_address with either the USB port (e.g. /dev/usb/lp0) in case of a local printer or the IP address, prefixed by net: (e.g. net:192.168.1.100), in case of a network printer:\n\n```\n# ccpdadmin -p queue_name -o printer_address\n```\n\nFor example, for a USB printer (in case of multiple USB-connected printers, read #Collisions with other printers):\n\n```\n# ccpdadmin -p LBP6310 -o /dev/usb/lp0\n```\n\nOr for a network printer:\n\n```\n# ccpdadmin -p LBP6310 -o net:192.168.1.100\n```\n\nStart/enable the CAPT daemon with ccpd.service.\n\nTo remove a printer:\n\n```\n# ccpdadmin -x queue_name\n```\n\n"
+    },
+    {
+      "title": "Local CUPS",
+      "level": 3,
+      "content": "The driver includes a status monitor which can be launched with\n\n```\n$ captstatusui -P printer_model\n```\n\ne.g.\n\n```\n$ captstatusui -P LBP6310\n```\n\nIf you only want the status monitor to pop up when a problem occurs, simply append the -e switch:\n\n```\n$ captstatusui -P LBP6310 -e\n```\n\n"
+    },
+    {
+      "title": "Remote CUPS",
+      "level": 3,
+      "content": "Unfortunately, a local installation of captstatusui will not detect CAPT printers on a remote CUPS server.\n\nRemote print monitoring can be achieved, however, using SSH and X11 forwarding.\n\n"
+    },
+    {
+      "title": "Client configuration",
+      "level": 4,
+      "content": "- create a new SSH key ~/.ssh/capt and copy the public key to the remote server\n- create a file captstatusui.sh with the following content, make it executable and place it in your autostart folder:\n\n```\n#!/bin/sh\nssh -T -Y -i ~/.ssh/capt remote_server_hostname_or_IP_address < /dev/null\n```\n\n"
+    },
+    {
+      "title": "Server configuration",
+      "level": 4,
+      "content": "- create a new user capt\n- append the following section to /etc/ssh/sshd_config and restart the SSH daemon or socket\n\n```\n...\nMatch User capt\n       X11Forwarding yes\n       PermitTTY no\n       ForceCommand captstatusui -P printer_model -e\n       AuthenticationMethods publickey\n```\n\ne.g.\n\n```\n...\nMatch User capt\n       X11Forwarding yes\n       PermitTTY no\n       ForceCommand captstatusui -P LBP6310 -e\n       AuthenticationMethods publickey\n```\n\nThis can be extended to include multiple users (using a single, shared SSH key or each with a unique SSH key) by adding each user to a capt group, then using a Match Group rule:\n\n```\n...\nMatch Group capt\n       X11Forwarding yes\n       PermitTTY no\n       ForceCommand captstatusui -P LBP6310 -e\n       AuthenticationMethods publickey\n```\n\n"
+    },
+    {
+      "title": "Conflict with CUPS",
+      "level": 3,
+      "content": "To prevent CUPS from accessing our CAPT-only printer (and confusing the firmware with multiple setup requests over USB), a list of unsupported VID/PID pairs may be added into /usr/share/cups/usb/. A new file (e. g. capt-printers.usb-quirks) may be created to prevent the list from getting overwritten by CUPS updates. See the issue on GitHub: Cups attempts to probe, configure unsupported Canon CAPT USB printers.\n\n"
+    },
+    {
+      "title": "Collisions with other printers",
+      "level": 3,
+      "content": "Other printers connected to the computer may create their own /dev/usb/lpN entries, possibly even before your Canon printer is enumerated and initialized, causing CAPT to access devices it shouldn't be touching. A symlink to the USB device can be created automatically by Udev based on the USB VID/PID and (optionally) the serial number reported in dmesg.\n\n```\n/etc/udev/rules.d/50-canon.rules\n```\n\n```\nSUBSYSTEMS==\"usb\", ATTRS{idVendor}==\"04a9\", ATTRS{idProduct}==\"271c\", ATTRS{serial}==\"0000A2BARL02\", SYMLINK+=\"usb/lbp7010c\"\n```\n\nThen, add the symlinked path to CCPD:\n\n```\n# ccpdadmin -p LBP7010C -o /dev/usb/lbp7010c\n```\n\nSource: Arch Forums: \"/dev/usb/lp1\" is used instead of \"/dev/usb/lp0\" for printers\n\n"
+    }
+  ]
+}

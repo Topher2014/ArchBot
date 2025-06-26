@@ -1,0 +1,61 @@
+{
+  "title": "Notify OSD",
+  "url": "https://wiki.archlinux.org/title/Notify_OSD",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- GTK\n- Libcanberra\n\nDesktop notifications are small, passive popup dialogs that notify the user of particular events in an asynchronous manner.\n\n"
+    },
+    {
+      "title": "Libnotify",
+      "level": 2,
+      "content": "libnotify is a desktop-independent implementation of the Desktop Notifications Specification, which provides notify-send(1) utility and support for GTK and Qt applications. It is already used by many open source applications like Evolution and Pidgin.\n\n"
+    },
+    {
+      "title": "Notification servers",
+      "level": 2,
+      "content": "In order to receive notifications sent via libnotify, a notification server is required.\n\n"
+    },
+    {
+      "title": "Built-in",
+      "level": 3,
+      "content": "Cinnamon, Deepin, Enlightenment, GNOME, and GNOME Flashback use their own implementations to display notifications, and may not be able to be replaced since their notification servers are started automatically on login to receive notifications from applications via DBus.\n\nOn KDE Plasma if you enter the configuration for the System Tray you can disable the built-in notification server under System Services by changing the drop-down next to Notifications to Disabled. You can then add your preferred notification server in the System Settings menu under System / Autostart by adding a new Autostart application. You will need to log out and back in to take effect.\n\n"
+    },
+    {
+      "title": "Standalone",
+      "level": 3,
+      "content": "In other desktop environments, a notification server needs to be manually installed and launched using e.g. XDG Autostart.\n\nAlternatively, by making the notification server a D-Bus service, the notification server can be launched automatically on the first call to it. Most notification servers already ship a dbus service under /usr/share/dbus-1/services. For some implementations, e.g. notification-daemon package, it's necessary to create one manually in the user D-Bus services directory ($XDG_DATA_HOME/dbus-1/services):\n\n```\norg.freedesktop.Notifications.service\n```\n\n```\n[D-BUS Service]\nName=org.freedesktop.Notifications\nExec=/usr/lib/notification-daemon-1.0/notification-daemon\n```\n\nWhenever an application sends a notification by sending a signal to org.freedesktop.Notifications, D-Bus activates /usr/lib/notification-daemon-1.0/notification-daemon if it has not already been activated.\n\nYou can also choose one of the following implementations:\n\n- Deadd Notification Center — A notification-daemon with notification center inspired by Dunst.\n\n- Dunst — Minimalist notification daemon for Linux designed to fit nicely into minimalist window managers like dwm. Includes Wayland support since 1.6.\n\n- fnott — Keyboard driven and lightweight Wayland notification daemon for wlroots-based compositors.\n\n- LXQt Notification Daemon — Notification server for LXQt.\n\n- mako — A lightweight notification daemon for Wayland; it currently works on Sway and river.\n\n- MATE Notification Daemon — Notification server for MATE.\n\n- Notification Daemon — The original notification server.\n\n- Notify OSD — Notification server for Unity.\n\n- statnot — Small, lightweight notification daemon that can output notifications to the root window's title, stdout or FIFO pipes, making it integrate very well with tiling window managers.\n\n- swaync — A simple GTK based notification daemon for Sway.\n\n- twmn — Notification system for tiling window managers.\n\n- wired — Lightweight notification daemon with highly customizable layout blocks, written in Rust.\n\n- Xfce Notification Daemon — Notification server for Xfce.\n\n"
+    },
+    {
+      "title": "Send notifications to another user",
+      "level": 3,
+      "content": "systemd-run(1) can be used to enter another user's session and send notifications to them, e.g. from a background script running as root:\n\n```\n# systemd-run --machine=target_user@.host --user notify-send 'Hello world!' 'This is an example notification.'\n```\n\nAnother possibility is to use systembus-notify. The following command will show a notification to all users who run systembus-notify in their user session:\n\n```\n$ dbus-send --system / net.nuetzlich.SystemNotifications.Notify 'string:Hello world!' 'string:This is an example notification.'\n```\n\n"
+    },
+    {
+      "title": "Replace previous notification",
+      "level": 3,
+      "content": "Notifications can be replaced if their ID is known; if a new notification request specifies the same ID, it will always replace the old notification. Unfortunately notify-send does not report this ID, so alternative tools are required to do this on CLI. One capable CLI-tool is the notify-send.py python script, which provides notify-send syntax with additional ID-reporting and replacing capabilities.\n\nHowever, with some notification servers (such as Notify-OSD), you can use the string:x-canonical-private-synchronous: hint with notify-send to achieve the same result.\n\nFor example, to get a notification displaying time:\n\n```\nwhile true; do\n  date=$(date)\n  notify-send \"$date\" -h string:x-canonical-private-synchronous:my-notification\n  sleep 1\ndone\n```\n\n"
+    },
+    {
+      "title": "Include Buttons or listen for close/on-click of the notification",
+      "level": 3,
+      "content": "With the notify-send.py script, actions can be used to display buttons or to listen for the default-action of the notification (usually, when the user clicks on it) and the close-action. When the action-icons hint is set to true and the notification daemon supports this, the buttons will display icons instead of text. The script prints the action identifier or \"close\" to the command line when the corresponding event has occured. To listen for the default action (on-click), one has to use the action-identifier \"default\".\n\nExample with icons on buttons:\n\n```\nnotify-send.py \"Buttons\" \"Do you like em?\" --hint boolean:action-icons:true --action yes:face-cool no:face-sick\n```\n\n"
+    },
+    {
+      "title": "Multiple notification servers with D-Bus services",
+      "level": 3,
+      "content": "As described in the section Standalone, users can create a D-Bus service so that a notification server can be launched automatically. Some implementations already include the D-Bus service files. However, this causes a problem when multiple notification servers are installed and when some of them come with the service files. For example, installing both dunst and mako without explicitly specifying the desired server, D-Bus then chooses one for the users, and the decision is out of users' control. To avoid the situation, you can override the service used by creating an org.freedesktop.Notifications.service (see #Standalone) and pointing to the service you want to use, then restarting the session.\n\n"
+    },
+    {
+      "title": "Applications hanging for exactly one minute",
+      "level": 3,
+      "content": "If applications hang when attempting to show notifications, it might be because of a notification service falsely advertising its availability through the D-Bus service.\n\nFor instance, suppose a user recently installed a KDE component that requires plasma-workspace, but the user is still running XFCE. In this case, the KDE notifier will be prioritized, but the user is not running it. The application will hang while waiting for the service, and only after a timeout will it fall back to xfce4-notifyd.\n\nThe most noticeable hanging might come from the volume indicator scroll adjustment.\n\nIf you are in this situation, you should have two notification handlers:\n\n```\n$ find /usr/share/dbus-1/services/ -name '*Notif*'\n```\n\n```\norg.kde.plasma.Notifications.service\norg.xfce.xfce4-notifyd.Notifications.service\n```\n\nOf those two, one fails regularly after a 1-minute timeout, as seen in the journal:\n\n```\n# journalctl -g notif\n```\n\n```\nJul 01 09:40:49 laptop dbus-daemon[866]: [session uid=1000 pid=866] Activating service name='org.freedesktop.Notifications' requested by ':1.193' (uid=1000 pid=5432 comm=\"/usr/lib/xfce4/panel/wrapper-2.0 /usr/lib/xfce4/pa\")\nJul 01 09:41:49 laptop plasma_waitforname[6093]: org.kde.knotifications: WaitForName: Service was not registered within timeout\nJul 01 09:41:49 laptop dbus-daemon[866]: [session uid=1000 pid=866] Activated service 'org.freedesktop.Notifications' failed: Process org.freedesktop.Notifications exited with status 1\n```\n\nChoosing the service you want to use as described in #Multiple notification servers with D-Bus services will fix the problem.\n\n"
+    },
+    {
+      "title": "See also",
+      "level": 2,
+      "content": "- Libnotify Reference Manual\n- C example (archived version)\n- Python notification examples\n- Python notify example (french article)\n\n"
+    }
+  ]
+}

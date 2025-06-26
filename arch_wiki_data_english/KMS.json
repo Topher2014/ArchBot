@@ -1,0 +1,61 @@
+{
+  "title": "KMS",
+  "url": "https://wiki.archlinux.org/title/KMS",
+  "sections": [
+    {
+      "title": "Introduction",
+      "level": 1,
+      "content": "Related articles\n\n- ATI\n- Intel graphics\n- Nouveau\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\nKernel Mode Setting (KMS) is a method for setting display resolution and depth in the kernel space rather than user space.\n\nThe Linux kernel's implementation of KMS enables native resolution in the framebuffer and allows for instant console (tty) switching. KMS also enables newer technologies (such as DRI2) which will help reduce artifacts and increase 3D performance, even kernel space power-saving.\n\n"
+    },
+    {
+      "title": "Background",
+      "level": 2,
+      "content": "Previously, setting up the video card was the job of the X server. Because of this, it was not easily possible to have fancy graphics in virtual consoles. Also, each time a switch from X to a virtual console was made (Ctrl+Alt+F2), the server had to give control over the video card to the kernel, which was slow and caused flickering. The same \"painful\" process happened when the control was given back to the X server (Alt+F7 when X runs in VT7).\n\nWith Kernel Mode Setting (KMS), the kernel is now able to set the mode of the video card. This makes fancy graphics during bootup, virtual console and X fast switching possible, among other things.\n\n"
+    },
+    {
+      "title": "Configuration",
+      "level": 2,
+      "content": "At first, note that for any method you use, you should always disable:\n\n- Any vga= options in your boot loader as these will conflict with the native resolution enabled by KMS.\n- Any video= lines that enable a framebuffer that conflicts with the driver.\n- Any other framebuffer drivers (such as uvesafb).\n\nNote: **This article or section is out of date.** This article or section is out of date.\n\nThis article or section is out of date.\n\nNote: **This article or section needs expansion.** This article or section needs expansion.\n\nThis article or section needs expansion.\n\n"
+    },
+    {
+      "title": "Late KMS start",
+      "level": 3,
+      "content": "Intel, Nouveau, ATI and AMDGPU drivers already enable KMS automatically for all chipsets, so you do not need to do anything.\n\nThe proprietary NVIDIA driver supports KMS (since 364.12), which has to be manually enabled.\n\n"
+    },
+    {
+      "title": "Early KMS start",
+      "level": 3,
+      "content": "KMS is typically initialized after the initramfs stage. However, it is possible to enable KMS already during the initramfs stage. Add the required module for the video driver to the initramfs configuration file:\n\n- amdgpu for AMDGPU, or radeon when using the legacy ATI driver.\n- i915 for Intel graphics.\n- nouveau for the open-source Nouveau driver.\n- nvidia nvidia_modeset nvidia_uvm nvidia_drm for the out-of-tree nvidia and nvidia-open drivers. See NVIDIA#DRM kernel mode setting for details.\n\n- mgag200 for Matrox graphics.\n- Depending on QEMU graphics in use (qemu option -vga type or libvirt <video><model type='type'>[2]): bochs for std (qemu) and vga/bochs (libvirt), virtio-gpu for virtio, qxl for qxl, vmwgfx for vmware (qemu) and vmvga (libvirt), cirrus for cirrus.\n- Depending on VirtualBox graphics controller: vmwgfx for VMSVGA, vboxvideo for VBoxVGA or VBoxSVGA.\n\n- bochs for std (qemu) and vga/bochs (libvirt),\n- virtio-gpu for virtio,\n- qxl for qxl,\n- vmwgfx for vmware (qemu) and vmvga (libvirt),\n- cirrus for cirrus.\n\n- vmwgfx for VMSVGA,\n- vboxvideo for VBoxVGA or VBoxSVGA.\n\nInitramfs configuration instructions are slightly different depending on the initramfs generator you use.\n\n"
+    },
+    {
+      "title": "mkinitcpio",
+      "level": 4,
+      "content": "For in-tree modules, make sure kms is included in the HOOKS array in /etc/mkinitcpio.conf (this is the default since mkinitcpio v33).\n\nFor out-of-tree modules, place the module names in the MODULES array. For example, to enable early KMS for the NVIDIA graphics driver:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nMODULES=(... nvidia nvidia_modeset nvidia_uvm nvidia_drm ...)\n```\n\nIf you are using the #Forcing modes and EDID method, you should embed the custom file into initramfs as well:\n\n```\n/etc/mkinitcpio.conf\n```\n\n```\nFILES=(/usr/lib/firmware/edid/your_edid.bin)\n```\n\nThen regenerate the initramfs.\n\n"
+    },
+    {
+      "title": "Booster",
+      "level": 4,
+      "content": "If you use Booster, you can load required modules with this config change:\n\n```\n/etc/booster.yaml\n```\n\n```\nmodules_force_load: i915\n```\n\nIf you are using the #Forcing modes and EDID method, you should embed the custom file into your booster images as well:\n\n```\n/etc/booster.yaml\n```\n\n```\nextra_files: /usr/lib/firmware/edid/your_edid.bin\n```\n\nThen regenerate the booster images.\n\n"
+    },
+    {
+      "title": "My fonts are too tiny",
+      "level": 3,
+      "content": "See Linux console#Fonts for how to change your console font to a large font. The Terminus font (terminus-font) is available in many sizes, such as ter-132b which is larger.\n\nAlternatively, disabling modesetting might switch to lower resolution and make fonts appear larger.\n\n"
+    },
+    {
+      "title": "Forcing modes and EDID",
+      "level": 2,
+      "content": "If your native resolution is not automatically configured or no display at all is detected, then your monitor might send none or just a skewed EDID file. The kernel will try to catch this case and will set one of the most typical resolutions.\n\nIn case you have the EDID file for your monitor, you merely need to explicitly enforce it (see below). However, most often one does not have direct access to a sane file and it is necessary to either extract an existing one and fix it or to generate a new one.\n\nGenerating new EDID binaries for various resolutions and configurations is possible during kernel compilation by following the upstream documentation (also see here for a short guide). Other solutions are outlined in details in this article. Extracting an existing one is in most cases easier, e.g. if your monitor works fine under Windows, you might have luck extracting the EDID from the corresponding driver, or if a similar monitor works which has the same settings, you may use get-edid(1) from the read-edid package. You can also try looking in /sys/class/drm/*/edid.\n\nAfter having prepared your EDID, place it in a directory, e.g. called edid under /usr/lib/firmware/ and copy your binary into it.\n\nTo load it at boot, specify the following in the kernel command line:\n\n```\ndrm.edid_firmware=edid/your_edid.bin\n```\n\nIn order to apply it only to a specific connector, use:\n\n```\ndrm.edid_firmware=VGA-1:edid/your_edid.bin\n```\n\nIf you want to set multiple edid files, use:\n\n```\ndrm.edid_firmware=VGA-1:edid/your_edid.bin,VGA-2:edid/your_other_edid.bin\n```\n\nIf you are doing early KMS, you must include the custom EDID file in the initramfs, otherwise you will run into problems.\n\nThe value of the drm.edid_firmware parameter may also be altered after boot by writing to /sys/module/drm/parameters/edid_firmware:\n\n```\n# echo edid/your_edid.bin > /sys/module/drm/parameters/edid_firmware\n```\n\nThis will only take effect for newly plugged in displays, already plugged-in screens will continue to use their existing EDID settings. For external displays, replugging them is sufficient to see the effect however.\n\nTo load an EDID after boot, you can use debugfs instead of a kernel command line parameter if the kernel is not in lockdown mode. This is very useful if you swap the monitors on a connector or just for testing. Once you have an EDID file as above, run:\n\n```\n# cat correct-edid.bin > /sys/kernel/debug/dri/0/HDMI-A-2/edid_override\n```\n\nAnd to disable:\n\n```\n# echo -n reset > /sys/kernel/debug/dri/0/HDMI-A-2/edid_override\n```\n\nIf your monitor supports hotplugging, you can also trigger a hotplug to make the monitor use the new EDID you just loaded (e.g. into edid_override), so you don't have to physically replug the monitor nor reboot:\n\n```\n# echo 1 > /sys/kernel/debug/dri/0/HDMI-A-2/trigger_hotplug\n```\n\n"
+    },
+    {
+      "title": "Forcing modes",
+      "level": 3,
+      "content": "From the nouveau wiki:\n\n- https://docs.kernel.org/fb/modedb.html\n- https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/drm_fb_helper.c\n\nThe format is:\n\n```\nvideo=<driver>:<conn>:<xres>x<yres>[M][R][-<bpp>][@<refresh>][i][m][eDd]\n```\n\n- <driver>: Specify a video mode at bootup.\n- <conn>: Specifies the video connection type, such as VGA, DVI, HDMI, etc., see /sys/class/drm/ for available connectors\n- <xres>: The horizontal resolution in pixels.\n- <yres>: The vertical resolution in pixels.\n- [M]: Enables the use of VESA Coordinated Video Timings (CVT) to calculate the video mode timings instead of looking up the mode from a database\n- [R]: Enables reduced blanking calculations for digital displays when using CVT. This reduces the horizontal and vertical blanking intervals to save bandwidth.\n- [-<bpp>]: Specifies the color depth or bits per pixel (e.g., -24 for 24-bit color).\n- [@<refresh>]: Specifies the refresh rate in Hz.\n- [i]: Enables interlaced mode.\n- [m]: Adds margins to the CVT calculation (1.8% of xres rounded down to 8 pixels and 1.8% of yres)\n- [e]: output forced to on\n- [D]: digital output forced to on (e.g. DVI-I connector)\n- [d]: output forced to off\n\nYou can override the modes of several outputs using video= several times, for instance, to force DVI to 1024x768 at 85 Hz and TV-out off:\n\n```\nvideo=DVI-I-1:1024x768@85 video=TV-1:d\n```\n\nTo get the name and current status of connectors, you can use the following shell oneliner:\n\n```\n$ for p in /sys/class/drm/*/status; do con=${p%/status}; echo -n \"${con#*/card?-}: \"; cat $p; done\n```\n\n```\nDVI-I-1: connected\nHDMI-A-1: disconnected\nVGA-1: disconnected\n```\n\n"
+    },
+    {
+      "title": "Disabling modesetting",
+      "level": 2,
+      "content": "You may want to disable KMS for various reasons. To disable KMS, add nomodeset as a kernel parameter. See Kernel parameters for more info.\n\nAlong with the nomodeset kernel parameter, for an Intel graphics card, you need to add i915.modeset=0, and for an Nvidia graphics card, you need to add nouveau.modeset=0. For Nvidia Optimus dual-graphics system, you need to add all the three kernel parameters (i.e. \"nomodeset i915.modeset=0 nouveau.modeset=0\").\n\n"
+    }
+  ]
+}
