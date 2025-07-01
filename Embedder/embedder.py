@@ -78,8 +78,13 @@ class ArchWikiEmbedder:
         print(f"Index built with {self.index.ntotal} vectors")
         return self.index
     
-    def save_index(self, index_file='arch_wiki_index.faiss', metadata_file='arch_wiki_metadata.pkl'):
+    def save_index(self, output_dir='.', base_name='arch_wiki'):
         """Save the index and metadata"""
+        os.makedirs(output_dir, exist_ok=True)
+        
+        index_file = os.path.join(output_dir, f'{base_name}_index.faiss')
+        metadata_file = os.path.join(output_dir, f'{base_name}_metadata.pkl')
+        
         print(f"Saving index to {index_file}...")
         faiss.write_index(self.index, index_file)
         
@@ -88,9 +93,13 @@ class ArchWikiEmbedder:
             pickle.dump(self.chunks, f)
         
         print("Index and metadata saved!")
+        return index_file, metadata_file
     
-    def load_index(self, index_file='arch_wiki_index.faiss', metadata_file='arch_wiki_metadata.pkl'):
+    def load_index(self, output_dir='.', base_name='arch_wiki'):
         """Load previously saved index and metadata"""
+        index_file = os.path.join(output_dir, f'{base_name}_index.faiss')
+        metadata_file = os.path.join(output_dir, f'{base_name}_metadata.pkl')
+        
         print(f"Loading index from {index_file}...")
         self.index = faiss.read_index(index_file)
         
@@ -150,35 +159,48 @@ class ArchWikiEmbedder:
 def main():
     """Main function to embed your Arch Wiki chunks"""
     import sys
+    import argparse
     
-    # Get JSON file path from command line or use default
-    json_file = sys.argv[1] if len(sys.argv) > 1 else 'arch_chunks.json'
+    parser = argparse.ArgumentParser(description='Create embeddings for Arch Wiki chunks')
+    parser.add_argument('json_file', nargs='?', default='arch_chunks.json',
+                       help='Path to arch_chunks.json file')
+    parser.add_argument('-o', '--output', default='.',
+                       help='Output directory for index files')
+    
+    args = parser.parse_args()
+    
+    json_file = args.json_file
+    output_dir = args.output
+    base_name = 'arch_wiki'
     
     if not os.path.exists(json_file):
         print(f"Error: File '{json_file}' not found!")
-        print("Usage: python arch_wiki_embedder.py [path_to_chunks.json]")
+        print("Usage: python arch_wiki_embedder.py [json_file] [-o output_dir]")
         return
     
     embedder = ArchWikiEmbedder()
     
     # Check if index already exists
-    if os.path.exists('arch_wiki_index.faiss') and os.path.exists('arch_wiki_metadata.pkl'):
+    index_file = os.path.join(output_dir, f'{base_name}_index.faiss')
+    metadata_file = os.path.join(output_dir, f'{base_name}_metadata.pkl')
+    
+    if os.path.exists(index_file) and os.path.exists(metadata_file):
         print("Found existing index files.")
         choice = input("Load existing index? (y/n): ").lower().strip()
         if choice == 'y':
-            embedder.load_index()
+            embedder.load_index(output_dir, base_name)
         else:
             # Create new index
             embedder.load_chunks(json_file)
             embeddings = embedder.create_embeddings()
             embedder.build_index(embeddings)
-            embedder.save_index()
+            embedder.save_index(output_dir, base_name)
     else:
         # Create new index
         embedder.load_chunks(json_file)
         embeddings = embedder.create_embeddings()
         embedder.build_index(embeddings)
-        embedder.save_index()
+        embedder.save_index(output_dir, base_name)
     
     # Interactive search
     print("\n" + "="*60)
