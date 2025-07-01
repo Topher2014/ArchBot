@@ -10,45 +10,54 @@ pip install sentence-transformers faiss-cpu numpy tqdm
 
 ## Usage
 
-### First Run (Create Index)
+### Basic Usage
 ```bash
-python arch_wiki_embedder.py path/to/arch_chunks.json
+python arch_wiki_embedder.py arch_chunks.json
 ```
 
-This will:
-- Load your Arch Wiki chunks
-- Create embeddings using E5-Large-V2
-- Build a FAISS search index
-- Save everything for future use
-
-### Subsequent Runs (Use Existing Index)
+### Specify Output Directory
 ```bash
-python arch_wiki_embedder.py
+python arch_wiki_embedder.py arch_chunks.json -o ./output/
 ```
 
-The script will detect existing index files and ask if you want to reuse them.
-
-## Search
-
-After the index is built, you can search interactively:
-
+### Command Format
+```bash
+python arch_wiki_embedder.py [json_file] [-o output_dir]
 ```
-Query: how to configure wifi
-Query: systemd service not starting
-Query: quit
-```
+
+- `json_file`: Path to your arch_chunks.json (default: arch_chunks.json)
+- `-o, --output`: Output directory for index files (default: current directory)
+
+## What It Does
+
+1. **First Run**: Creates embeddings and builds search index
+2. **Subsequent Runs**: Detects existing index files and asks if you want to reuse them
+3. **Interactive Search**: Enter queries to search the Arch Wiki
 
 ## Files Created
 
 - `arch_wiki_index.faiss` - FAISS search index
 - `arch_wiki_metadata.pkl` - Document chunks and metadata
 
-## Example
+## Examples
 
 ```bash
-# Initial setup
+# Basic usage (saves to current directory)
 python arch_wiki_embedder.py ./arch_chunks.json
 
-# Search
-Query: pacman package conflicts
+# Save to specific directory
+python arch_wiki_embedder.py ./data/arch_chunks.json -o ./indexes/
+
+# Using default json file with custom output
+python arch_wiki_embedder.py -o ./models/
+```
+
+## Search
+
+After the index is built:
+
+```
+Query: how to configure wifi
+Query: systemd service not starting
+Query: quit
 ```
