@@ -1,109 +1,86 @@
-# Arch Wiki Retriever
+# Arch Wiki Retrieval with Query Refinement
 
-Fast semantic search through your Arch Wiki embeddings.
+Semantic search for Arch Wiki documentation using E5-Large-V2 embeddings with optional LLM query enhancement.
+
+## Setup
+
+```bash
+# For embeddings
+pip install sentence-transformers faiss-cpu numpy tqdm
+
+# For query refinement (optional)
+pip install torch transformers accelerate
+```
+
+## Components
+
+- **`embedder.py`** - Creates vector embeddings from Arch Wiki chunks
+- **`query_refiner.py`** - Expands queries using local LLMs
+- **`retriever.py`** - Searches with optional query refinement
 
 ## Quick Start
 
+### 1. Create Index
 ```bash
-# Interactive search mode
-python retriever.py
+python embedder.py arch_chunks.json -o ./indexes/
+```
+
+### 2. Search with Query Refinement
+```bash
+python retriever.py -i ./indexes/
+```
+
+### 3. Search without Refinement
+```bash
+python retriever.py -i ./indexes/ --no-refinement
+```
+
+## Usage Examples
+
+### Basic Search
+```bash
+# Interactive mode with refinement
+python retriever.py -i ./indexes/
 
 # Single query
-python retriever.py -q "install graphics drivers"
+python retriever.py -i ./indexes/ -q "wifi broken" --show-refinement
 ```
 
-## Requirements
-
+### Custom Models
 ```bash
-pip install sentence-transformers faiss-cpu numpy
+# Use specific refiner model
+python retriever.py -i ./indexes/ -r "../Models/Phi-3-mini-4k-instruct"
+
+# Use different embedding model
+python retriever.py -i ./indexes/ -m "intfloat/e5-base-v2"
 ```
 
-## Usage
+## Interactive Commands
 
-```bash
-python retriever.py [options]
-```
+- `wifi broken` - Search for wireless troubleshooting
+- `toggle` - Toggle refinement display on/off
+- `refine <query>` - Show query refinement without searching
+- `stats` - Show index statistics
+- `help` - Show available commands
+- `quit` - Exit
 
-### Options
+## Query Refinement Examples
 
-- `-i, --index-dir DIR` - Directory with index files (default: current directory)
-- `-n, --name NAME` - Base name for index files (default: arch_wiki)
-- `-k, --top-k NUM` - Number of results to show (default: 5)
-- `-q, --query TEXT` - Single query (non-interactive mode)
-- `-m, --model MODEL` - Sentence transformer model (default: intfloat/e5-large-v2)
-- `--max-content NUM` - Max content length to display (default: 300)
+**Without refinement:** "wifi broken" → searches literally  
+**With refinement:** "wifi broken" → "wireless network configuration NetworkManager iwctl troubleshooting"
 
-### Examples
+**Without refinement:** "sound not working" → basic search  
+**With refinement:** "sound not working" → "audio configuration ALSA PulseAudio sound card driver"
 
-```bash
-# Interactive mode (recommended)
-python retriever.py
+## Options
 
-# Search specific index directory
-python retriever.py -i ./my_embeddings
+### Retriever Options
+- `-i, --index-dir` - Directory containing index files
+- `-k, --top-k` - Number of results to return (default: 5)
+- `-r, --refiner-model` - Path to refiner model
+- `--no-refinement` - Disable query refinement
+- `--show-refinement` - Show query refinement in output
 
-# Single query with more results
-python retriever.py -q "bluetooth setup" -k 10
-
-# Custom index name
-python retriever.py -i ./custom -n my_wiki
-
-# Show more content per result
-python retriever.py --max-content 500
-```
-
-## Interactive Mode
-
-In interactive mode, you can:
-
-- **Search**: Type any query and press Enter
-- **Help**: Type `help` for commands
-- **Stats**: Type `stats` to see index information
-- **Quit**: Type `quit`, `exit`, or `q` to exit
-- **Ctrl+C**: Also exits the program
-
-### Sample Session
-
-```
-Query: install arch linux
-# Shows top 5 results with installation guides
-
-Query: wifi not working
-# Shows networking troubleshooting docs
-
-Query: stats
-Index Statistics:
-  Total vectors: 1,247
-  Total chunks: 1,247
-  Vector dimension: 1024
-
-Query: quit
-Goodbye!
-```
-
-## Search Tips
-
-- **Natural language**: "How do I set up WiFi?" works great
-- **Keywords**: "bluetooth audio" or "graphics drivers"
-- **Specific issues**: "black screen after update"
-- **Commands**: "pacman install" or "systemctl enable"
-
-## Result Format
-
-Each result shows:
-- **Rank & Score**: Relevance ranking and similarity score
-- **Page**: Arch Wiki page title
-- **Section**: Specific section within the page
-- **Type**: Content type (section, intro, etc.)
-- **URL**: Direct link to the wiki page
-- **Content**: Relevant text excerpt
-
-## Prerequisites
-
-You must first create embeddings using the embedder:
-
-```bash
-python embedder.py arch_chunks.json
-```
-
-This creates the required index files that the retriever searches through.
+### Files Created by Embedder
+- `arch_wiki_index.faiss` - FAISS search index
+- `arch_wiki_metadata.pkl` - Document chunks and metadata
