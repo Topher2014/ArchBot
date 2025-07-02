@@ -10,29 +10,44 @@ pip install sentence-transformers faiss-cpu numpy tqdm
 
 ## Usage
 
-### Basic Usage
+### Create New Index
 ```bash
+# Basic usage (saves to current directory)
 python arch_wiki_embedder.py arch_chunks.json
+
+# Save to specific directory
+python arch_wiki_embedder.py arch_chunks.json -o ./indexes/
 ```
 
-### Specify Output Directory
+### Load Existing Index
 ```bash
-python arch_wiki_embedder.py arch_chunks.json -o ./output/
+# Load from specific directory
+python arch_wiki_embedder.py -l ./indexes/
+
+# Load from different location
+python arch_wiki_embedder.py -l ./models/arch_vectors/
 ```
 
 ### Command Format
 ```bash
-python arch_wiki_embedder.py [json_file] [-o output_dir]
+python arch_wiki_embedder.py [json_file] [-o output_dir] [-l load_dir]
 ```
 
-- `json_file`: Path to your arch_chunks.json (default: arch_chunks.json)
-- `-o, --output`: Output directory for index files (default: current directory)
+- `json_file`: Path to your arch_chunks.json (only needed when creating)
+- `-o, --output`: Directory to save NEW index files
+- `-l, --load`: Directory to load EXISTING index files from
 
-## What It Does
+## Multiple Vector Sets
 
-1. **First Run**: Creates embeddings and builds search index
-2. **Subsequent Runs**: Detects existing index files and asks if you want to reuse them
-3. **Interactive Search**: Enter queries to search the Arch Wiki
+```bash
+# Create different vector sets
+python arch_wiki_embedder.py arch_chunks.json -o ./vectors/v1/
+python arch_wiki_embedder.py arch_updated.json -o ./vectors/v2/
+
+# Switch between them
+python arch_wiki_embedder.py -l ./vectors/v1/    # Use version 1
+python arch_wiki_embedder.py -l ./vectors/v2/    # Use version 2
+```
 
 ## Files Created
 
@@ -42,22 +57,12 @@ python arch_wiki_embedder.py [json_file] [-o output_dir]
 ## Examples
 
 ```bash
-# Basic usage (saves to current directory)
-python arch_wiki_embedder.py ./arch_chunks.json
+# Create new index
+python arch_wiki_embedder.py ./arch_chunks.json -o ./models/
 
-# Save to specific directory
-python arch_wiki_embedder.py ./data/arch_chunks.json -o ./indexes/
+# Later, load that index for searching
+python arch_wiki_embedder.py -l ./models/
 
-# Using default json file with custom output
-python arch_wiki_embedder.py -o ./models/
-```
-
-## Search
-
-After the index is built:
-
-```
-Query: how to configure wifi
-Query: systemd service not starting
-Query: quit
+# Or load from a different location
+python arch_wiki_embedder.py -l ./backup_vectors/
 ```
