@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Arch Wiki Document Embedder using E5-Large-V2
-Embeds your arch_chunks.json and creates a searchable index
+Creates embeddings for arch_chunks.json and saves searchable index
 """
 
 import json
@@ -11,6 +11,8 @@ from sentence_transformers import SentenceTransformer
 import os
 from tqdm import tqdm
 import pickle
+import argparse
+
 
 class ArchWikiEmbedder:
     def __init__(self, model_name='intfloat/e5-large-v2'):
@@ -94,151 +96,70 @@ class ArchWikiEmbedder:
             pickle.dump(self.chunks, f)
         
         print("Index and metadata saved!")
+        print(f"Files created:")
+        print(f"  - {index_file}")
+        print(f"  - {metadata_file}")
         return index_file, metadata_file
-    
-    def load_index(self, output_dir='.', base_name='arch_wiki'):
-        """Load previously saved index and metadata"""
-        index_file = os.path.join(output_dir, f'{base_name}_index.faiss')
-        metadata_file = os.path.join(output_dir, f'{base_name}_metadata.pkl')
-        
-        print(f"Loading index from {index_file}...")
-        self.index = faiss.read_index(index_file)
-        
-        print(f"Loading metadata from {metadata_file}...")
-        with open(metadata_file, 'rb') as f:
-            self.chunks = pickle.load(f)
-        
-        print(f"Loaded index with {self.index.ntotal} vectors and {len(self.chunks)} chunks")
-    
-    def search(self, query, top_k=3):
-        """Search for similar documents"""
-        if not self.index or not self.chunks:
-            raise ValueError("Index not loaded. Call build_index() or load_index() first.")
-        
-        # Add e5's required "query: " prefix
-        query_text = f"query: {query}"
-        
-        # Embed query
-        query_embedding = self.model.encode([query_text])
-        faiss.normalize_L2(query_embedding)
-        
-        # Search
-        scores, indices = self.index.search(query_embedding.astype('float32'), top_k)
-        
-        # Format results
-        results = []
-        for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
-            if idx < len(self.chunks):  # Safety check
-                results.append({
-                    'rank': i + 1,
-                    'score': float(score),
-                    'page_title': self.chunks[idx]['page_title'],
-                    'section_path': self.chunks[idx]['section_path'],
-                    'url': self.chunks[idx]['url'],
-                    'content': self.chunks[idx]['content'],
-                    'chunk_type': self.chunks[idx]['chunk_type'],
-                    'full_chunk': self.chunks[idx]
-                })
-        
-        return results
-    
-    def print_results(self, results):
-        """Pretty print search results"""
-        for result in results:
-            print(f"\n{'='*60}")
-            print(f"Rank {result['rank']} | Score: {result['score']:.4f}")
-            print(f"Page: {result['page_title']}")
-            print(f"Section: {result['section_path']}")
-            print(f"Type: {result['chunk_type']}")
-            print(f"URL: {result['url']}")
-            print("-" * 60)
-            # Truncate content for display
-            content = result['content'][:300] + "..." if len(result['content']) > 300 else result['content']
-            print(content)
 
 
 def main():
     """Main function to embed your Arch Wiki chunks"""
-    import sys
-    import argparse
-    
     parser = argparse.ArgumentParser(description='Create embeddings for Arch Wiki chunks')
-    parser.add_argument('json_file', nargs='?', default=None,
-                       help='Path to arch_chunks.json file (only needed when creating new index)')
+    parser.add_argument('json_file', 
+                       help='Path to arch_chunks.json file')
     parser.add_argument('-o', '--output', default='.',
-                       help='Output directory for NEW index files')
-    parser.add_argument('-l', '--load', 
-                       help='Load existing index from this directory')
+                       help='Output directory for index files (default: current directory)')
+    parser.add_argument('-n', '--name', default='arch_wiki',
+                       help='Base name for output files (default: arch_wiki)')
+    parser.add_argument('-b', '--batch-size', type=int, default=32,
+                       help='Batch size for embedding creation (default: 32)')
+    parser.add_argument('-m', '--model', default='intfloat/e5-large-v2',
+                       help='Sentence transformer model name (default: intfloat/e5-large-v2)')
+    parser.add_argument('-f', '--force', action='store_true',
+                       help='Overwrite existing index files without asking')
     
     args = parser.parse_args()
     
-    json_file = args.json_file
-    output_dir = args.output
-    load_dir = args.load
-    base_name = 'arch_wiki'
+    # Check if input file exists
+    if not os.path.exists(args.json_file):
+        print(f"Error: File '{args.json_file}' not found!")
+        return 1
     
-    embedder = ArchWikiEmbedder()
+    # Check if output files already exist
+    index_file = os.path.join(args.output, f'{args.name}_index.faiss')
+    metadata_file = os.path.join(args.output, f'{args.name}_metadata.pkl')
     
-    # If load directory specified, use it
-    if load_dir:
-        index_file = os.path.join(load_dir, f'{base_name}_index.faiss')
-        metadata_file = os.path.join(load_dir, f'{base_name}_metadata.pkl')
+    if not args.force and (os.path.exists(index_file) or os.path.exists(metadata_file)):
+        print("Warning: Output files already exist:")
+        if os.path.exists(index_file):
+            print(f"  - {index_file}")
+        if os.path.exists(metadata_file):
+            print(f"  - {metadata_file}")
         
-        if os.path.exists(index_file) and os.path.exists(metadata_file):
-            embedder.load_index(load_dir, base_name)
-        else:
-            print(f"Error: Index files not found in {load_dir}")
-            print(f"Looking for: {index_file} and {metadata_file}")
-            return
-    else:
-        # Creating new index - need JSON file
-        if not json_file:
-            print("Error: JSON file required when creating new index")
-            print("Usage: python embedder.py arch_chunks.json [-o output_dir]")
-            print("   or: python embedder.py -l existing_index_dir")
-            return
-            
-        if not os.path.exists(json_file):
-            print(f"Error: File '{json_file}' not found!")
-            return
-        
-        # Check if index already exists in output directory
-        index_file = os.path.join(output_dir, f'{base_name}_index.faiss')
-        metadata_file = os.path.join(output_dir, f'{base_name}_metadata.pkl')
-        
-        if os.path.exists(index_file) and os.path.exists(metadata_file):
-            print("Found existing index files in output directory.")
-            choice = input("Load existing index? (y/n): ").lower().strip()
-            if choice == 'y':
-                embedder.load_index(output_dir, base_name)
-            else:
-                # Create new index
-                embedder.load_chunks(json_file)
-                embeddings = embedder.create_embeddings()
-                embedder.build_index(embeddings)
-                embedder.save_index(output_dir, base_name)
-        else:
-            # Create new index
-            embedder.load_chunks(json_file)
-            embeddings = embedder.create_embeddings()
-            embedder.build_index(embeddings)
-            embedder.save_index(output_dir, base_name)
+        choice = input("Overwrite existing files? (y/n): ").lower().strip()
+        if choice != 'y':
+            print("Aborted.")
+            return 1
     
-    print("\n" + "="*60)
-    print("ARCH WIKI SEARCH - Ready!")
-    print("Enter queries to search (or 'quit' to exit)")
-    print("="*60)
-    
-    while True:
-        query = input("\nQuery: ").strip()
-        if query.lower() in ['quit', 'exit', 'q']:
-            break
+    # Create embedder and process
+    try:
+        embedder = ArchWikiEmbedder(model_name=args.model)
+        embedder.load_chunks(args.json_file)
+        embeddings = embedder.create_embeddings(batch_size=args.batch_size)
+        embedder.build_index(embeddings)
+        embedder.save_index(args.output, args.name)
         
-        if query:
-            print(f"\nSearching for: '{query}'")
-            results = embedder.search(query, top_k=10)
-            embedder.print_results(results)
+        print("\n" + "="*60)
+        print("SUCCESS! Embeddings created and saved.")
+        print(f"To search, use: python retriever.py -i {args.output}")
+        print("="*60)
+        
+        return 0
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())

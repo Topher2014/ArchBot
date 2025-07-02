@@ -1,8 +1,18 @@
-# Arch Wiki Retrieval
+# Arch Wiki Embedder
 
-Semantic search for Arch Wiki documentation using E5-Large-V2 embeddings.
+Creates searchable embeddings from your Arch Wiki chunks using E5-Large-V2.
 
-## Setup
+## Quick Start
+
+```bash
+# Basic usage - creates index in current directory
+python embedder.py arch_chunks.json
+
+# Specify output directory
+python embedder.py arch_chunks.json -o ./my_index
+```
+
+## Requirements
 
 ```bash
 pip install sentence-transformers faiss-cpu numpy tqdm
@@ -10,59 +20,54 @@ pip install sentence-transformers faiss-cpu numpy tqdm
 
 ## Usage
 
-### Create New Index
 ```bash
-# Basic usage (saves to current directory)
-python arch_wiki_embedder.py arch_chunks.json
-
-# Save to specific directory
-python arch_wiki_embedder.py arch_chunks.json -o ./indexes/
+python embedder.py <json_file> [options]
 ```
 
-### Load Existing Index
-```bash
-# Load from specific directory
-python arch_wiki_embedder.py -l ./indexes/
+### Options
 
-# Load from different location
-python arch_wiki_embedder.py -l ./models/arch_vectors/
+- `-o, --output DIR` - Output directory for index files (default: current directory)
+- `-n, --name NAME` - Base name for output files (default: arch_wiki)
+- `-b, --batch-size SIZE` - Batch size for embedding creation (default: 32)
+- `-m, --model MODEL` - Sentence transformer model (default: intfloat/e5-large-v2)
+- `-f, --force` - Overwrite existing files without asking
+
+### Examples
+
+```bash
+# Basic embedding
+python embedder.py arch_chunks.json
+
+# Custom output location
+python embedder.py arch_chunks.json -o ./embeddings
+
+# Larger batch size for faster processing (uses more RAM)
+python embedder.py arch_chunks.json -b 64
+
+# Force overwrite existing files
+python embedder.py arch_chunks.json -f
+
+# Different model
+python embedder.py arch_chunks.json -m sentence-transformers/all-MiniLM-L6-v2
 ```
 
-### Command Format
-```bash
-python arch_wiki_embedder.py [json_file] [-o output_dir] [-l load_dir]
-```
+## Output Files
 
-- `json_file`: Path to your arch_chunks.json (only needed when creating)
-- `-o, --output`: Directory to save NEW index files
-- `-l, --load`: Directory to load EXISTING index files from
+The embedder creates two files:
+- `{name}_index.faiss` - The searchable vector index
+- `{name}_metadata.pkl` - Document metadata and text content
 
-## Multiple Vector Sets
+## Performance Notes
 
-```bash
-# Create different vector sets
-python arch_wiki_embedder.py arch_chunks.json -o ./vectors/v1/
-python arch_wiki_embedder.py arch_updated.json -o ./vectors/v2/
+- **Time**: Embedding creation takes several minutes depending on document count
+- **CPU-only**: Uses CPU to avoid GPU power draw (configurable in code)
+- **Memory**: Adjust batch size based on available RAM
+- **Storage**: Index files are typically 100-500MB depending on document count
 
-# Switch between them
-python arch_wiki_embedder.py -l ./vectors/v1/    # Use version 1
-python arch_wiki_embedder.py -l ./vectors/v2/    # Use version 2
-```
+## Next Steps
 
-## Files Created
-
-- `arch_wiki_index.faiss` - FAISS search index
-- `arch_wiki_metadata.pkl` - Document chunks and metadata
-
-## Examples
+After creating embeddings, use the retriever to search:
 
 ```bash
-# Create new index
-python arch_wiki_embedder.py ./arch_chunks.json -o ./models/
-
-# Later, load that index for searching
-python arch_wiki_embedder.py -l ./models/
-
-# Or load from a different location
-python arch_wiki_embedder.py -l ./backup_vectors/
+python retriever.py -i ./my_index
 ```
