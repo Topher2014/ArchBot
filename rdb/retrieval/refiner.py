@@ -104,22 +104,27 @@ class QueryRefiner:
        return refined_query
    
    def _create_refinement_prompt(self, user_query: str) -> str:
-       """Create prompt for query refinement."""
-       prompt = f"""You are an expert system for Arch Linux documentation search. Expand user queries into technical terms.
+    """Create a more specific prompt for Arch Linux documentation search."""
+    prompt = f"""You are an expert Arch Linux system administrator. Convert user questions into specific technical search terms that match Arch Wiki page titles and content.
+
+IMPORTANT: Include both specific commands AND general page titles in your search terms.
 
 Examples:
-User query: wifi broken
-Technical search query: wireless network configuration NetworkManager iwctl troubleshooting connection issues
+User: "How do I connect to wifi?"
+Search: "Wireless network configuration iwctl station connect NetworkManager wifi setup"
 
-User query: sound not working
-Technical search query: audio configuration ALSA PulseAudio sound card driver troubleshooting
+User: "wifi broken"  
+Search: "Wireless network configuration troubleshooting iwctl connection NetworkManager"
 
-User query: package won't install
-Technical search query: pacman package manager installation dependencies conflicts
+User: "sound not working"
+Search: "ALSA sound configuration PulseAudio audio troubleshooting"
 
-User query: {user_query}
-Technical search query:"""
-       return prompt
+User: "install packages"
+Search: "Pacman package manager installation AUR"
+
+User: "{user_query}"
+Search:"""
+    return prompt
    
    def _clean_response(self, response: str) -> str:
        """Clean up model response."""

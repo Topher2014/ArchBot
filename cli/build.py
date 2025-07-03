@@ -106,13 +106,19 @@ def build_cmd(ctx, input, output, embedding_model, batch_size, force, stats):
     
     try:
         with Timer("Index building") as timer:
-            # Step 1: Process documents into chunks
-            click.echo("\nStep 1: Processing documents into chunks...")
-            with Timer("Chunking") as chunk_timer:
-                chunks = chunker.process_directory(input_dir)
-                chunker.save_chunks()
+            # Step 1: Load or create chunks
+            if config.chunks_file.exists() and not force:
+                click.echo("\nStep 1: Loading existing chunks...")
+                with Timer("Chunking") as chunk_timer:
+                    chunks = chunker.load_chunks()
+                click.echo(f"Loaded {len(chunks)} existing chunks in {chunk_timer}")
+            else:
+                click.echo("\nStep 1: Processing documents into chunks...")
+                with Timer("Chunking") as chunk_timer:
+                    chunks = chunker.process_directory(input_dir)
+                    chunker.save_chunks()
+                click.echo(f"Created {len(chunks)} chunks in {chunk_timer}")
             
-            click.echo(f"Created {len(chunks)} chunks in {chunk_timer}")
             chunker.print_stats()
             
             # Step 2: Create embeddings
@@ -120,8 +126,7 @@ def build_cmd(ctx, input, output, embedding_model, batch_size, force, stats):
             with Timer("Embedding creation") as embed_timer:
                 embeddings = embedder.create_embeddings(chunks)
             
-            click.echo(f"Created embeddings in {embed_timer}")
-            
+            click.echo(f"Created embeddings in {embed_timer}") 
             # Step 3: Build index
             click.echo("\nStep 3: Building FAISS index...")
             with Timer("Index building") as index_timer:

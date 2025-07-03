@@ -3,6 +3,7 @@ Configuration management for RDB.
 """
 
 import os
+import torch
 from pathlib import Path
 from typing import Optional
 
@@ -40,7 +41,8 @@ class Config:
        # Embedding settings
        self.embedding_model = os.getenv("RDB_EMBEDDING_MODEL", "intfloat/e5-large-v2")
        self.embedding_batch_size = int(os.getenv("RDB_EMBEDDING_BATCH_SIZE", "32"))
-       self.use_gpu = os.getenv("RDB_USE_GPU", "false").lower() == "true"
+       gpu_available = torch.cuda.is_available()
+       self.use_gpu = os.getenv("RDB_USE_GPU", str(gpu_available)).lower() == "true"
        self.device = "cuda" if self.use_gpu else "cpu"
        
        # Retrieval settings
