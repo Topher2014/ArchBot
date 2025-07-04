@@ -51,8 +51,8 @@ class QueryRefiner:
    def _find_default_model(self) -> Optional[str]:
        """Find default model from common locations."""
        default_models = [
-           "../../Models/Llama/Meta-Llama-3.1-8B",
-           "../../Models/Phi-3-mini-4k-instruct", 
+           "~/models/Llama/Meta-Llama-3.1-8B",
+           "~/models/Phi-3-mini-4k-instruct", 
            "microsoft/Phi-3-mini-4k-instruct",
            "meta-llama/Llama-3.1-8B-Instruct"
        ]
