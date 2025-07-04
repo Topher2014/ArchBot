@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}RDB - Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-4xl font-bold text-gray-900 mb-6">
+            <i class="fas fa-database text-blue-600 mr-3"></i>
+            RDB - Retrieval Database
+        </h1>
+        
+        <p class="text-xl text-gray-600 mb-8">
+            Semantic search through Arch Linux documentation using advanced embeddings and retrieval techniques.
+        </p>
+        
+        <!-- Quick Search -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Search</h2>
+            <div class="flex">
+                <input type="text" id="quickSearch" placeholder="Search Arch Wiki documentation..." 
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="performQuickSearch()" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-r-lg transition duration-200">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-chart-line text-green-600 mr-2"></i>
+                    System Status
+                </h3>
+                <div id="systemStatus" class="text-left">
+                    <div class="flex justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-history text-purple-600 mr-2"></i>
+                    Recent Activity
+                </h3>
+                <div id="recentActivity" class="text-left">
+                    <div class="flex justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="grid md:grid-cols-2 gap-4">
+            <a href="{{ url_for('search_page') }}" 
+               class="bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-lg transition duration-200 block">
+                <i class="fas fa-search text-2xl mb-2"></i>
+                <h4 class="font-semibold">Advanced Search</h4>
+                <p class="text-sm opacity-90">Search with refinement and filters</p>
+            </a>
+            
+            <div class="bg-gray-600 hover:bg-gray-700 text-white p-6 rounded-lg transition duration-200 cursor-pointer"
+                 onclick="showSystemInfo()">
+                <i class="fas fa-info-circle text-2xl mb-2"></i>
+                <h4 class="font-semibold">System Info</h4>
+                <p class="text-sm opacity-90">View configuration details</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Info Modal -->
+<div id="systemInfoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">System Information</h3>
+                    <button onclick="closeSystemInfo()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="systemInfoContent">
+                    <div class="flex justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemStatus();
+    loadRecentActivity();
+    
+    // Handle Enter key in quick search
+    document.getElementById('quickSearch').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performQuickSearch();
+        }
+    });
+});
+
+function performQuickSearch() {
+    const query = document.getElementById('quickSearch').value.trim();
+    if (query) {
+        window.location.href = `/search?q=${encodeURIComponent(query)}`;
+    }
+}
+
+function loadSystemStatus() {
+    // Show basic system info without admin functionality
+    const statusDiv = document.getElementById('systemStatus');
+    statusDiv.innerHTML = `
+        <div class="space-y-2">
+            <div class="flex justify-between">
+                <span>Search System:</span>
+                <span class="text-green-600">✓ Available</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Documentation:</span>
+                <span class="text-blue-600">Arch Wiki</span>
+            </div>
+            <div class="flex justify-between">
+                <span>Search Type:</span>
+                <span class="text-blue-600">Semantic</span>
+            </div>
+        </div>
+    `;
+}
+
+function loadRecentActivity() {
+    fetch('/api/search/history?limit=5')
+        .then(response => response.json())
+        .then(data => {
+            const activityDiv = document.getElementById('recentActivity');
+            if (data.history && data.history.length > 0) {
+                activityDiv.innerHTML = `
+                    <div class="space-y-2">
+                        ${data.history.slice(0, 3).map(search => `
+                            <div class="border-l-2 border-blue-500 pl-2">
+                                <div class="text-sm font-medium">${search.original_query}</div>
+                                <div class="text-xs text-gray-500">${search.results_count} results</div>
+                            </div>
+                        `).join('')}
+                        <div class="text-xs text-gray-500 mt-2">
+                            Total: ${data.stats.total_searches} searches
+                        </div>
+                    </div>
+                `;
+            } else {
+                activityDiv.innerHTML = '<p class="text-gray-500">No recent searches</p>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('recentActivity').innerHTML = 
+                '<p class="text-red-600">Error loading activity</p>';
+        });
+}
+
+function showSystemInfo() {
+    document.getElementById('systemInfoModal').classList.remove('hidden');
+    
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('systemInfoContent').innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Configuration</h4>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <div><strong>Embedding Model:</strong> ${data.embedding_model.split('/').pop()}</div>
+                            <div><strong>Device:</strong> ${data.device}</div>
+                            <div><strong>Default Results:</strong> ${data.default_top_k}</div>
+                            <div><strong>Query Refinement:</strong> ${data.enable_query_refinement ? 'Enabled' : 'Disabled'}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Chunk Sizes</h4>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <div><strong>Small:</strong> ${data.chunk_sizes.small}</div>
+                            <div><strong>Medium:</strong> ${data.chunk_sizes.medium}</div>
+                            <div><strong>Large:</strong> ${data.chunk_sizes.large}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            document.getElementById('systemInfoContent').innerHTML = 
+                '<p class="text-red-600">Error loading system information</p>';
+        });
+}
+
+function closeSystemInfo() {
+    document.getElementById('systemInfoModal').classList.add('hidden');
+}
+</script>
+{% endblock %}
