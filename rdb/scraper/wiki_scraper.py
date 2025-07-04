@@ -29,7 +29,8 @@ class WikiScraper:
        
        # Headers to make scraper look like a browser
        self.headers = {
-           'User-Agent': config.user_agent,
+            'User-Agent': 'git/2.40.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
        }
        
        # Base URL for Arch Wiki
@@ -40,7 +41,7 @@ class WikiScraper:
        self.logger.info("Getting list of all Arch Wiki pages...")
        
        all_pages = []
-       next_page_url = f"{self.base_url}/title/Special:AllPages"
+       next_page_url = f"{self.base_url}/title/Special:AllPages?hideredirects=1"
        
        while next_page_url:
            self.logger.debug(f"Fetching page list from: {next_page_url}")
@@ -60,9 +61,10 @@ class WikiScraper:
                for link in content.find_all('a'):
                    href = link.get('href')
                    if href and '/title/' in href:
+                       href = href.replace('/title//', '/title/')
                        page_url = urljoin(self.base_url, href)
                        # Skip special pages and other namespaces
-                       if not any(x in page_url for x in ['Special:', 'Talk:', 'User:', 'File:']):
+                       if not any(x in page_url for x in ['Special:', 'Talk:', 'User:', 'File:', 'International_communities']):
                            all_pages.append(page_url)
            
            # Find next page link
@@ -106,14 +108,18 @@ class WikiScraper:
                 page_data['is_redirect'] = is_redirect
                 if is_redirect:
                     page_data['redirect_source'] = page_title
-           else:
-               self.logger.warning(f"No content extracted from: {page_title}")
+                return page_data
+            else:
+               error_msg = f"No content extracted from: {page_title}"
+               self.logger.warning(error_msg)
                return None
                
-       except requests.RequestException as e:
-           self.logger.error(f"Network error scraping {url}: {e}")
+        except requests.RequestException as e:
+           error_msg = f"Network error scraping {url}: {e}"
+           self.logger.error(error_msg)
            return None
-       except Exception as e:
+        except Exception as e:
+           error_msg = f"Error scraping {url}: {e}"
            self.logger.error(f"Error scraping {url}: {e}")
            return None
 
@@ -134,65 +140,92 @@ class WikiScraper:
            return False
 
     def scrape_all(self, output_dir: Optional[str] = None) -> int:
-       """Scrape all wiki pages."""
-       if output_dir is None:
-           output_dir = self.config.raw_data_dir
-       else:
-           output_dir = Path(output_dir)
-       
-       output_dir.mkdir(parents=True, exist_ok=True)
-       
-       # Get or load page list
-       page_list_file = output_dir / "page_list.json"
-       
-       if page_list_file.exists():
-           self.logger.info("Loading existing page list...")
-           with open(page_list_file, 'r', encoding='utf-8') as f:
-               page_list = json.load(f)
-       else:
-           page_list = self.get_all_pages()
-           # Save page list for future reference
-           with open(page_list_file, 'w', encoding='utf-8') as f:
-               json.dump(page_list, f, indent=2)
-       
-       # Process pages
-       total_pages = len(page_list)
-       success_count = 0
-       error_count = 0
-       skip_count = 0
-       
-       self.logger.info(f"Starting scraping of {total_pages} pages...")
-       
-       for i, url in enumerate(page_list):
-           page_title = unquote(url.split('/title/')[-1].replace('_', ' '))
-           safe_title = page_title.replace('/', '_').replace('\\', '_').replace(':', '_')
-           output_file = output_dir / f"{safe_title}.json"
-           
-           # Skip if already exists
-           if output_file.exists():
-               skip_count += 1
-               if i % 50 == 0:
-                   self.logger.info(f"Progress: {i+1}/{total_pages} - "
-                                  f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
-               continue
-           
-           # Scrape page
-           page_data = self.scrape_page(url)
-           if page_data and self.save_page(page_data, output_dir):
-               success_count += 1
-           else:
-               error_count += 1
-           
-           # Progress logging
-           if i % 50 == 0 or i == total_pages - 1:
-               self.logger.info(f"Progress: {i+1}/{total_pages} - "
-                              f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
-           
-           # Rate limiting
-           delay = random.uniform(self.config.scrape_delay_min, self.config.scrape_delay_max)
-           time.sleep(delay)
-       
-       self.logger.info(f"Scraping complete! Total: {total_pages}, "
-                       f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
-       
-       return success_count
+        """Scrape all wiki pages."""
+        if output_dir is None:
+            output_dir = self.config.raw_data_dir
+        else:
+            output_dir = Path(output_dir)
+        
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Track canonical URLs to avoid scraping duplicates
+        canonical_urls_seen = set()
+        redirect_mappings = {}  # original_url -> canonical_url
+        
+        # Get or load page list
+        page_list_file = output_dir / "page_list.json"
+        
+        if page_list_file.exists():
+            self.logger.info("Loading existing page list...")
+            with open(page_list_file, 'r', encoding='utf-8') as f:
+                page_list = json.load(f)
+        else:
+            page_list = self.get_all_pages()
+            # Save page list for future reference
+            with open(page_list_file, 'w', encoding='utf-8') as f:
+                json.dump(page_list, f, indent=2)
+        
+        # Process pages
+        total_pages = len(page_list)
+        success_count = 0
+        error_count = 0
+        skip_count = 0
+        
+        self.logger.info(f"Starting scraping of {total_pages} pages...")
+        
+        for i, url in enumerate(page_list):
+            page_title = unquote(url.split('/title/')[-1].replace('_', ' '))
+            safe_title = page_title.replace('/', '_').replace('\\', '_').replace(':', '_')
+            output_file = output_dir / f"{safe_title}.json"
+            
+            # Skip if already exists
+            if output_file.exists():
+                skip_count += 1
+                if i % 50 == 0:
+                    self.logger.info(f"Progress: {i+1}/{total_pages} - "
+                                   f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
+                continue
+            
+            # Scrape page
+            page_data = self.scrape_page(url)
+            if page_data:
+                canonical_url = page_data.get('canonical_url', url)
+                
+                # Check if we've already scraped this canonical URL
+                if canonical_url in canonical_urls_seen:
+                    # Store redirect mapping but skip saving
+                    redirect_mappings[url] = canonical_url
+                    skip_count += 1
+                    self.logger.debug(f"Skipping duplicate canonical URL: {canonical_url}")
+                else:
+                    # Mark canonical URL as seen
+                    canonical_urls_seen.add(canonical_url)
+                    
+                    # Save the page
+                    if self.save_page(page_data, output_dir):
+                        success_count += 1
+                    else:
+                        error_count += 1
+            else:
+                error_count += 1
+            
+            # Progress logging
+            if i % 50 == 0 or i == total_pages - 1:
+                self.logger.info(f"Progress: {i+1}/{total_pages} - "
+                               f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
+            
+            # Rate limiting
+            delay = random.uniform(self.config.scrape_delay_min, self.config.scrape_delay_max)
+            time.sleep(delay)
+        
+        # Save redirect mappings for reference
+        if redirect_mappings:
+            redirect_file = output_dir / "redirects.json"
+            with open(redirect_file, 'w', encoding='utf-8') as f:
+                json.dump(redirect_mappings, f, indent=2)
+            self.logger.info(f"Saved {len(redirect_mappings)} redirect mappings to {redirect_file}")
+        
+        self.logger.info(f"Scraping complete! Total: {total_pages}, "
+                        f"Skipped: {skip_count}, Success: {success_count}, Error: {error_count}")
+        
+        return success_count
