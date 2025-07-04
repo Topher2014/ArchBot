@@ -19,9 +19,9 @@ from .content_parser import ContentParser
 
 
 class WikiScraper:
-   """Scraper for Arch Wiki documentation."""
-   
-   def __init__(self, config: Config):
+    """Scraper for Arch Wiki documentation."""
+
+    def __init__(self, config: Config):
        """Initialize wiki scraper with configuration."""
        self.config = config
        self.logger = get_logger(__name__)
@@ -35,7 +35,7 @@ class WikiScraper:
        # Base URL for Arch Wiki
        self.base_url = "https://wiki.archlinux.org"
        
-   def get_all_pages(self) -> List[str]:
+    def get_all_pages(self) -> List[str]:
        """Get list of all pages on Arch Wiki."""
        self.logger.info("Getting list of all Arch Wiki pages...")
        
@@ -78,22 +78,34 @@ class WikiScraper:
        
        self.logger.info(f"Found {len(all_pages)} wiki pages")
        return all_pages
-   
-   def scrape_page(self, url: str) -> Optional[dict]:
-       """Scrape individual wiki page."""
-       try:
-           page_title = unquote(url.split('/title/')[-1].replace('_', ' '))
-           self.logger.debug(f"Scraping: {page_title}")
-           
-           response = requests.get(url, headers=self.headers, timeout=30)
-           response.raise_for_status()
-           
-           soup = BeautifulSoup(response.text, 'html.parser')
-           page_data = self.parser.extract_content(soup, url)
-           
-           if page_data:
-               self.logger.debug(f"Successfully scraped: {page_title}")
-               return page_data
+
+    def scrape_page(self, url: str) -> Optional[dict]:
+        """Scrape individual wiki page, handling redirects."""
+        try:
+            page_title = unquote(url.split('/title/')[-1].replace('_', ' '))
+            self.logger.debug(f"Scraping: {page_title}")
+            
+            response = requests.get(url, headers=self.headers, timeout=30)
+            response.raise_for_status()
+            
+            # Check if this was a redirect
+            canonical_url = response.url
+            is_redirect = canonical_url != url
+            
+            if is_redirect:
+                canonical_title = unquote(canonical_url.split('/title/')[-1].replace('_', ' '))
+                self.logger.debug(f"Redirect detected: {page_title} -> {canonical_title}")
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            page_data = self.parser.extract_content(soup, canonical_url)
+            
+            if page_data:
+                # Add redirect information
+                page_data['canonical_url'] = canonical_url
+                page_data['original_url'] = url
+                page_data['is_redirect'] = is_redirect
+                if is_redirect:
+                    page_data['redirect_source'] = page_title
            else:
                self.logger.warning(f"No content extracted from: {page_title}")
                return None
@@ -104,8 +116,8 @@ class WikiScraper:
        except Exception as e:
            self.logger.error(f"Error scraping {url}: {e}")
            return None
-   
-   def save_page(self, page_data: dict, output_dir: Path) -> bool:
+
+    def save_page(self, page_data: dict, output_dir: Path) -> bool:
        """Save page data to JSON file."""
        try:
            page_title = page_data.get('title', 'Unknown')
@@ -120,8 +132,8 @@ class WikiScraper:
        except Exception as e:
            self.logger.error(f"Error saving page data: {e}")
            return False
-   
-   def scrape_all(self, output_dir: Optional[str] = None) -> int:
+
+    def scrape_all(self, output_dir: Optional[str] = None) -> int:
        """Scrape all wiki pages."""
        if output_dir is None:
            output_dir = self.config.raw_data_dir
