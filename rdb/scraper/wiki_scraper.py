@@ -39,6 +39,27 @@ class WikiScraper:
     def get_all_pages(self) -> List[str]:
        """Get list of all pages on Arch Wiki."""
        self.logger.info("Getting list of all Arch Wiki pages...")
+       exclude_patterns = [
+
+           'Special:', 'Talk:', 'User:', 'File:', 'International_communities',
+           # European languages
+           '(Polski)', '(Español)', '(Português)', '(Français)', '(Deutsch)', 
+           '(Italiano)', '(Nederlands)', '(Svenska)', '(Dansk)', '(Norsk)',
+           '(Suomi)', '(Magyar)', '(Čeština)', '(Slovenčina)', '(Slovenščina)',
+           '(Hrvatski)', '(Bosanski)', '(Lietuvių)', '(Română)', '(Türkçe)',
+           '(Ελληνικά)', '(Български)', '(Српски)', '(Українська)',
+           # Cyrillic
+           '(Русский)',
+           # Asian languages  
+           '(简体中文)', '(繁體中文)', '(正體中文)', '(日本語)', '(한국어)',
+           '(ไทย)', '(हिन्दी)', '(বাংলা)',
+           # Middle Eastern/Other
+           '(العربية)', '(עברית)', '(فارسی)',
+           # Constructed/Regional
+           '(Esperanto)', '(Català)', '(Bahasa Indonesia)', '(Qhichwa)',
+           # Additional variations I spotted
+           '(Norsk Bokmål)'
+       ]
        
        all_pages = []
        next_page_url = f"{self.base_url}/title/Special:AllPages?hideredirects=1"
@@ -63,10 +84,12 @@ class WikiScraper:
                    if href and '/title/' in href:
                        href = href.replace('/title//', '/title/')
                        page_url = urljoin(self.base_url, href)
-                       # Skip special pages and other namespaces
-                       if not any(x in page_url for x in ['Special:', 'Talk:', 'User:', 'File:', 'International_communities']):
+
+                       # Decode URL before filtering
+                       decoded_url = unquote(page_url)
+
+                       if not any(pattern in decoded_url for pattern in exclude_patterns):
                            all_pages.append(page_url)
-           
            # Find next page link
            next_page_url = None
            nav_links = soup.find('div', {'class': 'mw-allpages-nav'})
