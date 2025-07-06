@@ -3,6 +3,7 @@ Query refiner using local LLMs for better search terms.
 """
 
 import os
+from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from typing import Optional
@@ -51,16 +52,23 @@ class QueryRefiner:
    def _find_default_model(self) -> Optional[str]:
        """Find default model from common locations."""
        default_models = [
-           "~/models/Llama/Meta-Llama-3.1-8B",
-           "~/models/Phi-3-mini-4k-instruct", 
+           "~/.models/Llama/Meta-Llama-3.1-8B",
+           "~/.models/Phi-3-mini-4k-instruct", 
            "microsoft/Phi-3-mini-4k-instruct",
            "meta-llama/Llama-3.1-8B-Instruct"
        ]
        
        for model in default_models:
-           if os.path.exists(model) or not model.startswith("../"):
+           if model.startswith("~") or model.startswith("./") or model.startswith("/"):
+                # Local path - check if it exists
+                expanded_path = Path(model).expanduser().resolve()
+                if expanded_path.exists():
+                    return str(expanded_path)
+           else:
+               # HuggingFace model ID - we can't check if it exists without downloading
+               # So we'll return it and let the loader handle any errors
                return model
-       
+
        return None
    
    def _get_device(self) -> str:
