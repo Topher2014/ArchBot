@@ -30,7 +30,7 @@ def create_app(data_dir=None, debug=False):
     log_level = "DEBUG" if debug else "INFO"
     setup_logging(log_level=log_level)
     
-    # Register blueprints (removed admin_bp)
+    # Register blueprints
     app.register_blueprint(search_bp, url_prefix='/api/search')
     app.register_blueprint(api_bp, url_prefix='/api')
     
@@ -39,11 +39,6 @@ def create_app(data_dir=None, debug=False):
     def index():
         """Main page."""
         return render_template('index.html')
-    
-    @app.route('/search')
-    def search_page():
-        """Search page."""
-        return render_template('search.html')
     
     @app.errorhandler(404)
     def not_found(error):
