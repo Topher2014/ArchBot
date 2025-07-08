@@ -49,7 +49,7 @@
                     </div>
                     
                     <div class="flex items-end">
-                        <button onclick="performSearch()" 
+                        <button onclick="performSearch()" id="searchButton"
                                 class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
                             <i class="fas fa-search mr-2"></i>Search
                         </button>
@@ -58,11 +58,23 @@
             </div>
         </div>
         
-        <!-- Loading -->
-        <div id="searchLoading" class="hidden">
-            <div class="bg-white rounded-lg shadow-md p-6 text-center mb-8">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <p class="text-gray-600">Searching...</p>
+        <!-- Terminal Window -->
+        <div id="terminalWindow" class="hidden mb-8">
+            <div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+                <div class="bg-gray-800 px-4 py-2 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    </div>
+                    <span class="text-gray-300 text-sm font-mono">RDB Search Process</span>
+                    <button onclick="hideTerminal()" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="terminalContent" class="bg-gray-900 text-green-400 font-mono text-sm p-4 h-64 overflow-y-auto">
+                    <!-- Terminal output will appear here -->
+                </div>
             </div>
         </div>
         
@@ -120,6 +132,8 @@
 
 {% block scripts %}
 <script>
+let eventSource = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Handle Enter key in search
     document.getElementById('searchQuery').addEventListener('keypress', function(e) {
@@ -139,10 +153,15 @@ function performSearch() {
     const topK = parseInt(document.getElementById('topK').value);
     const refineQuery = document.getElementById('refineQuery').checked;
     
-    // Show loading, hide other elements
-    showElement('searchLoading');
+    // Hide results and show loading state
     hideElement('searchResults');
     hideElement('noResults');
+    hideElement('terminalWindow');
+    
+    // Disable search button and show loading
+    const searchButton = document.getElementById('searchButton');
+    searchButton.disabled = true;
+    searchButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
     
     const searchData = {
         query: query,
@@ -159,7 +178,9 @@ function performSearch() {
     })
     .then(response => response.json())
     .then(data => {
-        hideElement('searchLoading');
+        // Re-enable search button
+        searchButton.disabled = false;
+        searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
         
         if (data.error) {
             alert('Search error: ' + data.error);
@@ -173,9 +194,25 @@ function performSearch() {
         }
     })
     .catch(error => {
-        hideElement('searchLoading');
+        // Re-enable search button
+        searchButton.disabled = false;
+        searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
         alert('Search failed: ' + error.message);
     });
+}
+
+function appendToTerminal(message) {
+    const terminalContent = document.getElementById('terminalContent');
+    const line = document.createElement('div');
+    line.textContent = message;
+    terminalContent.appendChild(line);
+    
+    // Auto-scroll to bottom
+    terminalContent.scrollTop = terminalContent.scrollHeight;
+}
+
+function hideTerminal() {
+    hideElement('terminalWindow');
 }
 
 function displayResults(data) {
@@ -193,40 +230,44 @@ function displayResults(data) {
     `;
     
     // Results list
-    resultsList.innerHTML = data.results.map((result, index) => `
-        <div class="border rounded-lg p-4 mb-4 hover:shadow-md transition duration-200">
-            <div class="flex justify-between items-start mb-2">
-                <h4 class="text-lg font-semibold text-blue-600">
-                    <a href="${result.url}" target="_blank" class="hover:underline">
-                        ${result.page_title}
-                    </a>
-                </h4>
-                <div class="text-right text-sm text-gray-500">
-                    <div>Rank #${result.rank}</div>
-                    <div>Score: ${result.score.toFixed(4)}</div>
+    if (data.results && data.results.length > 0) {
+        resultsList.innerHTML = data.results.map((result, index) => `
+            <div class="border rounded-lg p-4 mb-4 hover:shadow-md transition duration-200">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="text-lg font-semibold text-blue-600">
+                        <a href="${result.url}" target="_blank" class="hover:underline">
+                            ${result.page_title}
+                        </a>
+                    </h4>
+                    <div class="text-right text-sm text-gray-500">
+                        <div>Rank #${result.rank}</div>
+                        <div>Score: ${result.score.toFixed(4)}</div>
+                    </div>
                 </div>
+                
+                <div class="text-sm text-gray-600 mb-2">
+                    <i class="fas fa-folder mr-1"></i>
+                    ${result.section_path}
+                    <span class="ml-3">
+                        <i class="fas fa-tag mr-1"></i>
+                        ${result.chunk_type}
+                    </span>
+                </div>
+                
+                <p class="text-gray-800 mb-3">${result.content}</p>
+                
+                <a href="${result.url}" target="_blank" 
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    <i class="fas fa-external-link-alt mr-1"></i>
+                    View on Arch Wiki
+                </a>
             </div>
-            
-            <div class="text-sm text-gray-600 mb-2">
-                <i class="fas fa-folder mr-1"></i>
-                ${result.section_path}
-                <span class="ml-3">
-                    <i class="fas fa-tag mr-1"></i>
-                    ${result.chunk_type}
-                </span>
-            </div>
-            
-            <p class="text-gray-800 mb-3">${result.content}</p>
-            
-            <a href="${result.url}" target="_blank" 
-               class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                <i class="fas fa-external-link-alt mr-1"></i>
-                View on Arch Wiki
-            </a>
-        </div>
-    `).join('');
-    
-    showElement('searchResults');
+        `).join('');
+        
+        showElement('searchResults');
+    } else {
+        showElement('noResults');
+    }
 }
 
 function showElement(id) {
