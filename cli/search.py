@@ -16,13 +16,14 @@ from rdb.utils.helpers import Timer
 @click.option('--top-k', '-k', type=int, help='Number of results to return')
 @click.option('--refine', '-r', is_flag=True, help='Enable query refinement')
 @click.option('--no-refine', is_flag=True, help='Disable query refinement')
+@click.option('--refiner-model', '-m', help='Specify refiner model (path or HuggingFace ID)')  # <-- ADD THIS
 @click.option('--interactive', '-i', is_flag=True, help='Start interactive search mode')
 @click.option('--max-content', type=int, default=300, help='Maximum content length to display')
 @click.option('--show-refinement', is_flag=True, help='Show query refinement process')
 @click.option('--history', is_flag=True, help='Show search history')
 @click.option('--limit', '-l', type=int, default=20, help='Number of recent searches to show (with --history)')
 @click.pass_context
-def search_cmd(ctx, query, top_k, refine, no_refine, interactive, max_content, show_refinement, history, limit):
+def search_cmd(ctx, query, top_k, refine, no_refine, refiner_model, interactive, max_content, show_refinement, history, limit):
     """Search the RDB index."""
     config = ctx.obj['config']
     
@@ -62,6 +63,13 @@ def search_cmd(ctx, query, top_k, refine, no_refine, interactive, max_content, s
     # Override config with command line options
     if top_k:
         config.default_top_k = top_k
+
+    # Override refiner model if specified
+    if refiner_model:
+        config.refiner_model = refiner_model
+        # Force enable refinement if model is specified
+        if not no_refine:
+            refine = True
     
     # Determine refinement setting
     use_refinement = config.enable_query_refinement
