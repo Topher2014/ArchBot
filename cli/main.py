@@ -93,6 +93,35 @@ cli.add_command(scrape_cmd, name='scrape')
 cli.add_command(build_cmd, name='build')
 cli.add_command(search_cmd, name='search')
 
+@cli.command()
+@click.option('--host', default='0.0.0.0', help='Host to bind to')
+@click.option('--port', '-p', type=int, default=5000, help='Port to bind to')
+@click.option('--debug', is_flag=True, help='Enable debug mode')
+@click.pass_context
+def web(ctx, host, port, debug):
+    """Start the web interface."""
+    config = ctx.obj['config']
+    
+    try:
+        from rdb.web.app import create_app
+        
+        click.echo(f"Starting RDB Web Interface...")
+        click.echo(f"Host: {host}")
+        click.echo(f"Port: {port}")
+        click.echo(f"Debug: {debug}")
+        if config.data_dir:
+            click.echo(f"Data directory: {config.data_dir}")
+        click.echo(f"\nAccess the web interface at: http://{host}:{port}")
+        click.echo("Press Ctrl+C to stop")
+        
+        app = create_app(data_dir=str(config.data_dir), debug=debug)
+        app.run(host=host, port=port, debug=debug)
+        
+    except KeyboardInterrupt:
+        click.echo("\nShutting down web interface...")
+    except Exception as e:
+        raise click.ClickException(f"Failed to start web interface: {e}")
+
 
 def main():
    """Main entry point for the CLI."""
