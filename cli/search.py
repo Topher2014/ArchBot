@@ -73,7 +73,7 @@ def search_cmd(ctx, query, top_k, refine, no_refine, refiner_model, interactive,
     
     # Determine refinement setting
     use_refinement = config.enable_query_refinement
-    if refine:
+    if refine or refiner_model:
         use_refinement = True
     elif no_refine:
         use_refinement = False
