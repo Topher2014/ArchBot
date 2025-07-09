@@ -1,65 +1,20 @@
 """
-Search API routes.
+Search API routes using subprocess approach.
 """
 
 import json
-import logging
-import io
-import sys
+import subprocess
 import time
 from flask import Blueprint, request, jsonify, current_app, Response
-from rdb.retrieval.retriever import DocumentRetriever
 from rdb.storage.database import DatabaseManager
 from rdb.utils.helpers import Timer
 
 search_bp = Blueprint('search', __name__)
-logger = logging.getLogger(__name__)
-
-
-class LogCapture:
-    """Capture logs and yield them for SSE streaming."""
-    
-    def __init__(self):
-        self.logs = []
-        self.handler = None
-    
-    def start_capture(self):
-        """Start capturing logs."""
-        self.handler = logging.StreamHandler(io.StringIO())
-        self.handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        self.handler.setFormatter(formatter)
-        
-        # Add handler to root logger to capture all logs
-        logging.getLogger().addHandler(self.handler)
-    
-    def stop_capture(self):
-        """Stop capturing logs."""
-        if self.handler:
-            logging.getLogger().removeHandler(self.handler)
-    
-    def get_new_logs(self):
-        """Get new log entries since last call."""
-        if not self.handler:
-            return []
-        
-        # Get the captured content
-        content = self.handler.stream.getvalue()
-        
-        # Split into lines and filter out empty ones
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
-        
-        # Reset the stream
-        self.handler.stream.seek(0)
-        self.handler.stream.truncate(0)
-        
-        return lines
 
 
 @search_bp.route('/stream', methods=['POST'])
 def search_stream():
-    """Stream search process with real-time logs."""
-    # Get the search parameters from the request before entering the generator
+    """Stream search process using subprocess."""
     data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({'error': 'Query is required'}), 400
@@ -74,97 +29,66 @@ def search_stream():
     
     def generate():
         try:
-            # Start log capture
-            log_capture = LogCapture()
-            log_capture.start_capture()
+            yield f"data: {json.dumps({'type': 'log', 'message': '> Starting fresh search process...'})}\n\n"
+            time.sleep(0.2)
             
-            yield f"data: {json.dumps({'type': 'log', 'message': '> Starting search request...'})}\n\n"
-            yield f"data: {json.dumps({'type': 'log', 'message': f'> Query: {query}'})}\n\n"
-            yield f"data: {json.dumps({'type': 'log', 'message': f'> Top K: {top_k}, Refine: {refine_query}'})}\n\n"
+            # Build CLI command
+            cmd = ['rdb', 'search', query, '--top-k', str(top_k)]
+            if refine_query:
+                cmd.append('--refine')
+            else:
+                cmd.append('--no-refine')
             
-            # Small delay to let initial logs show
-            time.sleep(0.1)
+            cmd_str = " ".join(cmd)
+            yield f"data: {json.dumps({'type': 'log', 'message': f'> Running: {cmd_str}'})}\n\n"
+            time.sleep(0.2)
             
-            # Initialize retriever (this will generate the interesting logs)
-            yield f"data: {json.dumps({'type': 'log', 'message': '> Initializing retriever...'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': '> Subprocess loading models...'})}\n\n"
             
-            retriever = DocumentRetriever(config)
+            # Run search in subprocess
+            with Timer() as timer:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120  # 2 minute timeout
+                )
             
-            # Check for new logs after retriever init
-            time.sleep(0.5)  # Give time for logs to be generated
-            for log_line in log_capture.get_new_logs():
-                yield f"data: {json.dumps({'type': 'log', 'message': f'  {log_line}'})}\n\n"
-            
-            yield f"data: {json.dumps({'type': 'log', 'message': '> Loading search index...'})}\n\n"
-            
-            if not retriever.load_index():
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Search index not available. Please build index first.'})}\n\n"
+            if result.returncode != 0:
+                error_msg = result.stderr or "Unknown error"
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Search failed: {error_msg}'})}\n\n"
                 return
             
-            # Check for logs after index loading
-            time.sleep(0.5)
-            for log_line in log_capture.get_new_logs():
-                yield f"data: {json.dumps({'type': 'log', 'message': f'  {log_line}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': f'> Subprocess completed in {timer.elapsed*1000:.0f}ms'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': '> Process terminated, all memory freed'})}\n\n"
             
-            # Log search to database
-            db_manager = DatabaseManager(config)
-            search_data = {
-                'original_query': query,
-                'top_k': top_k,
-                'query_refinement_enabled': refine_query
-            }
-            
-            yield f"data: {json.dumps({'type': 'log', 'message': '> Performing search...'})}\n\n"
-            
-            # Perform search
-            with Timer() as timer:
-                results = retriever.search(query, top_k=top_k, refine_query=refine_query)
-            
-            # Check for logs during search
-            time.sleep(0.2)
-            for log_line in log_capture.get_new_logs():
-                yield f"data: {json.dumps({'type': 'log', 'message': f'  {log_line}'})}\n\n"
-            
-            # Update search log
-            search_data.update({
-                'refined_query': results[0]['final_query'] if results else query,
-                'results_count': len(results),
-                'search_time_ms': int(timer.elapsed * 1000)
-            })
-            db_manager.log_search(search_data)
-            
-            yield f"data: {json.dumps({'type': 'log', 'message': f'> Search completed in {timer.elapsed*1000:.0f}ms'})}\n\n"
-            yield f"data: {json.dumps({'type': 'log', 'message': f'> Found {len(results)} results'})}\n\n"
-            
-            # Stop log capture
-            log_capture.stop_capture()
-            
-            # Send final results
+            # Safely encode CLI output to avoid JSON parsing issues
+            import base64
+            cli_output_encoded = base64.b64encode(result.stdout.encode('utf-8')).decode('ascii')
+
             response_data = {
                 'query': query,
-                'refined_query': results[0]['final_query'] if results else query,
-                'results': results,
-                'search_time_ms': search_data['search_time_ms'],
-                'total_results': len(results)
+                'refined_query': query,
+                'results': [],
+                'search_time_ms': int(timer.elapsed * 1000),
+                'total_results': 0,
+                'cli_output_encoded': cli_output_encoded
             }
             
             yield f"data: {json.dumps({'type': 'results', 'data': response_data})}\n\n"
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
             
+        except subprocess.TimeoutExpired:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Search timed out after 2 minutes'})}\n\n"
         except Exception as e:
-            logger.error(f"Search stream error: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-        finally:
-            # Ensure log capture is stopped
-            if 'log_capture' in locals():
-                log_capture.stop_capture()
     
     return Response(generate(), mimetype='text/event-stream')
 
 
 @search_bp.route('/query', methods=['POST'])
 def search_query():
-    """Search documents (original endpoint for compatibility)."""
+    """Simple search using subprocess."""
     try:
         data = request.get_json()
         if not data or 'query' not in data:
@@ -177,43 +101,50 @@ def search_query():
         top_k = data.get('top_k', 5)
         refine_query = data.get('refine_query', False)
         
-        config = current_app.config['RDB_CONFIG']
+        # Build CLI command
+        cmd = ['rdb', 'search', query, '--top-k', str(top_k)]
+        if refine_query:
+            cmd.append('--refine')
+        else:
+            cmd.append('--no-refine')
         
-        # Initialize retriever
-        retriever = DocumentRetriever(config)
-        if not retriever.load_index():
-            return jsonify({'error': 'Search index not available. Please build index first.'}), 503
+        # Run search in subprocess
+        with Timer() as timer:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
         
-        # Log search
-        db_manager = DatabaseManager(config)
+        if result.returncode != 0:
+            error_msg = result.stderr or "Unknown error"
+            return jsonify({'error': f'Search failed: {error_msg}'}), 500
+        
+        # Log search to database
+        db_manager = DatabaseManager(current_app.config['RDB_CONFIG'])
         search_data = {
             'original_query': query,
+            'refined_query': query,
             'top_k': top_k,
-            'query_refinement_enabled': refine_query
-        }
-        
-        # Perform search
-        with Timer() as timer:
-            results = retriever.search(query, top_k=top_k, refine_query=refine_query)
-        
-        # Update search log
-        search_data.update({
-            'refined_query': results[0]['final_query'] if results else query,
-            'results_count': len(results),
+            'query_refinement_enabled': refine_query,
+            'results_count': 0,  # CLI doesn't easily return count
             'search_time_ms': int(timer.elapsed * 1000)
-        })
+        }
         db_manager.log_search(search_data)
         
         return jsonify({
             'query': query,
-            'refined_query': results[0]['final_query'] if results else query,
-            'results': results,
-            'search_time_ms': search_data['search_time_ms'],
-            'total_results': len(results)
+            'refined_query': query,
+            'results': [],
+            'search_time_ms': int(timer.elapsed * 1000),
+            'total_results': 0,
+            'cli_output': result.stdout
         })
         
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Search timed out after 2 minutes'}), 500
     except Exception as e:
-        logger.error(f"Search error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -234,17 +165,13 @@ def search_history():
         })
         
     except Exception as e:
-        logger.error(f"Search history error: {e}")
         return jsonify({'error': str(e)}), 500
 
 
 @search_bp.route('/suggestions', methods=['GET'])
 def search_suggestions():
-    """Get search suggestions (simple implementation)."""
+    """Get search suggestions."""
     try:
-        config = current_app.config['RDB_CONFIG']
-        
-        # Simple suggestions based on common Arch Wiki topics
         suggestions = [
             "wifi connection problems",
             "install arch linux",
@@ -261,5 +188,4 @@ def search_suggestions():
         return jsonify({'suggestions': suggestions})
         
     except Exception as e:
-        logger.error(f"Search suggestions error: {e}")
         return jsonify({'error': str(e)}), 500
