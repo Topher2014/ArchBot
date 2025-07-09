@@ -13,9 +13,9 @@ from ..utils.logging import get_logger
 
 
 class QueryRefiner:
-   """Refines user queries into technical search terms using local LLMs."""
-   
-   def __init__(self, config: Config):
+    """Refines user queries into technical search terms using local LLMs."""
+
+    def __init__(self, config: Config):
        """Initialize query refiner with configuration."""
        self.config = config
        self.logger = get_logger(__name__)
@@ -48,36 +48,59 @@ class QueryRefiner:
            self.tokenizer.pad_token = self.tokenizer.eos_token
        
        self.logger.info("Refiner model loaded successfully!")
-   
-   def _find_default_model(self) -> Optional[str]:
-       """Find default model from common locations."""
-       default_models = [
-           "~/.models/Llama/Meta-Llama-3.1-8B",
-           "~/.models/Phi-3-mini-4k-instruct", 
-           "microsoft/Phi-3-mini-4k-instruct",
-           "meta-llama/Llama-3.1-8B-Instruct"
-       ]
        
-       for model in default_models:
-           if model.startswith("~") or model.startswith("./") or model.startswith("/"):
-                # Local path - check if it exists
-                expanded_path = Path(model).expanduser().resolve()
-                if expanded_path.exists():
-                    return str(expanded_path)
-           else:
-               # HuggingFace model ID - we can't check if it exists without downloading
-               # So we'll return it and let the loader handle any errors
-               return model
+    def _find_default_model(self) -> Optional[str]:
+        """Find default model from local directory or fall back to remote."""
+        # Check project-local models directory first
+        models_dir = self.config.data_dir / "models"
+        
+        if models_dir.exists():
+            valid_models = []
+            for model_dir in models_dir.iterdir():
+                if model_dir.is_dir() and self._is_valid_model_dir(model_dir):
+                    valid_models.append(model_dir)
+            
+            if len(valid_models) > 1:
+                # Sort for deterministic behavior
+                valid_models.sort(key=lambda x: x.name)
+                model_names = [m.name for m in valid_models]
+                self.logger.warning(f"Multiple models found: {model_names}")
+                self.logger.warning(f"Using: {valid_models[0].name}")
+                self.logger.info("Set RDB_REFINER_MODEL to specify which model to use")
+            
+            if valid_models:
+                self.logger.info(f"Found local model: {valid_models[0].name}")
+                return str(valid_models[0])
+        
+        # Fall back to remote models
+        remote_models = [
+            "Qwen/Qwen2.5-1.5B-Instruct"
+        ]
+        
+        self.logger.info(f"No local models found, will download: {remote_models[0]}")
+        return remote_models[0]
 
-       return None
-   
-   def _get_device(self) -> str:
+    def _is_valid_model_dir(self, path: Path) -> bool:
+        """Check if directory contains a valid model."""
+        # Check for essential model files
+        required_files = ["config.json"]
+        optional_files = ["tokenizer.json", "tokenizer_config.json", "pytorch_model.bin", "model.safetensors"]
+        
+        # Must have config.json
+        if not (path / "config.json").exists():
+            return False
+        
+        # Must have at least one model file
+        has_model_file = any((path / file).exists() for file in optional_files)
+        return has_model_file
+
+    def _get_device(self) -> str:
        """Determine the best device to use."""
        if self.config.use_gpu and torch.cuda.is_available():
            return 'cuda'
        return 'cpu'
-   
-   def refine_query(self, user_query: str) -> str:
+
+    def refine_query(self, user_query: str) -> str:
        """Refine a user query into technical search terms."""
        prompt = self._create_refinement_prompt(user_query)
        
@@ -110,31 +133,31 @@ class QueryRefiner:
        refined_query = self._clean_response(refined_query)
        
        return refined_query
-   
-   def _create_refinement_prompt(self, user_query: str) -> str:
-    """Create a more specific prompt for Arch Linux documentation search."""
-    prompt = f"""You are an expert Arch Linux system administrator. Convert user questions into specific technical search terms that match Arch Wiki page titles and content.
 
-IMPORTANT: Include both specific commands AND general page titles in your search terms.
+    def _create_refinement_prompt(self, user_query: str) -> str:
+        """Create a more specific prompt for Arch Linux documentation search."""
+        prompt = f"""You are an expert Arch Linux system administrator. Convert user questions into specific technical search terms that match Arch Wiki page titles and content.
 
-Examples:
-User: "How do I connect to wifi?"
-Search: "Wireless network configuration iwctl station connect NetworkManager wifi setup"
+        IMPORTANT: Include both specific commands AND general page titles in your search terms.
 
-User: "wifi broken"  
-Search: "Wireless network configuration troubleshooting iwctl connection NetworkManager"
+        Examples:
+        User: "How do I connect to wifi?"
+        Search: "Wireless network configuration iwctl station connect NetworkManager wifi setup"
 
-User: "sound not working"
-Search: "ALSA sound configuration PulseAudio audio troubleshooting"
+        User: "wifi broken"  
+        Search: "Wireless network configuration troubleshooting iwctl connection NetworkManager"
 
-User: "install packages"
-Search: "Pacman package manager installation AUR"
+        User: "sound not working"
+        Search: "ALSA sound configuration PulseAudio audio troubleshooting"
 
-User: "{user_query}"
-Search:"""
-    return prompt
-   
-   def _clean_response(self, response: str) -> str:
+        User: "install packages"
+        Search: "Pacman package manager installation AUR"
+
+        User: "{user_query}"
+        Search:"""
+        return prompt
+
+    def _clean_response(self, response: str) -> str:
        """Clean up model response."""
        response = response.strip()
        
