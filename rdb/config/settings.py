@@ -47,7 +47,7 @@ class Config:
        
        # Retrieval settings
        self.default_top_k = int(os.getenv("RDB_DEFAULT_TOP_K", "5"))
-       self.enable_query_refinement = os.getenv("RDB_ENABLE_QUERY_REFINEMENT", "true").lower() == "true"
+       self.enable_query_refinement = os.getenv("RDB_ENABLE_QUERY_REFINEMENT", "false").lower() == "true"
        
        # Query refinement settings
        self.refiner_model = os.getenv("RDB_REFINER_MODEL", None)
