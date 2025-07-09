@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}RDB - Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-4xl font-bold text-gray-900 mb-6">
+            <i class="fas fa-database text-blue-600 mr-3"></i>
+            RDB - Retrieval Database
+        </h1>
+        
+        <p class="text-xl text-gray-600 mb-8">
+            Semantic search through Arch Linux documentation using advanced embeddings and retrieval techniques.
+        </p>
+        
+        <!-- Search Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="space-y-4">
+                <div>
+                    <label for="searchQuery" class="block text-sm font-medium text-gray-700 mb-2">
+                        Search Query
+                    </label>
+                    <input type="text" id="searchQuery" placeholder="Enter your search query..." 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="topK" class="block text-sm font-medium text-gray-700 mb-2">
+                            Number of Results
+                        </label>
+                        <select id="topK" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="5">5 results</option>
+                            <option value="10">10 results</option>
+                            <option value="15">15 results</option>
+                            <option value="20">20 results</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Query Refinement
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="refineQuery" class="mr-2">
+                            <span class="text-sm">Use AI query refinement</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-end">
+                        <button onclick="performSearch()" id="searchButton"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                            <i class="fas fa-search mr-2"></i>Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Terminal Window -->
+        <div id="terminalWindow" class="hidden mb-8">
+            <div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+                <div class="bg-gray-800 px-4 py-2 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                    </div>
+                    <span class="text-gray-300 text-sm font-mono">RDB Search Process</span>
+                    <button onclick="hideTerminal()" class="text-gray-400 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="terminalContent" class="bg-gray-900 text-green-400 font-mono text-sm p-4 h-64 overflow-y-auto">
+                    <!-- Terminal output will appear here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search Results -->
+        <div id="searchResults" class="hidden mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">Search Results</h3>
+                <div id="searchInfo" class="text-sm text-gray-600 mb-4"></div>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+        
+        <!-- No Results -->
+        <div id="noResults" class="hidden mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                <i class="fas fa-search text-gray-400 text-3xl mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">No Results Found</h3>
+                <p class="text-gray-600">Try adjusting your search terms or enabling query refinement.</p>
+            </div>
+        </div>
+        
+        <!-- System Info Button -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <button onclick="showSystemInfo()" 
+                    class="bg-gray-600 hover:bg-gray-700 text-white p-6 rounded-lg transition duration-200 w-full">
+                <i class="fas fa-info-circle text-2xl mb-2"></i>
+                <h4 class="font-semibold">System Info</h4>
+                <p class="text-sm opacity-90">View configuration details</p>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- System Info Modal -->
+<div id="systemInfoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-96 overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">System Information</h3>
+                    <button onclick="closeSystemInfo()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="systemInfoContent">
+                    <div class="flex justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let eventSource = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle Enter key in search
+    document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
+        }
+    });
+});
+
+let searchInProgress = false;
+
+function performSearch() {
+    const query = document.getElementById('searchQuery').value.trim();
+    if (!query) {
+        alert('Please enter a search query');
+        return;
+    }
+    
+    const topK = parseInt(document.getElementById('topK').value);
+    const refineQuery = document.getElementById('refineQuery').checked;
+    
+    // Show terminal and hide other elements
+    showElement('terminalWindow');
+    hideElement('searchResults');
+    hideElement('noResults');
+    
+    // Clear terminal
+    const terminalContent = document.getElementById('terminalContent');
+    terminalContent.innerHTML = '';
+    
+    // Disable search button
+    const searchButton = document.getElementById('searchButton');
+    searchButton.disabled = true;
+    searchButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
+    
+    // Use subprocess streaming
+    fetch('/api/search/stream', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            query: query,
+            top_k: topK,
+            refine_query: refineQuery
+        })
+    })
+    .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        function readStream() {
+            reader.read().then(({done, value}) => {
+                if (done) {
+                    searchButton.disabled = false;
+                    searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                    return;
+                }
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            if (data.type === 'log') {
+                                appendToTerminal(data.message);
+                            } else if (data.type === 'results') {
+                                displaySubprocessResults(data.data);
+                            } else if (data.type === 'complete') {
+                                searchButton.disabled = false;
+                                searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                                appendToTerminal('> Search complete!');
+                                return;
+                            } else if (data.type === 'error') {
+                                appendToTerminal('> ERROR: ' + data.message);
+                                searchButton.disabled = false;
+                                searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing data:', e);
+                        }
+                    }
+                }
+                
+                readStream();
+            });
+        }
+        
+        readStream();
+    })
+    .catch(error => {
+        appendToTerminal('> Error: ' + error.message);
+        searchButton.disabled = false;
+        searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+    });
+}
+
+function displaySubprocessResults(data) {
+    const searchInfo = document.getElementById('searchInfo');
+    const resultsList = document.getElementById('resultsList');
+    
+    // Show CLI output in a formatted way
+    searchInfo.innerHTML = `
+        <div class="flex flex-wrap gap-4 text-sm">
+            <span><strong>Query:</strong> ${data.query}</span>
+            <span><strong>Time:</strong> ${data.search_time_ms}ms</span>
+            <span><strong>Method:</strong> Subprocess</span>
+        </div>
+    `;
+    
+    // Display CLI output
+    resultsList.innerHTML = `
+        <div class="bg-gray-100 p-4 rounded-lg">
+            <h4 class="font-semibold mb-2">CLI Output:</h4>
+            <pre class="text-sm whitespace-pre-wrap">${atob(data.cli_output_encoded)}</pre>
+        </div>
+    `;
+    
+    showElement('searchResults');
+}
+
+function appendToTerminal(message) {
+    const terminalContent = document.getElementById('terminalContent');
+    const line = document.createElement('div');
+    line.textContent = message;
+    terminalContent.appendChild(line);
+    
+    // Auto-scroll to bottom
+    terminalContent.scrollTop = terminalContent.scrollHeight;
+}
+
+function hideTerminal() {
+    hideElement('terminalWindow');
+}
+
+function displayResults(data) {
+    const searchInfo = document.getElementById('searchInfo');
+    const resultsList = document.getElementById('resultsList');
+    
+    // Search info
+    searchInfo.innerHTML = `
+        <div class="flex flex-wrap gap-4 text-sm">
+            <span><strong>Query:</strong> ${data.query}</span>
+            ${data.refined_query !== data.query ? `<span><strong>Refined:</strong> ${data.refined_query}</span>` : ''}
+            <span><strong>Results:</strong> ${data.total_results}</span>
+            <span><strong>Time:</strong> ${data.search_time_ms}ms</span>
+        </div>
+    `;
+    
+    // Results list
+    if (data.results && data.results.length > 0) {
+        resultsList.innerHTML = data.results.map((result, index) => `
+            <div class="border rounded-lg p-4 mb-4 hover:shadow-md transition duration-200">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="text-lg font-semibold text-blue-600">
+                        <a href="${result.url}" target="_blank" class="hover:underline">
+                            ${result.page_title}
+                        </a>
+                    </h4>
+                    <div class="text-right text-sm text-gray-500">
+                        <div>Rank #${result.rank}</div>
+                        <div>Score: ${result.score.toFixed(4)}</div>
+                    </div>
+                </div>
+                
+                <div class="text-sm text-gray-600 mb-2">
+                    <i class="fas fa-folder mr-1"></i>
+                    ${result.section_path}
+                    <span class="ml-3">
+                        <i class="fas fa-tag mr-1"></i>
+                        ${result.chunk_type}
+                    </span>
+                </div>
+                
+                <p class="text-gray-800 mb-3">${result.content}</p>
+                
+                <a href="${result.url}" target="_blank" 
+                   class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    <i class="fas fa-external-link-alt mr-1"></i>
+                    View on Arch Wiki
+                </a>
+            </div>
+        `).join('');
+        
+        showElement('searchResults');
+    } else {
+        showElement('noResults');
+    }
+}
+
+function showElement(id) {
+    document.getElementById(id).classList.remove('hidden');
+}
+
+function hideElement(id) {
+    document.getElementById(id).classList.add('hidden');
+}
+
+function showSystemInfo() {
+    document.getElementById('systemInfoModal').classList.remove('hidden');
+    
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('systemInfoContent').innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Configuration</h4>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <div><strong>Embedding Model:</strong> ${data.embedding_model.split('/').pop()}</div>
+                            <div><strong>Device:</strong> ${data.device}</div>
+                            <div><strong>Default Results:</strong> ${data.default_top_k}</div>
+                            <div><strong>Query Refinement:</strong> ${data.enable_query_refinement ? 'Enabled' : 'Disabled'}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Chunk Sizes</h4>
+                        <div class="mt-2 space-y-1 text-sm">
+                            <div><strong>Small:</strong> ${data.chunk_sizes.small}</div>
+                            <div><strong>Medium:</strong> ${data.chunk_sizes.medium}</div>
+                            <div><strong>Large:</strong> ${data.chunk_sizes.large}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            document.getElementById('systemInfoContent').innerHTML = 
+                '<p class="text-red-600">Error loading system information</p>';
+        });
+}
+
+function closeSystemInfo() {
+    document.getElementById('systemInfoModal').classList.add('hidden');
+}
+</script>
+{% endblock %}
