@@ -16,9 +16,9 @@ from .index_manager import IndexManager
 
 
 class DocumentRetriever:
-   """Retrieves documents using semantic search with optional query refinement and deduplication."""
-   
-   def __init__(self, config: Config):
+    """Retrieves documents using semantic search with optional query refinement and deduplication."""
+
+    def __init__(self, config: Config):
        """Initialize document retriever with configuration."""
        self.config = config
        self.logger = get_logger(__name__)
@@ -34,12 +34,12 @@ class DocumentRetriever:
            except Exception as e:
                self.logger.warning(f"Could not load query refiner: {e}")
                self.logger.info("Continuing without query refinement")
-   
-   def load_index(self, index_dir: Optional[str] = None) -> bool:
+
+    def load_index(self, index_dir: Optional[str] = None) -> bool:
        """Load FAISS index and metadata."""
        return self.index_manager.load_index(index_dir)
-   
-   def search(self, query: str, top_k: Optional[int] = None, 
+
+    def search(self, query: str, top_k: Optional[int] = None, 
               refine_query: bool = False, show_refinement: bool = False,
               enable_deduplication: bool = True) -> List[Dict[str, Any]]:
        """Search for similar documents with optional query refinement and deduplication."""
@@ -127,8 +127,8 @@ class DocumentRetriever:
            result['rank'] = i + 1
        
        return results
-   
-   def _deduplicate_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def _deduplicate_results(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
        """Remove duplicate results based on content similarity and page titles."""
        if not results:
            return results
@@ -178,8 +178,8 @@ class DocumentRetriever:
                    self.logger.debug(f"Merged aliases: {', '.join(result['aliases'])}")
        
        return deduplicated
-   
-   def _normalize_title(self, title: str) -> str:
+
+    def _normalize_title(self, title: str) -> str:
        """Normalize page title for deduplication comparison."""
        # Convert to lowercase and replace common variations
        normalized = title.lower()
@@ -197,8 +197,8 @@ class DocumentRetriever:
            normalized = normalized.replace(old, new)
        
        return normalized
-   
-   def search_interactive(self, top_k: Optional[int] = None, show_refinement: bool = True):
+
+    def search_interactive(self, top_k: Optional[int] = None, show_refinement: bool = True):
        """Interactive search loop."""
        if top_k is None:
            top_k = self.config.default_top_k
@@ -268,8 +268,8 @@ class DocumentRetriever:
                break
            except Exception as e:
                print(f"Error during search: {e}")
-   
-   def _print_results(self, results: List[Dict], max_content_length: int = 300, 
+
+    def _print_results(self, results: List[Dict], max_content_length: int = 300, 
                      show_queries: bool = False):
        """Pretty print search results with alias information."""
        if show_queries and results:
@@ -300,3 +300,35 @@ class DocumentRetriever:
            if len(content) > max_content_length:
                content = content[:max_content_length] + "..."
            print(content)
+
+    def cleanup_models(self):
+        """Cleanup models and free GPU memory."""
+        import gc
+        import torch
+        
+        self.logger.info("Cleaning up models and GPU memory...")
+        
+        # Clear embedding model
+        if hasattr(self, 'embedding_model') and self.embedding_model:
+            if hasattr(self.embedding_model, 'model'):
+                self.embedding_model.model = None
+            self.embedding_model = None
+        
+        # Clear query refiner
+        if hasattr(self, 'query_refiner') and self.query_refiner:
+            if hasattr(self.query_refiner, 'model'):
+                self.query_refiner.model = None
+            if hasattr(self.query_refiner, 'tokenizer'):
+                self.query_refiner.tokenizer = None
+            self.query_refiner = None
+        
+        # Force garbage collection
+        gc.collect()
+        
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            self.logger.info("GPU memory cleared")
+        
+        self.logger.info("Model cleanup complete")

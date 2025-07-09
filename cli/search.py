@@ -70,11 +70,18 @@ def search_cmd(ctx, query, top_k, refine, no_refine, interactive, max_content, s
     elif no_refine:
         use_refinement = False
     
-    # Initialize retriever
     try:
+        # Temporarily override config based on CLI flag
+        original_refinement_setting = config.enable_query_refinement
+        config.enable_query_refinement = use_refinement
+        
         retriever = DocumentRetriever(config)
         if not retriever.load_index():
             raise click.ClickException("Could not load search index. Run 'rdb build' first.")
+        
+        # Restore original config setting
+        config.enable_query_refinement = original_refinement_setting
+        
     except Exception as e:
         raise click.ClickException(f"Error initializing retriever: {e}")
     

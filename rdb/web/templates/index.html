@@ -143,6 +143,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+let searchInProgress = false;
+
 function performSearch() {
     const query = document.getElementById('searchQuery').value.trim();
     if (!query) {
@@ -153,52 +155,108 @@ function performSearch() {
     const topK = parseInt(document.getElementById('topK').value);
     const refineQuery = document.getElementById('refineQuery').checked;
     
-    // Hide results and show loading state
+    // Show terminal and hide other elements
+    showElement('terminalWindow');
     hideElement('searchResults');
     hideElement('noResults');
-    hideElement('terminalWindow');
     
-    // Disable search button and show loading
+    // Clear terminal
+    const terminalContent = document.getElementById('terminalContent');
+    terminalContent.innerHTML = '';
+    
+    // Disable search button
     const searchButton = document.getElementById('searchButton');
     searchButton.disabled = true;
     searchButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
     
-    const searchData = {
-        query: query,
-        top_k: topK,
-        refine_query: refineQuery
-    };
-    
-    fetch('/api/search/query', {
+    // Use subprocess streaming
+    fetch('/api/search/stream', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(searchData)
+        body: JSON.stringify({
+            query: query,
+            top_k: topK,
+            refine_query: refineQuery
+        })
     })
-    .then(response => response.json())
-    .then(data => {
-        // Re-enable search button
-        searchButton.disabled = false;
-        searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+    .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
         
-        if (data.error) {
-            alert('Search error: ' + data.error);
-            return;
+        function readStream() {
+            reader.read().then(({done, value}) => {
+                if (done) {
+                    searchButton.disabled = false;
+                    searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                    return;
+                }
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            if (data.type === 'log') {
+                                appendToTerminal(data.message);
+                            } else if (data.type === 'results') {
+                                displaySubprocessResults(data.data);
+                            } else if (data.type === 'complete') {
+                                searchButton.disabled = false;
+                                searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                                appendToTerminal('> Search complete!');
+                                return;
+                            } else if (data.type === 'error') {
+                                appendToTerminal('> ERROR: ' + data.message);
+                                searchButton.disabled = false;
+                                searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing data:', e);
+                        }
+                    }
+                }
+                
+                readStream();
+            });
         }
         
-        if (data.results && data.results.length > 0) {
-            displayResults(data);
-        } else {
-            showElement('noResults');
-        }
+        readStream();
     })
     .catch(error => {
-        // Re-enable search button
+        appendToTerminal('> Error: ' + error.message);
         searchButton.disabled = false;
         searchButton.innerHTML = '<i class="fas fa-search mr-2"></i>Search';
-        alert('Search failed: ' + error.message);
     });
+}
+
+function displaySubprocessResults(data) {
+    const searchInfo = document.getElementById('searchInfo');
+    const resultsList = document.getElementById('resultsList');
+    
+    // Show CLI output in a formatted way
+    searchInfo.innerHTML = `
+        <div class="flex flex-wrap gap-4 text-sm">
+            <span><strong>Query:</strong> ${data.query}</span>
+            <span><strong>Time:</strong> ${data.search_time_ms}ms</span>
+            <span><strong>Method:</strong> Subprocess</span>
+        </div>
+    `;
+    
+    // Display CLI output
+    resultsList.innerHTML = `
+        <div class="bg-gray-100 p-4 rounded-lg">
+            <h4 class="font-semibold mb-2">CLI Output:</h4>
+            <pre class="text-sm whitespace-pre-wrap">${atob(data.cli_output_encoded)}</pre>
+        </div>
+    `;
+    
+    showElement('searchResults');
 }
 
 function appendToTerminal(message) {
