@@ -52,7 +52,7 @@ class QueryRefiner:
     def _find_default_model(self) -> Optional[str]:
         """Find default model from local directory or fall back to remote."""
         # Check project-local models directory first
-        models_dir = self.config.data_dir / "models"
+        models_dir = Path("local/models")
         
         if models_dir.exists():
             valid_models = []
