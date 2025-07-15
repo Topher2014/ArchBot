@@ -15,7 +15,37 @@ class Config:
        """Initialize configuration with optional data directory."""
        # Base directories
        self.project_root = Path(__file__).parent.parent.parent
-       self.data_dir = Path(data_dir) if data_dir else self.project_root / "data"
+       
+       if data_dir:
+           self.data_dir = Path(data_dir)
+       else:
+           # Use XDG data directory for installed packages, fallback to project dir for development
+           xdg_data_home = os.getenv('XDG_DATA_HOME', str(Path.home() / '.local' / 'share'))
+           installed_data_dir = Path(xdg_data_home) / 'rdb'
+           
+           # Check if we're in a development environment (has setup.py nearby)
+           if (self.project_root / 'setup.py').exists() or (self.project_root / 'pyproject.toml').exists():
+               # Development mode - use project data directory
+               self.data_dir = self.project_root / "data"
+           elif installed_data_dir.exists():
+               # Installed package with user data
+               self.data_dir = installed_data_dir
+           else:
+               # Try system-wide data directory
+               system_data_dir = Path('/usr/share/rdb')
+               if system_data_dir.exists():
+                   # Copy system data to user directory if it doesn't exist
+                   installed_data_dir.mkdir(parents=True, exist_ok=True)
+                   if not any(installed_data_dir.iterdir()):  # Directory is empty
+                       import shutil
+                       try:
+                           shutil.copytree(system_data_dir, installed_data_dir, dirs_exist_ok=True)
+                       except Exception:
+                           pass  # Fall back silently
+                   self.data_dir = installed_data_dir
+               else:
+                   # Final fallback - create user data directory
+                   self.data_dir = installed_data_dir
        
        # Ensure data directories exist
        self.raw_data_dir = self.data_dir / "raw"
@@ -66,7 +96,7 @@ class Config:
        # Web scraping
        self.user_agent = os.getenv("RDB_USER_AGENT", 
            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-       
+   
    def get_cache_path(self, cache_type: str, identifier: str) -> Path:
        """Get cache file path for a specific cache type and identifier."""
        cache_subdir = self.cache_dir / cache_type
