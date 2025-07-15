@@ -37,8 +37,8 @@ checkdepends=(
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz"
         "$pkgname-data-$pkgver.tar.gz::$url/releases/download/v$pkgver/rdb-data-v$pkgver.tar.gz")
-sha256sums=('SKIP'  # Update with actual checksum of source code
-            'SKIP') # Update with actual checksum of data archive
+sha256sums=('8d9bd06e7dce7da1a5146a3daf2d66b1e24eb247b931568ef52b610903571a94'
+            '06991876d01467b49151848032697856f8a89c34c02e34aabf90f270170421f5')
 
 build() {
     cd "$pkgname-$pkgver"
@@ -54,6 +54,8 @@ check() {
 package() {
     cd "$pkgname-$pkgver"
     python -m installer --destdir="$pkgdir" dist/*.whl
+
+    rm -rf "$pkgdir/usr/lib/python"*/site-packages/tests/
     
     # Install license and documentation
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
